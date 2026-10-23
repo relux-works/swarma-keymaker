@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -25,6 +26,7 @@ func excerpt(spec, name string) (string, error) {
 
 type scenario struct {
 	name, preflight, allocation, database, key, diagnostic string
+	sudoersPath                                            string
 	lookupExit, expectedExit, mutations                    int
 }
 
@@ -36,7 +38,10 @@ func evaluate(bash, guards string, test scenario) error {
 	// PATH is deliberately empty of tools. Only these shell functions can run;
 	// unexpected external commands fail rather than touching the host.
 	prefix := fmt.Sprintf(`set -euo pipefail
-BASE_GROUP=fixture-primary
+TEST_A=platform-test-a
+TEST_B=platform-test-b
+TEST_GROUP=platform-test-reg
+WINDOW_SUDOERS=%q
 getent() {
  if [ "$1" = %q ] && [ "$2" = %q ]; then
   return %d
@@ -45,7 +50,7 @@ getent() {
 }
 groupadd() { printf 'MUTATION groupadd\n'; }
 useradd() { printf 'MUTATION useradd\n'; }
-`, test.database, test.key, test.lookupExit)
+`, test.sudoersPath, test.database, test.key, test.lookupExit)
 	script := prefix + guards + test.preflight + test.allocation
 	cmd := exec.Command(bash, "--noprofile", "--norc", "-s")
 	cmd.Env = []string{"PATH=/nonexistent", "LC_ALL=C"}
@@ -73,7 +78,7 @@ useradd() { printf 'MUTATION useradd\n'; }
 
 func main() {
 	check := flag.Bool("check", false, "check marked specification shell blocks without host changes")
-	plant := flag.Bool("plant", false, "replace one guard with the inverted-getent regression in memory; checker must fail")
+	plant := flag.Bool("plant", false, "weaken lookup/path guards in memory; checker must fail")
 	flag.Parse()
 	if *check == *plant || flag.NArg() != 0 {
 		fmt.Fprintln(os.Stderr, "use exactly one of -check or -plant")
@@ -93,17 +98,36 @@ func main() {
 		}
 	}
 	if *plant {
-		original := "require_absent passwd swarma-keymaker\n"
-		if strings.Count(blocks["service-preflight"], original) != 1 {
-			fmt.Fprintln(os.Stderr, "plant not applied")
-			os.Exit(2)
+		for _, target := range []struct{ block, original, replacement string }{
+			{"service-preflight", "require_absent passwd swarma-keymaker\n", "! getent passwd swarma-keymaker > /dev/null\n"},
+			{"window-preflight", "require_absent passwd \"$TEST_A\"\n", "! getent passwd \"$TEST_A\" > /dev/null\n"},
+			{"window-preflight", "if [ -e \"$WINDOW_SUDOERS\" ] || [ -L \"$WINDOW_SUDOERS\" ]; then\n", "if false; then\n"},
+		} {
+			if strings.Count(blocks[target.block], target.original) != 1 {
+				fmt.Fprintln(os.Stderr, "plant not applied")
+				os.Exit(2)
+			}
+			blocks[target.block] = strings.Replace(blocks[target.block], target.original, target.replacement, 1)
 		}
-		blocks["service-preflight"] = strings.Replace(blocks["service-preflight"], original, "! getent passwd swarma-keymaker > /dev/null\n", 1)
-		fmt.Println("PLANT applied in memory: inverted getent for the service username")
+		fmt.Println("PLANT applied in memory: inverted getent for service/window usernames and disabled window path guard")
 	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	// These are checker-owned files, never /etc paths. The marked path guard must
+	// reject an existing file or dangling symlink before any allocation stub runs.
+	scratch, err := os.MkdirTemp("", "runbook-check-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "checker scratch unavailable")
+		os.Exit(2)
+	}
+	existing := filepath.Join(scratch, "existing-sudoers")
+	link := filepath.Join(scratch, "dangling-sudoers")
+	if os.WriteFile(existing, []byte("preserve fixture\n"), 0600) != nil || os.Symlink(filepath.Join(scratch, "absent"), link) != nil {
+		fmt.Fprintln(os.Stderr, "checker fixtures unavailable")
+		os.RemoveAll(scratch)
 		os.Exit(2)
 	}
 	var tests []scenario
@@ -127,6 +151,12 @@ func main() {
 			}
 		}
 	}
+	for _, sample := range []struct{ name, path string }{{"file", existing}, {"dangling-symlink", link}} {
+		tests = append(tests, scenario{name: "TestRunbookWindowPathBeforeMutation/" + sample.name,
+			preflight: blocks["window-preflight"], allocation: blocks["window-allocation"],
+			database: "none", key: "none", lookupExit: 2, sudoersPath: sample.path,
+			expectedExit: 1, mutations: 0, diagnostic: "existing window path: " + sample.path})
+	}
 	// These are synthetic lookup keys, never requested OS allocations. This
 	// checks numeric UID/GID guard semantics while the installer uses --system.
 	for _, database := range []string{"passwd", "group"} {
@@ -145,10 +175,21 @@ func main() {
 	}
 	failures := 0
 	for _, test := range tests {
+		if test.sudoersPath == "" {
+			test.sudoersPath = filepath.Join(scratch, "absent")
+		}
 		if err := evaluate(bash, blocks["guards"], test); err != nil {
 			fmt.Fprintln(os.Stderr, "FAIL", err)
 			failures++
 		}
+	}
+	if data, err := os.ReadFile(existing); err != nil || string(data) != "preserve fixture\n" {
+		fmt.Fprintln(os.Stderr, "FAIL checker-owned sudoers fixture changed")
+		failures++
+	}
+	if err := os.RemoveAll(scratch); err != nil {
+		fmt.Fprintln(os.Stderr, "FAIL checker fixture cleanup")
+		failures++
 	}
 	if failures > 0 {
 		fmt.Fprintf(os.Stderr, "%d/%d runbook checks failed\n", failures, len(tests))

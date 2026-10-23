@@ -798,190 +798,194 @@ generation adapter, enrollment and operator-verifier qualifications.
 
 ### 12.2 Provision the reusable test window once
 
-The owner chooses an existing unprivileged runner account. The following are
-example test-account/group names, not constants in the integration runner.
+The owner provisions a shared platform test window with two empty system
+accounts and one test group. The documented defaults are `platform-test-a`,
+`platform-test-b` and `platform-test-reg`. Names come from runner configuration,
+not compiled constants; if different names are configured, the owner uses those
+same names when provisioning. `<runner>` denotes an existing unprivileged
+runner account, never root. The neutral window may serve more than one service's
+tests and is separate from the production service's control group.
+
 Use the same root Bash shell and `require_absent` function from section 12.1.
-Both test users are empty system accounts: no home creation, login shell or
-password. Their shared primary group is an existing unprivileged base group;
-only account A joins the new registration test group. The runner is not a
-member of that group and may assume it only through the constrained sudo rule.
-This test group is separate from the production service's control group.
+Only `getent` exit 2 means absent: a collision (0) or any other lookup failure
+aborts before allocation. This minimal provisioning writes no state file and
+no runner configuration. It allocates system IDs without fixing or renumbering
+them; primary-group selection follows the system's `useradd` policy.
 
 ```sh
 set -euo pipefail
 test "$(id -u)" = 0
-: "${RUNNER_USER:?set an existing unprivileged test-runner account}"
-BASE_GROUP=nogroup
-WINDOW_STATE=/var/lib/swarma-keymaker-test-window
-WINDOW_SUDOERS=/etc/sudoers.d/swarma-keymaker-test-window
-RUNNER_CONFIG=/etc/swarma-keymaker-test-window.json
+: "${RUNNER_USER:?set the existing unprivileged <runner> account}"
+TEST_A=${TEST_A:-platform-test-a}
+TEST_B=${TEST_B:-platform-test-b}
+TEST_GROUP=${TEST_GROUP:-platform-test-reg}
+WINDOW_SUDOERS=/etc/sudoers.d/agent-platform-test
+for window_name in "$RUNNER_USER" "$TEST_A" "$TEST_B" "$TEST_GROUP"; do
+  case "$window_name" in ''|*[!a-z0-9_-]*|-*|[0-9]*) exit 1 ;; esac
+done
+test "$TEST_A" != "$TEST_B"
+test "$RUNNER_USER" != "$TEST_A"
+test "$RUNNER_USER" != "$TEST_B"
+RUNNER_UID=$(id -u -- "$RUNNER_USER")
+test "$RUNNER_UID" -ne 0
 # runbook-check:begin window-preflight
-TEST_A=platform-test-a
-TEST_B=platform-test-b
-TEST_GROUP=platform-test-reg
 require_absent passwd "$TEST_A"
-require_absent group "$TEST_A"
 require_absent passwd "$TEST_B"
+require_absent group "$TEST_A"
 require_absent group "$TEST_B"
 require_absent group "$TEST_GROUP"
+if [ -e "$WINDOW_SUDOERS" ] || [ -L "$WINDOW_SUDOERS" ]; then
+  printf 'existing window path: %s\n' "$WINDOW_SUDOERS" >&2
+  exit 1
+fi
 # runbook-check:end window-preflight
-case "$RUNNER_USER" in ''|*[!a-z0-9_-]*) exit 1 ;; esac
-RUNNER_UID=$(id -u "$RUNNER_USER")
-test "$RUNNER_UID" -ne 0
-getent group "$BASE_GROUP" > /dev/null
-BASE_GID=$(getent group "$BASE_GROUP" | cut -d: -f3)
-test "$BASE_GID" -ne 0
-for window_path in "$WINDOW_STATE" "$WINDOW_SUDOERS" "$RUNNER_CONFIG"; do
-  if [ -e "$window_path" ] || [ -L "$window_path" ]; then
-    printf 'existing window path: %s\n' "$window_path" >&2
-    exit 1
-  fi
-done
-install -d -o root -g root -m 0700 "$WINDOW_STATE"
 # runbook-check:begin window-allocation
 groupadd --system "$TEST_GROUP"
-useradd --system --no-create-home --no-user-group --gid "$BASE_GROUP" \
-  --home-dir /nonexistent --shell /usr/sbin/nologin "$TEST_A"
-useradd --system --no-create-home --no-user-group --gid "$BASE_GROUP" \
-  --home-dir /nonexistent --shell /usr/sbin/nologin "$TEST_B"
+useradd --system --no-create-home --home-dir /nonexistent \
+  --shell /usr/sbin/nologin "$TEST_A"
+useradd --system --no-create-home --home-dir /nonexistent \
+  --shell /usr/sbin/nologin "$TEST_B"
 # runbook-check:end window-allocation
 usermod -a -G "$TEST_GROUP" "$TEST_A"
-# useradd without a password creates a locked account; verify, never print hashes.
-for test_account in "$TEST_A" "$TEST_B"; do
-  account_status=$(passwd -S "$test_account")
-  case "$account_status" in "$test_account L "*) ;; *) exit 1 ;; esac
-done
-TEST_A_UID=$(id -u "$TEST_A")
-TEST_B_UID=$(id -u "$TEST_B")
-TEST_GROUP_GID=$(getent group "$TEST_GROUP" | cut -d: -f3)
-TEST_A_ENTRY=$(getent passwd "$TEST_A" | cut -d: -f1,3-7)
-TEST_B_ENTRY=$(getent passwd "$TEST_B" | cut -d: -f1,3-7)
-TEST_GROUP_ENTRY=$(getent group "$TEST_GROUP" | cut -d: -f1,3,4)
-test "$(printf '%s\n' "$TEST_GROUP_ENTRY" | cut -d: -f3)" = "$TEST_A"
-printf '%s ALL=(%s,%s) NOPASSWD: ALL\n%s ALL=(%s:%s) NOPASSWD: ALL\n' \
-  "$RUNNER_USER" "$TEST_A" "$TEST_B" \
-  "$RUNNER_USER" "$RUNNER_USER" "$TEST_GROUP" > "$WINDOW_STATE/sudoers.candidate"
-visudo -cf "$WINDOW_STATE/sudoers.candidate"
-install -o root -g root -m 0440 "$WINDOW_STATE/sudoers.candidate" "$WINDOW_SUDOERS"
-python3 - "$RUNNER_USER" "$RUNNER_UID" "$TEST_A" "$TEST_A_UID" \
-  "$TEST_B" "$TEST_B_UID" "$TEST_GROUP" "$TEST_GROUP_GID" "$RUNNER_CONFIG" <<'PY'
-import json, sys
-r, ru, a, au, b, bu, g, gi, path = sys.argv[1:]
-with open(path, 'x') as f:
-    json.dump(dict(runner_user=r, runner_uid=int(ru), client_a=a, client_a_uid=int(au),
-                   client_b=b, client_b_uid=int(bu), registration_group=g,
-                   registration_gid=int(gi)), f, sort_keys=True)
-    f.write('\n')
-PY
-chown root:root "$RUNNER_CONFIG"
-chmod 0644 "$RUNNER_CONFIG"
-SUDOERS_DIGEST=$(sha256sum "$WINDOW_SUDOERS" | cut -d' ' -f1)
-CONFIG_DIGEST=$(sha256sum "$RUNNER_CONFIG" | cut -d' ' -f1)
-# Root-only provenance excludes password fields; %q is Bash shell quoting.
-for variable in RUNNER_USER RUNNER_UID TEST_A TEST_B TEST_GROUP TEST_A_UID \
-  TEST_B_UID TEST_GROUP_GID TEST_A_ENTRY TEST_B_ENTRY TEST_GROUP_ENTRY \
-  WINDOW_SUDOERS RUNNER_CONFIG SUDOERS_DIGEST CONFIG_DIGEST; do
-  printf '%s=%q\n' "$variable" "${!variable}"
-done > "$WINDOW_STATE/window.env"
-chmod 0600 "$WINDOW_STATE/window.env"
+(
+  umask 0337
+  set -o noclobber
+  printf 'Defaults:%s !requiretty\n%s ALL=(%s,%s) NOPASSWD: ALL\n%s ALL=(%s:%s) NOPASSWD: ALL\n' \
+    "$RUNNER_USER" "$RUNNER_USER" "$TEST_A" "$TEST_B" \
+    "$RUNNER_USER" "$RUNNER_USER" "$TEST_GROUP" > "$WINDOW_SUDOERS"
+)
+chown root:root "$WINDOW_SUDOERS"
+chmod 0440 "$WINDOW_SUDOERS"
+visudo -cf "$WINDOW_SUDOERS"
+id "$TEST_A"
+id "$TEST_B"
 ```
 
-The sudoers rules have no root Runas target. They permit commands only as the
-two test accounts, or as the runner with the test registration group; this is
-an intentional capability to execute arbitrary fixture clients under those
-unprivileged identities. Do not add the runner to a root/sudo group, use a
-wildcard Runas identity or grant a root helper. Account A alone has standing
-test-group membership. No production identity, enrollment or secret is used.
-If allocation fails partway, the owner must reconcile that partial window
-before rerunning; a missing provenance record never authorizes deletion.
+Both accounts have no created home, a nologin shell and no assigned password;
+`useradd` without a password leaves the account locked. Only A belongs to the
+new test group. The sudoers drop-in permits arbitrary fixture commands only
+as A, B, or the runner with that group. It has no root or wildcard Runas target
+and does not add the runner to a privileged group. `!requiretty` permits
+noninteractive test clients, not additional identities. A failed partial setup
+requires owner inspection before retrying; no absent state file proves that an
+existing account or path is safe to delete. No production secrets are involved.
 
 ### 12.3 Verify and run as the unprivileged runner
 
-Read the test names and numeric pins from the root-owned runner configuration;
-the runner MUST refuse changed ownership/IDs or an unexpected current UID.
-For the example names the owner's runner-account verification is:
+After provisioning, the runner supplies its own readable JSON configuration.
+The minimal window needs neither a root-owned state file nor a root-owned
+numeric-pinned configuration. A configuration using the documented defaults is:
+
+```json
+{
+  "runner_user": "<runner>",
+  "client_a": "platform-test-a",
+  "client_b": "platform-test-b",
+  "registration_group": "platform-test-reg",
+  "scratch_dir": "/tmp"
+}
+```
+
+Replace `<runner>` with the actual unprivileged account. Root-owned
+configuration and `runner_uid`, `client_a_uid`, `client_b_uid`,
+`registration_gid` pins are optional hardening, not artifacts produced by the
+minimal setup. The runner MUST resolve the configured names, require distinct
+nonzero runner/A/B UIDs, and require that its own UID equals the configured
+runner's. Optional pins, when supplied, MUST match. These checks validate the
+test window; they do not establish account-generation authority.
+
+As the runner, verify the defaults (substitute configured names if changed):
 
 ```sh
+RUNNER_USER='<runner>'
 sudo -n -u platform-test-a -- /usr/bin/id -u
 sudo -n -u platform-test-b -- /usr/bin/id -u
-sudo -n -u "$(id -un)" -g platform-test-reg -- /usr/bin/id -g
+sudo -n -u "$RUNNER_USER" -g platform-test-reg -- /usr/bin/id -g
+sudo -n -u platform-test-a -- /usr/bin/id -G
+sudo -n -u platform-test-b -- /usr/bin/id -G
 ```
 
-The first two results MUST equal `client_a_uid` and `client_b_uid` in config,
-and the third MUST equal `registration_gid`. Tests also check A's group list
-contains that GID and B's does not. Missing sudo permission is PENDING, not a
+The first two outputs MUST equal the independently resolved client UIDs; the
+third MUST equal the configured group's resolved GID. The group MUST be
+nonroot; A's group list MUST contain that GID and B's MUST NOT. The runner MUST
+refuse inconsistent identities or membership; it MUST NOT infer success from
+account names alone. Missing window or sudo permission is PENDING, never a
 skipped or passing multi-UID qualification.
 
-The future runner starts its own daemon fixture as itself, using
-`sudo -n -u <configured-runner> -g <configured-test-group>` where needed for
-socket group setup. Clients use `sudo -n -u <configured-account> -- <client>`.
-The fixture uses only a public test seed and runner-owned state; it MUST NOT
-read production service paths or run under the production service account.
-Its test generation journal is synthetic and proves no production adapter.
-Configuration, not code, supplies all account/group names. The planned CLI is:
+The reviewed `keymaker-window` runner starts its own daemon fixture as itself.
+Clients use `sudo -n -u <configured-account> -- <client>`. The runner-as-self
+sudo rule with the test group remains available for group-restricted socket
+fixtures; surface A alone needs no such socket. Use only a public test seed
+and runner-owned state, never production service paths or the production user.
+Synthetic generation fixtures do not qualify the production journal adapter.
+A proposed invocation for the reviewed runner binary is:
 
 ```sh
-: "${RUNNER_SCRATCH:?set a private scratch parent owned by the runner}"
-: "${REPORT_PATH:?set a report path outside the fixture work directory}"
-WORK_DIR=$(mktemp -d "${RUNNER_SCRATCH%/}/keymaker-it.XXXXXXXX")
-keymaker-integration run --config /etc/swarma-keymaker-test-window.json \
-  --work-dir "$WORK_DIR" --report "$REPORT_PATH"
-keymaker-integration cleanup --config /etc/swarma-keymaker-test-window.json \
-  --work-dir "$WORK_DIR" --retained-report "$REPORT_PATH"
+: "${WINDOW_CONFIG:?set the runner-readable JSON configuration path}"
+: "${RUNNER_SCRATCH:?set an existing absolute build scratch directory}"
+"$RUNNER_SCRATCH/keymaker-window" -config "$WINDOW_CONFIG" -check
+"$RUNNER_SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"
 ```
 
-The runner exposes only its socket subdirectory for traversal by the two
-clients; secret/state directories stay 0700. Cleanup MUST validate a
-runner-owned creation manifest containing the work directory's canonical path,
-UID, device/inode and per-run random token. It MUST stop only recorded child
-PIDs whose UID, process-start identity and run token still match, and await
-termination. A reused/mismatched PID or directory identity refuses cleanup;
-never kill by name or assume the current occupant is the original child.
-The retained report must be durable and outside the work directory before
-removing only that manifest-owned tree. Cleanup MUST NOT delete OS accounts,
-groups, global sockets or other runs' files. These runner operations are
-future v0 requirements, not an existing executable or proof of safe deletion.
+The canonical compiled runner exits 0 for pass, 1 for execution/test failure,
+2 for usage/configuration error and 3 for PENDING. With `-check`, 0 qualifies
+only provisioning preflight. PENDING prints exactly
+`PENDING: test window not provisioned` on stderr. A make convenience wrapper
+may normalize nonzero exits to 2; it MUST print the underlying runner status,
+and callers needing the distinction MUST call the runner directly.
+
+The configured scratch parent must allow both clients to traverse to the run
+binary and socket. The runner must not chmod private ancestor directories.
+Only its run directory, client executable and socket subdirectory are exposed
+for traversal; master/state directories stay 0700 with 0600 files. The runner
+creates its own work tree and records its canonical path, UID, device/inode
+and per-run random token. Cleanup MUST validate that manifest, wait for its
+recorded child processes and persist a durable report outside the tree before
+removing only its own tree. Any process termination MUST check the recorded
+PID, UID, start identity and run token; no pattern killing or reused-PID
+assumptions. Mismatched directory/process identity or failed report persistence
+refuses cleanup. Interrupted trees remain for owner inspection; no standalone
+cleanup command or ownership proof from a missing state file is assumed.
+Runner cleanup MUST NOT remove OS accounts, groups, global sockets or another
+run's files. No privileged provisioning or live qualification is claimed here.
 
 ### 12.4 Owner rollback of the one-time window
 
-First finish fixture cleanup as the runner. The owner then uses root Bash:
+First finish fixture cleanup as the runner. Because this is a shared window,
+the owner must confirm all consumers are idle and inspect the exact accounts,
+group and sudoers drop-in before authorizing removal. Without a root state
+file there is no automatic provenance comparison: names alone do not prove
+ownership. Stop on changed or ambiguous resources; reconcile them manually.
+Do not run rollback against an existing unrelated window.
+
+After that inspection, use root Bash with the same configured names (defaults
+below). Remove the sudoers permission first, then the two accounts and group:
 
 ```sh
 set -euo pipefail
 test "$(id -u)" = 0
-WINDOW_STATE=/var/lib/swarma-keymaker-test-window
-test ! -L "$WINDOW_STATE"
-test "$(stat -c '%u:%a' "$WINDOW_STATE")" = 0:700
-test ! -L "$WINDOW_STATE/window.env"
-test "$(stat -c '%u:%a' "$WINDOW_STATE/window.env")" = 0:600
-. "$WINDOW_STATE/window.env"
-# Exact recorded directory/account/group identities must still belong to this window.
-CURRENT_A=$(getent passwd "$TEST_A" | cut -d: -f1,3-7)
-CURRENT_B=$(getent passwd "$TEST_B" | cut -d: -f1,3-7)
-CURRENT_GROUP=$(getent group "$TEST_GROUP" | cut -d: -f1,3,4)
-test "$CURRENT_A" = "$TEST_A_ENTRY"
-test "$CURRENT_B" = "$TEST_B_ENTRY"
-test "$CURRENT_GROUP" = "$TEST_GROUP_ENTRY"
+TEST_A=${TEST_A:-platform-test-a}
+TEST_B=${TEST_B:-platform-test-b}
+TEST_GROUP=${TEST_GROUP:-platform-test-reg}
+WINDOW_SUDOERS=/etc/sudoers.d/agent-platform-test
 test ! -L "$WINDOW_SUDOERS"
-test ! -L "$RUNNER_CONFIG"
-CURRENT_SUDOERS_DIGEST=$(sha256sum "$WINDOW_SUDOERS" | cut -d' ' -f1)
-CURRENT_CONFIG_DIGEST=$(sha256sum "$RUNNER_CONFIG" | cut -d' ' -f1)
-test "$CURRENT_SUDOERS_DIGEST" = "$SUDOERS_DIGEST"
-test "$CURRENT_CONFIG_DIGEST" = "$CONFIG_DIGEST"
+test "$(stat -c '%u:%a' "$WINDOW_SUDOERS")" = 0:440
+visudo -cf "$WINDOW_SUDOERS"
 rm -- "$WINDOW_SUDOERS"
 visudo -c
-# No --remove: the accounts had no homes; userdel refuses a still-used account.
+# No --remove: no homes were created; active accounts must not be forced away.
 userdel -- "$TEST_A"
 userdel -- "$TEST_B"
 groupdel -- "$TEST_GROUP"
-rm -- "$RUNNER_CONFIG" "$WINDOW_STATE/sudoers.candidate" "$WINDOW_STATE/window.env"
-rmdir -- "$WINDOW_STATE"
 ```
 
-Changed records, absent provenance, active processes or unexpected leftover
-files stop rollback and require owner inspection. No recursive deletion,
-pattern kill, existing unrelated account deletion or UID renumbering is
-permitted by this procedure. The external retained test report is preserved.
+There is no state/configuration cleanup in this minimal window. Retain the
+runner's configuration and external test reports. If account deletion reports
+active processes, or any step fails, stop and inspect; do not force deletion,
+kill by pattern, recursively delete directories or renumber UIDs. Account
+primary-group leftovers, if any, require separate owner inspection rather
+than guessed cleanup. Optional hardening artifacts have their own separately
+reviewed teardown and are not required by this procedure.
 
 ## 13. Tests and vector evidence
 
@@ -1073,8 +1077,11 @@ tests in this initial repository. Future rework MUST retain them by name.
     rotation and compromise/reissue records need publication and qualification;
     they are hooks only in v0. macOS/TPM are separate qualification work.
 11. **Q11 — privileged evidence gate:** owner pre-provisions section 12's
-    reusable two-UID window and constrained non-root sudo; no privileged action
-    or service deployment is part of this spec-only slice.
+    shared two-UID window and constrained non-root sudo. The minimal setup
+    writes no state/configuration; the unprivileged runner supplies names and
+    verifies distinct nonroot UIDs, sudo readbacks and A-only group membership.
+    Live multi-UID evidence remains PENDING until that window is available;
+    no privileged action or service deployment is part of this spec-only slice.
 12. **Q12 — decided:** registrar-valid exe rows are
     refused locally in v0, including matching snapshots. A future design must
     qualify per-operation executable identity and descriptor delegation, not

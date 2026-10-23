@@ -66,8 +66,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all ten are killed |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
-| Go + Bash | Shell guard regressions: `go run ./tools/runbook-check/main.go -check` | Named offline verdicts; no account writes |
-| Go + Bash | Shell guard plant: `go run ./tools/runbook-check/main.go -plant` | Expected nonzero exit 1 naming `TestRunbookCollisionBeforeMutation` |
+| Go + Bash | Check actual marked shell preflights with stubbed NSS and mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; temporary path fixtures under `TMPDIR`, then removed; no account writes |
+| Go + Bash | Plant inverted-getent and window-path bypass regressions in memory: `go run ./tools/runbook-check/main.go -plant` | Expected exit 1 naming collision/lookup and `TestRunbookWindowPathBeforeMutation` failures; production files unchanged |
 | Python 3 | JSON syntax: `python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("vectors").glob("*.json")]'` | Exit status; no files |
 | Git | Scope: `git diff --check`; signatures: `git log --format="%h %G?"` | Diagnostics and signature verdicts |
 

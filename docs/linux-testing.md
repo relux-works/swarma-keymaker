@@ -23,7 +23,9 @@ incarnation replacement before release. It asserts the precise refusal, no
 released signature and refusal audit on both in-flight and next requests.
 `TestLiveConnectionInvalidation` additionally tests real idle connection closure.
 These fake generation transitions do not qualify a cross-process journal adapter
-or an operating-system account allocator.
+or an operating-system account allocator. `TestAuditFailureClosesListener`
+checks actual socket closure, no signature/state change, and the bounded
+`audit_unavailable` service-health return on a journal fault.
 
 ## Reusable multi-UID window
 
@@ -122,3 +124,14 @@ catalog table. The coverage document maps every vector, declares K1b rows, and
 records the two requested narrowing mutants; it does not claim a killed mutant
 for every implementation surface. No prior committed implementation reviewer
 tests existed. Existing vector and specification tooling remains unchanged.
+
+## Dispatch interpretation
+
+Surface A has only SSH opcodes, with no named decrypt operation. All unsupported
+opcodes use section 6's `agent_message_unsupported` audit code and SSH failure;
+native JSON is never dispatched as a native method on this socket. No decrypt
+branch was added to recognize a method that this protocol does not have.
+The task's conditional `operation_unsupported` decrypt rule therefore has no
+surface-A method to apply to; that code belongs to native unsupported methods.
+The command-line `decrypt` token is invalid usage (exit 2). This interpretation
+preserves the specification's opcode contract and keeps decryption outside v0.

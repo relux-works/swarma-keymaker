@@ -163,7 +163,11 @@ func startRealFixture(t *testing.T, overrideUID ...uint32) *runningFixture {
 		cancel()
 		select {
 		case e := <-done:
-			if e != nil {
+			var want error
+			if engine.closed.Load() {
+				want = Code("audit_unavailable")
+			}
+			if e != want {
 				t.Error(e)
 			}
 		case <-time.After(5 * time.Second):
@@ -175,6 +179,43 @@ func startRealFixture(t *testing.T, overrideUID ...uint32) *runningFixture {
 		t.Fatal(c)
 	}
 	return &runningFixture{server, engine, g, public, audit, seen}
+}
+
+// An actual audit append failure closes all listeners/connections without a
+// signature or state mutation and returns the bounded service-health code. Normal
+// socket/signing controls are exercised by TestRealClients on the same server.
+func TestAuditFailureClosesListener(t *testing.T) {
+	f := startRealFixture(t)
+	c, e := net.DialUnix("unix", nil, &net.UnixAddr{Name: f.server.Path, Net: "unix"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer c.Close()
+	c.SetDeadline(time.Now().Add(time.Second))
+	f.audit.mu.Lock()
+	f.audit.writer = &faultFile{file: f.audit.file, writeFail: true}
+	f.audit.mu.Unlock()
+	before := f.engine.Store.Snapshot()
+	if _, e = c.Write(Packet(validBody(f.public, "git"))); e != nil {
+		t.Fatal(e)
+	}
+	body, _ := ReadFrame(c)
+	if len(body) != 0 && !bytes.Equal(body, []byte{5}) {
+		t.Fatal("audit failure released response")
+	}
+	// EOF proves the connection is invalidated; listener closure precedes it.
+	var next [1]byte
+	if n, err := c.Read(next[:]); n != 0 || err != io.EOF {
+		t.Fatal("audit failure kept connection", n, err)
+	}
+	if !f.engine.closed.Load() || !reflect.DeepEqual(before, f.engine.Store.Snapshot()) {
+		t.Fatal("audit closure invariant")
+	}
+	other, err := net.DialTimeout("unix", f.server.Path, time.Second)
+	if err == nil {
+		other.Close()
+		t.Fatal("listener remained open after audit failure")
+	}
 }
 
 // Environment is constructed from an allowlist: no inherited Git variables,

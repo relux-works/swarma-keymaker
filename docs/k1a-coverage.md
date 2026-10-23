@@ -118,7 +118,7 @@ syntax checks.
 | Generation unavailable | `TestProductionGenerationRefuses`, `TestProductionBinaryGenerationGate` | Actual production binary refuses; injected fake-backed positive, no journal adapter |
 | Release and next-request fencing | `TestReleaseFences` | Controlled sign pause; revoke/retire/reuse win before release |
 | Real connection invalidation | `TestLiveConnectionInvalidation` | Kernel socket closure for all three transitions; same UID fixture |
-| Durable audit failure/replay/rotation | `TestAuditWriteFailures`, `TestAuditRecoveryAndRotation`, `TestAuditStartupRejectsIncompleteEvidence` | Append/short/sync/budget faults, corrupt/truncated/unsafe/discontinuous evidence |
+| Durable audit failure/replay/rotation | `TestAuditWriteFailures`, `TestAuditFailureClosesListener`, `TestAuditRecoveryAndRotation`, `TestAuditStartupRejectsIncompleteEvidence` | Append/short/sync/budget faults, corrupt/truncated/unsafe/discontinuous evidence |
 | Audit schema/dependencies | `TestAuditCanonicalSchema`, `TestAuditDependencyFailures` | Exact null schema/canonical strings, missing entropy and untrusted clock |
 | Bounded input/state instances | `TestAgentFrameBounds`, `TestStateJSONRejectsAmbiguity`, `TestSocketGuards`, `TestStateLock`, `TestRateLimits` | Frame/JSON/repeated-instance/rate checks; not a performance or hard-sandbox qualification |
 | Current UID, stock OpenSSH/Git | `TestRealClients` | Actual SO_PEERCRED; negative namespace/raw; exact fixture-key verification; isolated HOME/Git configuration |

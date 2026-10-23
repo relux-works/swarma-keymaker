@@ -119,6 +119,9 @@ func (s *Server) Serve(ctx context.Context) error {
 			closed := s.closed
 			s.mu.Unlock()
 			if closed {
+				if s.Engine.closed.Load() {
+					return Code("audit_unavailable")
+				}
 				return nil
 			}
 			return failure("accept failed")

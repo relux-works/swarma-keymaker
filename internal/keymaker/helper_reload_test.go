@@ -88,7 +88,12 @@ func TestReviewHelperReloadDeadline(t *testing.T) {
 				defer func() { unblock(); <-reloaded }()
 			}
 			req := helperRequest(3)
-			req["timeout_ms"] = int64(100)
+			// Race-test persists measured 73-104ms; the old gate also expired.
+			// Keep the valid control at the normal 2000ms budget; only the
+			// slow-reload refusal exercises the 100ms deadline.
+			if slow {
+				req["timeout_ms"] = int64(100)
+			}
 			started := time.Now()
 			nativeSend(t, c, req)
 			select {

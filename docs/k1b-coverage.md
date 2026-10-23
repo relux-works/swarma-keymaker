@@ -135,6 +135,8 @@ domain `registration/1`, no retained result change and continuing hello admissio
 | Distinct keys/preimages on actual sockets | `TestHelperDomainSeparation` | Helper proof cannot verify as SSHSIG; A signature cannot verify as registration/1; A rejects host public-key selector |
 | Actual-write ordering | `TestHelperReleaseOrdering` | Retirement/revocation before release suppresses proof; release-first proof stands |
 | Expiry after durable audit | `TestHelperExpiryAfterAudit` | Exact expiry refuses; one nanosecond before expiry passes |
+| Valid concurrent helper/pubkey | `TestHelperConcurrentPubkeyControl` | Both succeed at the normal native budget, 20 repetitions at one and two scheduler processors |
+| Reader and writer admission fairness | `TestReviewR2SocketReloadFairness`, `TestHelperReloadFairnessControl`, enrollment `TestAdmissionGatePublicationHandoff`, `TestAdmissionGateWriterProgress`, `TestAdmissionGateFailedPublication` | At one scheduler processor, already queued readers enter before the next pause completes, cancellation clears admission debt, failed publication fences its cohort, and sustained readers allow 40 publications |
 | Bounded enrollment wait | `TestReviewHelperReloadDeadline`, enrollment `TestEnrollmentGateDeadline` | 100ms helper deadline releases shared locks; parallel pubkey succeeds before slow pin I/O resumes; no helper nonce/signature/result, exactly one refusal audit |
 | Reload I/O and atomic publication | `TestHelperReloadPreparesOutsideWrite`, enrollment `TestReloadPreparesOutsideReleaseBarrier`, `TestReviewHelperReloadOrders` | Pin I/O proceeds during an actual write; the entire snapshot or failure fence swaps after release; old enrollment is fenced on failure |
 | Enrollment barrier | `TestHelperReloadBeforeRelease`, enrollment `TestWithAuthorizedReleaseBarrier` | Failed reload before barrier refuses; reload cannot overtake a held release |
@@ -146,11 +148,12 @@ domain `registration/1`, no retained result change and continuing hello admissio
 | Multi-UID helper | `TestMultiUIDHelper/{uid-not-mapped,foreign-binding,retired}/{negative,control}` | Compiled; live reviewer window PENDING |
 
 Helper narrowing controls run with `go run ./tools/mutations/main.go -group helper
--scratch "$SCRATCH"`. The six selected plants fail a named behavioral assertion;
+-scratch "$SCRATCH"`. The seven selected plants fail a named behavioral assertion;
 setup/compilation errors do not count. The other mutation groups are unchanged.
 
 | Mutant | Property narrowed to | Named failing test | Outcome |
 | --- | --- | --- | --- |
+| helper-reader-handoff | Published readers receive reserved admission despite the next writer pause | `TestReviewR2SocketReloadFairness` | Killed, child exit 1: valid helper expires during successful reloads |
 | helper-uncancellable-enrollment | Expired helper frees generation/Store while reload I/O is pending | `TestReviewHelperReloadDeadline/slow-reload` | Killed, child exit 1: parallel pubkey remains blocked before I/O resumes |
 | helper-reload-io-lock | Preparing a candidate proceeds during an admitted socket write | `TestHelperReloadPreparesOutsideWrite/valid` | Killed, child exit 1: pin I/O waits for the actual write |
 | helper-binding | Binding before construction and at release | `TestDaemonHelperVectors/helper-missing-binding/negative` | Killed, child exit 1: forbidden envelope escaped |

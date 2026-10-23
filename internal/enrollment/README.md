@@ -407,3 +407,15 @@ held release while the swap waits, including failure fencing and valid recovery.
 `TestEnrollmentGateDeadline` checks cancellation without callback effects and a
 valid post-publication control. Admission cancellation maps to the existing
 `request_deadline_exceeded` code. No lock-wait goroutines are left behind.
+
+Each publication reserves admission for its already queued readers. A phase
+counter distinguishes that finite cohort from later arrivals. The next pause
+closes admission to new arrivals, admits the reserved cohort or accounts for
+its cancellation, then proceeds with reload preparation. The final write barrier
+still drains admitted callbacks before publication. Continuous readers cannot
+extend the handoff or starve the writer. No sleep, yield or waiter goroutine
+implements fairness. `TestAdmissionGatePublicationHandoff` checks cancellation
+before/after publication and its unpaused control at one scheduler processor;
+`TestAdmissionGateWriterProgress` checks sustained readers and 40 publications;
+`TestAdmissionGateFailedPublication` checks that immediate valid recovery cannot
+erase the failed fence for its reserved cohort.

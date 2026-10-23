@@ -82,6 +82,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |
 | Go | Bounded decoder fuzzing: `GOMAXPROCS=2 go test ./internal/control -run '^$' -fuzz '^FuzzCCJRoundTrip$' -fuzztime=20s -parallel=1` | Verdicts and Go fuzz cache; failing corpus under `internal/control/testdata/fuzz/` |
+| Go | Concurrent valid helper/pubkey control: `GOMAXPROCS=1 go test -race ./internal/keymaker -run '^TestHelperConcurrentPubkeyControl$' -count=20 -p=1`; repeat with `GOMAXPROCS=2` | Both responses verify/succeed at the normal native budget; no reload traffic |
+| Go | Reader/writer admission fairness: `GOMAXPROCS=1 go test -race ./internal/enrollment ./internal/keymaker -run '^Test(AdmissionGate\|ReviewR2SocketReloadFairness\|HelperReloadFairnessControl)' -count=3 -p=1` | Finite reader handoff, cancellation, failed-publication fencing, writer progress and real helper socket control |
 | Go | Reload deadline and publication regressions: `GOMAXPROCS=2 go test -race ./internal/keymaker -run '^Test(ReviewHelperReloadDeadline\|HelperReloadPreparesOutsideWrite)$' -count=1 -p=1` | Fixture pin I/O, real daemon sockets and authority barriers; allowed pubkey retention plus refusal-only helper audit |
 | Go | Native integration checks: `go test ./internal/keymaker -run '^TestNative' -count=1`; race: `go test -race ./internal/keymaker -run '^TestNative' -count=1` | Verdicts; temporary fixtures under `TMPDIR` |
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |

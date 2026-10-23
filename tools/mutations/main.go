@@ -98,6 +98,7 @@ func main() {
 	}
 	if *group == "helper" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"helper-reader-handoff", "../enrollment/gate.go", "if !g.paused || queued && phase != g.phase {", "if !g.paused {", "^TestReviewR2SocketReloadFairness$", "--- FAIL: TestReviewR2SocketReloadFairness", "valid helper starved by successive valid reloads"},
 			{"helper-uncancellable-enrollment", "../enrollment/gate.go", "select {\n\t\tcase <-ctx.Done():\n\t\tcase <-changed:\n\t\t}", "<-changed", "^TestReviewHelperReloadDeadline$/^slow-reload$", "--- FAIL: TestReviewHelperReloadDeadline/slow-reload", "parallel pubkey blocked by expired helper before reload I/O resumed"},
 			{"helper-reload-io-lock", "../enrollment/authority.go", "code := candidate.load(ctx)\n\ta.mu.Lock()", "a.mu.Lock()\n\tcode := candidate.load(ctx)", "^TestHelperReloadPreparesOutsideWrite$", "--- FAIL: TestHelperReloadPreparesOutsideWrite/valid", "reload I/O waited for the actual socket write"},
 			{"helper-binding", "registration.go", `b, c := s.lookup(peer.UID, peer.Generation)`, `b, c := Binding{}, Code("")`, "^TestDaemonHelperVectors$/^helper-missing-binding$/^negative$", "--- FAIL: TestDaemonHelperVectors/helper-missing-binding/negative", "native response exposed forbidden field envelope"},
@@ -126,6 +127,11 @@ func main() {
 			os.Exit(2)
 		}
 		cmd := exec.Command("go", "test", "-overlay", overlay, pkg, "-run", c.test, "-count=1", "-v")
+		// Reproduce the fairness finding's one-processor schedule regardless
+		// of the calling shell's parallelism.
+		if c.name == "helper-reader-handoff" {
+			cmd.Env = append(cmd.Environ(), "GOMAXPROCS=1")
+		}
 		var output bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &output, &output
 		pid := 0

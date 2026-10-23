@@ -73,17 +73,22 @@ func readCode(err error) Code {
 	}
 	return FrameTruncated
 }
-func writeFrame(w io.Writer, obj Object) error {
+func marshalFrame(obj Object) ([]byte, error) {
 	body, err := Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	frame := make([]byte, 4+len(body))
+	binary.BigEndian.PutUint32(frame, uint32(len(body)))
+	copy(frame[4:], body)
+	return frame, nil
+}
+func writeFrame(w io.Writer, obj Object) error {
+	frame, err := marshalFrame(obj)
 	if err != nil {
 		return err
 	}
-	var header [4]byte
-	binary.BigEndian.PutUint32(header[:], uint32(len(body)))
-	if err = writeAll(w, header[:]); err != nil {
-		return err
-	}
-	return writeAll(w, body)
+	return writeAll(w, frame)
 }
 func writeAll(w io.Writer, data []byte) error {
 	for len(data) > 0 {

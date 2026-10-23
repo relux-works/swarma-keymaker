@@ -8,9 +8,9 @@ generation. Private identity keys never enter station processes.
 
 **Status: specification and native wire layer.** `internal/control` implements
 bounded CCJ-1 framing, version negotiation and sequential request dispatch.
-Peer/generation authority, request-ID admission and method execution are injected
-interfaces; no production adapters are supplied. There is no service binary,
-installer or deployed security boundary. The vector tool is offline test tooling.
+Peer/generation authority, request-ID admission, method execution and final
+release fencing are required injected interfaces; no production adapters are
+supplied. There is no service binary, installer or deployed security boundary. The vector tool is offline test tooling.
 The proposed Linux v0 and publication gates are in
 [`spec/keymaker.md`](spec/keymaker.md).
 
@@ -49,6 +49,16 @@ sequential request at a time. Clients must wait for replies; it does not inspect
 kernel receive queues to infer when clients wrote subsequent bytes. Socket
 provisioning, connection/workload limits, method-specific parameter schemas,
 authorization, durable retries and audit remain core integration obligations.
+A successful hello pins the connection's UID and generation. A changed tuple or
+failed generation evidence refuses and closes; continuing work requires a fresh
+connection. `ReleaseFence.WithActive` must serialize authoritative generation,
+final result/binding checks and durable audit with the actual response write for
+hello and methods. Encoding and write-deadline setup precede the barrier; a
+retirement that wins the barrier suppresses success and closes after a typed
+refusal where transport permits it. A partial success write closes without a
+second reply. The interface can wrap the core's `GenerationSource.WithActive`;
+a lookup followed by an unprotected write does not satisfy its contract.
+
 Exact retries may pass the request-ID interface for handler-owned result recovery;
 changed arguments must be refused by that generation-scoped interface.
 

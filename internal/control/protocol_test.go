@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -133,6 +134,9 @@ func TestFrameWriter(t *testing.T) {
 	w.Reset()
 	if err := writeFrame(w, Object{"bad": 1.5}); err == nil || w.Len() != 0 {
 		t.Fatal("invalid output written")
+	}
+	if err := writeFrame(w, Object{"large": strings.Repeat("x", MaxFrame)}); err == nil || w.Len() != 0 {
+		t.Fatal("oversize output written")
 	}
 	if err := writeAll(zeroWriter{}, []byte{1}); !errors.Is(err, io.ErrShortWrite) {
 		t.Fatal(err)

@@ -31,7 +31,13 @@ type idsFunc func(context.Context, Peer, Request) Code
 
 func (f idsFunc) Admit(c context.Context, p Peer, r Request) Code { return f(c, p, r) }
 
-func testServer(t *testing.T, handler Handler, peers PeerSource, ids RequestIDs) *Server {
+type fenceFunc func(context.Context, Peer, Request, Object, func() Code) Code
+
+func (f fenceFunc) WithActive(c context.Context, p Peer, r Request, o Object, release func() Code) Code {
+	return f(c, p, r, o, release)
+}
+
+func testServer(t *testing.T, handler Handler, peers PeerSource, ids RequestIDs, fences ...ReleaseFence) *Server {
 	t.Helper()
 	if handler == nil {
 		handler = handlerFunc(func(context.Context, Peer, string, Object) (Object, Code) { return Object{"ok": true}, "" })
@@ -53,7 +59,14 @@ func testServer(t *testing.T, handler Handler, peers PeerSource, ids RequestIDs)
 			return ""
 		})
 	}
-	s, err := New(handler, peers, ids)
+	// Fixed-active fixture only; real adapters must serialize with retirement.
+	var fence ReleaseFence = fenceFunc(func(_ context.Context, _ Peer, _ Request, _ Object, release func() Code) Code { return release() })
+	if len(fences) == 1 {
+		fence = fences[0]
+	} else if len(fences) > 1 {
+		t.Fatal("multiple test fences")
+	}
+	s, err := New(handler, peers, ids, fence)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,10 +435,16 @@ func TestPeerRevalidation(t *testing.T) {
 			if admitted.Load() != 1 || handled.Load() != 0 {
 				t.Fatal("failed authority reached ID/handler")
 			}
-			send(t, c, operation(3, "pubkey", Object{}, 2000))
-			wantSuccess(t, receive(t, c), requestID(3))
-			if admitted.Load() != 2 || handled.Load() != 1 {
-				t.Fatal("control did not pass")
+			closed(t, c)
+			// Recovery requires a new negotiated connection, even if the source
+			// resumes returning active evidence on its next lookup.
+			fresh, _ := client(t, s, nil)
+			send(t, fresh, hello(3, 1))
+			wantSuccess(t, receive(t, fresh), requestID(3))
+			send(t, fresh, operation(4, "pubkey", Object{}, 2000))
+			wantSuccess(t, receive(t, fresh), requestID(4))
+			if admitted.Load() != 3 || handled.Load() != 1 {
+				t.Fatal("fresh-connection control did not pass")
 			}
 		})
 	}
@@ -567,13 +586,24 @@ func TestOperationDeadline(t *testing.T) {
 	wantSuccess(t, receive(t, c), requestID(3))
 }
 
-// Blocked work is never dispatched concurrently with a buffered later request.
-// The server reads no next frame until the first handler and response complete;
-// clients are required to wait, and queued bytes are not an allowed pipeline API.
+type countReadsConn struct {
+	net.Conn
+	reads *atomic.Int32
+}
+
+func (c countReadsConn) Read(p []byte) (int, error) {
+	c.reads.Add(1)
+	return c.Conn.Read(p)
+}
+
+// Queued bytes cause neither another server Read nor a second Handler call
+// while the first operation is in flight; both requests succeed in order later.
 func TestSequentialDispatch(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
-	var calls atomic.Int32
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	var calls, reads atomic.Int32
 	s := testServer(t, handlerFunc(func(context.Context, Peer, string, Object) (Object, Code) {
 		if calls.Add(1) == 1 {
 			close(started)
@@ -581,15 +611,19 @@ func TestSequentialDispatch(t *testing.T) {
 		}
 		return Object{}, ""
 	}), nil, nil)
-	c, _ := client(t, s, nil)
+	c, _ := client(t, s, func(n net.Conn) net.Conn { return countReadsConn{n, &reads} })
+	defer unblock()
 	negotiate(t, c)
 	send(t, c, operation(2, "pubkey", Object{}, 2000))
 	<-started
+	before := reads.Load()
 	send(t, c, operation(3, "pubkey", Object{}, 2000))
-	if calls.Load() != 1 {
-		t.Fatal("concurrent dispatch")
+	// Bounded scheduling window, rather than the socket read deadline.
+	time.Sleep(30 * time.Millisecond)
+	if calls.Load() != 1 || reads.Load() != before {
+		t.Fatalf("read-ahead or concurrent dispatch: calls=%d reads=%d before=%d", calls.Load(), reads.Load(), before)
 	}
-	close(release)
+	unblock()
 	wantSuccess(t, receive(t, c), requestID(2))
 	wantSuccess(t, receive(t, c), requestID(3))
 }
@@ -666,21 +700,23 @@ func TestUnixListenerCancellation(t *testing.T) {
 }
 
 // A missing dependency fails construction rather than enabling a permissive
-// handler, peer source or uniqueness tracker; valid injection remains usable.
+// handler, peer source, uniqueness tracker or release fence; valid injection works.
 func TestRequiredDependencies(t *testing.T) {
 	h := handlerFunc(func(context.Context, Peer, string, Object) (Object, Code) { return Object{}, "" })
 	p := peerFunc(func(context.Context, net.Conn) (Peer, Code) { return Peer{1001, "g"}, "" })
 	ids := idsFunc(func(context.Context, Peer, Request) Code { return "" })
+	fence := fenceFunc(func(_ context.Context, _ Peer, _ Request, _ Object, release func() Code) Code { return release() })
 	for _, deps := range []struct {
 		h Handler
 		p PeerSource
 		i RequestIDs
-	}{{nil, p, ids}, {h, nil, ids}, {h, p, nil}} {
-		if _, err := New(deps.h, deps.p, deps.i); err == nil {
+		f ReleaseFence
+	}{{nil, p, ids, fence}, {h, nil, ids, fence}, {h, p, nil, fence}, {h, p, ids, nil}} {
+		if _, err := New(deps.h, deps.p, deps.i, deps.f); err == nil {
 			t.Fatal("missing dependency accepted")
 		}
 	}
-	if _, err := New(h, p, ids); err != nil {
+	if _, err := New(h, p, ids, fence); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -742,11 +778,24 @@ func TestSharedRequestIDContract(t *testing.T) {
 	}
 	generation.Store("generation-b")
 	send(t, c2, operation(2, "register", Object{"example": int64(1)}, 2000))
-	wantSuccess(t, receive(t, c2), requestID(2))
+	wantError(t, receive(t, c2), requestID(2), "generation_mismatch")
+	closed(t, c2)
+	mu.Lock()
+	_, adopted := seen["1001/generation-b/"+requestID(2)]
+	mu.Unlock()
+	if adopted || handlerCalls.Load() != 2 {
+		t.Fatal("old connection adopted new generation")
+	}
+	// The ID's generation scope changes only on a new negotiated connection.
+	c3, _ := client(t, s, nil)
+	send(t, c3, hello(4, 1))
+	wantSuccess(t, receive(t, c3), requestID(4))
+	send(t, c3, operation(2, "register", Object{"example": int64(1)}, 2000))
+	wantSuccess(t, receive(t, c3), requestID(2))
 	mu.Lock()
 	_, ok := seen["1001/generation-b/"+requestID(2)]
 	mu.Unlock()
-	if !ok || peerCalls.Load() != 7 {
+	if !ok || peerCalls.Load() != 9 || handlerCalls.Load() != 3 {
 		t.Fatalf("gate did not see current peer: generation=%v source calls=%d", ok, peerCalls.Load())
 	}
 }

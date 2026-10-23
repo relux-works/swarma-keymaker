@@ -174,3 +174,37 @@ register-after-active; no key-purpose or signed-receipt authority is added.
 | PC2: currency through activation | Specify and qualify final ordering between the two confirmation facts, pin withdrawal, revoke/epoch change and user-manager active append, without RPC under either side's state/journal locks. A fresh nonce/2000ms local observation or equal service instance ID is not a lease and cannot close this race. No shared-lock/lease/commit protocol is claimed implemented. Until this is resolved, bump refuses rather than using a cached receipt. |
 | PC3: creating guard, durability and restore | Qualify metadata-only creating target guard with active caller, published gate→data→commit order and <=250ms local window. Cover exact replay, audit/commit uncertainty, restart/promotion/removal history, protected policy-digest provenance and epoch/journal floor restore. No timer activation or deleting committed evidence; include new state in option C inventory if activated. |
 | PC4: identity allocation and rollout | Operator preallocates a never-used purpose-1 identity for bump: ordinary persistent same-path reuse would reproduce the old key and is not this operation. Confirm this account-to-identity mapping, local generation-pin review/install flow, resource budgets and actual fresh account-token acquisition through its owning service. Keep normal create register-after-active unless separately reviewed. Runtime/root/backend and joint negative-vector qualification remain open. |
+
+## Generation-journal adapter integration gates
+
+The pinned vector source is the public user-manager
+[`gen-journal/1` candidate at `33d0b94`](https://github.com/relux-works/swarma-user-manager/blob/33d0b941dcd4a7ee6d2b5b4ee03c4357056034df/spec/generation-journal.md).
+Its 67-case manifest and exact raw files are copied under
+`internal/keymaker/testdata/gen-journal/`, with per-file source paths and SHA256
+in `provenance.json`. Drift controls check those bytes; they do not establish
+adapter conformance. `generation_source_fenced` is a stable nonretryable
+incident refusal, with audited native admission coverage. The production
+journal adapter and its activation remain pending.
+
+- The source library exports a single-active-UID barrier and an inspection
+  operation that releases its locks before returning. Keymaker needs a common
+  window for multiple principal predicates, including retired targets and
+  deferred verdicts. The reusable read-window and marker validator, including
+  nonroot fixture policy, are private. Resolve ownership of a reusable consumer
+  window/test interface versus a consumer-owned path/lock/marker implementation;
+  do not silently fork the source validator or substitute an unlocked check.
+- The format requires a 250 ms cooperative data window. The current final
+  callback carries no shorter context to audit and actual response handoff.
+  A bounded-context interface must reach those operations; a check after the
+  callback cannot recall bytes already released.
+- Explicit initial-floor enrollment and external restore authorization need
+  an agreed contract. Missing/corrupt established reader floors must fence,
+  without initializing from the restored journal. The witness supplement is
+  not activated and cannot be represented as an implemented authorization source.
+- The source module requires registrar `5f44ebf3f788`, while this module pins
+  `263ca7fcfd97`. Their CCJ package trees are identical
+  (`53452b3e84a131d811221834a1d84c1328dcd5d3`), as are the public registration,
+  enrollment and registry packages. A normal import still changes Go's selected
+  module version and requires the dependency/conformance pin to be reconciled.
+- The landed user-manager commit pin and qualification against a real root-owned
+  journal remain pending. Synthetic nonroot fixtures cannot satisfy either gate.

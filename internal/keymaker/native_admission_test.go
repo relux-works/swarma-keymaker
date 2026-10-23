@@ -140,7 +140,7 @@ func nativeAdmissionControl(t *testing.T, f *nativeFixture, g *nativeAdmissionGe
 // typed, ID-bound refusal/audit, no binding/result effect and no method dispatch.
 // Each case then admits an active hello and pubkey through the same real socket.
 func TestNativeGenerationAdmissionRefusal(t *testing.T) {
-	for _, verdict := range []Code{"generation_inactive", "generation_mismatch", "generation_source_unavailable"} {
+	for _, verdict := range []Code{"generation_inactive", "generation_mismatch", "generation_source_unavailable", "generation_source_fenced"} {
 		for _, recheck := range []bool{false, true} {
 			name := string(verdict) + "/initial"
 			if recheck {

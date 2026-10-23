@@ -129,7 +129,7 @@ func (s *Server) ServeConnAccepted(ctx context.Context, conn net.Conn, accepted 
 func (s *Server) ServeConnRefused(ctx context.Context, conn net.Conn, peer Peer, refusal Code) {
 	defer conn.Close()
 	switch refusal {
-	case "generation_inactive", "generation_mismatch", "generation_source_unavailable":
+	case "generation_inactive", "generation_mismatch", "generation_source_unavailable", "generation_source_fenced":
 	default:
 		return
 	}
@@ -355,7 +355,7 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 
 func generationFailure(code Code) bool {
 	switch code {
-	case "generation_inactive", "generation_mismatch", "generation_source_unavailable", "peer_identity_unavailable", "identity_revoked":
+	case "generation_inactive", "generation_mismatch", "generation_source_unavailable", "generation_source_fenced", "peer_identity_unavailable", "identity_revoked":
 		return true
 	}
 	return false

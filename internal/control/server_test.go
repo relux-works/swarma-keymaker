@@ -483,7 +483,7 @@ func TestRequestIDAdmission(t *testing.T) {
 // Typed errors expose only the fixed code and six permitted retryable classes;
 // neither a handler's result-on-error nor its arbitrary diagnostic can escape.
 func TestResponseRefusals(t *testing.T) {
-	codes := []Code{"rate_limited", "busy", "generation_source_unavailable", "enrollment_unavailable", "audit_unavailable", DeadlineExceeded, RequestConflict, "identity_revoked", "role_not_permitted", "enrollment_unverified", "enrollment_unsupported"}
+	codes := []Code{"rate_limited", "busy", "generation_source_unavailable", "enrollment_unavailable", "audit_unavailable", DeadlineExceeded, RequestConflict, "identity_revoked", "role_not_permitted", "enrollment_unverified", "enrollment_unsupported", "generation_source_fenced"}
 	for _, code := range codes {
 		t.Run(string(code), func(t *testing.T) {
 			s := testServer(t, handlerFunc(func(context.Context, Peer, string, Object) (Object, Code) {

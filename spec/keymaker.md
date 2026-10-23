@@ -1221,6 +1221,7 @@ strings. Registrar-owned signed-document verdicts retain registrar spelling.
 | `peer_identity_unavailable` | Kernel credentials could not be established |
 | `binding_not_found`, `peer_binding_mismatch`, `binding_conflict` | Missing, foreign or conflicting binding |
 | `generation_inactive`, `generation_mismatch`, `generation_source_unavailable` | Retired, different or unavailable account incarnation |
+| `generation_source_fenced` | Generation journal rollback/fork, stale writer or capacity-reserve incident; operator reconciliation required; `retryable=false` |
 | `role_not_permitted` | Authenticated peer has no operation authority |
 | `provision_state_invalid` (unimplemented provision/confirm proposal) | Exact target journal token is active, retiring or removed rather than creating for provision/confirm; `retryable=false` |
 | `binding_provisioned` (unimplemented provision/confirm proposal) | Key use or public-key disclosure reaches a reserved binding without qualified durable active promotion; `retryable=false` |

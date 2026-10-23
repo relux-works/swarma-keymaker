@@ -97,6 +97,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Verify copied generation-vector provenance and bounded drift controls: `go test ./internal/keymaker -run '^TestGenerationVector(Provenance\|DriftControl)$' -count=1 -v` | Exact public source hashes and 67-case inventory; this does not run adapter verdicts |
+| Go | Check terminal generation refusal handling: `GOMAXPROCS=2 GOFLAGS=-p=2 GORACE=atexit_sleep_ms=0 go test -race ./internal/control ./internal/keymaker -run '^Test(GenerationSourceFencedContract\|NativeGenerationAdmissionRefusal\|ResponseRefusals\|RetryableAllowlist)$' -count=1 -v` | Nonretryable typed refusals, one admission audit and no effects, paired active controls; private test sockets under TMPDIR |
 | Go | Test pure proof construction: `go test ./internal/registration -count=1` | Local pinned registration vectors and generated in-memory fixture keys; no host SSH access |
 | Go | Race-check proof construction: `GOMAXPROCS=2 go test -race ./internal/registration -count=1 -p=1` | Race diagnostics and verdicts |
 | Go | Vet proof construction: `go vet ./internal/registration ./tools/mutations` | Diagnostics |

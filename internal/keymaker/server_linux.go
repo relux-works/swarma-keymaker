@@ -215,7 +215,7 @@ func writeResponse(c *net.UnixConn, b []byte) error {
 }
 func fatalCode(c Code) bool {
 	switch c {
-	case "identity_revoked", "generation_inactive", "generation_mismatch", "generation_source_unavailable", "audit_unavailable", "binding_conflict", "binding_not_found", "peer_identity_unavailable":
+	case "identity_revoked", "generation_inactive", "generation_mismatch", "generation_source_unavailable", "generation_source_fenced", "audit_unavailable", "binding_conflict", "binding_not_found", "peer_identity_unavailable":
 		return true
 	}
 	return false

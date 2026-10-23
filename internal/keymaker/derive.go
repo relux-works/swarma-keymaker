@@ -96,10 +96,13 @@ func (m *Master) withKey(path string, f func(ed25519.PrivateKey) []byte) ([]byte
 	if c := ValidatePath(path, "agent-identity"); c != "" {
 		return nil, c
 	}
+	if m == nil {
+		return nil, "custody_unavailable"
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.closed {
-		return nil, "generation_source_unavailable"
+	if m.closed || len(m.seed) != 32 {
+		return nil, "custody_unavailable"
 	}
 	indices, _ := parsePath(path)
 	node := deriveNode(m.seed, indices)

@@ -69,9 +69,9 @@ these are internal-consistency failures, not ordinary caller refusals; no envelo
 escapes. Signer failures propagate the existing section-15 Code supplied by the
 trusted adapter without diagnostics or an invented generic signing code.
 `TestSigningFailures/typed-error` exercises `sign_key_mismatch`, with a valid
-signing control. A generic custody failure without a fitting existing code still
-needs a specification decision before daemon integration. It is not mapped to
-`audit_unavailable`, and no signer-availability code is added here.
+signing control. The proposed core custody refusal is
+`custody_unavailable` with `retryable=false`, awaiting curator content approval.
+It is not mapped to `audit_unavailable`.
 
 ## Vector coverage
 

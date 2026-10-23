@@ -552,6 +552,11 @@ Keymaker signs admission evidence; it never calls the homeserver, issues a
 JWT, logs a token, or promises that already-issued carrier sessions are ended
 by local revocation.
 
+Local signing custody that is closed, unloaded or unable to maintain its required
+protection refuses `custody_unavailable` with `retryable=false`; healthy generation,
+enrollment and audit evidence do not substitute for custody. Recovery requires
+restoring protected custody before a new admission attempt.
+
 ## 9. Domain separation
 
 | Entry | Key | Bytes that may be signed |
@@ -1133,5 +1138,6 @@ strings. Registrar-owned signed-document verdicts retain registrar spelling.
 | `enrollment_unavailable`, `enrollment_unverified`, `enrollment_unsupported`, `host_revoked` | Unavailable, untrusted, unsupported or revoked enrollment |
 | `uid_not_permitted`, `name_not_permitted`, `audience_mismatch` | Mapped principal, name or audience check failed |
 | `key_not_enrolled`, `key_not_valid_now` | Host purpose key absent or outside enrolled window |
+| `custody_unavailable` | Local signing custody is closed, unloaded or its required protection failed; `retryable=false` on B, failure packet on A |
 | `entropy_unavailable`, `clock_untrusted` | Cannot safely create fresh admission proof |
 | `rate_limited`, `busy`, `state_capacity_exceeded`, `audit_unavailable` | Resource or durable-evidence admission closure |

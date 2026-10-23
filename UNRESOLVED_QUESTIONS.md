@@ -85,8 +85,7 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
 - Binding enforcement and native helper wiring remain integration obligations.
   The pure [registration builder](internal/registration/README.md) constructs and
   self-verifies proofs, but enrollment authority alone cannot release one.
-- The trusted registration Signer propagates an existing section-15 Code. A
-  generic custody failure with no fitting code needs specification review before
-  daemon integration; no generic signer code or audit-failure substitution is
-  introduced. Registrar self-check failures keep their typed spellings and
-  return no proof, as internal-consistency failures.
+- Proposed `custody_unavailable` (`retryable=false`) covers closed, unloaded or
+  protection-failed local signing custody on both surfaces. This proposal awaits
+  curator content approval. Other existing refusal meanings are unchanged.
+  Registrar self-check failures retain their typed spellings and return no proof.

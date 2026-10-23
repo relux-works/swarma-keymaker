@@ -133,3 +133,17 @@ complete Request delivery to Handler and mandatory workload/refusal Observer
 are core/wire seams needed to implement the existing contract, not new wire
 methods. Recovery refuses older snapshots without `requests`; no automatic
 migration or reconstruction is claimed. See [Linux testing](linux-testing.md).
+
+## Proposed custody refusal
+
+The original 70 rows are supplemented by `custody-closed`, pending curator
+content approval of `custody_unavailable` (`retryable=false`).
+`TestCustodyUnavailableVectors/{agent,control}/{negative,control}` exercises
+both actual sockets, exact audit code, no retained success on refusal, and
+independent open-Master controls. The native case uses public-key lookup; the
+helper signing case is covered with helper integration separately.
+
+`TestMasterUnavailableStates/{unloaded,nil}/{agent,control}/{negative,open-control}`
+additionally prevents empty-seed derivation and nil-provider panics on both
+sockets, with independent open providers. These are custody failure variants,
+not additional vector IDs.

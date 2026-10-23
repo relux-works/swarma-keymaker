@@ -1708,6 +1708,17 @@
       "expected_code": "name_invalid",
       "positive_control": "ok-helper-mxid-length",
       "mutation_path": "/request/params/name"
+    },
+    {
+      "id": "custody-closed",
+      "claim": "Closed local signing custody refuses independently of healthy generation and enrollment evidence.",
+      "input": {
+        "evaluation": "custody",
+        "closed": true
+      },
+      "expected_code": "custody_unavailable",
+      "positive_control": "ok-custody-closed",
+      "mutation_path": "/closed"
     }
   ],
   "positive": [
@@ -3256,6 +3267,15 @@
         "connection": "fresh"
       },
       "expected_result": "exact 255-byte mxid with explicitly mapped legacy name may sign"
+    },
+    {
+      "id": "ok-custody-closed",
+      "input": {
+        "evaluation": "custody",
+        "closed": false
+      },
+      "claim": "Open protected custody can sign or return its public key.",
+      "expected_result": "Signature or public key from open custody"
     }
   ]
 }

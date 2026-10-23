@@ -224,8 +224,8 @@ of fixture seed encodings. Independent open controls verify signatures or keys.
 `TestCustodySignCauses` separately covers the signing operation's captured cause.
 `TestCustodyAuditSchema` rejects missing/unknown/misapplied new causes before any
 append and rejects correctly rehashed invalid stored metadata. It recovers valid
-causes. Historical custody records without a cause now refuse recovery; ordinary
-records without custody metadata retain their canonical bytes and hashes.
+causes and historical cause-free custody records. Recovery retains their exact
+canonical bytes and hashes; new appends still require a valid custody cause.
 These fixture tests do not qualify live multi-UID use or memory non-extraction.
 
 | Mutant | Gate | Named failing test |
@@ -246,9 +246,13 @@ the result to unknown, without writing or poisoning the journal; ordinary
 unknown-time records still append. The shared append implementation retains the
 context gate, cancellation boundaries and post-durable-action completion rule.
 
-`TestCustodyResultMatrix` executes all 45 combinations below through each append
-API and recovery (135 cases). This is the custody-linkage verdict; it does not
-add unrelated generic audit-schema validation. Absence of code/cause is `none`.
+`TestCustodyResultMatrix` uses separate literal append and recovery verdicts for
+all 45 combinations through each append API and recovery (135 cases). This is
+the custody-linkage verdict; it does not add unrelated generic audit-schema
+validation. Absent code/cause is `none`. Recovery permits absent historical
+metadata, including older unknown-time records; all present metadata is strict.
+
+Append / AppendContext:
 
 | Result | RefusalCode | none | closed | unloaded | protection_failed | invalid cause |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -262,7 +266,35 @@ add unrelated generic audit-schema validation. Absence of code/cause is `none`.
 | unknown | custody_unavailable | reject | reject | reject | reject | reject |
 | unknown | other | accept | reject | reject | reject | reject |
 
+Recovery:
+
+| Result | RefusalCode | none | closed | unloaded | protection_failed | invalid cause |
+| --- | --- | --- | --- | --- | --- | --- |
+| refused | none | accept | reject | reject | reject | reject |
+| refused | custody_unavailable | accept | accept | accept | accept | reject |
+| refused | other | accept | reject | reject | reject | reject |
+| success | none | accept | reject | reject | reject | reject |
+| success | custody_unavailable | accept | reject | reject | reject | reject |
+| success | other | accept | reject | reject | reject | reject |
+| unknown | none | accept | reject | reject | reject | reject |
+| unknown | custody_unavailable | accept | reject | reject | reject | reject |
+| unknown | other | accept | reject | reject | reject | reject |
 The `custody-result-linkage` mutant removes only the Result predicate and is
 killed by `TestCustodyResultLinkage/Append/success`; it also exercises the matching
 AppendContext and recovery assertions. The existing cause-code validation stays
 in place. These are isolated local journal fixtures, not live journal edits.
+
+### Historical custody recovery
+
+`TestCustodyLegacyRecovery/{custody,ordinary}` uses the exact synthetic journal
+bytes written and reopened by main `243a330`. The committed fixtures in
+`internal/keymaker/testdata/custody-legacy-243a330/` preserve their fixed SHA256
+values and original record digests, checked independently of the new writer.
+Recovery must retain the original chain head and file bytes, with no cause
+synthesis or history rewriting. Ordinary history is the paired control.
+The existing `TestCustodyAuditSchema/legacy` case also accepts old omission.
+New cause-free appends still refuse on both APIs in the append matrix.
+
+The `custody-legacy-recovery` mutant applies the strict append predicate only
+to replay. `TestCustodyLegacyRecovery/custody` must fail while ordinary-history
+recovery still passes; no new-write or present-metadata validation is weakened.

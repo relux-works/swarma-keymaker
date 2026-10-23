@@ -32,6 +32,12 @@ func validAuditCustody(r AuditRecord) bool {
 	return isCustody && r.Result == "refused" && r.CustodyCause.valid()
 }
 
+// Recovery accepts absent historical metadata without inventing a cause or
+// changing the canonical record. Present metadata obeys every new-write rule.
+func validReplayAuditCustody(r AuditRecord) bool {
+	return r.CustodyCause == nil || validAuditCustody(r)
+}
+
 // Production Masters supply detailed results internally without changing the
 // existing public Signer contract. Other injected signers keep their own Codes;
 // a custody refusal without a valid cause cannot be appended as new evidence.

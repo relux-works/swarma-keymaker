@@ -269,7 +269,7 @@ func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.R
 				return nil, failure("audit record too large")
 			}
 			var r AuditRecord
-			if StrictJSON(bytes.NewReader(line), &r) != nil || !validAuditCustody(r) {
+			if StrictJSON(bytes.NewReader(line), &r) != nil || !validReplayAuditCustody(r) {
 				return nil, failure("invalid audit record")
 			}
 			b, e := canonical(r)

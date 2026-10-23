@@ -641,22 +641,27 @@ not omitted. `domain` is the SSHSIG namespace (`git`), registrar domain, or
 `control`; result is `success`, `refused` or `unknown`. Time is whole-second UTC
 or null with result `unknown` when trustworthy time cannot be established.
 
-`custody_unavailable` records MUST have result `refused` and include
-`custody_cause`, exactly one of `closed`, `unloaded`, or `protection_failed`. A nil Master or empty seed
+Both append APIs MUST require new `custody_unavailable` records to have result
+`refused` and include `custody_cause`, exactly one of `closed`, `unloaded`, or
+`protection_failed`. A nil Master or empty seed
 maps to `unloaded`; an explicitly closed Master maps to `closed` even after its
 seed is erased; any other non-32-byte seed maps to `protection_failed`. Capture
 the cause during the failing custody operation. This member MUST be omitted on
 other records, including successful operations, and MUST NOT appear in responses
 on either surface, including helper responses. All three causes produce identical
 response bytes for the same request. The member carries no key material or
-free-form diagnostics. Historical custody records without the required cause now
-refuse recovery; ordinary historical records without custody metadata retain their canonical bytes
-and hash chain. Both append APIs and recovery MUST reject a custody refusal code
-without a cause, a cause with another or absent code, and a cause on `success`,
-`unknown` or any result other than `refused`. This also applies after time
-qualification: if uncertain time changes the result to `unknown`, the custody
-record MUST refuse before any append; ordinary cause-free unknown-time records
-retain their existing behavior. No automatic journal migration is provided.
+free-form diagnostics. Recovery MUST accept otherwise valid historical records
+without `custody_cause`, including `custody_unavailable` refusals. This exception
+is recovery-only: both append APIs MUST reject a new custody refusal code without
+a cause. Whenever a cause is present, both append APIs and recovery MUST validate
+its enum and require `refusal_code` equal to `custody_unavailable` and result
+`refused`; a cause with another or absent code, or on `success`, `unknown` or any
+other result, MUST refuse. Recovery MUST NOT invent a cause, rewrite historical
+bytes or recompute stored record hashes; canonical bytes and the existing hash
+chain remain unchanged. After time qualification, a new custody record whose
+result becomes `unknown` MUST refuse before any append. Ordinary cause-free
+unknown-time records retain their existing behavior. No journal migration is
+needed for this optional historical metadata.
 
 Audit is an append-only sequence of CCJ-1 JSON lines owned by the service,
 mode 0600, in a 0700 directory. Each operation, including hello, lookup and

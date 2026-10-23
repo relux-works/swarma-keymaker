@@ -154,28 +154,34 @@ func TestCustodyResultLinkage(t *testing.T) {
 // This literal table covers every combination of the three specified Results,
 // code class (absent/custody/other), and absent/three valid/invalid causes. It
 // checks custody linkage, not unrelated generic audit-schema constraints.
+// Append and recovery expectations are separate: absent historical metadata is
+// accepted only by recovery, while all present metadata retains strict linkage.
 func TestCustodyResultMatrix(t *testing.T) {
 	causes := []string{"none", "closed", "unloaded", "protection_failed", "invalid"}
 	rows := []struct {
-		result, code string
-		accept       [5]bool
+		result, code     string
+		append, recovery [5]bool
 	}{
-		{"refused", "none", [5]bool{true, false, false, false, false}},
-		{"refused", "custody_unavailable", [5]bool{false, true, true, true, false}},
-		{"refused", "binding_not_found", [5]bool{true, false, false, false, false}},
-		{"success", "none", [5]bool{true, false, false, false, false}},
-		{"success", "custody_unavailable", [5]bool{false, false, false, false, false}},
-		{"success", "binding_not_found", [5]bool{true, false, false, false, false}},
-		{"unknown", "none", [5]bool{true, false, false, false, false}},
-		{"unknown", "custody_unavailable", [5]bool{false, false, false, false, false}},
-		{"unknown", "binding_not_found", [5]bool{true, false, false, false, false}},
+		{"refused", "none", [5]bool{true, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"refused", "custody_unavailable", [5]bool{false, true, true, true, false}, [5]bool{true, true, true, true, false}},
+		{"refused", "binding_not_found", [5]bool{true, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"success", "none", [5]bool{true, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"success", "custody_unavailable", [5]bool{false, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"success", "binding_not_found", [5]bool{true, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"unknown", "none", [5]bool{true, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"unknown", "custody_unavailable", [5]bool{false, false, false, false, false}, [5]bool{true, false, false, false, false}},
+		{"unknown", "binding_not_found", [5]bool{true, false, false, false, false}, [5]bool{true, false, false, false, false}},
 	}
 	for _, mode := range []string{"Append", "AppendContext", "Recovery"} {
 		t.Run(mode, func(t *testing.T) {
 			for _, row := range rows {
 				for i, cause := range causes {
 					t.Run(row.result+"/"+row.code+"/"+cause, func(t *testing.T) {
-						checkCustodyResult(t, mode, custodyResultRecord(row.result, row.code, cause), row.accept[i])
+						accept := row.append[i]
+						if mode == "Recovery" {
+							accept = row.recovery[i]
+						}
+						checkCustodyResult(t, mode, custodyResultRecord(row.result, row.code, cause), accept)
 					})
 				}
 			}

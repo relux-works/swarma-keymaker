@@ -44,3 +44,23 @@ func TestProductionBinaryGenerationGate(t *testing.T) {
 		t.Fatalf("production admission must refuse: %v %s", e, out)
 	}
 }
+
+// Reconciliation dispatch validates flags and requires the privileged operator;
+// version is the nearby nonprivileged positive command. No system path is read.
+func TestReconcileCommandDispatch(t *testing.T) {
+	for _, sample := range []struct {
+		args   []string
+		status int
+	}{
+		{[]string{"enrollment", "reconcile"}, 2},
+		{[]string{"enrollment", "reconcile", "--unknown"}, 2},
+		{[]string{"enrollment", "reconcile", "--config", filepath.Join(t.TempDir(), "pins.json"), "extra"}, 2},
+		{[]string{"enrollment", "reconcile", "--config", filepath.Join(t.TempDir(), "pins.json")}, 1},
+		{[]string{"version"}, 0},
+	} {
+		var out bytes.Buffer
+		if status := run(context.Background(), sample.args, &out, &out); status != sample.status {
+			t.Fatalf("%v: %d %s", sample.args, status, &out)
+		}
+	}
+}

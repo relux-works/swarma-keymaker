@@ -3,6 +3,7 @@ package enrollment
 import (
 	"context"
 	"errors"
+	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -30,8 +31,8 @@ const (
 )
 
 // Reconciler attests freshness from evidence independent of restored local state.
-// Check receives a copy. nil is conservative: existing local state alone cannot
-// establish freshness. A service must supply its qualified startup policy.
+// Check receives a copy. New selects the operator-command policy when nil;
+// existing local state alone cannot establish freshness.
 type Reconciler interface {
 	Check(context.Context, *registry.HighWater) error
 }
@@ -58,13 +59,34 @@ type Authority struct {
 	fence       Code
 	commitFault bool
 	storeOps    durableOps
+	lease       *os.File
+	closed      bool
 }
 
 func New(configPath string, files Files, reconcile Reconciler) *Authority {
 	if files == nil {
 		files = LinuxFiles{}
 	}
+	if reconcile == nil {
+		reconcile = &commandReconciler{configPath: configPath, files: files}
+	}
 	return &Authority{configPath: configPath, files: files, reconcile: reconcile, fence: EnrollmentUnavailable}
+}
+
+// Close permanently fences this authority and releases its stopped-helper lease.
+// Call only after its serving goroutines have stopped; later Reload refuses.
+func (a *Authority) Close() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.closed = true
+	a.snapshot = nil
+	a.policy = nil
+	a.fence = EnrollmentUnverified
+	if a.lease != nil {
+		unlock(a.lease)
+		a.lease = nil
+	}
+	return nil
 }
 
 // Reload validates protected pins and the complete snapshot, persists rollback
@@ -76,7 +98,7 @@ func (a *Authority) Reload(ctx context.Context) Code {
 	a.snapshot = nil
 	a.policy = nil
 	a.fence = EnrollmentUnverified
-	if a.commitFault {
+	if a.commitFault || a.closed {
 		return a.fence
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -88,6 +110,12 @@ func (a *Authority) Reload(ctx context.Context) Code {
 	}
 	if a.stateDir != "" && config.StateDir != a.stateDir {
 		return a.fence
+	}
+	if a.lease == nil {
+		a.lease, err = directoryLease(config.StateDir, a.files, uint32(os.Geteuid()), false)
+		if err != nil {
+			return a.fence
+		}
 	}
 	a.stateDir = config.StateDir
 	store := newFileStore(ctx, config.StateDir, a.files)
@@ -106,8 +134,18 @@ func (a *Authority) Reload(ctx context.Context) Code {
 		if !reflect.DeepEqual(retained, a.retained) {
 			return a.fence
 		}
-	} else if a.reconcile == nil || a.reconcile.Check(ctx, retained.Clone()) != nil {
-		return a.fence
+	} else {
+		var reconcileErr error
+		if r, ok := a.reconcile.(*commandReconciler); ok {
+			reconcileErr = r.checkPinned(ctx, retained.Clone(), config)
+		} else if a.reconcile != nil {
+			reconcileErr = a.reconcile.Check(ctx, retained.Clone())
+		} else {
+			reconcileErr = errTrust
+		}
+		if reconcileErr != nil {
+			return a.fence
+		}
 	}
 	if err = safeRepository(ctx, a.files, config.Registry); err != nil {
 		a.fence = localCode(err)

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 	"github.com/relux-works/swarma-keymaker/internal/keymaker"
 )
 
@@ -19,8 +20,11 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) int {
 		fmt.Fprintln(out, version)
 		return 0
 	}
+	if len(args) >= 2 && args[0] == "enrollment" && args[1] == "reconcile" {
+		return runReconcile(ctx, args[2:], os.Stdin, out, errOut)
+	}
 	if len(args) == 0 || args[0] != "serve" {
-		fmt.Fprintln(errOut, "usage: keymaker version | serve --config <file>")
+		fmt.Fprintln(errOut, "usage: keymaker version | serve --config <file> | enrollment reconcile --config <file> [--confirm <sha256>]")
 		return 2
 	}
 	flags := flag.NewFlagSet("serve", flag.ContinueOnError)
@@ -39,4 +43,19 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	os.Exit(run(ctx, os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func runReconcile(ctx context.Context, args []string, input io.Reader, out, errOut io.Writer) int {
+	flags := flag.NewFlagSet("enrollment reconcile", flag.ContinueOnError)
+	flags.SetOutput(errOut)
+	config := flags.String("config", "", "protected enrollment pin configuration")
+	confirm := flags.String("confirm", "", "exact full state SHA256; omit to prompt")
+	if flags.Parse(args) != nil || flags.NArg() != 0 || *config == "" {
+		return 2
+	}
+	if err := enrollment.Reconcile(ctx, *config, *confirm, input, out, errOut); err != nil {
+		fmt.Fprintln(errOut, err)
+		return 1
+	}
+	return 0
 }

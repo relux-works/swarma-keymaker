@@ -17,7 +17,7 @@ func metadata(info os.FileInfo) (Metadata, error) {
 	if !ok {
 		return Metadata{}, errTrust
 	}
-	return Metadata{Mode: info.Mode(), UID: st.Uid}, nil
+	return Metadata{Mode: info.Mode(), UID: st.Uid, Links: st.Nlink}, nil
 }
 func (LinuxFiles) Lstat(path string) (Metadata, error) {
 	info, err := os.Lstat(path)

@@ -25,7 +25,7 @@ gates are in [`spec/keymaker.md`](spec/keymaker.md).
 `internal/enrollment` supplies protected pins, isolated signed-Git verification,
 durable rollback state and local enrollment authority using the registrar
 packages. First acceptance requires an explicit operator bootstrap through the
-reconcile command; the service never initializes empty state. Every restart
+[reconcile command](internal/enrollment/README.md#operator-reconciliation-procedure); the service never initializes empty state. Every restart
 requires explicit operator reconciliation. The proposed
 Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
@@ -37,7 +37,7 @@ Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 | `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |
 | `go.mod`, `go.sum` | Go version and exact registrar dependency pin |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
-| `cmd/keymaker/` | Production `serve` and `version` entry points |
+| `cmd/keymaker/` | Production `serve`, `version` and operator `enrollment reconcile` entry points |
 | `internal/keymaker/` | Linux custody, derivation, bindings/results, audit and both socket servers |
 | `cmd/keymaker-window/`, `internal/testwindow/` | Nonroot integration-window harness; separate from the daemon |
 | `docs/k1a-coverage.md` | Surface A coverage and retained recovery controls |
@@ -69,6 +69,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Race-check proof construction: `GOMAXPROCS=2 go test -race ./internal/registration -count=1 -p=1` | Race diagnostics and verdicts |
 | Go | Vet proof construction: `go vet ./internal/registration ./tools/mutations` | Diagnostics |
 | gofmt | Check proof formatting: `gofmt -l internal/registration/*.go tools/mutations/main.go` | Empty output expected |
+| keymaker | Reconcile before enrollment startup: `keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG"` (root operator, stopped helper; optionally `--confirm "$EXACT_STATE_SHA256"`) | JSON lines on stdout, summary/prompt on stderr; one-use approval in protected enrollment state directory |
 | Go | Test enrollment authority: `go test ./internal/enrollment` | Named verdicts; isolated fixture registries/keys under the Go temporary directory, cleaned by tests |
 | Go | Targeted race check: `GOMAXPROCS=2 go test -race ./internal/enrollment -run 'TestConcurrentReloadAuthorize\|TestStoreCompareAndSwap\|TestInterruptedWriteFencesUntilRestart' -count=1 -p=1` | Race diagnostics and verdicts |
 | Go | Run the published enrollment fixture integration: `GOPROXY=off go test -v ./internal/enrollment -run '^TestRegistrarEnrollmentConformance$' -count=1` | 114 negative/25 positive local pinned-module rows; no test-time fetch |

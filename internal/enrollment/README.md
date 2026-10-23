@@ -11,6 +11,7 @@ The entry points are:
 ```go
 func New(configPath string, files Files, reconcile Reconciler) *Authority
 func (a *Authority) Reload(ctx context.Context) Code
+func (a *Authority) Close() error
 func (a *Authority) Authorize(ctx context.Context, peerUID uint32,
     generation, key, name, aud string, issuedAt, now time.Time) (EnrolledKey, Code)
 func NewOperatorReconciler(path string, files Files) (*OperatorReconciler, error)
@@ -42,7 +43,8 @@ are refused. This shape shows placeholders, not deployable verification keys:
   "registry": "/var/lib/enrollment-registry.git",
   "state_dir": "/var/lib/keymaker/enrollment",
   "stations": {"sample": true},
-  "generations": {"30001": "00000000000000000000000000000001"}
+  "generations": {"30001": "00000000000000000000000000000001"},
+  "service_uid": 30001
 }
 ```
 
@@ -104,8 +106,9 @@ checks as configuration. Integer history keys also require canonical decimal
 spelling, so distinct JSON keys cannot collapse into one sequence entry.
 The service never obtains `Reconciled=true` from mere
 local-file readability. The `Reconciler` receives a copy and must establish
-freshness from independently trusted evidence. A nil reconciler refuses an
-existing-state restart. Successful in-process commits retain the known-latest
+freshness from independently trusted evidence. A nil reconciler selects the
+one-use operator-command policy below; without its protected receipt, an
+existing-state restart refuses. Successful in-process commits retain the known-latest
 state for subsequent reloads. `StateDigest` can identify that state; calculating
 a digest from the local file does not itself establish freshness.
 
@@ -120,28 +123,97 @@ a Commit error returns neither snapshot nor replacement high water, durable stat
 is indeterminate, and admission stays fenced until operator reconciliation.
 
 Every restart needs a new operator decision; a local file alone never sets
-`Reconciled=true`. `OperatorReconciler` is the only shipped reconciliation policy.
-Create a fresh `NewOperatorReconciler(approvalPath, nil)` for each process start,
-pass it to `New`, and expose its public `Challenge()` to the trusted operator
-interface. After reconciling the actual latest approved revision, history,
-tombstones and freshness, the operator supplies a protected root-owned file:
+`Reconciled=true`. `New(configPath, nil, nil)` selects the command-record policy.
+The legacy explicit `OperatorReconciler` challenge adapter remains for callers
+that implement their own qualified operator interface; its input is incompatible
+with command records. Production callers should use the default policy.
 
-```json
-{
-  "startup_id": "<this-startup-Challenge-value>",
-  "state_sha256": "<StateDigest-of-the-reconciled-high-water>"
-}
+## Operator reconciliation procedure
+
+Use this procedure **before every enrollment-authority restart**, including a
+restart after a failed commit. Stop the enrollment helper/daemon first. Every
+`Authority` holds a shared `flock` on the state-directory inode from its first
+reload until `Close`; stop serving and call `Close` at shutdown. The command
+requires that inode's exclusive lock and also exclusively locks the existing
+Store lock file. A live or starting helper, another operator command, or an
+active Store writer causes refusal. There are no PID-file or socket guesses.
+The current `serve` entry point still refuses at the unavailable generation
+journal gate; this procedure supplies the enrollment API's startup policy,
+not a deployed daemon integration.
+
+The protected pin config must include the actual nonzero `service_uid`. The
+state directory must be mode 0700, owned by that service UID (so the service can
+consume its one-use approval), with
+**root-owned protected ancestors**. These stronger reconciliation rules prevent
+the service from replacing the locked directory inode. Run the following single
+command as the root operator, with the installed binary and protected pin path:
+
+```sh
+keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG"
 ```
 
-The file can live at `/etc/keymaker/enrollment-reconciliation.json`, with the
-same protected-file rules as the pin configuration. The digest identifies the
-complete state, not just its revision. For an unchanged file written by this
-store it is also the SHA-256 of the exact `high-water.json` bytes. The operator
-must establish freshness before approving that digest; merely copying a local
-file hash is not reconciliation. Earlier-start approvals, wrong digests and
-unsafe files cannot authorize a restart. Reload after the new approval performs
-full validation again. The reconciliation command is supplied by the stacked operator layer; this
-Go API remains available for explicit injected startup policies. An external-witness policy is not shipped.
+Stdout is newline-delimited JSON, schema `version: 1`. The first object contains
+`pin_revision`, `pin_sha256` (the canonical complete protected configuration),
+`publisher_fingerprint` (`SHA256:` followed by lowercase hex over the decoded
+Ed25519 publisher key), `audience`, `local_revision`, sorted `hosts` (host, seq,
+id, revoked), `state_sha256`, `snapshot_sha256`, `evidence`, `match`, `reason`,
+and `approved: false`. `state_sha256` hashes the versioned complete high-water
+record, including sequence history and permanent key/name ownership. A human
+summary and confirmation prompt go to stderr. Bootstrap-marker presence is
+reported as evidence of prior acceptance; a partial marker, missing high water,
+or any orphan/pending/unrecognized file refuses. Never-used state also refuses;
+this command cannot bootstrap.
+
+The command reads state without creating a lock file or calling its persistent
+Commit. It recomputes the pinned registry through the production Git verifier,
+ancestry check and registrar loader, capturing proposed Commits only in
+memory. An isolated fresh preview derives state from the pin without trusting
+local history; its registrar `FirstUse` validation mode has only an in-memory
+Store and cannot bootstrap local state. A separate retained-state validation
+performs the real ancestry/history checks. Both must succeed. Local and proposed **complete** state must match, including the accepted
+revision. Reasons distinguish changed revision, missing host, changed ID or
+revocation, history/ownership mismatch and registrar rejection (including
+rollback). It never silently advances a lagging accepted revision.
+
+Independently establish that the protected pin represents the current approved
+registry and that the retained history is the latest known state. This is the
+operator freshness decision under interim option A; matching local bytes alone
+cannot establish it. Type the exact 64-character `state_sha256`, then Enter.
+For an operator interface that already made this decision, the same command
+accepts `--confirm "$EXACT_STATE_SHA256"`. Whitespace, wrong/stale digests, EOF
+without a digest and changed state/pin refuse. Policy and snapshot/state are
+re-read after confirmation while the locks remain held.
+
+Success emits a second JSON object with `approved: true` and exits 0. Exit 1
+means refusal or I/O failure; malformed command flags exit 2. Start the helper
+with the default reconciliation policy. It accepts only the command's strict
+record with the current full state digest, **full pin digest and protected config
+path hash**; it consumes
+the exact root-owned, single-linked approval inode and fsyncs its removal before
+admitting enrollment. A later restart needs another command invocation. The
+service can read/unlink the approval but cannot create a replacement root-owned
+inode. Approval files and pending markers are operator authority, **excluded
+from service-owned state backups**; copying a root-owned approval as part of
+backup restoration is a new privileged approval, not supported recovery.
+
+Approval publication uses an independently durable pending marker in the
+root-owned pin-config directory (named from the full config-path hash), then a
+full-write/file-fsync/close/rename/directory-fsync sequence. The service cannot
+remove that root-directory fence. Any failure retains
+the pending fence, even if rename made an approval visible. Removing the marker
+is the final fallible action. Its removal is intentionally not fsynced afterwards:
+a crash can conservatively resurrect the fence, never expose a candidate whose
+publication was not synced. A failed command cannot clear a previous fence. An
+already-present approval refuses replacement: consume it at startup, or investigate it through separate
+privileged recovery if it is stale or damaged.
+
+On a mismatch or interrupted-write fence, **leave the helper stopped** and
+retain the JSON report and error. Investigate against independently trusted
+registry history/backups. Repair or recovery is a separate privileged operator
+action outside this command; it must preserve monotonic history, tombstones and
+permanent ownership. No repair/reset/bootstrap switch is supplied. Do not clear
+evidence or edit approval/high-water files to force admission. After authorized
+recovery, rerun this same procedure; no file editing is part of reconciliation.
 
 ## Check order and helper codes
 

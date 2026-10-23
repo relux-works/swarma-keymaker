@@ -8,7 +8,8 @@ import (
 	"github.com/relux-works/swarma-registrar/registry"
 )
 
-// OperatorReconciler is the only supplied startup policy. A fresh instance is
+// OperatorReconciler is the legacy injected challenge adapter. New defaults to
+// the operator command policy instead. A fresh challenge instance is
 // required for every process start; approval files from earlier starts cannot
 // automatically un-fence a local restored high-water file.
 type OperatorReconciler struct {

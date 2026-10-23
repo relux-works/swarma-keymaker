@@ -21,8 +21,9 @@ import (
 
 // Metadata is the small ownership boundary used by configuration fixtures.
 type Metadata struct {
-	Mode fs.FileMode
-	UID  uint32
+	Mode  fs.FileMode
+	UID   uint32
+	Links uint64
 }
 
 // Files supplies no-follow file reads and lstat metadata. Production uses LinuxFiles.
@@ -45,6 +46,7 @@ type PinConfig struct {
 	StateDir    string            `json:"state_dir"`
 	Stations    map[string]bool   `json:"stations"`
 	Generations map[string]string `json:"generations"`
+	ServiceUID  *uint32           `json:"service_uid,omitempty"`
 }
 
 var errTrust = errors.New("unverified local trust")
@@ -197,6 +199,9 @@ func loadConfig(path string, files Files) (PinConfig, *format.Policy, error) {
 		return c, nil, err
 	}
 	if !revisionPattern.MatchString(c.Revision) || !absolute(c.Registry) || !absolute(c.StateDir) || len(c.Maintainers) == 0 || !canonicalAudience(c.Audience) || len(c.Stations) == 0 {
+		return c, nil, errTrust
+	}
+	if c.ServiceUID != nil && (*c.ServiceUID == 0 || *c.ServiceUID == 4294967295) {
 		return c, nil, errTrust
 	}
 	for _, key := range c.Maintainers {

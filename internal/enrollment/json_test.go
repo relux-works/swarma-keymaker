@@ -54,6 +54,8 @@ func TestConfigBootstrapCaseAlias(t *testing.T) {
 // members, unknown names, and duplicate decoded names refuse before any write.
 func TestConfigExactMembers(t *testing.T) {
 	f := newFixture(t)
+	uid := uint32(os.Geteuid())
+	f.config.ServiceUID = &uid
 	f.config.Revision = f.commit(f.valid(), "", true)
 	f.writeConfig()
 	original, err := os.ReadFile(f.configPath)

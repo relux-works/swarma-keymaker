@@ -6,11 +6,14 @@ Keymaker holds an installation's key material and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
 generation. Private identity keys never enter station processes.
 
-**Status: specification and native wire layer.** `internal/control` implements
-bounded CCJ-1 framing, version negotiation and sequential request dispatch.
-Peer/generation authority, request-ID admission, method execution and final
-release fencing are required injected interfaces; no production adapters are
-supplied. There is no service binary, installer or deployed security boundary. The vector tool is offline test tooling.
+**Status: v0 core under development.** Linux custody primitives and offline
+tests are present; production generation admission remains unavailable.
+There is no deployed security boundary or installer in this repository.
+
+`internal/control` implements bounded CCJ-1 framing, version negotiation and
+sequential request dispatch. Peer/generation authority, request-ID admission,
+method execution and final release fencing are required injected interfaces;
+no production control adapters are supplied.
 The proposed Linux v0 and publication gates are in
 [`spec/keymaker.md`](spec/keymaker.md).
 
@@ -20,6 +23,7 @@ The proposed Linux v0 and publication gates are in
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `go.mod` | Standard-library-only module and Go version |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
+| `internal/keymaker/` | Linux custody, derivation, bindings and generation interfaces |
 | `tools/vectors/` | Reproducible Go derivation generator and fixture checks |
 | `tools/runbook-check/` | Offline regression of the specification's shell guards, using stubs |
 | `UNRESOLVED_QUESTIONS.md` | Index of decisions and activation gates |
@@ -37,6 +41,7 @@ or host account-management commands.
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |
 | Go | Bounded decoder fuzzing: `GOMAXPROCS=2 go test ./internal/control -run '^$' -fuzz '^FuzzCCJRoundTrip$' -fuzztime=20s -parallel=1` | Verdicts and Go fuzz cache; failing corpus under `internal/control/testdata/fuzz/` |
+| Go | Check core packages: `go test ./internal/keymaker` | Test verdicts; temporary fixtures follow `TMPDIR` |
 | Go | Check published SLIP-0010 controls, regenerate in memory and compare: `go run ./tools/vectors/main.go -check` | Summary on stdout; refuses mismatched fixtures |
 | Go | Regenerate Keymaker derivation examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash | Check actual marked shell preflights with stubbed NSS and mutations: `go run ./tools/runbook-check/main.go -check` | Named regression verdicts on stdout; no host writes |
@@ -62,6 +67,6 @@ a lookup followed by an unprotected write does not satisfy its contract.
 Exact retries may pass the request-ID interface for handler-owned result recovery;
 changed arguments must be refused by that generation-scoped interface.
 
-The checks validate transport behavior, fixtures and derivation tooling. They do
-not qualify a daemon, enforce real kernel peer authentication or replace the
-pending integration tests listed in the specification.
+The native wire checks validate transport behavior with injected peers. They do
+not qualify a production daemon, enforce real kernel peer authentication or
+replace the pending integration tests listed in the specification.

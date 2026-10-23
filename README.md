@@ -30,9 +30,15 @@ packages. First acceptance requires an explicit operator bootstrap through the
 requires explicit operator reconciliation. The proposed
 Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
+The [option C witness proposal](spec/keymaker-witness.md) defines a separate
+Keymaker stream, witnessed state epochs and startup/commit recovery rules.
+It is spec only: option A remains in use, and witness placement, keys,
+freshness, exclusion and lifecycle qualification remain open activation gates.
+
 | Path | Contents |
 | --- | --- |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
+| `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
 | `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |

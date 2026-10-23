@@ -3,6 +3,10 @@
 Status: spec only; Linux v0 candidate. MUST and MUST NOT describe requirements,
 not implemented or qualified capabilities. No service code is included.
 
+The [option C external-witness supplement](keymaker-witness.md) proposes state
+rollback protection, lifecycle vectors and explicitly enumerated normative
+changes; it does not activate or change this specification's existing rules.
+
 ## 1. Scope and public references
 
 Keymaker is a dedicated local key-custody service. It provides one bound

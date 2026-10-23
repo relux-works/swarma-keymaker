@@ -1,5 +1,10 @@
 # Local enrollment authority
 
+The proposed [option C witness supplement](../../spec/keymaker-witness.md)
+describes future external freshness and C-specific consumption ordering; the
+option A startup consumption contract below remains unchanged and implemented
+without a witness.
+
 This Linux package supplies the caller interfaces for the pinned registrar
 packages. Enrollment parsing, publisher verification, snapshot phase ordering,
 current record selection, name syntax/ownership and historical rollback rules

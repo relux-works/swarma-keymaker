@@ -41,6 +41,35 @@ loader diagnostics are not silently renamed into signed-format rules. The
 helper is Ed25519-only in v0 although the registrar also supports P-256.
 No unresolved interface may be replaced with an allow-all production stub.
 
+## Option C external witness: specification and activation gates
+
+The [witness supplement](spec/keymaker-witness.md) proposes Keymaker's own
+complete-state commitment and separate consumer stream, following the accepted
+external-intent direction in the
+[registrar specification, section 4.5](https://github.com/relux-works/swarma-registrar/blob/5f44ebf3f78829144aa7864ca2e4ad62bea43eb5/spec/registrar.md#45-external-high-water-witness-option-c-normative-draft).
+Its [normative change list](spec/keymaker-witness.md#9-normative-changes-to-existing-sections)
+is for curator review; no implementation, qualification or activation is claimed.
+The enrollment restore residual below remains **open** until those steps land.
+An unconsumed approval restored with old consumed-ID/state evidence, including
+a snapshot restored inside its TTL, has no independent freshness proof under A.
+C would detect a restored older epoch or unresolved external intent; local
+receipt equality and boot/TTL checks cannot provide that guarantee.
+
+| Question | Direction / remaining decision and evidence |
+| --- | --- |
+| WC1: placement | Owner chooses an independently administered restore/failure boundary and independently surviving checkpoint. No location is selected here; joint host/witness loss or undetectable joint rollback remains outside the guarantee. |
+| WC2: clock and freshness | Qualify authoritative serialized latest reads, challenge-bound signed replies, post-restore unpredictable entropy, transport/authentication, bounded framing/proofs and operation deadlines. Wall-clock freshness/TTL alone is insufficient; existing trusted-time checks remain. |
+| WC3: Keymaker consumer stream | Separate Keymaker/station stream is the accepted direction. Qualify protected station/lineage enrollment, ACLs, exact artifact inventory/manifest and continuity-preserving migration. Registrar receipts cannot reconcile this consumer. |
+| Witness key custody | Curator must approve internal SLIP-0010 purpose 3 and qualify writer custody, independent witness verifier-key provisioning, purpose binding, rotation/revocation and lost-master recovery without resetting the stream/epoch. No socket gains a witness-key operation. |
+| WC4: single active instance | Qualify exclusion of an older serving instance throughout authority use, including restored clones. Local flock or witness compare-head writes alone do not fence its signatures. |
+| WC5: lifecycle and cost | Publish cross-privilege commit coordination, C-specific receipt ordering, bootstrap, exact-candidate privileged recovery, explicit A fallback/re-entry and loss-of-evidence handling. Qualify two witness durability round trips per logical commit, including all A success audits, within existing budgets. Cancellation/replacement of an unresolved intent is not inferred from local bytes. |
+
+Boot identity, ten-minute TTL and one-use consumption remain required whenever
+an A approval is used. A fresh equal C head would replace per-start A approval
+only in activated C; historical consumed IDs and pending evidence remain
+protected. An outage never automatically switches modes. Every item above
+remains open for activation; unchanged-code checks cannot close it.
+
 ## Enrollment adapter activation gates
 
 Enrollment approval replay residual: the ten-minute, same-boot approval and

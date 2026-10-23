@@ -224,11 +224,21 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 	if limit != "" {
 		code = limit
 	}
-	report := func(peer *Peer, request Request, refusal Code) Code {
-		return s.observer.Refuse(ctx, conn, peer, request, body, refusal)
+	// Refusal reporting has its own bounded budget, including after an expired
+	// method. No unaudited error is emitted if the wait for audit is abandoned.
+	report := func(peer *Peer, request Request, refusal Code) (Code, bool) {
+		refusalCtx, cancel := context.WithTimeout(ctx, frameBudget)
+		defer cancel()
+		stop := context.AfterFunc(refusalCtx, func() { conn.Close() })
+		defer stop()
+		code := s.observer.Refuse(refusalCtx, conn, peer, request, body, refusal)
+		deadline, _ := refusalCtx.Deadline()
+		return code, refusalCtx.Err() == nil && time.Now().Before(deadline)
 	}
 	if code != "" {
-		s.replyError(conn, nil, report(nil, Request{}, code), time.Now().Add(frameBudget))
+		if refusal, ready := report(nil, Request{}, code); ready {
+			s.replyError(conn, nil, refusal, time.Now().Add(frameBudget))
+		}
 		return false
 	}
 	if done == nil {
@@ -236,7 +246,9 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 	}
 	obj, err := Decode(body)
 	if err != nil {
-		s.replyError(conn, nil, report(nil, Request{}, CCJNoncanonical), time.Now().Add(frameBudget))
+		if refusal, ready := report(nil, Request{}, CCJNoncanonical); ready {
+			s.replyError(conn, nil, refusal, time.Now().Add(frameBudget))
+		}
 		return false
 	}
 	req, id, code := envelope(obj)
@@ -326,7 +338,11 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 	if ctx.Err() != nil {
 		return false
 	}
-	code = report(established, req, code)
+	var audited bool
+	code, audited = report(established, req, code)
+	if !audited {
+		return false
+	}
 	closeAfter = closeAfter || code == "audit_unavailable"
 	if !s.replyError(conn, id, code, time.Now().Add(frameBudget)) {
 		return false

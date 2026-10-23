@@ -151,7 +151,16 @@ func TestNativeGenerationAdmissionRefusal(t *testing.T) {
 				before, audit := nativeSnapshot(t, f), nativeAudit(t, f.store.journal)
 				f.start()
 				c := nativeDial(t, f.server.ControlPath)
-				nativeSend(t, c, nativeHello(1))
+				body, err := control.Marshal(nativeHello(1))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := writeResponse(c, Packet(body)); err != nil {
+					if errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ECONNRESET) {
+						t.Fatalf("generation admission silently closed before response: %v", err)
+					}
+					t.Fatal(err)
+				}
 				body, code := ReadFrame(c)
 				if code != "" || body == nil {
 					t.Fatalf("generation admission silently closed: frame=%s bytes=%d", code, len(body))

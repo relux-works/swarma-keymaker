@@ -51,6 +51,7 @@ or production signed-act qualification.
 | --- | --- | --- |
 | Generation refusal at connection admission | `TestNativeGenerationAdmissionRefusal`, `TestNativeGenerationAdmissionMethods`, `TestNativeGenerationAdmissionOneFrame` | Initial/confirmation inactive, mismatch and unavailable checks return exact code/retryable/ID and one UID-attributed audit; no Identify, ID admission, method dispatch, binding/result/nonce effect or held watcher; active hello/pubkey and verified-helper controls |
 | Refused connection bounds and framing | `TestNativeGenerationAdmissionMalformed`, `TestNativeGenerationAdmissionDeadline`, `TestNativeGenerationAdmissionMissingPeer`, control `TestRefusedConnectionObservers`, `TestRefusedConnectionBounds` | Oversize/malformed/truncated/canonical/schema errors remain fatal; silent/partial readers keep original admission deadline and hold no shared locks/slot; unknown kernel peer remains silent; work budgets and audit-failure override retained |
+| Refusal audit cancellation boundary | `TestReviewAdmissionQueuedAuditDeadline`, `TestNativeAdmissionStartedAuditDeadline`, `TestNativeOrdinaryRefusalAuditDeadline`, `TestJournalCancelledBeforeAppend`, `TestJournalDeadlineDuringPreparation` | Context-aware journal gate abandons unstarted audit after deadline with slot release and no late record; already-started durable append completes once. Framing, canonical and method refusals share bounded report waits; same-journal active controls follow |
 | No helper signing path | `TestNativeHelperUnsupported` | Unsupported response, unchanged state, zero instrumented Sign calls and own-pubkey control |
 | UID and generation operator authority | `TestNativeOperatorGeneration`, assigned wrong-UID vectors | Configured tuple, no wire role switch |
 | Exact self pubkey and register schema | `TestNativePubkeySelectors`, `TestNativeRegisterGuards` | Selector/schema/UID-range/target evidence refusals leave state unchanged; own-key/valid registration controls |
@@ -80,13 +81,14 @@ or production signed-act qualification.
 never overwrites source, and requires a named assertion witness rather than a
 compile/setup failure. The ten existing K1a controls remain. The four original
 native controls plus three lifecycle controls, one concurrent replay control
-and one generation-admission control bring the wrapper to nineteen; wrapper
+and two generation-admission controls bring the wrapper to twenty; wrapper
 exit 0 means every mutant's named test
 exited 1 with the intended witness.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
 | --- | --- | --- | --- |
-| `native-generation-admission-refusal` | Replace the one-frame refusal with the former silent close | `TestNativeGenerationAdmissionRefusal/generation_inactive/initial` | Killed; real single-UID socket must return the exact framed generation refusal instead of frame_truncated/zero bytes |
+| `native-generation-admission-refusal` | Replace the one-frame refusal with the former silent close | `TestNativeGenerationAdmissionRefusal/generation_inactive/initial` | Killed; real single-UID socket must return the exact framed generation refusal instead of write-side EPIPE/ECONNRESET or read-side frame_truncated/zero bytes |
+| `native-refusal-audit-wait` | Replace cancellable journal acquisition with an unconditional wait | `TestReviewAdmissionQueuedAuditDeadline` | Killed; expired audit waiter must release the shared slot before unlock and must never append afterward |
 | `native-replay-before-target-barrier` | Move the authoritative retained lookup outside the generation barrier, preserving Store synchronization and all authority predicates | `TestNativeConcurrentTargetReplay/same-id-retired`, `/same-id-reused` | Killed; the winner commits while the retry waits, and the still-current caller must recover its result after target retirement or reuse |
 | `native-operator` | Remove exact configured operator tuple check | `TestNativeVectors/register-wrong-uid/negative` | Killed; real kernel UID projected against a different configured operator; not live multi-UID qualification |
 | `native-persistent-revoke` | Remove persistent-as-ephemeral refusal | `TestNativeVectors/revoke-persistent-as-ephemeral/negative` | Killed; exact required code, not generic failure |
@@ -197,3 +199,16 @@ helper signing case is covered with helper integration separately.
 additionally prevents empty-seed derivation and nil-provider panics on both
 sockets, with independent open providers. These are custody failure variants,
 not additional vector IDs.
+
+### Refusal audit wait rule
+
+Native refusal reporting uses a bounded context: accept-time refusals inherit
+remaining admission time; ordinary framing/schema/method refusals have a separate
+report budget of at most two seconds, also bounded by the parent. No existing
+journal-acquisition cancellation rule preceded this change. Expiry before journal
+acquisition abandons the append and closes without an unaudited response, releasing
+the slot without poisoning a healthy journal. Read-only record preparation rechecks the deadline before the first durable
+action. Once that action begins, its write/sync completes even if the socket
+deadline expires. Actual append/sync
+failure still fences both surfaces. Successful operation auditing remains durable
+and non-cancellable. The journal remains last in the existing lock order.

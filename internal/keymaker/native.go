@@ -189,7 +189,12 @@ func (n *Native) audit(record AuditRecord) Code {
 	}
 	return ""
 }
-func (n *Native) Refuse(_ context.Context, conn net.Conn, p *control.Peer, r control.Request, body []byte, refusal control.Code) control.Code {
+func (n *Native) Refuse(ctx context.Context, conn net.Conn, p *control.Peer, r control.Request, body []byte, refusal control.Code) control.Code {
+	// The wire supplies the remaining admission budget or a separate bounded
+	// refusal-report budget. Successful operation auditing stays non-cancellable.
+	if auditContextExpired(ctx) {
+		return control.DeadlineExceeded
+	}
 	if p == nil {
 		if kernel, c := kernelPeer(conn); c == "" {
 			p = &control.Peer{UID: kernel.UID}
@@ -212,8 +217,18 @@ func (n *Native) Refuse(_ context.Context, conn net.Conn, p *control.Peer, r con
 		r = control.Request{Method: "overload"}
 		body = nil
 	}
-	if c := n.audit(n.record(p, r, body, Code(refusal))); c != "" {
+	if n.Engine.closed.Load() {
+		return "audit_unavailable"
+	}
+	c := n.Engine.Audit.AppendContext(ctx, n.record(p, r, body, Code(refusal)))
+	if c == "request_deadline_exceeded" {
+		// No append began. Caller closes without a result; a healthy journal stays
+		// usable. Actual write/sync failures below still fence both surfaces.
 		return control.Code(c)
+	}
+	if c != "" {
+		n.Engine.fail()
+		return "audit_unavailable"
 	}
 	return refusal
 }

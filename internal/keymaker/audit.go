@@ -2,6 +2,7 @@ package keymaker
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -135,7 +135,14 @@ type AuditRecord struct {
 	Previous      string  `json:"previous_digest"`
 	Digest        string  `json:"record_digest"`
 }
-type Auditor interface{ Append(AuditRecord) Code }
+
+// Append completes a durable append without cancellation. AppendContext may
+// abandon only the wait before an append begins; once begun it has the same
+// durability and failure semantics as Append.
+type Auditor interface {
+	Append(AuditRecord) Code
+	AppendContext(context.Context, AuditRecord) Code
+}
 
 // AuditClock reports whether UTC is trustworthy. Uncertain time is recorded as
 // null/unknown rather than inventing a timestamp for the operation.
@@ -154,7 +161,7 @@ type auditSeal struct {
 	Digest string `json:"last_digest"`
 }
 type Journal struct {
-	mu           sync.Mutex
+	mu           auditGate
 	dir          *os.File
 	file         *os.File
 	writer       durableFile
@@ -360,11 +367,24 @@ func (j *Journal) rotate() error {
 	return j.dir.Sync()
 }
 func (j *Journal) Append(r AuditRecord) Code {
-	j.mu.Lock()
+	return j.AppendContext(context.Background(), r)
+}
+
+// Acquiring the journal is the cancellation boundary. No worker is left waiting
+// after cancellation, and no sequence, budget or failure state has changed.
+// Preparation rechecks the budget before its first durable action. Once that
+// action begins, the complete append owns its write/sync even after deadline.
+func (j *Journal) AppendContext(ctx context.Context, r AuditRecord) Code {
+	if !j.mu.LockContext(ctx) {
+		return "request_deadline_exceeded"
+	}
 	defer j.mu.Unlock()
-	return j.appendLocked(r)
+	return j.appendContextLocked(ctx, r)
 }
 func (j *Journal) appendLocked(r AuditRecord) Code {
+	return j.appendContextLocked(context.Background(), r)
+}
+func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 	if j.failed {
 		return "audit_unavailable"
 	}
@@ -380,6 +400,9 @@ func (j *Journal) appendLocked(r AuditRecord) Code {
 		r.Result = "unknown"
 	}
 	digest, e := auditDigest(r)
+	if auditContextExpired(ctx) {
+		return "request_deadline_exceeded"
+	}
 	if e != nil {
 		j.failed = true
 		return "audit_unavailable"
@@ -387,6 +410,9 @@ func (j *Journal) appendLocked(r AuditRecord) Code {
 	r.Digest = digest
 	b, e := canonical(r)
 	b = append(b, '\n')
+	if auditContextExpired(ctx) {
+		return "request_deadline_exceeded"
+	}
 	if e != nil || len(b) > 8192 {
 		j.failed = true
 		return "audit_unavailable"
@@ -398,6 +424,11 @@ func (j *Journal) appendLocked(r AuditRecord) Code {
 	if j.total+int64(len(b)) > budget {
 		j.failed = true
 		return "audit_unavailable"
+	}
+	// No durable action has begun during canonical preparation. Check immediately
+	// before rotation/write; after this boundary never cancel a partial append.
+	if auditContextExpired(ctx) {
+		return "request_deadline_exceeded"
 	}
 	if j.size+int64(len(b)) > j.segmentLimit {
 		if j.rotate() != nil {

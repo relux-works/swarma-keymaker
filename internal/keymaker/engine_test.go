@@ -135,13 +135,18 @@ func (f *fakeGenerations) set(uid uint32, state, token string) {
 }
 
 type memoryAudit struct {
-	mu      sync.Mutex
+	mu      auditGate
 	records []AuditRecord
 	fail    bool
 }
 
 func (a *memoryAudit) Append(r AuditRecord) Code {
-	a.mu.Lock()
+	return a.AppendContext(context.Background(), r)
+}
+func (a *memoryAudit) AppendContext(ctx context.Context, r AuditRecord) Code {
+	if !a.mu.LockContext(ctx) {
+		return "request_deadline_exceeded"
+	}
 	defer a.mu.Unlock()
 	if a.fail {
 		return "audit_unavailable"

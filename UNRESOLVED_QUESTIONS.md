@@ -21,7 +21,7 @@ The authoritative decision list and safe defaults are in
 
 ## Q5: registrar draft alignment and explicit differences
 
-Reference: [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/bf9af1edae06835a88906c197e8b74bb5f8d6f5a/spec/registrar.md),
+Reference: [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/f81020a685b8d33c4fc61d835192d4fc87739398/spec/registrar.md),
 sections 2–5. Its constants remain under review; a changed revision requires
 explicit consumer updates and re-qualification before activation.
 

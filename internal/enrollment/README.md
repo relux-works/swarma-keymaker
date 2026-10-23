@@ -268,6 +268,9 @@ Exhaustive pre-lock refusal list (each is a not-begun outcome):
    canonical scalar restrictions, all other member/type checks and semantic
    pin/policy checks occur after invalidation, including refusal of fractions,
    exponent notation, unsafe integers and negative zero.
+   The JSON syntax gate has a maximum nesting depth of 10000. A deeper document
+   refuses before the Store lock and therefore leaves consent unconsumed, like
+   any other pre-lock syntax refusal.
 3. **Protected directory/lifecycle lease:** the state path/ancestors or opened
    directory inode fail ownership/type/mode/identity checks, cannot be opened,
    or its shared lifecycle lease is unavailable. Only directory metadata is

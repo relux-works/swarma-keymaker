@@ -42,6 +42,7 @@ type Native struct {
 // pins the first self binding and subscribes while the Store lock is held.
 type nativeConnectionKey struct{}
 type nativeConnection struct {
+	custodyCause  custodyCause
 	conn          net.Conn
 	done          <-chan struct{}
 	binding       uint64
@@ -220,7 +221,11 @@ func (n *Native) Refuse(ctx context.Context, conn net.Conn, p *control.Peer, r c
 	if n.Engine.closed.Load() {
 		return "audit_unavailable"
 	}
-	c := n.Engine.Audit.AppendContext(ctx, n.record(p, r, body, Code(refusal)))
+	record := n.record(p, r, body, Code(refusal))
+	if connection := connectionFrom(ctx); connection != nil {
+		record.CustodyCause = auditCustodyCause(Code(refusal), connection.custodyCause)
+	}
+	c := n.Engine.Audit.AppendContext(ctx, record)
 	if c == "request_deadline_exceeded" {
 		// No append began. Caller closes without a result; a healthy journal stays
 		// usable. Actual write/sync failures below still fence both surfaces.
@@ -245,6 +250,7 @@ func (n *Native) Admit(ctx context.Context, p control.Peer, r control.Request) c
 		return "peer_identity_unavailable"
 	}
 	connection.requestID, connection.prepared = r.ID, false
+	connection.custodyCause = ""
 	connection.conditions = []GenerationCondition{{Principal: principal}}
 	if mutation(r.Method) {
 		if c := n.operator(principal); c != "" {
@@ -303,7 +309,8 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		if c := connection.pin(n.Engine.Store, b); c != "" {
 			return nil, control.Code(c)
 		}
-		public, c := n.Engine.Signer.Public(b.Path)
+		public, c, cause := publicForAudit(n.Engine.Signer, b.Path)
+		connection.custodyCause = cause
 		if c != "" {
 			return nil, control.Code(c)
 		}
@@ -419,7 +426,8 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 			return c
 		}
 		if r.Method == "register" {
-			public, c := n.Engine.Signer.Public(b.Path)
+			public, c, cause := publicForAudit(n.Engine.Signer, b.Path)
+			connection.custodyCause = cause
 			if c != "" {
 				return c
 			}

@@ -33,7 +33,10 @@ func (s registrationSigner) Sign(ctx context.Context, preimage []byte) ([]byte, 
 	}
 	// Only Builder can reach this private adapter. Its preimage remains owned by
 	// the registrar; surface A cannot call this purpose-selecting operation.
-	signature, code := s.master.withPurpose(s.path, "host-registration", func(k ed25519.PrivateKey) []byte { return ed25519.Sign(k, preimage) })
+	signature, code, cause := s.master.withPurposeCause(s.path, "host-registration", func(k ed25519.PrivateKey) []byte { return ed25519.Sign(k, preimage) })
+	if connection := connectionFrom(ctx); connection != nil {
+		connection.custodyCause = cause
+	}
 	if ctx.Err() != nil {
 		return nil, proof.DeadlineExceeded
 	}

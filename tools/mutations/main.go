@@ -56,6 +56,9 @@ func main() {
 		}
 		old, c := outside, outsideCode`
 	controls := []struct{ name, file, old, new, test, needle, witness string }{
+		{"custody-wrong-cause", "derive.go", `return nil, "custody_unavailable", custodyClosed`, `return nil, "custody_unavailable", custodyUnloaded`, "^TestCustodyAuditCauses$/^(agent-sign|control-pubkey|helper)$/^closed$", "--- FAIL: TestCustodyAuditCauses/agent-sign/closed", "custody audit cause mismatch"},
+		{"custody-native-response-cause", "native.go", "return refusal\n}\n\n// Admit", "if record.CustodyCause != nil { return control.Code(*record.CustodyCause) }; return refusal\n}\n\n// Admit", "^TestCustodyAuditCauses$/^control-pubkey$/^closed$", "--- FAIL: TestCustodyAuditCauses/control-pubkey/closed", "custody response bytes changed"},
+		{"custody-agent-response-cause", "server_linux.go", "if writeResponse(c, AgentFailure) != nil ||", "if writeResponse(c, Packet(append([]byte{5}, []byte(\"closed\")...))) != nil ||", "^TestCustodyAuditCauses$/^agent-sign$/^closed$", "--- FAIL: TestCustodyAuditCauses/agent-sign/closed", "custody response bytes changed"},
 		{"peer-uid", "binding.go", "if b.UID != peer.UID {", "if false {", "^TestRefusalVectors$/^binding-wrong-uid$/^negative$", "--- FAIL: TestRefusalVectors/binding-wrong-uid/negative", "code \"\", want"},
 		{"namespace", "wire.go", "if string(namespace) != \"git\" {", "if len(namespace) < 0 {", "^TestRefusalVectors$/^ssh-namespace$/^negative$", "--- FAIL: TestRefusalVectors/ssh-namespace/negative", "code \"\", want"},
 		{"missing-snapshot", "binding.go", "if len(entries) != 0 || err != io.EOF {", "if len(entries) < 0 && err != io.EOF {", "^TestMissingSnapshotRecovery$/^missing$", "--- FAIL: TestMissingSnapshotRecovery/missing", "incomplete recovery admitted a store"},
@@ -105,7 +108,7 @@ func main() {
 			{"helper-reload-io-lock", "../enrollment/authority.go", "code := candidate.load(ctx)\n\ta.mu.Lock()", "a.mu.Lock()\n\tcode := candidate.load(ctx)", "^TestHelperReloadPreparesOutsideWrite$", "--- FAIL: TestHelperReloadPreparesOutsideWrite/valid", "reload I/O waited for the actual socket write"},
 			{"helper-binding", "registration.go", `b, c := s.lookup(peer.UID, peer.Generation)`, `b, c := Binding{}, Code("")`, "^TestDaemonHelperVectors$/^helper-missing-binding$/^negative$", "--- FAIL: TestDaemonHelperVectors/helper-missing-binding/negative", "native response exposed forbidden field envelope"},
 			{"helper-release-recheck", "registration.go", `if pc := retained.Recheck(ctx); pc != "" {`, `if pc := proof.Code(""); retained == nil && pc != "" {`, "^TestHelperExpiryAfterAudit$/^expired$", "--- FAIL: TestHelperExpiryAfterAudit/expired", "native response exposed forbidden field envelope"},
-			{"helper-surface-a-key", "registration.go", `s.master.withPurpose(s.path, "host-registration",`, `s.master.withPurpose("m/1'"+s.path[len("m/2'"):], "agent-identity",`, "^TestHelperDomainSeparation$", "--- FAIL: TestHelperDomainSeparation", "helper refused positive control"},
+			{"helper-surface-a-key", "registration.go", `s.master.withPurposeCause(s.path, "host-registration",`, `s.master.withPurposeCause("m/1'"+s.path[len("m/2'"):], "agent-identity",`, "^TestHelperDomainSeparation$", "--- FAIL: TestHelperDomainSeparation", "helper refused positive control"},
 			{"helper-retry-nonce", "registration.go", `if old != nil {
 				_, pc := h.builder.Restore(ctx, raw, in)`, `if false {
 				_, pc := h.builder.Restore(ctx, raw, in)`, "^TestHelperDurableRetry$", "--- FAIL: TestHelperDurableRetry", "same-ID retry minted a new nonce"},

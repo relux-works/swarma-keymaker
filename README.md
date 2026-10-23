@@ -14,8 +14,9 @@ still refuses `generation_source_unavailable` until the authoritative generation
 journal and ordering adapter exist. No fixture authority is compiled into it.
 Persistent operator revocation remains closed without a signed-act verifier;
 `sign_registration` builds registrar proofs with a separate purpose-2 key,
-current binding/enrollment authority and durable same-ID recovery. The proposed
-`custody_unavailable` refusal awaits curator content approval. There is no
+current binding/enrollment authority and durable same-ID recovery. The curator-approved
+`custody_unavailable` refusal uses one response for every custody cause; only the
+local audit distinguishes `closed`, `unloaded` and `protection_failed`. There is no
 deployed security boundary or installer here.
 
 `internal/control` provides bounded CCJ-1 framing and dispatch.
@@ -103,6 +104,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Refusal audit deadline regressions: `GOMAXPROCS=2 go test -race ./internal/keymaker -run '^Test(ReviewAdmissionQueuedAuditDeadline\|NativeAdmissionStartedAuditDeadline\|NativeOrdinaryRefusalAuditDeadline\|JournalCancelledBeforeAppend\|JournalDeadlineDuringPreparation)$' -count=1 -p=1` | Journal contention abandons only unstarted appends, releases slots and closes without late audit; started sync completes exactly once; healthy same-daemon controls |
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
 | gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
+| Go | Custody response/audit regressions: `go test -race ./internal/keymaker -run '^Test(CustodyAudit|CustodySign|CustodyUnavailable|MasterUnavailable)' -count=1 -p=1`; `go run ./tools/mutations/main.go -group core -scratch "$SCRATCH"` | Real-socket byte-equal refusals, local cause enumeration, open signing controls; logs/overlays under private scratch |
 | Go | Build daemon: `go build -o "$SCRATCH/keymaker" ./cmd/keymaker`; run `"$SCRATCH/keymaker" version` or `"$SCRATCH/keymaker" serve --config "$CONFIG"` | Binary; version or readiness refusal on stderr |
 | Go | Build canonical window runner: `go build -o "$SCRATCH/keymaker-window" ./cmd/keymaker-window` | Runner binary in scratch |
 | Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |

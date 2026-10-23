@@ -2,7 +2,7 @@
 
 All original 70 refusal rows are covered: 31 surface-A pairs in
 [k1a-coverage.md](k1a-coverage.md), 23 native pairs below and 16 helper pairs.
-The proposed custody code adds one pair covering both sockets (71 total).
+The approved custody code adds one pair covering both sockets (71 total).
 No helper row remains deferred. The brief supplies vector rows but no separate
 attack-surface catalog table (brief gap); this map does not claim an independent
 narrowing mutant for every vector or implementation line.
@@ -177,7 +177,7 @@ contract. No previously committed test name is removed. The existing
 
 Production generation-journal ordering and signed operator-act verification
 remain unavailable. Live multi-UID execution, root provisioning, service sandbox,
-deployment and macOS are unqualified. The proposed custody code awaits curator content approval.
+deployment and macOS are unqualified. The custody code is curator-approved.
 Public result names use `master_epoch`
 and raw-32-byte base64 `public_key`; these spell the spec's epoch/public-key
 results without adding signing authority. Multi-principal generation evidence,
@@ -186,10 +186,10 @@ are core/wire seams needed to implement the existing contract, not new wire
 methods. Recovery refuses older snapshots without `requests`; no automatic
 migration or reconstruction is claimed. See [Linux testing](linux-testing.md).
 
-## Proposed custody refusal
+## Approved custody refusal
 
-The original 70 rows are supplemented by `custody-closed`, pending curator
-content approval of `custody_unavailable` (`retryable=false`).
+The original 70 rows are supplemented by `custody-closed`, with curator-approved
+`custody_unavailable` (`retryable=false`).
 `TestCustodyUnavailableVectors/{agent,control}/{negative,control}` exercises
 both actual sockets, exact audit code, no retained success on refusal, and
 independent open-Master controls. The native case uses public-key lookup; the
@@ -212,3 +212,23 @@ action. Once that action begins, its write/sync completes even if the socket
 deadline expires. Actual append/sync
 failure still fences both surfaces. Successful operation auditing remains durable
 and non-cancellable. The journal remains last in the existing lock order.
+
+### Local custody cause audit
+
+`TestCustodyAuditCauses` exercises closed, nil, empty and invalid-length Masters
+on A sign/public-key lookup and B public-key lookup/register/helper signing.
+Each operation compares the complete response body against fixed expected bytes:
+A returns the single failure byte; B returns the same nonretryable error and ID.
+It checks the local cause, no retained success, bounded audit members and absence
+of fixture seed encodings. Independent open controls verify signatures or keys.
+`TestCustodySignCauses` separately covers the signing operation's captured cause.
+`TestCustodyAuditSchema` rejects missing/unknown/misapplied new causes before any
+append and rejects correctly rehashed invalid stored metadata. It recovers valid
+causes and historical records without this optional extension, preserving hashes.
+These fixture tests do not qualify live multi-UID use or memory non-extraction.
+
+| Mutant | Gate | Named failing test |
+| --- | --- | --- |
+| `custody-wrong-cause` | Closed custody is not reported as unloaded | `TestCustodyAuditCauses/agent-sign/closed` (also B pubkey/helper) |
+| `custody-native-response-cause` | B does not expose local cause | `TestCustodyAuditCauses/control-pubkey/closed` |
+| `custody-agent-response-cause` | A response contains only its failure byte | `TestCustodyAuditCauses/agent-sign/closed` |

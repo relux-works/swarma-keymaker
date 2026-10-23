@@ -54,7 +54,7 @@ This package cannot make a later write atomic, enforce current registry state,
 retain same-ID results or reserve registrar replay state. Those belong to the daemon integration in `internal/keymaker/registration.go`. Same-ID retry must retain the original proof rather
 than call Build again; each fresh Build deliberately consumes independent entropy.
 
-## Refusals and remaining integration decision
+## Approved custody refusal and typed failures
 
 Every failed Build returns a nil proof. Local clock, entropy, window, expiry,
 audience and algorithm refusals use existing helper spellings. A canceled call
@@ -68,8 +68,10 @@ these are internal-consistency failures, not ordinary caller refusals; no envelo
 escapes. Signer failures propagate the existing section-15 Code supplied by the
 trusted adapter without diagnostics or an invented generic signing code.
 `TestSigningFailures/typed-error` exercises `sign_key_mismatch`, with a valid
-signing control. The proposed core custody refusal is
-`custody_unavailable` with `retryable=false`, awaiting curator content approval.
+signing control. The curator-approved core custody refusal is
+`custody_unavailable` with `retryable=false`. Only local audit records its cause
+(`closed`, `unloaded` or `protection_failed`); the response never distinguishes
+these causes.
 It is not mapped to `audit_unavailable`.
 
 ## Vector coverage

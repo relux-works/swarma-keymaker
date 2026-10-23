@@ -136,10 +136,15 @@ func (e *Engine) record(s Session, q agentRequest, body []byte, c Code) AuditRec
 	return r
 }
 func (e *Engine) refuse(s Session, q agentRequest, body []byte, c Code) Code {
+	return e.refuseWithCause(s, q, body, c, "")
+}
+func (e *Engine) refuseWithCause(s Session, q agentRequest, body []byte, c Code, cause custodyCause) Code {
 	if e.closed.Load() {
 		return "audit_unavailable"
 	}
-	if e.Audit.Append(e.record(s, q, body, c)) != "" {
+	record := e.record(s, q, body, c)
+	record.CustodyCause = auditCustodyCause(c, cause)
+	if e.Audit.Append(record) != "" {
 		e.fail()
 		return "audit_unavailable"
 	}
@@ -239,9 +244,9 @@ func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release fun
 			return e.refuse(s, q, body, c)
 		}
 	}
-	public, c := e.Signer.Public(current.Path)
+	public, c, cause := publicForAudit(e.Signer, current.Path)
 	if c != "" {
-		return e.refuse(s, q, body, c)
+		return e.refuseWithCause(s, q, body, c, cause)
 	}
 	if len(public) != 32 {
 		return e.refuse(s, q, body, "sign_key_mismatch")
@@ -259,9 +264,9 @@ func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release fun
 		if ctx.Err() != nil {
 			return e.refuse(s, q, body, "request_deadline_exceeded")
 		}
-		sig, code := e.Signer.Sign(current.Path, q.data)
+		sig, code, cause := signForAudit(e.Signer, current.Path, q.data)
 		if code != "" {
-			return e.refuse(s, q, body, code)
+			return e.refuseWithCause(s, q, body, code, cause)
 		}
 		if len(sig) != 64 {
 			erase(sig)

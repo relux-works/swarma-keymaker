@@ -116,9 +116,10 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
   [registration builder](internal/registration/README.md) constructs and checks
   proofs; enrollment alone still grants no binding or release authority.
   Production generation evidence and live multi-UID qualification remain gates.
-- Proposed `custody_unavailable` (`retryable=false`) covers closed, unloaded or
-  protection-failed local signing custody on both surfaces. This proposal awaits
-  curator content approval. Other existing refusal meanings are unchanged.
+- Curator-approved `custody_unavailable` (`retryable=false`) covers closed, unloaded
+  or protection-failed local signing custody on both surfaces. Responses do not
+  distinguish causes; only local audit records the closed cause enumeration.
+  Other existing refusal meanings are unchanged.
   Registrar self-check failures retain their typed spellings and return no proof.
 
 

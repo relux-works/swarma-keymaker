@@ -97,23 +97,34 @@ func (m *Master) withKey(path string, f func(ed25519.PrivateKey) []byte) ([]byte
 }
 
 func (m *Master) withPurpose(path, purpose string, f func(ed25519.PrivateKey) []byte) ([]byte, Code) {
+	result, code, _ := m.withPurposeCause(path, purpose, f)
+	return result, code
+}
+
+func (m *Master) withPurposeCause(path, purpose string, f func(ed25519.PrivateKey) []byte) ([]byte, Code, custodyCause) {
 	if c := ValidatePath(path, purpose); c != "" {
-		return nil, c
+		return nil, c, ""
 	}
 	if m == nil {
-		return nil, "custody_unavailable"
+		return nil, "custody_unavailable", custodyUnloaded
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.closed || len(m.seed) != 32 {
-		return nil, "custody_unavailable"
+	if m.closed {
+		return nil, "custody_unavailable", custodyClosed
+	}
+	if len(m.seed) == 0 {
+		return nil, "custody_unavailable", custodyUnloaded
+	}
+	if len(m.seed) != 32 {
+		return nil, "custody_unavailable", custodyProtectionFailed
 	}
 	indices, _ := parsePath(path)
 	node := deriveNode(m.seed, indices)
 	defer erase(node)
 	key := ed25519.NewKeyFromSeed(node[:32])
 	defer erase(key)
-	return f(key), ""
+	return f(key), "", ""
 }
 func (m *Master) Public(path string) ([]byte, Code) {
 	return m.withKey(path, func(k ed25519.PrivateKey) []byte { return append([]byte(nil), k[32:]...) })

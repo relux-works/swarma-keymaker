@@ -118,22 +118,23 @@ func canonical(v any) ([]byte, error) {
 }
 
 type AuditRecord struct {
-	Seq           uint64  `json:"seq"`
-	Time          *string `json:"time"`
-	Instance      string  `json:"instance"`
-	Surface       string  `json:"surface"`
-	RequestID     *string `json:"request_id"`
-	PeerUID       *uint32 `json:"peer_uid"`
-	Generation    *string `json:"generation"`
-	Path          *string `json:"path"`
-	Epoch         *string `json:"master_epoch"`
-	Operation     string  `json:"operation"`
-	Domain        *string `json:"domain"`
-	PayloadDigest *string `json:"payload_digest"`
-	Result        string  `json:"result"`
-	RefusalCode   *Code   `json:"refusal_code"`
-	Previous      string  `json:"previous_digest"`
-	Digest        string  `json:"record_digest"`
+	CustodyCause  *custodyCause `json:"custody_cause,omitempty"`
+	Seq           uint64        `json:"seq"`
+	Time          *string       `json:"time"`
+	Instance      string        `json:"instance"`
+	Surface       string        `json:"surface"`
+	RequestID     *string       `json:"request_id"`
+	PeerUID       *uint32       `json:"peer_uid"`
+	Generation    *string       `json:"generation"`
+	Path          *string       `json:"path"`
+	Epoch         *string       `json:"master_epoch"`
+	Operation     string        `json:"operation"`
+	Domain        *string       `json:"domain"`
+	PayloadDigest *string       `json:"payload_digest"`
+	Result        string        `json:"result"`
+	RefusalCode   *Code         `json:"refusal_code"`
+	Previous      string        `json:"previous_digest"`
+	Digest        string        `json:"record_digest"`
 }
 
 // Append completes a durable append without cancellation. AppendContext may
@@ -268,7 +269,7 @@ func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.R
 				return nil, failure("audit record too large")
 			}
 			var r AuditRecord
-			if StrictJSON(bytes.NewReader(line), &r) != nil {
+			if StrictJSON(bytes.NewReader(line), &r) != nil || !validAuditCustody(r, false) {
 				return nil, failure("invalid audit record")
 			}
 			b, e := canonical(r)
@@ -385,7 +386,7 @@ func (j *Journal) appendLocked(r AuditRecord) Code {
 	return j.appendContextLocked(context.Background(), r)
 }
 func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
-	if j.failed {
+	if j.failed || !validAuditCustody(r, true) {
 		return "audit_unavailable"
 	}
 	r.Seq = j.seq + 1

@@ -607,8 +607,8 @@ restoring protected custody before a new admission attempt.
 | Native control methods on B | No signing key operation | Binding mutations and public metadata only |
 | Native registration helper on B | Configured purpose 2 | Registrar-built `registration/1` preimage only |
 | Internal state witness (separate proposal) | Reserved purpose 3 | `keymaker-witness-record/1` + NUL + service-built CCJ-1 body only |
-| Native `sign_message` on B (unimplemented candidate) | Purpose 4, active peer's author message sibling | Accepted waggle `MSG_LABEL` + LF + canonical CCJ-1 object whose signer identity and key ID match that peer's active binding and purpose-4 key |
-| Internal message-key certification (decided, unimplemented) | Purpose 5, owner-pinned certification root | Only `keymaker-msg-key/1` + NUL + service-built attestation body, with validity at most 24 hours |
+| Native `sign_message` on B (unimplemented candidate) | Purpose 4, active peer's author message sibling | Draft-aligned exact `swarma-msg/2` + LF + canonical signed record, with `key` and `body.author` equal to that peer's active attested purpose-4 key ID; accepted-head re-pin pending |
+| Internal message-key certification (decided, unimplemented) | Purpose 5, owner-pinned certification root | Only waggle `swarma-attestation attestation/1` + LF + service-built signed record, with validity at most 24 hours; same-root shared-revocation signing conflict remains gated in the supplement |
 
 The last three rows summarize unactivated proposals, not current signing
 capabilities. See the [witness supplement](keymaker-witness.md#31-protected-identity-and-purpose-separation)
@@ -1214,6 +1214,10 @@ strings. Registrar-owned signed-document verdicts retain registrar spelling.
 | `sign_key_mismatch`, `sign_flags_unsupported`, `agent_message_unsupported` | Wrong SSH key/flags or unsupported agent type |
 | `operation_unsupported`, `request_malformed`, `request_conflict` | Unsupported method, invalid schema or conflicting effect ID |
 | `frame_too_large`, `frame_truncated`, `frame_malformed`, `ccj_noncanonical` | Transport/canonical-byte failure |
+| `message_too_large` (decided, unimplemented message contract) | Complete decoded message preimage >24576 bytes within a valid native frame; `retryable=false` |
+| `signer_identity_unavailable` (unimplemented message contract) | Missing/invalid service-resolved attested caller key or identity policy after precise native authority checks; `retryable=false` |
+| `signer_identity_malformed` (unimplemented message contract) | Missing `key` or `body.author`, non-object record/path container or wrongly typed/multi-value identity field after canonical validation; `retryable=false` |
+| `signer_identity_mismatch` (unimplemented message contract) | Either string differs byte-for-byte from caller's own active attested purpose-4 key ID, even if both foreign strings agree; `retryable=false` |
 | `version_unsupported`, `hello_required`, `hello_already_negotiated` | Invalid negotiation state |
 | `request_deadline_exceeded`, `request_expired` | Request budget or retained helper result lifetime ended |
 | `enrollment_unavailable`, `enrollment_unverified`, `enrollment_unsupported`, `host_revoked` | Unavailable, untrusted, unsupported or revoked enrollment |

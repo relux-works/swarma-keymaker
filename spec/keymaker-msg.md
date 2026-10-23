@@ -7,21 +7,21 @@ MUST and MUST NOT below describe the proposed contract after approval, not a
 claim that the daemon supports it. There is no new socket or deployment step.
 The stable-key lifecycle (MSG2), purpose-5 issuer and 24-hour ceiling (MSG3),
 and bounded signing language with caller identity/key checks are decided.
-The exact envelope-field/label alignment (MSG1) and qualification remain gates.
+Draft envelope alignment is recorded; accepted-head re-pin (MSG1) and
+qualification remain gates.
 
 The owner of `swarm-envelope/2` is
-[the waggle repository](https://github.com/relux-works/waggle). Its S0 draft branch
-`spec/s0-envelope-grants` was not published when this proposal was prepared.
-The supplied shape is `domain label || LF || CCJ-1(body)`, with
-`id = sha256(preimage)` and signatures outside the body. **`MSG_LABEL` is a
-named parameter pending waggle's accepted S0 definition, not literal bytes
-and not an invented `swarma-msg` prefix.** Publication and review of a pinned,
-independently accepted S0 head remain an activation gate (MSG1). An unreviewed
-local draft is not an alignment authority. Keymaker MUST NOT silently adapt
-to another label or invent an envelope dialect. Operator device keys remain
-P-256; these agent keys are Ed25519. Neither substitutes for the other's
-authority. Agent message keys sign only the **author** role: human approver
-and delegate-session signatures have separate waggle authority contracts.
+[the waggle repository](https://github.com/relux-works/waggle).
+This candidate aligns to draft commit **`136dba2726009f9ed4458ab81d983e572897f2d8`**,
+`spec/swarm-envelope-2.md` §§2.2–2.6 and 6 on `spec/s0-envelope-grants`.
+All waggle citations below pin that draft, not a reviewed main release.
+Independent acceptance and a fresh comparison/re-pin to the forwarded accepted
+head remain MSG1 activation gates. Keymaker MUST NOT silently adapt to a
+changed head or invent an envelope dialect. The compatibility differences in
+[section 4.4](#44-draft-alignment-differences-and-unresolved-gates) remain explicit.
+Operator device keys remain P-256; agent keys are Ed25519. Agent message keys
+supply only author authority. The byte signer does not interpret a record's
+claimed role/type; waggle receivers enforce that authority boundary (§3.2).
 
 ## 1. Purpose registry and domain separation
 
@@ -36,8 +36,8 @@ never a path chosen by a client. Purpose 4 is reserved, not currently enabled.
 | 1, `agent-identity` | Surface A's peer-bound Git SSHSIG preimage only |
 | 2, `host-registration` | Configured helper's registrar-built registration preimage only |
 | 3, `state-witness` (proposal) | Internal witness records under `keymaker-witness-record/1` plus NUL only; no socket key access |
-| 4, `swarma-msg` (this proposal) | Active peer's derived message key; an accepted author `MSG_LABEL` plus LF and canonical object only |
-| 5, `root-attestation` (decided, MSG3) | Internal service-built message-key attestations under `keymaker-msg-key/1` plus NUL only |
+| 4, `swarma-msg` (this proposal) | Active peer's derived message key; exact `swarma-msg/2` plus LF and a canonical signed record with caller-bound key paths |
+| 5, `root-attestation` (decided, MSG3) | Internal service-built message-key attestations under `swarma-attestation attestation/1` plus LF only; shared revocation authority remains gated (§4.4) |
 
 The distinct SLIP-0010 purpose ancestors supply distinct keys. Prefixes and
 framing supply non-overlapping preimages. Both are mandatory in **both
@@ -57,15 +57,31 @@ security requirement: if one distinct label prefixes another, the shorter
 one's following LF differs from the longer one's next non-control byte.
 Acceptance of one exact label never accepts its longer or shorter neighbor.
 
-Protected configuration pins only S0 entries permitting purpose-4 Ed25519
-agent **author** signatures for the applicable envelope types. `MSG_LABEL`
-denotes the exact expected label for one such entry; if S0 defines several,
-use that closed allowlist, never a client-selected role/type/key parameter.
-Approver/delegate labels MUST NOT be admitted. Verifiers select the expected
-label from S0's role/type contract and reject relabeling an author signature
-as another role or type. S0 must make that context cryptographically bound
-and checkable; an ambiguous role/type mapping blocks alignment. Keymaker
-does not inspect body semantics to compensate for an ambiguous label design.
+The complete nine-literal registry is copied from
+[waggle §2.4](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#24-exact-domain-registry-and-key-profiles):
+
+| Exact ASCII label | Assignment | `sign_message` |
+| --- | --- | --- |
+| `swarma-msg/2` | Message signed record | Accept exact domain only, subject to §3.2 |
+| `swarma-waggle grant/1` | General grant | Refuse |
+| `swarma-waggle operator-act/1` | Operator act | Refuse |
+| `swarma-attestation attestation/1` | Root-issued key attestation | Refuse |
+| `swarma-attestation revocation/1` | Shared revocation snapshot | Refuse |
+| `swarma-registrar registration/1` | Registrar registration | Refuse |
+| `swarma-registrar enrollment/1` | Registrar enrollment | Refuse |
+| `swarma-credential-broker grant/1` | Broker grant | Refuse |
+| `swarma-credential-broker revocation/1` | Broker revocation | Refuse |
+
+Labels are 1–96 ASCII bytes in 0x20–0x7e. The witness placeholder in waggle
+is not a tenth literal; our separate NUL-framed witness domain stays refused.
+No caller or protected configuration may add an alias to this closed table.
+There is one message label for every message role. The signed record binds
+`version`, `role`, `key` and the complete `body`, including `body.type`.
+Receivers admit only message/1 author Ed25519 agent signatures with current
+purpose-4 certification; optional approvers require separately attested P-256
+operator devices. Delegate is reserved with no admitted v0 profile.
+A shared message tag does not grant the byte signer semantic role authority.
+Grants/operator acts use different tags; no method here signs those domains.
 
 ## 2. Derivation, generation authority and continuity
 
@@ -99,8 +115,8 @@ Stable-key verification proves the persistent key signed the bytes. It does
 generation's attestation MUST NOT be presented as proof that an older signature
 was made by that generation. Generation attribution needs a registration or
 attestation reference covered by waggle's signed body and checked against the
-attestation. Keymaker does not insert that reference; the only body checks
-are the signer identity and key ID specified in section 3.2 (MSG1).
+attestation. Keymaker does not insert that reference; the only record checks
+are `key` and `body.author` specified in section 3.2.
 For current-use verification, a verifier MUST reject a signature whose
 attested generation is not active, or whose attestation has expired, **even
 if the public-key bytes are identical to an active generation's key**.
@@ -168,102 +184,118 @@ duplicated in params. `timeout_ms` retains its base meaning.
 Request schema example (the placeholder is **not** literal wire bytes):
 
 ```text
-{method:"sign_message",params:{preimage:base64url(MSG_LABEL || 0x0a || CCJ-1(BOUND_BODY))},
+{method:"sign_message",params:{preimage:base64url(ASCII("swarma-msg/2") || 0x0a || CCJ-1(BOUND_RECORD))},
  request_id:"00000000000000000000000000000004",timeout_ms:2000}
 ```
 
-`BOUND_BODY` contains the required signer/key fields defined symbolically
-below. Serialize that native object with CCJ-1 after the accepted S0 label,
-field paths and value encodings are known. An empty body MUST refuse because
-it lacks both fields; no literal application envelope is invented here.
+Per [waggle §2.2](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#22-ccj-1-and-preimages),
+`BOUND_RECORD` is `{body:BODY,key:K,role:"author",version:"swarm-envelope/2"}`
+for a conforming author; `BODY.author` equals K. This is schema notation;
+CCJ-1 determines member order. Keymaker signs the original supplied bytes.
 Success is exactly `{request_id,result:{key_id,signature}}`, where `key_id`
-is `sha256:` followed by the lowercase SHA-256 hex of the raw message public
-key and `signature` is strict unpadded base64url of its 64-byte Ed25519
-signature over the **exact complete decoded preimage**. No prehash, outer
-frame, request ID, newline suffix or extra envelope is signed. The caller
-computes waggle's envelope `id = sha256(preimage)` and places the returned
-signature outside the body per S0. That content digest is distinct from the
-native request ID and the public-key identifier.
+is `ed25519:` plus canonical unpadded base64url of the 32 raw purpose-4 public
+key bytes ([waggle §2.3](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#23-cryptography)),
+and `signature` is strict unpadded base64url of the 64-byte ordinary Ed25519
+signature over the **exact complete decoded preimage**. This message-specific
+key ID replaces the former draft's digest ID, not existing native methods' IDs.
+No prehash, outer frame, request ID, newline suffix or extra envelope is signed.
+
+The caller separately computes `content_preimage = ASCII("swarma-msg/2") ||
+LF || CCJ-1(BODY)` and `id = "sha256:" || lowercase_hex(SHA-256(content_preimage))`.
+It assembles `{version,body,id,signatures}`, placing `{role,key,sig}` entries
+outside the body. **The content ID does not hash the signed record.** It is
+distinct from the native request ID, message key ID and audit preimage digest.
 
 ### 3.2 Validation and the byte-signing boundary
 
-After bounded native parsing and current authority checks, compare the bytes
-before the first LF to an exact accepted author `MSG_LABEL` entry. Require
-one LF separator and one CCJ-1 canonical JSON **object** after it. The signer
-checks the label before body-field resolution. The tail uses all of base
-section 7's scalar, ordering, escaping, Unicode,
-safe-integer and depth rules. Parse it and require byte equality with its
-canonical encoding. Do not normalize or repair it before signing. A BOM,
-extra LF, trailing bytes, another JSON document, duplicate members, scalar
-top level, or noncanonical JSON refuses before field checks.
+After bounded native parsing and current authority checks, use the ordered
+[waggle §2.5 admission](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#25-message-signer-provider-opaque-canonical-bytes):
 
-The accepted bounded language additionally requires **exactly two body-field
-checks**, in this order after canonical validation:
+1. Check the complete decoded preimage length before allocation/signing:
+   **`MAX_MSG_PREIMAGE_BYTES = 24576`**.
+2. Require a first LF; before it require 1–96 bytes in ASCII 0x20–0x7e.
+3. Compare that entire label exactly to `swarma-msg/2`.
+4. Require the complete remainder to be CCJ-1 canonical JSON bytes:
+   parse/re-encode equality, depth **12** (root container = 1), strings at most
+   **8192 bytes**, arrays at most **64 entries**, and every registrar CCJ-1
+   scalar/order/escaping/Unicode/safe-integer rule. A BOM, trailing bytes,
+   extra LF, multiple documents, duplicate decoded members (including escaped
+   aliases) or noncanonical encoding refuses before identity
+   resolution. Never normalize or repair the bytes.
 
-1. Resolve `SIGNER_FIELD` and require its value to equal `BOUND_SIGNER(binding)`,
-   the envelope-format public identity associated with the authenticated
-   caller's active binding.
-2. Resolve `KEY_ID_FIELD` and require its value to equal the key ID of that
-   binding's service-derived purpose-4 public key, as returned in section 3.1.
+Keymaker is a multi-agent provider, so §2.5's identity narrowing is mandatory.
+Resolve the caller's attested purpose-4 key ID from the **own active binding**
+and current generation, not request data. Missing/invalid service-resolved key
+or identity policy refuses `signer_identity_unavailable`. Existing precise
+peer/binding/generation/certification failures retain their base codes (§2.3,
+§6); this code covers inability to resolve a usable signer identity after those
+checks, not an alias that hides a known revoke or retirement.
 
-`SIGNER_FIELD` and `KEY_ID_FIELD` are named parameters, **not literal field
-names**. Their exact names, paths, canonical value encodings and the mapping
-from the protected binding to `BOUND_SIGNER(binding)` MUST come from reviewed
-alignment with the accepted waggle specification (MSG1). They are not request
-selectors. Until that alignment is available, message signing stays closed.
-Each pinned path MUST resolve exactly once to one value of the agreed type;
-no recursive search, wildcard/multiple matches, aliases, first/last-wins
-selection, string coercion or normalization may supply authority.
+Then extract **exactly two identity paths**, each exactly once:
 
-A missing field, wrong type or ambiguous/multiple-valued representation
-refuses `request_malformed`. Duplicate JSON members, including either field,
-already refuse `ccj_noncanonical`; there is no CCJ-1 canonical object with
-duplicate members. A well-formed, uniquely resolved value naming another
-identity or key refuses proposed `message_binding_mismatch` (section 6).
-These checks MUST use the same current binding/derived key as admission and
-the final `with_active` release fence; a field comparison cannot pin stale
-authority. Refusals produce no signature or successful retained result.
+| Exact path | Comparison |
+| --- | --- |
+| `key` | Top-level signed-record string equals the caller's resolved attested purpose-4 key ID |
+| `body.author` | String in the `body` object equals that same caller-resolved key ID |
 
-Only those two fields are interpreted. Other canonical body members remain
-opaque; unknown members outside the pinned authority paths grant no authority
-and are not alternate identity sources. Keymaker MUST NOT assemble or repair
-the envelope, apply other envelope-member allowlists, or interpret roles,
-grants, content, recipients, timestamps or operator intent. waggle checks
-those semantics. Keymaker MUST NOT rewrite either field to make it match.
+A missing path, non-object signed record or path container, wrong type or multi-valued
+representation refuses `signer_identity_malformed`. Duplicate JSON members
+already refuse `ccj_noncanonical`; canonical duplicate members are impossible.
+Either unequal string refuses `signer_identity_mismatch`, including two
+mutually equal foreign strings. Comparisons are byte-for-byte: no recursive
+search, aliases, first/last-member choice, coercion or normalization. These are
+checks of key-ID equality, not a third validator of claimed foreign key syntax.
+The protected resolved ID itself must have the §3.1 Ed25519 encoding.
+All three identity codes have `retryable=false`, disclose no values, and
+replace the former draft's `message_binding_mismatch` proposal.
 
-Decided: **`MAX_MSG_PREIMAGE_BYTES = 48000`**, counting the full decoded label,
-LF and canonical body, not just the body. Its unpadded base64url is at most
-64000 bytes. With this exact request schema, a 32-character ID and the longest
-permitted timeout spelling, the native payload is at most 64116 bytes,
-leaving 1420 bytes below the 65536-byte frame-payload ceiling. The four-byte
-length header is outside that ceiling. S0 must align to this limit or negotiate
-an explicit reviewed replacement (MSG1), not assume a 65536-byte preimage fits.
-Exact label comparison, the LF delimiter and CCJ-1 canonicality are also
-decided; MSG1 supplies the actual label bytes and field schema, not permission
-to relax these rules.
+Both checks MUST use the same current binding/derived key as admission and
+final `with_active` release, including retries. A comparison cannot pin stale
+authority. Pre-commit refusals release no signature or new successful result.
 
-An over-cap frame header refuses before allocation/body read. A valid frame
-whose decoded preimage is 48001 bytes refuses `message_too_large`, even if
-its label/body are otherwise valid. Check the decoded bound before signing,
-and bound decoding allocations by it; never truncate or sign a prefix to fit.
-The decoded object also obeys depth 16. Section 7 supplies both exact decoded
-boundary controls and an independent frame-header overflow vector.
+Only these two paths are interpreted. Other canonical record/body members
+remain opaque. In particular `room`, `to` and `body_sha256` are signed inside
+the complete body, but Keymaker does not interpret or reconstruct them.
+[waggle §2.1](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#21-closed-schemas-and-limits)
+requires receivers to compare the actual delivery room/recipient and hash the
+actual delivered UTF-8 text. Keymaker does not enforce other member allowlists,
+role/type/version semantics, audience, timestamps, action, grants or operator
+intent. A canonical record claiming `approver`, a reserved delegate or another
+body type can pass these byte/identity checks; its agent signature supplies
+no such authority and the receiver MUST reject the wrong profile/tag/type.
+This explicit §2.5 boundary replaces the former draft's role-specific labels.
+Keymaker MUST NOT assemble, repair or rewrite the record or either checked path.
 
-This deliberately relaxes the base's absolute "no method accepting arbitrary
-signing bytes" wording. The proposed replacement is: **no unrestricted
-byte-signing method; each signing method has a fixed purpose/key and a
-non-overlapping, validated preimage language**. `sign_message` admits
-caller-chosen canonical objects only under the closed author-label set. It
-cannot sign arbitrary raw bytes or another protocol's preimage, but it can sign
-arbitrary application content encoded in that language. Canonicality supplies
-unambiguous bytes, not semantic approval or task authorization. This
-bounded-language exception is accepted subject to the two caller-bound field
-checks above. It MUST NOT be claimed to preserve a stronger ban on all
-caller-supplied content, nor to provide other envelope-semantic validation.
+At 24576 decoded bytes, unpadded base64url is exactly **32768 bytes**. This
+method's exact schema with a 32-character ID and timeout 2000 has **116 bytes**
+of other JSON syntax/fields: maximum native payload **32884 bytes**, headroom
+**32652 bytes** below the 65536-byte payload ceiling. The four-byte header is
+outside that ceiling: total frame 32888 bytes, 32648 below even a total-frame
+65536 ceiling. The enforced 116-byte metadata budget is narrower than waggle's
+4096-byte allowance (36864-byte payload / 36868-byte total); it is not an
+unbounded metadata assumption. Unknown params refuse; arbitrary escaping of
+raw bytes is not the carrier. Outer native JSON keeps depth 16; the decoded
+signed-record depth is independently 12.
+
+A valid frame with a 24577-byte decoded preimage refuses `message_too_large`,
+without truncation; its 32770-byte encoding plus wrapper still fits (32886).
+An over-cap frame header separately refuses `frame_too_large` before body read.
+The depth-13 signed record refuses `ccj_noncanonical`. These specialize the
+native error vocabulary, mapped explicitly to waggle's provider codes in §6.
+Boundary references are waggle S21/S22 (24577/depth13 refusals) and PS2/PS3
+(24576/depth12 codec-only controls; PS3 is a top-level array); they do not prove caller
+identity or complete receiver-schema validity. §7 pairs equivalent limits
+with a correct caller-bound record.
+
+The accepted replacement for the base's absolute byte-signing ban is:
+**no unrestricted byte-signing method; each signing method has a fixed
+purpose/key and a non-overlapping, validated preimage language**.
 This is a chosen-message signing oracle inside a bounded, fixed-purpose
-canonical language, narrowed further by the signer/key checks. Distinct
-keys and exact non-overlapping preimages prevent transfer to the listed
-other domains under their required verifier contracts.
+canonical language, narrowed further by both identity paths. Canonicality
+supplies unambiguous bytes, not semantic approval or task authorization.
+Distinct keys and exact domain/LF framing prevent cross-domain transfer under
+the required verifier contracts. This does not preserve a stronger ban on all
+caller-supplied content or provide other envelope-semantic validation.
 
 ### 3.3 Durable retry and bounded effects
 
@@ -277,7 +309,7 @@ Exact argument comparison must not rely on a digest alone. Retained params
 may contain message content and remain private service state, never audit
 payload. There is no unbounded cache or automatic ID reclamation.
 
-Every retry rechecks current authority, both caller-bound body fields,
+Every retry rechecks current authority, both caller-bound identity paths,
 current key attestation validity and release ordering. Retirement, revocation or attestation expiry can therefore
 deny disclosure of an earlier success. A fresh binding cannot retrieve its
 predecessor's retained signature by reusing the ID. Result, successful audit
@@ -324,92 +356,128 @@ qualification of the exact format, provisioning, publication, fresh status
 proof, root continuity and revocation. A decision is not deployment evidence.
 Reusing purposes 1–4 or the SLIP master node is forbidden.
 
-### 4.2 Proposed attestation bytes and publication
+### 4.2 Draft-aligned attestation bytes and publication
 
-Under this decision, publish a CCJ-1 object exactly `{body,signature}`.
-The signature preimage is ASCII `keymaker-msg-key/1`, one NUL, then CCJ-1
-of `body`, without LF. The signature uses purpose 5 and strict unpadded
-base64url. Body contains exactly the following members (sets below are schema
-notation, not literal wire order; wire objects use CCJ-1 order):
+Use exactly the four-member `swarm-envelope/2` envelope, closed bodies and
+[waggle §2.6](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#26-root-signed-attestations-and-shared-revocation)
+attestation/1 profile. There is no private Keymaker certificate dialect.
+Content ID uses `ASCII("swarma-attestation attestation/1") || LF || CCJ-1(body)`.
+The purpose-5 root signs `ASCII("swarma-attestation attestation/1") || LF ||
+CCJ-1({body:body,key:issuer,role:"author",version:"swarm-envelope/2"})`.
+Exactly one author signature uses body.issuer, the independently pinned root.
+Signatures are strict unpadded base64url 64-byte Ed25519; raw root/public keys
+and signature verification meet waggle §2.3, including point/subgroup checks.
+No NUL prefix, bare-body signature or `{body,signature}` wrapper is accepted.
 
-| Member | Meaning |
+| Required body member | Agent certificate meaning and protected source |
 | --- | --- |
-| `type` | Literal `keymaker-msg-key/1` |
-| `owner` | Exact configured binding owner identifier |
-| `identity_path`, `path` | Bound purpose-1 path and its exact purpose-4 sibling, each four hardened indices in the base's path representation |
-| `uid`, `generation`, `registration_number` | Exact current binding tuple and monotonic registration number; no client claims |
-| `master_epoch`, `registry_revision` | Exact binding epoch and registry revision |
-| `purpose`, `algorithm` | Integer 4 and literal `Ed25519` |
-| `role` | Literal `author`; does not certify approver or delegate-session authority |
-| `public_key`, `key_id` | Strict unpadded base64url of 32 raw message-key bytes and their `sha256:` key ID |
-| `issuer_key_id`, `issuer_path`, `issuer_purpose` | Out-of-band pinned root's key ID, four-component purpose-5 path and integer 5 |
-| `not_before`, `not_after` | Whole-second UTC safe integers; a nonempty half-open validity window |
+| `type`, `issuer` | `attestation/1`, independently pinned purpose-5 root key ID |
+| `subject` | Exactly `{algorithm:"Ed25519",key_id:K,public_bytes:base64url(raw32)}`; K is `ed25519:` plus that same canonical encoding |
+| `key_class`, `purpose` | Exactly `agent`, `swarma-msg`; purpose string maps to our numeric derivation purpose 4, not issuer purpose 5 |
+| `roles`, `actions` | Exactly `["author"]`, `["message.sign"]`; no concrete action/target authorization |
+| `iat`, `exp` | Exact `YYYY-MM-DDTHH:MM:SSZ`, years 1970–9999, real dates; start-inclusive/end-exclusive |
+| `binding.uid` | Exact binding UID as JSON integer in [0,4294967294] |
+| `binding.generation` | Exact current generation, nonempty UTF-8 at most 255 bytes |
+| `binding.registration_number` | Exact current registration JSON integer in [1,9007199254740991] |
+| `binding.master_epoch` | Exact signing-service master epoch, nonempty UTF-8 at most 255 bytes |
+| `binding.owner` | Exact protected owner, nonempty UTF-8 at most 255 bytes |
+| `binding.path` | Exact purpose-4 path `m/4'/product'/project'/agent'`, nonempty UTF-8 at most 255 bytes; additionally enforce our four hardened components and identity-sibling relationship |
 
-All path fields are canonical strings `m/purpose'/product'/project'/agent'`,
-using unpadded decimal indices in `[0,2147483647]` before hardening, as in
-section 2.1. The issuer fields MUST equal the independently pinned issuer
-tuple/key/purpose; the certified epoch MUST equal that root's pinned epoch.
-Unknown members, malformed paths and noncanonical body bytes are invalid.
+The binding object has exactly those six members. Compare independently typed
+protected current-generation evidence with those fields plus boolean
+`active:true`; no normalization or coercion and no absence-equals-absence.
+Never silently rename epoch or substitute a reusable UID for a generation.
+Issue only from the authoritative active binding under `with_active`, with
+trusted time and `iat <= now < exp`. The decided lifetime is
+**`0 < exp - iat <= 86400` seconds**, where subtraction uses parsed instants.
+Both issuer and verifier MUST reject a longer window, even with a valid root
+signature. Protected policy may narrow it; refresh never widens revoked
+authority and creates an attestation, not a new message key.
+Both sides enforce **8192 bytes for the entire evidence envelope**, depth 16,
+strings 8192 and arrays 64, plus all CCJ-1/profile/time restrictions. Do not
+confuse this evidence cap with the message preimage cap or the 120-second
+message-body lifetime, which Keymaker does not interpret.
 
-Issue only with trustworthy time, from the active binding; require
-`not_before <= now < not_after` on issuance and every message release/retry.
-The decided maximum lifetime is **86400 seconds (24 hours)**:
-`0 < not_after - not_before <= 86400`. Issuers MUST enforce that ceiling;
-verifiers MUST reject a longer window, even if currently inside it. Protected
-policy may narrow it, with no skew extending authority. Refresh never widens a revoked binding's
-authority. A refresh builds another attestation, not another message key.
-Attestations are public metadata; private keys/chain codes are never published.
-
-The operator publishes the attestation alongside the independently pinned
-root and a current, authenticated binding-status view in the owner's public
-identity registry. No new Keymaker lookup/list method or network listener is
-proposed. A caller obtains its certificate through that registry by key ID
-and registration number, not by querying another UID on B. The concrete
-publication transport and fresh status proof remain base Q10 gates; an
-unsigned file or a historical signed certificate is insufficient. Message
-signing MUST remain closed until publication and fresh-status verification
-are qualified. Local validity/custody checks do not assert remote freshness.
+Publish certificates, independent root pins and authenticated current binding
+status through the owner's identity registry; no new socket, lookup RPC or
+network listener. Callers retrieve by key ID and registration number; private
+material is never published. Publication/freshness/root continuity remain Q10
+gates. Signing stays closed until qualification and §4.4 resolutions.
 
 ### 4.3 Verifier checks and withdrawn authority
 
-A verifier MUST establish the owner/root/epoch binding from independent pins,
-verify the attestation's purpose-5 signature over the exact certified body,
-strict encodings, validity window, expected owner, registry lineage, exact
-purpose/path relationship, public-key digest and expected registration. Then
-check independently fresh binding status and root/epoch revocation evidence.
-The attested `(uid,generation,registration_number)` MUST be currently active.
-A retired generation or expired attestation MUST cause current-use rejection
-regardless of equality with a new generation's purpose-4 public key; a new
-certificate cannot make the old generation's attestation current again.
-It MUST require purpose 4 and Ed25519, reconstruct the exact waggle preimage,
-check the envelope content ID, and verify the message signature using that
-certified public key. Require the certified `author` role and S0's exact
-algorithm/role/type/label combination; another role or type must not verify
-by reusing these bytes. waggle's verifier additionally checks the envelope
-schema, semantic authority and any signed generation/registration reference;
-a valid Keymaker signature supplies none of those decisions.
-If certified key bytes, key-ID derivation, message purpose, validity,
-generation binding or revocation status cannot be established, the verifier
-MUST refuse. No key-ID-only, certificate-only or role-agnostic fallback exists.
+A verifier establishes independent owner/root/purpose-5/epoch pins, then
+applies waggle §2.6's ordered envelope/header, content-ID/root-signature,
+complete typed profile/current binding/time, and signed issuer-snapshot checks.
+It additionally checks protected registry lineage, numeric purpose 4 and the
+exact path relationship from §2.1. These protected facts are not invented
+certificate members. Require Ed25519 subject/key-ID correspondence, author
+profile, expected registration, active generation and a valid <=86400-second
+window. A retired generation or expired attestation rejects even when a fresh
+registration uses identical public-key bytes. Reconstruct the exact message
+signed record and separate content ID, including the same 24576-byte
+message-preimage/depth12 limits; enforce waggle's full receiver schema,
+algorithm/role/type profile, action authority and delivery bindings. A valid
+Keymaker signature supplies none of those semantic decisions.
 
-Existing authorized binding revoke is the sole local revocation action;
-it tombstones the identity path and withdraws its message sibling, with the
-same operator-record gates, permanent history and release fence. No separate
-message-only revoke or shortcut around persistent-revoke authority is added.
-Retirement/unbinding withdraws a registration's authority without revoking
-the persistent path. Publication MUST retain predecessor and revocation
-tombstones and expose the withdrawn status for the old registration; a later
-registration MUST NOT make that old attestation current again.
+Revocation distribution uses waggle **revocation/1**, not a Keymaker format:
+body exactly `{type:"revocation/1",issuer,issued_at,complete:true,entries}`;
+entries are at most 64 closed `{kind,id,from}` objects, kind `key` or `record`.
+Use `swarma-attestation revocation/1` plus LF and the same separate content-ID
+and signed-record constructions. Exactly one author signature must come from
+the snapshot's directly pinned issuing root. Both issuer/verifier enforce the
+8192-byte evidence cap and typed timestamps. Authenticated complete snapshots
+need rollback continuity and protected positive maximum age <=60 seconds;
+future-issued, stale, incomplete, missing or rolled-back evidence refuses.
+Validate every entry before matching; key or attestation-record revocations
+are cumulative, effective at `from <= max(now,W)` per waggle §2.6, where
+W is the verifier's durable time watermark (§3.3 there). Root
+withdrawal remains an independent protected owner-pin/recovery action.
+The purpose-5 authority conflict in §4.4 MUST be resolved before issuance of
+these snapshots; no generic root-signing entry point is authorized here.
 
-After revocation, verifiers see a withdrawn registration/key authorization
-through the authenticated status view and MUST reject it for current use,
-even if its certificate has not expired. Missing, stale or unreachable status
-evidence fails closed; offline certificate-only verification cannot claim
-current authority. Already released signatures remain mathematically valid
-and cannot be recalled. Historical validity needs independently preserved
-time/status evidence and an explicit relying-party policy; a body timestamp
-alone cannot prove pre-revocation issuance. Keymaker provides no automatic
-grandfathering or retrospective creation-time guarantee.
+Existing authorized binding revoke remains the sole local source of truth:
+it tombstones the identity path and withdraws the purpose-4 sibling under the
+same operator gates and release fence. Shared snapshots distribute that
+withdrawal and cannot undo it. Retirement/unbinding withdraws a registration
+without revoking the persistent key; use record-level withdrawal rather than
+blanket key revocation for a retired generation when the stable key continues.
+Retain predecessor evidence/tombstones; a new certificate never makes the old
+generation current. The exact live publication/continuity process remains Q10.
+
+Verifiers also need independently fresh active-generation status: an empty
+revocation snapshot alone does not prove a registration active. Missing/stale
+status fails closed; no key-ID-only, certificate-only or role-agnostic fallback.
+Already released signatures remain mathematically valid and cannot be recalled.
+Historical validity is outside waggle v0; a body timestamp alone cannot prove
+pre-revocation issuance. Keymaker supplies no creation-time guarantee.
+
+### 4.4 Draft alignment differences and unresolved gates
+
+These are explicit changes or unresolved incompatibilities with the previous
+Keymaker draft, checked against waggle **136dba2**, §§2.2–2.6 and 6:
+
+| Difference | Treatment / remaining gate |
+| --- | --- |
+| Signing payload and content ID | Former body-only signing and `id=hash(preimage)` differ: sign the full `{body,key,role,version}` record; hash the separately tagged body for content ID (§3.1). This is a wire change, no compatibility alias. |
+| Role/type separation | One message label replaces symbolic role-specific labels. The signer cannot reject an approver/type claim without extra interpretation forbidden by §2.5; receivers enforce author authority (§3.2, MSG-V15). Delegate has no admitted profile. |
+| Key IDs and identity paths | Former `sha256:` public-key digest IDs and symbolic distinct signer identity become `ed25519:` raw-key encodings at `key` and `body.author` (§3). Other methods keep their existing IDs. |
+| Message limits and refusal vocabulary | 48000→24576 complete bytes; signed depth 16→12; add string 8192/array 64 caps. Native frame remains payload 65536/depth16. Source codec codes are mapped, not asserted identical (§6). |
+| Canonical value versus record shape | waggle codec-only PS3 admits a depth-12 array. Our mandatory identity phase rejects a canonical non-object signed record as `signer_identity_malformed`, not `ccj_noncanonical`; the original object-only codec refusal is replaced. The required two paths still make every successful record an object. |
+| Attestation wrapper, names and time | Former NUL-framed private body/wrapper replaced by LF-framed full envelope/signed record. Numeric subject purpose 4 maps to `purpose:"swarma-msg"`; singular role becomes roles/actions; `public_key` becomes subject.public_bytes; numeric not_before/not_after become strict iat/exp timestamps. Root purpose remains protected integer 5. |
+| Fields absent from the new wire profile | `identity_path`, `registry_revision`, `issuer_path`, `issuer_purpose` are not attestation members. Enforce identity sibling/registry lineage/root tuple/purpose using independent protected evidence and pins; do not add unknown wire fields or claim the certificate signs these facts. These inputs need Q10 qualification. |
+| Binding path semantics | waggle specifies an opaque protected `binding.path` string; this consumer requires it to be the purpose-4 subject path. Both producer and protected evidence must use that meaning; an identity-purpose path cannot be silently substituted. Accepted-head consumer mapping must confirm it (MSG1). |
+| Field ranges and evidence size | New binding strings <=255 bytes, UID excludes 4294967295 although native UIDs fit uint32, registration <=9007199254740991, timestamp years 1970–9999. Old certificate imposed no explicit whole-envelope cap; new evidence <=8192 bytes, depth16/string8192/array64. Issuer rejects nonrepresentable or oversized records; never truncate/coerce/omit binding fields. |
+| Lifetimes and status | Agent 86400-second ceiling matches on both sides; message bodies instead have <=120-second lifetime at receivers. Snapshot <=60-second freshness/64-entry cap and rollback continuity are additional requirements. Overflow cannot drop tombstones or claim completeness; rollover/publication capacity needs Q10 qualification. Snapshot currency does not replace fresh generation status. |
+| Purpose-5 revocation signing authority | waggle requires the same pinned issuer root to sign shared revocation snapshots. Our decided purpose-5 key may sign only service-built attestations (§4.1). This is an unresolved authority conflict: owner approval must explicitly widen that fixed internal language or waggle must publish an accepted compatible authority contract. No reuse of purposes 1–4, extra root, silent exception or snapshot issuance is authorized. Activation stays closed. |
+| Stable-key generation association | message/1's closed body has no generation/registration/attestation reference field; `body.author` is only the stable key ID. A certificate/status selected by a receiver cannot prove which generation created a signature. Do not add a field or relabel old signatures; any stronger generation-at-creation claim needs a reviewed waggle change (MSG1). |
+
+Every curator-required certificate fact is present or mapped explicitly in
+§4.2: uid, generation, registration_number, master epoch, subject purpose
+`swarma-msg`, Ed25519, author role, key bytes/key_id, owner, path and the
+issuer/verifier-enforced <=86400-second window. The additional missing wire
+facts and semantic differences above are not waived. The draft pin is not
+acceptance; re-check every row against the forwarded accepted head.
 
 ## 5. Audit and failure behavior
 
@@ -438,38 +506,33 @@ is no message-signing exemption from that proposal's authority fence.
 
 ## 6. Refusal-code reuse
 
-Decided: **`message_too_large`**, with `retryable=false`, covers a complete
-decoded preimage over 48000 bytes despite fitting a native frame. The existing
-`frame_too_large` remains the transport-length-header refusal.
+Native errors retain the base retryability allowlist. The message-specific
+identity codes below are proposed unimplemented additions to base §15, with
+exact conditions from [waggle §6](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/spec/swarm-envelope-2.md#6-future-verifier-contract-and-refusal-order).
+No response echoes supplied or expected values. `message_too_large` remains
+decided and non-retryable, now at the aligned 24576-byte limit.
 
-This contract proposes one additional non-retryable code,
-**`message_binding_mismatch`**, for a well-formed, uniquely resolved signer
-identity or key ID that differs from the calling UID's active binding and
-purpose-4 key. `peer_binding_mismatch` describes the authenticated peer versus
-a stored binding; `sign_key_mismatch` is the SSH requested-key check. Neither
-exactly describes these native body-field claims; those existing meanings
-remain unchanged. Missing/wrong-type/multiple-valued fields already fit
-`request_malformed`, while duplicate JSON members fit `ccj_noncanonical`.
-No aliases or per-field error spellings are added. Error responses disclose
-neither the expected field values nor the supplied ones.
+| Condition, in provider order after native admission | Native code (`retryable=false` unless base says otherwise) | waggle provider code / mapping |
+| --- | --- | --- |
+| Complete decoded preimage >24576, inside a valid frame | `message_too_large` | `signer_preimage_too_large` (S21 vs PS2) |
+| Missing LF, malformed tag alphabet/length | `namespace_not_permitted` | `signer_tag_malformed` |
+| Well-formed label other than exact `swarma-msg/2` | `namespace_not_permitted` | `signer_domain_refused` |
+| Tail violates canonical/depth12/string8192/array64 language | `ccj_noncanonical` | `signer_payload_invalid` (S22 vs PS3) |
+| Missing/invalid service-resolved attested caller key or identity policy after precise native authority checks | `signer_identity_unavailable` | Same; no caller field supplies the unavailable fact |
+| Missing `key` or `body.author`, non-object record/container, wrong type or multi-value representation | `signer_identity_malformed` | Same; duplicate members already fail canonicality |
+| Either extracted string differs from caller's resolved attested purpose-4 key ID | `signer_identity_mismatch` | Same; equal foreign strings still fail |
+| Invalid base64url, unknown/missing params, caller key/path/identity selectors | `request_malformed` | Native adapter schema, not a waggle identity-path error |
+| Whole frame over 65536 / truncated / malformed | `frame_too_large` / `frame_truncated` / `frame_malformed` | Native framing phase before provider |
+| Inactive/mismatched/missing generation or binding; revoked identity | Exact §2.3/base §15 codes | Existing authenticated-peer authority checks retained |
+| Changed method/params under retained ID | `request_conflict` | Native durable retry contract |
+| Missing required published certification / outside certified key window | `key_not_enrolled` / `key_not_valid_now` | Proposed message extension of existing host-key meanings |
+| Trusted time or custody unavailable | `clock_untrusted` / `custody_unavailable` | Existing custody boundary |
+| Capacity, deadline or audit unavailable | Existing resource/deadline/audit codes and exact base retryability | No new retryable identity class |
 
-Other typed errors retain section 7's `retryable` allowlist. Validation and
-permanent authority denials are not retryable; transient generation-source,
-resource/deadline and audit classes keep their exact base retryability.
-
-| Condition | Code and proposed application |
-| --- | --- |
-| Wrong or missing message label, including another protocol's prefix | `namespace_not_permitted`; extend its namespace meaning to the fixed message domain |
-| Decoded tail violates CCJ-1/object canonicality | `ccj_noncanonical`; applies to this nested canonical byte document too |
-| Invalid base64url, unknown/missing params or selector fields; missing, wrong-type or ambiguous signer/key body fields | `request_malformed` |
-| Well-formed signer identity or key ID differs from the active caller binding/purpose-4 key | Proposed `message_binding_mismatch`, `retryable=false` |
-| Whole frame over 65536 / truncated / malformed | `frame_too_large` / `frame_truncated` / `frame_malformed` at the existing framing phase |
-| Complete decoded preimage exceeds 48000, within a valid frame | Decided `message_too_large`, no truncation or signing |
-| Inactive/mismatched/missing generation or binding; revoked identity | Exact codes in section 2.3 and base section 15; no message-specific aliases |
-| Changed method/params for retained ID | `request_conflict` |
-| Missing required published certification / outside certified key window | `key_not_enrolled` / `key_not_valid_now`; proposed extension of these currently host-key meanings to message certification |
-| Trusted time or custody unavailable | `clock_untrusted` / `custody_unavailable` |
-| Capacity, deadline or audit unavailable | Existing resource/deadline/audit codes, without extending retryability |
+Mappings preserve rejection conditions, not provider-code spelling for existing
+native codec/domain errors. waggle identity codes are adopted exactly; no
+`message_binding_mismatch` alias is retained. Invalid identity resolution is
+not retried automatically: restore protected state through its normal flow.
 
 Cross-purpose signature verification failure is a verifier rejection, not a
 new native code: a caller cannot select a key. An attempted key selector on
@@ -484,14 +547,19 @@ They add no rows to the existing vector generator. Common fixture M: active
 bound peer at `(uid=1001,generation="g1")`, persistent purpose-1 path
 `m/1'/1'/1'/1'`, epoch `example-epoch-1`, registration 1, valid purpose-4
 attestation and independently fresh active status, healthy time/custody/audit,
-hello negotiated. `BOUND_BODY` resolves `SIGNER_FIELD` exactly once to M's
-bound public identity and `KEY_ID_FIELD` exactly once to M's purpose-4 key ID,
-using the accepted S0 paths/types. Preimage P is
-`MSG_LABEL || LF || CCJ-1(BOUND_BODY)` (no suffix), using the accepted S0 author
-label, not the literal parameter names. P2 is P with one otherwise opaque,
-disjoint member changed, while both authority fields stay correct. Encode as
-in section 3.1; use fresh valid IDs except the retry pair. These are custody
-fixtures, not a claim of complete application-envelope validity.
+hello negotiated. `BOUND_RECORD` has `key=K` and `body.author=K`, where K is
+M's service-resolved attested `ed25519:` key ID, body is an object and the
+other record fields are `role:"author",version:"swarm-envelope/2"`.
+Preimage P is `ASCII("swarma-msg/2") || LF || CCJ-1(BOUND_RECORD)`, no suffix.
+P2 changes one otherwise opaque body member while both identity paths stay
+correct. Encode as §3.1; fresh IDs except retries. These are custody fixtures,
+not complete receiver-schema validity. waggle's S21/S22 and PS2/PS3 are
+codec-only boundary references; PI1–PI5 and I01–I21 additionally exercise
+identity narrowing in its own draft vector set. Boundary files at the same commit:
+[S21](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/vectors/swarm-envelope-2/0-negative/S21.json),
+[S22](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/vectors/swarm-envelope-2/0-negative/S22.json),
+[PS2](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/vectors/swarm-envelope-2/1-positive/PS2.json),
+[PS3](https://github.com/relux-works/waggle/blob/136dba2726009f9ed4458ab81d983e572897f2d8/vectors/swarm-envelope-2/1-positive/PS3.json).
 
 For **pre-commit service refusals**, require no returned signature/private
 material, no binding mutation and no new successful retained result; only
@@ -507,12 +575,12 @@ signs/verifies P with the certified purpose-4 key or states its narrower control
 
 | ID / claim | Negative input and exact expected outcome | Nearby positive control |
 | --- | --- | --- |
-| MSG-V01 exact label | Replace `MSG_LABEL` with a label outside the closed author list (including appended-byte or case-change variants chosen outside it), or omit LF: `namespace_not_permitted`; prefix matching never admits it | M signs exact P; distinct platform labels sharing a prefix still compare as distinct because of the LF boundary |
+| MSG-V01 exact label and closed registry | Replace `swarma-msg/2` with each of the eight non-message literals in §1: `swarma-waggle grant/1`, `swarma-waggle operator-act/1`, `swarma-attestation attestation/1`, `swarma-attestation revocation/1`, `swarma-registrar registration/1`, `swarma-registrar enrollment/1`, `swarma-credential-broker grant/1`, `swarma-credential-broker revocation/1`: `namespace_not_permitted` for every case. Also refuse `swarma-msg/20`, case changes, missing LF/control/overlong tags | Exact P signs; exact LF comparison separates distinct prefix-sharing labels |
 | MSG-V02 registration separation | Feed either exact ASCII `swarma-registrar registration/1` + LF + canonical body or `swarma-registrar enrollment/1` + LF + canonical body to B: `namespace_not_permitted`; sending P to `sign_registration` as an extra bytes member is `request_malformed` | M signs P; helper separately constructs a valid enrolled registration proof with purpose 2 |
 | MSG-V03 SSHSIG separation | Feed valid Git SSHSIG preimage to B: `namespace_not_permitted`; P in A SIGN_REQUEST is `sign_data_not_sshsig` | M signs P; A signs valid Git SSHSIG with purpose 1 |
 | MSG-V04 witness separation | Feed `keymaker-witness-record/1` plus NUL and a valid witness body to B: `namespace_not_permitted`; P is not a witness-record preimage | M signs P; qualified internal purpose-3 writer/verifier accepts its valid record, conditional on option C activation |
-| MSG-V05 canonical tail | After the correct label + LF use `{ }`, duplicate-key `{"a":1,"a":1}`, `{"a":9007199254740992}`, the bytes `7b2261223a22ff227d` (invalid UTF-8 in a string), `[]`, or `{}` plus LF: `ccj_noncanonical` | Exact P and canonical P2 sign as distinct bytes; canonicality refusals precede missing-field checks |
-| MSG-V06 decoded and framing bounds | Complete otherwise-valid preimage of 48001 bytes in a valid native frame: `message_too_large`; independently a header declaring 65537 bytes: `frame_too_large` before body read, even when body absent | A complete 48000-byte preimage under the accepted label signs; its request payload is 64116 bytes at timeout 2000, excluding the header |
+| MSG-V05 canonical tail | After the correct label + LF use `{ }`, duplicate-key `{"a":1,"a":1}`, `{"a":9007199254740992}`, the bytes `7b2261223a22ff227d` (invalid UTF-8 in a string), or `{}` plus LF: `ccj_noncanonical` | Exact P and canonical P2 sign as distinct bytes; canonicality refusals precede missing-field checks |
+| MSG-V06 decoded and framing bounds | Otherwise-valid caller-bound preimage of 24577 bytes: `message_too_large`; separately signed-record depth 13: `ccj_noncanonical`; independently header 65537: `frame_too_large` before body read | A complete 24576-byte record signs at payload 32884 bytes excluding header; depth12 signs. Source boundary pairs S21/PS2 and S22/PS3 are codec-only controls |
 | MSG-V07 generation fence | Retire g1 before final release: `generation_inactive`; change journal to active g2 while connection pins g1: `generation_mismatch`; no late success | Same M without retirement signs; explicitly re-registered g2 needs fresh connection/attestation and succeeds |
 | MSG-V08 revoke fence | Revoke registration 1 before release or use a fresh connection afterward: `identity_revoked` | Unrevoked M signs; no resurrection control uses a tombstoned path |
 | MSG-V09 key-purpose verification | Verify M's P signature with purpose-1, -2, -3 or -5 public key: cryptographic verification fails; replace certificate purpose/key with those siblings: certificate/policy verification rejects, even if otherwise validly issuer-signed | Same signature and unchanged purpose-4 certificate verify; purpose-5 certificate signature verifies only under the pinned issuer |
@@ -521,24 +589,30 @@ signs/verifies P with the certified purpose-4 key or states its narrower control
 | MSG-V12 current certification | Expired local key attestation: `key_not_valid_now`; verifier with stale/missing status or a current revoked tombstone rejects current-use authentication despite a valid message signature | Valid window plus fresh active status and expected registration verifies |
 | MSG-V13 wire encoding | Pad P's base64url or set unused bits to nonzero: `request_malformed`; decoded bytes must not be silently repaired | Exact unpadded encoding in section 3.1 signs |
 | MSG-V14 audit/recovery boundary | Known pre-commit audit refusal: `audit_unavailable`, no output, mutation or new successful result. Separately interrupt a commit with unknown durability/acknowledgement: fence admission, release no success, reconcile actual durable outcome and keep any committed result; no signing during reconciliation | Healthy audit releases one retained result. If reconciliation finds a committed result after lost acknowledgement, same-ID/bytes retry recovers it exactly without signing again under current authority; if it proves no commit, no successful result exists; unresolved outcome stays fenced |
-| MSG-V15 role/type separation | Give B S0's human-approver or delegate-session label: `namespace_not_permitted`; verify a valid author signature as approver, delegate or a different envelope type: verifier rejects the wrong S0 combination/preimage | Agent Ed25519 author signature under its exact type-specific label verifies; independently authorized human P-256 approver and delegate-session controls follow S0, never the agent key |
+| MSG-V15 receiver role/type separation | Under the same `swarma-msg/2` label, change a correct caller-bound record's role to approver/delegate or its body type: byte signer may sign it; receiver rejects the agent's wrong profile/type or reconstruction. Grant/act tags refuse at signer; no invented role-specific tags | Agent Ed25519 author message verifies; optional independently attested P-256 approver follows waggle; delegate has no admitted v0 control |
 | MSG-V16 stable key, inactive attestation | Keep the same purpose-4 key for persistent path g1→g2; present a cryptographically valid g1 signature and unexpired g1 attestation after g1 retires: verifier rejects because its attested generation is not active, even though g2 uses identical key bytes | Signature with the fresh g2/registration-2 attestation, current generation association and active status verifies; expired g2 attestation still rejects |
 | MSG-V17 purpose-5 outbound isolation | A SIGN_REQUEST selecting the purpose-5 key: `sign_key_mismatch`; helper or `sign_message` params selecting it: `request_malformed`; bounded internal wrong-key plants feeding purpose 5 into helper (2), witness (3) or message (4) signers: `purpose_unknown` before signing | A signs with purpose 1, helper with 2, qualified witness with 3, message with 4; internal attestation builder alone signs its fixed attestation with 5; witness control is conditional on option C activation |
 | MSG-V18 attestation issuer isolation | For each purpose 1, 2, 3 and 4, replace the attestation signature/issuer with that sibling while keeping the true purpose-5 root independently pinned: verifier rejects the unpinned/wrong-purpose signer; claiming issuer purpose 5 cannot authorize it | Service-built attestation signed with the pinned purpose-5 issuer verifies, within a nonempty window of at most 86400 seconds; a 86401-second window rejects even with a valid issuer signature |
-| MSG-V19 signer identity binding | Change only the uniquely resolved `SIGNER_FIELD` to another well-formed public identity: `message_binding_mismatch`, `retryable=false`, no signature or new successful retained result | M's exact bound signer identity and correct key field sign without rewriting either field |
-| MSG-V20 key-ID binding | Change only `KEY_ID_FIELD` to another well-formed key ID: `message_binding_mismatch`, `retryable=false`, no signature or new successful retained result | M's service-derived purpose-4 key ID and correct signer field sign |
-| MSG-V21 mandatory fields | Remove `SIGNER_FIELD`, remove `KEY_ID_FIELD`, or remove both (including canonical `{}`): `request_malformed` after canonical validation | Correct BOUND_BODY containing each pinned authority field once signs |
-| MSG-V22 unique field resolution | Duplicate either authority member in raw JSON: `ccj_noncanonical` (canonical duplicates are impossible); at either pinned path, use a canonical multi-value/ambiguous representation instead of its agreed single-value type: `request_malformed`; no first/last/alias choice | Canonical BOUND_BODY resolves each exact field path to one correct value and signs; disjoint opaque members do not supply alternate authority |
+| MSG-V19 signer identity binding | Change only `body.author` to a foreign string: `signer_identity_mismatch`, `retryable=false`; also set both paths to the same foreign ID: same refusal, no new successful result | M's own active attested key ID at both paths signs without rewriting |
+| MSG-V20 signed-record key binding | Change only top-level `key` to a foreign string: `signer_identity_mismatch`, `retryable=false`; mutual agreement with a foreign author never supplies caller authority | M's service-derived purpose-4 key ID at both paths signs; exact retries recheck both |
+| MSG-V21 mandatory identity and resolution | Remove `key`, `body.author` or both (including canonical `{}`), use a canonical top-level scalar/array, set body to a scalar or either field to a non-string: `signer_identity_malformed`. Separately remove/invalidate protected resolved key/policy after valid native admission: `signer_identity_unavailable`. All non-retryable | Correct BOUND_RECORD and valid caller identity resolution sign; precise generation/revoke failures retain their native codes |
+| MSG-V22 unique field resolution | Duplicate either decoded authority member, including escaped aliases: `ccj_noncanonical` (canonical duplicates are impossible); use arrays/multi-value objects for either identity string: `signer_identity_malformed`; no first/last/alias choice | Exact `key` and `body.author` each resolve once to M's key ID; disjoint opaque members cannot substitute |
+| MSG-V23 attestation closed schema and bounds | Omit any required certificate or binding member: verifier `key_binding_unavailable`; wrong type/profile/key-id/root/purpose, inactive binding, 86401-second window, evidence >8192 bytes, depth17, UID 4294967295, registration 9007199254740992 or binding string 256 bytes: verifier `key_binding_invalid`. Issuer refuses these before signing; never omit/coerce to fit | Complete §4.2 purpose-5 certificate with exact active binding, valid <=86400 window and each applicable boundary within 8192-byte evidence verifies; exact 8192-byte evidence is a codec boundary control only if all other profile limits hold |
+| MSG-V24 shared revocation and currency | Missing/stale/future/incomplete/rolled-back issuer snapshot refuses current use as unavailable; malformed/signature-invalid snapshot refuses as invalid; effective key or attestation-record entry rejects even with old body.iat | Complete authentic fresh continuous snapshot with no effective match plus independently active status allows the ordinary certificate/message checks; snapshot signer authority remains gated by §4.4 |
 
-Construct MSG-V06 from a correct bound body containing an additional opaque
-ASCII string, disjoint from both authority paths. Let B be that canonical
-body's byte length when the extra string is empty, and L the accepted label
-length. Set the ASCII padding length to `48000 - L - 1 - B`; S0 must confirm
-the required fields and label leave room. One more padding byte yields the
-48001-byte negative without changing either authority field. Encode and
-check the whole native request for both: 64116/64118 bytes at timeout 2000,
-still inside the frame limit. No exact field names, labels or application-valid
-body are invented by these parametric vectors.
+Construct MSG-V06 from a correct caller-bound record with opaque string
+padding split across an array of at most 64 strings, each <=8192 bytes.
+Count CCJ-1 syntax and the 12-byte `swarma-msg/2` label plus LF: adjust ASCII
+padding to make the **complete** preimage exactly 24576; one additional byte
+in a non-full string yields 24577 without changing either identity path.
+Their base64url/native payload sizes are 32768/32884 and 32770/32886.
+Separately nest an opaque body member so the complete signed-record container
+depth is 12 (positive), then 13 (negative), counting root = 1. Strings/arrays
+stay within their bounds. Independent negatives are an 8193-byte string and
+65-entry array (`ccj_noncanonical`), paired with 8192-byte/64-entry valid
+caller-bound controls inside the preimage limit. These controls assert custody
+language only; a receiver may refuse an unregistered application payload.
+
 MSG-V07 and V08 require separate races where retirement/revocation wins the
 release barrier; released-first controls show the stated recall limit.
 MSG-V09's internal-purpose guard additionally needs a bounded faulty-selector
@@ -548,19 +622,22 @@ message tests are claimed by this text-only slice.
 ## 8. Open dependencies and scope bounds
 
 [MSG1](../UNRESOLVED_QUESTIONS.md#swarm-signer-message-specification-gates)
-remains open for waggle's exact label/role/type and generation-reference
-semantics, plus `SIGNER_FIELD`/`KEY_ID_FIELD` names, paths, canonical encodings
-and binding-to-public-identity mapping. MSG2 (stable key with fresh active-
-generation authority), MSG3 (owner-pinned purpose 5 and maximum 24 hours),
-and the bounded language/48000-byte limit/refusal are decided. Publication
-and fresh-status proof still need qualification under base Q10.
+is aligned to draft waggle **136dba2**, with independent acceptance and
+re-check/re-pin pending the forwarded accepted head. §4.4 records all identified
+wire/semantic/range/authority differences, including the unresolved purpose-5
+snapshot language and stable-key generation association. Do not substitute an
+unreviewed draft for an accepted authority. MSG2 (stable key, fresh active
+generation attestation), MSG3 (purpose 5, maximum 24 hours), and the bounded
+language remain decided; the aligned draft cap is 24576, signed depth12.
+Publication/fresh-status/root continuity remain base Q10 qualification gates.
+
 Base Q6, Q7, Q9 and Q10 continue to gate generation ordering, persistent
 revocation, socket access and portable certification. No new signed format
 can replace an unpublished authority interface with an allow-all stub. These design decisions alone do not
 qualify any of those dependencies.
 
-No surface table was supplied with this assignment (brief gap). All eight
-requested specification parts are covered; no required row is treated as
+No surface table was supplied with this assignment (brief gap). All six
+requested alignment parts are covered; no required row is treated as
 out of contract. Implementation, executable vectors/mutants, publication
 service and production qualification are outside this spec-only slice.
 
@@ -573,11 +650,11 @@ explicit amendments; publishing this proposal does not amend them silently:
 | --- | --- |
 | 3 | Message sibling lifecycle follows binding/tombstone and actual-release fences; generation-specific certificates do not imply generation-specific key bytes |
 | 4.1–4.3 | Reserve purpose 4 and decided internal purpose 5; preserve four hardened components and purpose-1-only binding registration; publish root certification/continuity before claiming it |
-| 5 | Add self-only `sign_message` without caller selectors, with signer/key body checks and durable retained-result authority |
+| 5 | Add self-only `sign_message` without caller selectors, with signed-record key/author checks and durable retained-result authority |
 | 7 | Add exact method/binary schema and validated-domain exception to the unrestricted-byte ban; include signatures in durable same-ID recovery |
 | 8 | Replace "only signing method on B" with the two method-specific signing authorities; helper bytes, enrollment and purpose 2 remain unchanged |
 | 9 | Add the proposed purpose-3/4/5 separation rows, including reverse-direction checks; ordinary metadata/mutations still perform no key signing |
 | 10 | Count message encoding, canonicalization, signing, retries and results inside existing limits; qualify group provisioning without implying helper permission |
 | 11 | Add `swarma-msg` logical domain, exact preimage digest/null rules and result audit transaction; preserve custody extension and failure closure |
 | 13–14 | Implement paired vectors, fault/race controls and acceptance coverage; resolve MSG1 and qualify decided MSG2/MSG3 before activation |
-| 15 | Add decided non-retryable `message_too_large` and proposed non-retryable `message_binding_mismatch`; reuse existing codes for malformed/missing/duplicate field cases and section 6 applications |
+| 15 | Add non-retryable `message_too_large` and the three `signer_identity_*` codes with §6 mappings; keep native schema/canonicality/domain errors separate |

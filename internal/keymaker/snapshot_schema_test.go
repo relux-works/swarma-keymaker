@@ -65,7 +65,7 @@ func TestSnapshotSchemaRequired(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, key := range []string{"records", "next_registration_number", "version", "audit_seq", "audit_hash"} {
+			for _, key := range []string{"records", "next_registration_number", "version", "audit_seq", "audit_hash", "requests"} {
 				t.Run("missing-"+key, func(t *testing.T) {
 					var changed map[string]json.RawMessage
 					json.Unmarshal(original, &changed)

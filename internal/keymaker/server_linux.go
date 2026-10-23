@@ -12,21 +12,28 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/relux-works/swarma-keymaker/internal/control"
 )
 
 type Server struct {
-	Engine        *Engine
-	Peers         PeerSource
-	Path          string
-	dir           *os.File
-	listener      *net.UnixListener
-	inode, device uint64
-	mu            sync.Mutex
-	connections   map[*net.UnixConn]uint32
-	counts        map[uint32]int
-	closed        bool
-	requests      chan struct{}
-	wg            sync.WaitGroup
+	Engine                      *Engine
+	Peers                       PeerSource
+	Path                        string
+	ControlPath                 string
+	controlListener             *net.UnixListener
+	controlWire                 *control.Server
+	native                      *Native
+	controlInode, controlDevice uint64
+	dir                         *os.File
+	listener                    *net.UnixListener
+	inode, device               uint64
+	mu                          sync.Mutex
+	connections                 map[*net.UnixConn]uint32
+	counts                      map[uint32]int
+	closed                      bool
+	requests                    chan struct{}
+	wg                          sync.WaitGroup
 }
 
 func LockState(dir *os.File, uid uint32) (*os.File, error) {
@@ -93,11 +100,24 @@ func (s *Server) Close() {
 	}
 	s.closed = true
 	s.listener.Close()
+	if s.controlListener != nil {
+		s.controlListener.Close()
+	}
 	for c := range s.connections {
 		c.Close()
 	}
 }
 func (s *Server) cleanup() {
+	if s.controlListener != nil {
+		anchor := fmt.Sprintf("/proc/self/fd/%d/control.sock", s.dir.Fd())
+		st, err := os.Lstat(anchor)
+		if err == nil && st.Mode()&os.ModeSocket != 0 {
+			stat := st.Sys().(*syscall.Stat_t)
+			if stat.Ino == s.controlInode && uint64(stat.Dev) == s.controlDevice && stat.Uid == uint32(os.Getuid()) {
+				syscall.Unlinkat(int(s.dir.Fd()), "control.sock")
+			}
+		}
+	}
 	anchor := fmt.Sprintf("/proc/self/fd/%d/agent.sock", s.dir.Fd())
 	st, e := os.Lstat(anchor)
 	if e == nil && st.Mode()&os.ModeSocket != 0 {
@@ -120,8 +140,23 @@ func (s *Server) Serve(ctx context.Context) error {
 		}
 	}()
 	defer func() { close(done); s.Close(); s.wg.Wait(); s.cleanup() }()
+	var other chan error
+	if s.controlListener != nil {
+		other = make(chan error, 1)
+		go func() { err := s.accept(ctx, s.controlListener, true); s.Close(); other <- err }()
+	}
+	err := s.accept(ctx, s.listener, false)
+	s.Close()
+	if other != nil {
+		if controlErr := <-other; err == nil {
+			err = controlErr
+		}
+	}
+	return err
+}
+func (s *Server) accept(ctx context.Context, listener *net.UnixListener, native bool) error {
 	for {
-		c, e := s.listener.AcceptUnix()
+		c, e := listener.AcceptUnix()
 		if e != nil {
 			s.mu.Lock()
 			closed := s.closed
@@ -157,7 +192,11 @@ func (s *Server) Serve(ctx context.Context) error {
 				}
 				s.mu.Unlock()
 			}()
-			s.handle(ctx, c, peer, code)
+			if native {
+				s.handleControl(ctx, c, peer, code)
+			} else {
+				s.handle(ctx, c, peer, code)
+			}
 		}()
 	}
 }
@@ -246,4 +285,36 @@ func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peer
 			}
 		}
 	}
+}
+
+// The watcher closes idle control connections too. It only revokes access;
+// Identify and the final WithActive still establish request/release authority.
+func (s *Server) handleControl(ctx context.Context, c *net.UnixConn, p Peer, code Code) {
+	done := make(chan struct{})
+	defer close(done)
+	if code == "" {
+		admitCtx, cancelAdmission := context.WithTimeout(ctx, 2*time.Second)
+		g, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
+		if refusal == "" && generationCode(g, p.UID) == "" {
+			change, cancel := s.Engine.Generations.Watch(p.UID, g.Generation)
+			defer cancel()
+			current, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
+			if refusal != "" || generationCode(current, p.UID) != "" || current.Generation != g.Generation {
+				cancelAdmission()
+				c.Close()
+				return
+			}
+			go func() {
+				select {
+				case <-change:
+					c.Close()
+				case <-ctx.Done():
+					c.Close()
+				case <-done:
+				}
+			}()
+		}
+		cancelAdmission()
+	}
+	s.controlWire.ServeConn(ctx, c)
 }

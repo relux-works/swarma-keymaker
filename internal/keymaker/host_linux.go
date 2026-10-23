@@ -27,7 +27,14 @@ type PeerSource interface {
 type LinuxPeer struct{}
 
 func (LinuxPeer) Credentials(c *net.UnixConn) (Peer, Code) {
-	raw, err := c.SyscallConn()
+	return kernelPeer(c)
+}
+func kernelPeer(c net.Conn) (Peer, Code) {
+	source, ok := c.(syscall.Conn)
+	if !ok {
+		return Peer{}, "peer_identity_unavailable"
+	}
+	raw, err := source.SyscallConn()
 	if err != nil {
 		return Peer{}, "peer_identity_unavailable"
 	}
@@ -228,6 +235,9 @@ func (UnavailableGeneration) Lookup(context.Context, uint32) (Generation, Code) 
 	return Generation{}, "generation_source_unavailable"
 }
 func (UnavailableGeneration) WithActive(context.Context, uint32, string, func() Code) Code {
+	return "generation_source_unavailable"
+}
+func (UnavailableGeneration) WithEvidence(context.Context, []GenerationCondition, func() Code) Code {
 	return "generation_source_unavailable"
 }
 func (UnavailableGeneration) Watch(uint32, string) (<-chan struct{}, func()) {

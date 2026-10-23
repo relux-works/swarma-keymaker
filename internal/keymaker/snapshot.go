@@ -11,10 +11,11 @@ import (
 // Version, all binding bytes and the next issued number are committed together.
 func (s *Store) contentDigest(version uint64) (string, error) {
 	body := struct {
-		Version uint64    `json:"version"`
-		Next    uint64    `json:"next_registration_number"`
-		Records []Binding `json:"records"`
-	}{version, s.next, s.records}
+		Version  uint64            `json:"version"`
+		Next     uint64            `json:"next_registration_number"`
+		Records  []Binding         `json:"records"`
+		Requests []retainedRequest `json:"requests"`
+	}{version, s.next, s.records, s.requests}
 	b, err := canonical(body)
 	if err != nil {
 		return "", err
@@ -57,12 +58,28 @@ func objectMembers(raw []byte, required []string, optional ...string) (map[strin
 // UnmarshalJSON requires every persisted member, including explicit empty
 // records. Typed strict decoding also rejects unknown fields at every level.
 func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash"}, "records")
+	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records")
 	if err != nil {
 		return err
 	}
 	if _, ok := fields["records"]; !ok {
 		return failure("missing snapshot records")
+	}
+	var requests []json.RawMessage
+	if json.Unmarshal(fields["requests"], &requests) != nil {
+		return failure("invalid retained requests")
+	}
+	for _, raw := range requests {
+		row, e := objectMembers(raw, []string{"caller", "id", "method", "arguments", "status"}, "result")
+		if e != nil {
+			return e
+		}
+		if _, ok := row["result"]; !ok {
+			return failure("missing retained result")
+		}
+		if _, e := objectMembers(row["caller"], []string{"uid", "generation"}); e != nil {
+			return e
+		}
 	}
 	if value, ok := fields["records"]; ok {
 		if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {

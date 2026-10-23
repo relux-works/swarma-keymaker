@@ -23,7 +23,15 @@ type GenerationSource interface {
 	// WithActive must not invoke the callback unless current authoritative evidence
 	// is active; its callback/release is ordered against retirement.
 	WithActive(context.Context, uint32, string, func() Code) Code
+	// WithEvidence validates all named generations under the same retirement
+	// barrier and holds it through the callback. No nested Lookup is permitted.
+	WithEvidence(context.Context, []GenerationCondition, func() Code) Code
 	Watch(uint32, string) (<-chan struct{}, func())
+}
+
+type GenerationCondition struct {
+	Principal Principal
+	Retired   bool // Require retiring/removed instead of active for cleanup.
 }
 
 // Generation tokens are opaque; their encoding belongs to the user-manager journal.
@@ -46,32 +54,35 @@ type Binding struct {
 	RegistryRevision string    `json:"registry_revision"`
 }
 type bindingDisk struct {
-	Next      uint64    `json:"next_registration_number"`
-	Records   []Binding `json:"records"`
-	Version   uint64    `json:"version"`
-	AuditSeq  uint64    `json:"audit_seq"`
-	AuditHash string    `json:"audit_hash"`
+	Next      uint64            `json:"next_registration_number"`
+	Records   []Binding         `json:"records"`
+	Requests  []retainedRequest `json:"requests"`
+	Version   uint64            `json:"version"`
+	AuditSeq  uint64            `json:"audit_seq"`
+	AuditHash string            `json:"audit_hash"`
 }
 type Store struct {
-	mu          sync.Mutex
-	records     []Binding
-	next        uint64
-	dir         *os.File
-	uid         uint32
-	watchers    map[uint64][]chan struct{}
-	failed      bool
-	initialized bool // This call proved the state directory was empty.
-	version     uint64
-	auditSeq    uint64
-	auditHash   string
-	journal     *Journal
-	auditDir    *os.File
+	mu           sync.Mutex
+	records      []Binding
+	requests     []retainedRequest
+	requestIndex map[requestKey]int
+	next         uint64
+	dir          *os.File
+	uid          uint32
+	watchers     map[uint64][]chan struct{}
+	failed       bool
+	initialized  bool // This call proved the state directory was empty.
+	version      uint64
+	auditSeq     uint64
+	auditHash    string
+	journal      *Journal
+	auditDir     *os.File
 }
 
 // NewStore is an in-process store; durable deployments use OpenStore. No caller
 // credential is accepted on a wire through these trusted lifecycle methods.
 func NewStore() *Store {
-	return &Store{next: 1, records: []Binding{}, watchers: map[uint64][]chan struct{}{}}
+	return &Store{next: 1, records: []Binding{}, requests: []retainedRequest{}, requestIndex: map[requestKey]int{}, watchers: map[uint64][]chan struct{}{}}
 }
 
 // OpenStore opens the reconciled pair, never a standalone binding authority.
@@ -142,6 +153,10 @@ func loadStore(dir *os.File, uid uint32) (*Store, error) {
 		return nil, failure("invalid binding journal")
 	}
 	s.records = disk.Records
+	s.requests = disk.Requests
+	if err := s.validateRequests(); err != nil {
+		return nil, err
+	}
 	s.next = disk.Next
 	s.version, s.auditSeq, s.auditHash = disk.Version, disk.AuditSeq, disk.AuditHash
 	if s.version == 0 || s.version > 9007199254740991 || s.auditSeq == 0 || s.auditSeq > 9007199254740991 || !validDigest(s.auditHash) {
@@ -152,16 +167,17 @@ func loadStore(dir *os.File, uid uint32) (*Store, error) {
 	}
 	return s, nil
 }
-func (s *Store) validate() Code {
-	if s.next == 0 || s.next > 9007199254740991 {
+func (s *Store) validate() Code { return validateBindings(s.records, s.next) }
+func validateBindings(records []Binding, next uint64) Code {
+	if next == 0 || next > 9007199254740991 {
 		return "binding_conflict"
 	}
 	nums := map[uint64]bool{}
 	active := map[Principal]bool{}
 	paths := map[string]Binding{}
 	var previousNumber uint64
-	for _, b := range s.records {
-		if b.Number <= previousNumber || b.Number >= s.next || nums[b.Number] || !validGeneration(b.Generation) || !validGeneration(b.Registrar.Generation) || b.Owner == "" || b.Epoch == "" || b.RegistryRevision == "" || ValidatePath(b.Path, "agent-identity") != "" || (b.Lifetime != "ephemeral" && b.Lifetime != "persistent") || (b.Status != "active" && b.Status != "unbound" && b.Status != "revoked") {
+	for _, b := range records {
+		if b.Number <= previousNumber || b.Number >= next || nums[b.Number] || !validGeneration(b.Generation) || !validGeneration(b.Registrar.Generation) || b.Owner == "" || b.Epoch == "" || b.RegistryRevision == "" || ValidatePath(b.Path, "agent-identity") != "" || (b.Lifetime != "ephemeral" && b.Lifetime != "persistent") || (b.Status != "active" && b.Status != "unbound" && b.Status != "revoked") {
 			return "binding_conflict"
 		}
 		nums[b.Number] = true
@@ -204,7 +220,7 @@ func (s *Store) persist() Code {
 	if c != "" {
 		return c
 	}
-	b, e := json.Marshal(bindingDisk{Next: s.next, Records: s.records, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash})
+	b, e := json.Marshal(bindingDisk{Next: s.next, Records: s.records, Requests: s.requests, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash})
 	if e != nil {
 		return "state_capacity_exceeded"
 	}

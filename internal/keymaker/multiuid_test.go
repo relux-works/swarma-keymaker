@@ -8,6 +8,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -16,9 +17,11 @@ import (
 	"os/exec"
 	"reflect"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
 
+	"github.com/relux-works/swarma-keymaker/internal/control"
 	"github.com/relux-works/swarma-keymaker/internal/testwindow"
 )
 
@@ -49,10 +52,20 @@ func windowClient() int {
 	var dialer net.Dialer
 	conn, e := dialer.DialContext(ctx, "unix", os.Getenv("KEYMAKER_CLIENT_SOCKET"))
 	if e != nil {
+		if os.Getenv("KEYMAKER_CLIENT_CONNECT_DENIED") == "1" && errors.Is(e, syscall.EACCES) {
+			return 0
+		}
+		return 1
+	}
+	if os.Getenv("KEYMAKER_CLIENT_CONNECT_DENIED") == "1" {
+		conn.Close()
 		return 1
 	}
 	defer conn.Close()
 	conn.SetDeadline(time.Now().Add(2 * time.Second))
+	if os.Getenv("KEYMAKER_CLIENT_SURFACE") == "control" {
+		return windowNativeClient(conn, public)
+	}
 	body := validBody(public, "git")
 	if _, e = conn.Write(Packet(body)); e != nil {
 		return 1
@@ -190,6 +203,184 @@ func TestMultiUID(t *testing.T) {
 						}
 					case <-time.After(time.Second):
 						t.Fatal(fmt.Sprint("no second UID peer"))
+					}
+				})
+			}
+		})
+	}
+}
+
+// Native clients validate the canonical wrapper, exact refusal or their own
+// derived public key. No expectation can supply service authority.
+func windowNativeClient(conn net.Conn, public []byte) int {
+	exchange := func(obj control.Object) (control.Object, error) {
+		body, err := control.Marshal(obj)
+		if err != nil {
+			return nil, err
+		}
+		for frame := Packet(body); len(frame) > 0; {
+			n, err := conn.Write(frame)
+			if err != nil || n == 0 {
+				return nil, fmt.Errorf("native write failed")
+			}
+			frame = frame[n:]
+		}
+		body, c := ReadFrame(conn)
+		if c != "" || body == nil {
+			return nil, fmt.Errorf("native read failed")
+		}
+		return control.Decode(body)
+	}
+	expected := os.Getenv("KEYMAKER_CLIENT_CODE")
+	response, err := exchange(nativeHello(1))
+	if err != nil {
+		return 1
+	}
+	if expected == "generation_inactive" {
+		if windowNativeError(response, nativeID(1), expected) {
+			return 0
+		}
+		return 1
+	}
+	if len(response) != 2 || response["request_id"] != nativeID(1) {
+		return 1
+	}
+	hello, ok := response["result"].(control.Object)
+	if !ok || len(hello) != 1 || hello["version"] != int64(1) {
+		return 1
+	}
+	response, err = exchange(nativeRequest(2, "pubkey", control.Object{}))
+	if err != nil {
+		return 1
+	}
+	if expected != "" {
+		if windowNativeError(response, nativeID(2), expected) {
+			return 0
+		}
+		return 1
+	}
+	result, ok := response["result"].(control.Object)
+	if !ok || len(response) != 2 || response["request_id"] != nativeID(2) || !exactMembers(result, "public_key", "path", "registration_number", "master_epoch") {
+		return 1
+	}
+	key, ok := result["public_key"].(string)
+	decoded, err := base64.StdEncoding.DecodeString(key)
+	if !ok || err != nil || !bytes.Equal(decoded, public) {
+		return 1
+	}
+	return 0
+}
+func windowNativeError(response control.Object, id, code string) bool {
+	e, ok := response["error"].(control.Object)
+	return ok && len(response) == 2 && response["request_id"] == id && len(e) == 2 && e["code"] == code && e["retryable"] == false
+}
+func runNativeWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *nativeFixture, public []byte, code string, deny bool) {
+	t.Helper()
+	denied := "0"
+	if deny {
+		denied = "1"
+	}
+	args := []string{"-n", "-u", user, "--", "/usr/bin/env", "KEYMAKER_TEST_CLIENT=1", "KEYMAKER_CLIENT_SURFACE=control", "KEYMAKER_CLIENT_UID=" + strconv.FormatUint(uint64(uid), 10), "KEYMAKER_CLIENT_SOCKET=" + f.server.ControlPath, "KEYMAKER_CLIENT_PUBLIC=" + base64.StdEncoding.EncodeToString(public), "KEYMAKER_CLIENT_CODE=" + code, "KEYMAKER_CLIENT_CONNECT_DENIED=" + denied, os.Args[0], "-keymaker-window-token=" + *windowToken}
+	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "sudo", args...)
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("native window client PID=%d", cmd.Process.Pid)
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("native window client failed: %v %s", err, output.Bytes())
+	}
+}
+
+// Run the daemon as the same unprivileged runner with the provisioned helper
+// group. Only A may connect; B's EACCES is a separate kernel-level assertion.
+// The role command is already required by the shared window, never broadened.
+func TestMultiUIDControl(t *testing.T) {
+	cfg, status, err := testwindow.Load(os.Getenv("KEYMAKER_WINDOW_CONFIG"))
+	if err != nil {
+		t.Fatalf("PENDING: test window not provisioned (runner status %d): %v", status, err)
+	}
+	w, status, err := testwindow.Verify(cfg, uint32(os.Getuid()), testwindow.CommandOutput)
+	if err != nil {
+		t.Fatalf("window status %d: %v", status, err)
+	}
+	if uint32(os.Getgid()) != w.GroupID {
+		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		defer cancel()
+		args := []string{"-n", "-u", w.Runner, "-g", w.Group, "--", "/usr/bin/env", "KEYMAKER_WINDOW_CONFIG=" + os.Getenv("KEYMAKER_WINDOW_CONFIG"), "KEYMAKER_WINDOW_SCRATCH=" + os.Getenv("KEYMAKER_WINDOW_SCRATCH"), "TMPDIR=" + os.Getenv("TMPDIR"), os.Args[0], "-test.run=^TestMultiUIDControl$", "-test.timeout=30s", "-test.v", "-keymaker-window-token=" + *windowToken}
+		cmd := exec.CommandContext(ctx, "sudo", args...)
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
+		var output bytes.Buffer
+		cmd.Stdout = &output
+		cmd.Stderr = &output
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("native group test child PID=%d", cmd.Process.Pid)
+		if err := cmd.Wait(); err != nil {
+			t.Fatalf("native group suite failed: %v %s", err, output.Bytes())
+		}
+		t.Log(output.String())
+		return
+	}
+	for _, scenario := range []string{"foreign-uid", "unbound", "retired"} {
+		t.Run(scenario, func(t *testing.T) {
+			for _, negative := range []bool{true, false} {
+				phase := "control"
+				if negative {
+					phase = "negative"
+				}
+				t.Run(phase, func(t *testing.T) {
+					binding := fixtureBinding(w.AID)
+					binding.Generation = nativeToken
+					var retained *Binding = &binding
+					if negative && scenario == "foreign-uid" {
+						other := binding
+						other.UID = w.BID
+						other.Path = "m/1'/1'/1'/2'"
+						retained = &other
+					}
+					if negative && scenario == "unbound" {
+						retained = nil
+					}
+					f := nativeBase(t, Principal{w.UID, nativeToken}, nil, retained)
+					f.generation.entries[w.AID] = Generation{UID: w.AID, Generation: nativeToken, State: "active", Revision: "fixture-order", Provenance: "verified-fixture", Verified: true}
+					if negative && scenario == "retired" {
+						f.generation.set(w.AID, "retiring", nativeToken)
+					}
+					f.start()
+					public, c := f.master.Public(binding.Path)
+					if c != "" {
+						t.Fatal(c)
+					}
+					before := f.store.Snapshot()
+					expected := ""
+					if negative {
+						expected = "binding_not_found"
+						if scenario == "retired" {
+							expected = "generation_inactive"
+						}
+					}
+					runNativeWindowClient(t, w, w.A, w.AID, f, public, expected, false)
+					records := nativeAudit(t, f.store.journal)
+					last := records[len(records)-1]
+					if last.PeerUID == nil || *last.PeerUID != w.AID || last.Surface != "control" {
+						t.Fatal("native kernel UID attribution missing")
+					}
+					if negative && (last.RefusalCode == nil || string(*last.RefusalCode) != expected) {
+						t.Fatal("native multi-UID audit mismatch")
+					}
+					if !reflect.DeepEqual(before, f.store.Snapshot()) {
+						t.Fatal("native client changed bindings")
+					}
+					runNativeWindowClient(t, w, w.B, w.BID, f, public, "", true)
+					if after := nativeAudit(t, f.store.journal); len(after) != len(records) {
+						t.Fatal("group-denied client reached daemon")
 					}
 				})
 			}

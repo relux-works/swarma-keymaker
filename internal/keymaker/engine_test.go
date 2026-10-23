@@ -71,23 +71,28 @@ func (f *fakeGenerations) Lookup(_ context.Context, uid uint32) (Generation, Cod
 	return f.lookup(uid)
 }
 func (f *fakeGenerations) WithActive(ctx context.Context, uid uint32, token string, fn func() Code) Code {
+	return f.WithEvidence(ctx, []GenerationCondition{{Principal: Principal{uid, token}}}, fn)
+}
+func (f *fakeGenerations) WithEvidence(ctx context.Context, conditions []GenerationCondition, fn func() Code) Code {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if ctx.Err() != nil {
 		return "request_deadline_exceeded"
 	}
-	g, c := f.lookup(uid)
-	if c != "" {
-		return c
-	}
-	if !g.Verified || g.Fenced || g.Provenance == "" || g.Revision == "" {
-		return "generation_source_unavailable"
-	}
-	if g.State != "active" {
-		return "generation_inactive"
-	}
-	if g.Generation != token {
-		return "generation_mismatch"
+	for _, condition := range conditions {
+		g, c := f.lookup(condition.Principal.UID)
+		if c != "" {
+			return c
+		}
+		if g.UID != condition.Principal.UID || !g.Verified || g.Fenced || g.Provenance == "" || g.Revision == "" {
+			return "generation_source_unavailable"
+		}
+		if (!condition.Retired && g.State != "active") || (condition.Retired && g.State != "retiring" && g.State != "removed") {
+			return "generation_inactive"
+		}
+		if g.Generation != condition.Principal.Generation {
+			return "generation_mismatch"
+		}
 	}
 	return fn()
 }

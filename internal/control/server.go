@@ -141,7 +141,13 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 	if body == nil && code == "" {
 		return false
 	}
-	done, limit := s.observer.Enter(ctx, conn)
+	enterDeadline := completed.Add(frameBudget)
+	if !state.negotiated {
+		enterDeadline = state.helloDeadline
+	}
+	enterCtx, enterCancel := context.WithDeadline(ctx, enterDeadline)
+	done, limit := s.observer.Enter(enterCtx, conn)
+	enterCancel()
 	if done != nil {
 		defer done()
 	}

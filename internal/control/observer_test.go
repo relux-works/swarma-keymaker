@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type observerFixture struct {
@@ -75,5 +76,34 @@ func TestHandlerReceivesRequestID(t *testing.T) {
 	wantSuccess(t, receive(t, c), requestID(2))
 	if _, err := New(s.handler, s.peers, s.ids, s.fence, nil); err == nil {
 		t.Fatal("missing observer admitted")
+	}
+}
+
+type boundedObserver struct {
+	observerFixture
+	bounded atomic.Int32
+}
+
+func (o *boundedObserver) Enter(ctx context.Context, _ net.Conn) (func(), Code) {
+	deadline, ok := ctx.Deadline()
+	if !ok || time.Until(deadline) > frameBudget {
+		return nil, "busy"
+	}
+	o.bounded.Add(1)
+	return func() {}, ""
+}
+
+// Shared-work admission receives a bounded context for hello and methods even
+// when the daemon parent has no deadline; a healthy observer permits both.
+func TestObserverAdmissionDeadline(t *testing.T) {
+	s := testServer(t, nil, nil, nil)
+	o := &boundedObserver{}
+	s.observer = o
+	c, _ := client(t, s, nil)
+	negotiate(t, c)
+	send(t, c, operation(2, "pubkey", Object{}, 2000))
+	wantSuccess(t, receive(t, c), requestID(2))
+	if o.bounded.Load() != 2 {
+		t.Fatal("observer admission escaped deadline")
 	}
 }

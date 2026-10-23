@@ -47,6 +47,11 @@ func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, e
 		if !s.matchesCommit(j.binding) {
 			return failure("binding journal recovery mismatch")
 		}
+		for _, request := range s.requests {
+			if request.Status == "pending" {
+				return failure("unresolved native mutation intent")
+			}
+		}
 		return nil
 	})
 	if err != nil {

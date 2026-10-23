@@ -392,7 +392,7 @@ func (j *Journal) appendLocked(r AuditRecord) Code {
 		return "audit_unavailable"
 	}
 	budget := j.totalLimit - j.reserve
-	if r.RefusalCode != nil || r.Result == "refused" {
+	if r.Surface == "control" || r.RefusalCode != nil || r.Result == "refused" {
 		budget = j.totalLimit
 	}
 	if j.total+int64(len(b)) > budget {

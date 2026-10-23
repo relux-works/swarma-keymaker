@@ -30,6 +30,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "scratch unavailable")
 		os.Exit(2)
 	}
+	socketGuard := "\tif syscall.Fchownat(fd, \"control.sock\", os.Getuid(), int(gid), 0x100 /* Linux AT_SYMLINK_NOFOLLOW */) != nil || syscall.Fchmodat(fd, \"control.sock\", 0660, 0) != nil {\n\t\treturn fail()\n\t}\n\tst, err := os.Lstat(staged)\n\tif err != nil {\n\t\treturn fail()\n\t}\n\tstat := st.Sys().(*syscall.Stat_t)\n\tif st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || stat.Uid != uint32(os.Getuid()) || stat.Gid != gid {\n\t\treturn fail()\n\t}\n"
+	socketFallback := "\t_ = syscall.Fchmodat(fd, \"control.sock\", 0666, 0)\n\tst, err := os.Lstat(staged)\n\tif err != nil { return fail() }\n\tstat := st.Sys().(*syscall.Stat_t)\n"
 	controls := []struct{ name, file, old, new, test, needle, witness string }{
 		{"peer-uid", "binding.go", "if b.UID != peer.UID {", "if false {", "^TestRefusalVectors$/^binding-wrong-uid$/^negative$", "--- FAIL: TestRefusalVectors/binding-wrong-uid/negative", "code \"\", want"},
 		{"namespace", "wire.go", "if string(namespace) != \"git\" {", "if len(namespace) < 0 {", "^TestRefusalVectors$/^ssh-namespace$/^negative$", "--- FAIL: TestRefusalVectors/ssh-namespace/negative", "code \"\", want"},
@@ -41,6 +43,10 @@ func main() {
 		{"missing-journal", "snapshot.go", "if commit.Version == 0 ||", "if commit.Version == 0 { return true }; if", "^TestCustodyStartupReconciliation$/^empty-audit$", "--- FAIL: TestCustodyStartupReconciliation/empty-audit", "incomplete custody evidence admitted startup"},
 		{"snapshot-journal-divergence", "custody_linux.go", "if !s.matchesCommit(j.binding) {", "if false && !s.matchesCommit(j.binding) {", "^TestSnapshotJournalDivergence$/^snapshot-before-revoke$", "--- FAIL: TestSnapshotJournalDivergence/snapshot-before-revoke", "BYPASS: restored pre-revoke snapshot signed"},
 		{"snapshot-records-optional", "snapshot.go", "if _, ok := fields[\"records\"]; !ok {", "if _, ok := fields[\"records\"]; !ok && false {", "^TestSnapshotSchemaRequired$/^revoked$/^missing-records$", "--- FAIL: TestSnapshotSchemaRequired/revoked/missing-records", "missing snapshot member admitted"},
+		{"native-operator", "native.go", "if p != n.Config.Operator {", "if false {", "^TestNativeVectors$/^register-wrong-uid$/^negative$", "--- FAIL: TestNativeVectors/register-wrong-uid/negative", "want role_not_permitted"},
+		{"native-persistent-revoke", "native.go", "if b.Lifetime == \"persistent\" && mode == \"ephemeral\" {", "if false {", "^TestNativeVectors$/^revoke-persistent-as-ephemeral$/^negative$", "--- FAIL: TestNativeVectors/revoke-persistent-as-ephemeral/negative", "want persistent_revoke_requires_operator"},
+		{"native-socket-permissions", "native_socket_linux.go", socketGuard, socketFallback, "^TestNativeSocketPermissions$/^invalid-group$", "--- FAIL: TestNativeSocketPermissions/invalid-group", "unsafe control group or path admitted"},
+		{"native-release-fence", "native.go", "return n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, release)", "return release()", "^TestNativeReleaseFence$/^hello$/^retirement-wins$", "--- FAIL: TestNativeReleaseFence/hello/retirement-wins", "native retirement released success"},
 	}
 	pkg := "./internal/keymaker"
 	if *group == "registration" {

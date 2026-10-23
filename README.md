@@ -130,10 +130,11 @@ replace the pending integration tests listed in the specification.
 
 ## Registrar dependency
 
-The enrollment schema, publisher verification, registry snapshot loader and name
-rules belong to `github.com/relux-works/swarma-registrar`. The dependency is pinned
-to reviewed main commit `fd2df68e861d45c955efa250ede342bc04468066`
-(`v0.0.0-20261023131515-fd2df68e861d`). Keymaker supplies caller-side trust,
+The registration proof format, enrollment schema, publisher verification,
+registry snapshot loader and name rules belong to
+`github.com/relux-works/swarma-registrar`. The dependency is pinned
+to reviewed main commit `263ca7fcfd97518ace7e740792500f6c92f4ba1e`
+(`v0.0.0-20261023150327-263ca7fcfd97`). Keymaker supplies caller-side trust,
 persistence and local authorization; it does not maintain a second loader.
 
 Any registrar API or behavior change requires a separate reviewed pull request

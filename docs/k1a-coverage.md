@@ -115,12 +115,15 @@ syntax checks.
 | Scoped registry and path mapping | `TestRegistryPathVectors`, `TestRegistryRejectsInvalidHistory` | Five path controls, invalid history, duplicate/implicit allocations |
 | Protected master storage | `TestMasterStorageGuards` | Owner/mode/parent/symlink/hardlink/type/length refusals and valid sign/verify |
 | Persistent lifecycle/tombstones | `TestBindingLifecycle`, `TestPersistentRetirement`, `TestBindingRecoveryFences` | Trusted internal lifecycle, no native mutation or signed-act verifier qualification |
+| Snapshot/journal recovery | `TestMissingSnapshotRecovery`, `TestCustodyStartupReconciliation` | Genuine empty bootstrap; retained evidence prevents reset; intact controls preserve tombstones/numbers; no independent rollback checkpoint |
+| Whole retained path history | `TestBindingHistoryUniqueness` | Hidden active/revoked predecessors, owner/lifetime/order violations refuse; valid persistent history signs for latest principal |
 | Generation unavailable | `TestProductionGenerationRefuses`, `TestProductionBinaryGenerationGate` | Actual production binary refuses; injected fake-backed positive, no journal adapter |
 | Release and next-request fencing | `TestReleaseFences` | Controlled sign pause; revoke/retire/reuse win before release |
 | Real connection invalidation | `TestLiveConnectionInvalidation` | Kernel socket closure for all three transitions; same UID fixture |
 | Durable audit failure/replay/rotation | `TestAuditWriteFailures`, `TestAuditFailureClosesListener`, `TestAuditRecoveryAndRotation`, `TestAuditStartupRejectsIncompleteEvidence` | Append/short/sync/budget faults, corrupt/truncated/unsafe/discontinuous evidence |
 | Audit schema/dependencies | `TestAuditCanonicalSchema`, `TestAuditDependencyFailures` | Exact null schema/canonical strings, missing entropy and untrusted clock |
 | Bounded input/state instances | `TestAgentFrameBounds`, `TestStateJSONRejectsAmbiguity`, `TestSocketGuards`, `TestStateLock`, `TestRateLimits` | Frame/JSON/repeated-instance/rate checks; not a performance or hard-sandbox qualification |
+| Refusal work and journal amplification | `TestFrameRefusalAccounting`, `TestOverloadRefusalBudget` | Real malformed/busy reconnects drain burst; fixed aggregate counter and bounded overload journal indications; valid responses recover with credit |
 | Current UID, stock OpenSSH/Git | `TestRealClients` | Actual SO_PEERCRED; negative namespace/raw; exact fixture-key verification; isolated HOME/Git configuration |
 | Second real UID | `TestMultiUID/{foreign-key,unbound,retired}/{negative,control}` | PENDING without the owner-provisioned window; compiled, not qualified |
 | PENDING cannot be deny-all | `TestPendingAndConfiguredCheck`, `TestMinimalWindow` | Missing window gives exact stderr/3; configured fake reaches real checker, minimal valid fake passes |
@@ -129,16 +132,22 @@ syntax checks.
 
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` plants only Go overlay
 files and requires the intended assertion failure; compilation/setup errors do
-not count. Its own exit is 0 only when both mutant subprocesses exit 1 for the
+not count. Its own exit is 0 only when all eight mutant subprocesses exit 1 for the
 named assertion. No source file is overwritten.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
 | --- | --- | --- | --- |
 | Remove binding peer UID equality | The binding authorization primitive must reject a different authenticated UID | `TestRefusalVectors/binding-wrong-uid/negative` | Killed (mutant test exit 1); tests this primitive, not every possible UID-check site |
 | Disable namespace comparison while retaining parsing | Agent dispatch must reject an otherwise valid non-Git SSHSIG preimage | `TestRefusalVectors/ssh-namespace/negative` | Killed (mutant test exit 1); does not qualify future protocols |
+| Ignore retained entries on missing snapshot | A lost snapshot cannot bootstrap over retained audit evidence | `TestMissingSnapshotRecovery/missing` | Killed (mutant test exit 1); does not detect complete-pair rollback |
+| Restore last-record-only active comparison | An intervening unbound record cannot conceal an active predecessor | `TestBindingHistoryUniqueness/hidden-active` | Killed (mutant test exit 1); scoped to retained path transitions |
+| Remove framing work charge | Actual oversize frames must consume work credit before journal writes | `TestFrameRefusalAccounting/oversize` | Killed (mutant test exit 1); bounded flood, not load qualification |
+| Remove busy work charge | Saturated dispatch must consume the same credit | `TestFrameRefusalAccounting/busy` | Killed (mutant test exit 1); actual server dispatch branch |
+| Journal every overload | Exhaustion cannot turn framed refusals into unlimited journal writes | `TestOverloadRefusalBudget` | Killed (mutant test exit 1); fixed clock bounds writes independently of wall time |
+| Permit empty journal for an existing snapshot | Existing state cannot silently bootstrap missing journal evidence | `TestCustodyStartupReconciliation/empty-audit` | Killed (mutant test exit 1); independent checkpoint remains outside scope |
 
-No surviving mutant is claimed killed. Only these two specified narrowing
+No surviving mutant is claimed killed. Only these eight specified narrowing
 mutants were planted. No separate implementation attack-surface table was
 provided in the brief; this vector map is not a claim of mutation coverage for
 every implementation line or deferred surface. See [Linux testing](linux-testing.md)
-for remaining deployment/generation gates and section 12 provisioning differences.
+for recovery rules, actual limits and remaining deployment/generation gates.

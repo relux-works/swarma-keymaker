@@ -50,10 +50,13 @@ type Engine struct {
 	rateMu      sync.Mutex
 	global      bucket
 	peers       map[Principal]*bucket
+	overload    bucket
+	aggregated  uint64
+	rateNow     func() time.Time
 }
 
 func NewEngine(s *Store, g GenerationSource, k Signer, a Auditor) *Engine {
-	return &Engine{Store: s, Generations: g, Signer: k, Audit: a, failed: make(chan struct{}), peers: map[Principal]*bucket{}}
+	return &Engine{Store: s, Generations: g, Signer: k, Audit: a, failed: make(chan struct{}), peers: map[Principal]*bucket{}, rateNow: time.Now}
 }
 func (e *Engine) Failed() <-chan struct{} { return e.failed }
 func (e *Engine) fail()                   { e.closed.Store(true); e.failOnce.Do(func() { close(e.failed) }) }
@@ -78,7 +81,7 @@ func (e *Engine) OpenSession(ctx context.Context, peer Peer) Session {
 func (e *Engine) charge(s Session) Code {
 	e.rateMu.Lock()
 	defer e.rateMu.Unlock()
-	now := time.Now()
+	now := e.rateNow()
 	if !e.global.take(now, 200, 256) {
 		return "rate_limited"
 	}
@@ -143,8 +146,56 @@ func (e *Engine) refuse(s Session, q agentRequest, body []byte, c Code) Code {
 	return c
 }
 
-// RejectFrame accounts for bounded framing errors without logging input bytes.
-func (e *Engine) RejectFrame(s Session, c Code) Code { return e.refuse(s, agentRequest{}, nil, c) }
+// overloadRefusal does no parsing, hashing or signing. Over-budget traffic gets
+// one aggregate journal indication/second (burst one); further refusals consume
+// only a fixed, saturating in-memory counter. No request can execute on this path.
+func (e *Engine) overloadRefusal(s Session, c Code) Code {
+	e.rateMu.Lock()
+	emit := e.overload.take(e.rateNow(), 1, 1)
+	if !emit && e.aggregated < 9007199254740991 {
+		e.aggregated++
+	}
+	e.rateMu.Unlock()
+	if emit {
+		return e.refuse(s, agentRequest{operation: "overload"}, nil, c)
+	}
+	if e.closed.Load() {
+		return "audit_unavailable"
+	}
+	return c
+}
+
+// AggregatedRefusals counts suppressed overload journal writes for this process;
+// it is bounded telemetry, not durable operation evidence or binding authority.
+func (e *Engine) AggregatedRefusals() uint64 {
+	e.rateMu.Lock()
+	defer e.rateMu.Unlock()
+	return e.aggregated
+}
+
+// RejectFrame charges bounded framing errors before journal work or input hashes.
+func (e *Engine) RejectFrame(s Session, c Code) Code {
+	if e.closed.Load() {
+		return "audit_unavailable"
+	}
+	if limit := e.charge(s); limit != "" {
+		return e.overloadRefusal(s, limit)
+	}
+	return e.refuse(s, agentRequest{}, nil, c)
+}
+
+// RejectBusy shares the same accounting as dispatched requests and framing
+// errors. Saturated dispatch cannot become a separate audit-write budget.
+func (e *Engine) RejectBusy(s Session, body []byte) Code {
+	if e.closed.Load() {
+		return "audit_unavailable"
+	}
+	if c := e.charge(s); c != "" {
+		return e.overloadRefusal(s, c)
+	}
+	q, _ := parseAgent(body)
+	return e.refuse(s, q, body, "busy")
+}
 
 // Handle releases a complete response only inside both the generation barrier and
 // the binding lock, after durable audit. The network callback must be deadline-
@@ -153,10 +204,10 @@ func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release fun
 	if e.closed.Load() {
 		return "audit_unavailable"
 	}
-	q, parseCode := parseAgent(body)
 	if c := e.charge(s); c != "" {
-		return e.refuse(s, q, body, c)
+		return e.overloadRefusal(s, c)
 	}
+	q, parseCode := parseAgent(body)
 	if s.Admission != "" {
 		return e.refuse(s, q, body, s.Admission)
 	}

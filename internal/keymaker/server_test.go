@@ -71,7 +71,7 @@ func TestLiveConnectionInvalidation(t *testing.T) {
 }
 
 // A second holder cannot open the same protected state; releasing the first lock
-// permits a new holder without deleting or replacing the lock inode.
+// permits a new holder without creating a file in the state directory.
 func TestStateLock(t *testing.T) {
 	d := t.TempDir()
 	os.Chmod(d, 0700)

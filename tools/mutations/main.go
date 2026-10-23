@@ -1,4 +1,4 @@
-// Narrowing controls for two Keymaker authorization gates. Source changes exist
+// Narrowing controls for Keymaker authorization, recovery and refusal gates. Source changes exist
 // only in Go overlay files under the caller's scratch directory.
 package main
 
@@ -29,9 +29,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "scratch unavailable")
 		os.Exit(2)
 	}
-	controls := []struct{ name, file, old, new, test, needle string }{
-		{"peer-uid", "binding.go", "if b.UID != peer.UID {", "if false {", "^TestRefusalVectors$/^binding-wrong-uid$/^negative$", "--- FAIL: TestRefusalVectors/binding-wrong-uid/negative"},
-		{"namespace", "wire.go", "if string(namespace) != \"git\" {", "if len(namespace) < 0 {", "^TestRefusalVectors$/^ssh-namespace$/^negative$", "--- FAIL: TestRefusalVectors/ssh-namespace/negative"},
+	controls := []struct{ name, file, old, new, test, needle, witness string }{
+		{"peer-uid", "binding.go", "if b.UID != peer.UID {", "if false {", "^TestRefusalVectors$/^binding-wrong-uid$/^negative$", "--- FAIL: TestRefusalVectors/binding-wrong-uid/negative", "code \"\", want"},
+		{"namespace", "wire.go", "if string(namespace) != \"git\" {", "if len(namespace) < 0 {", "^TestRefusalVectors$/^ssh-namespace$/^negative$", "--- FAIL: TestRefusalVectors/ssh-namespace/negative", "code \"\", want"},
+		{"missing-snapshot", "binding.go", "if len(entries) != 0 || err != io.EOF {", "if len(entries) < 0 && err != io.EOF {", "^TestMissingSnapshotRecovery$/^missing$", "--- FAIL: TestMissingSnapshotRecovery/missing", "incomplete recovery admitted a store"},
+		{"path-history", "binding.go", "if old.Status != \"unbound\" || old.Lifetime", "if old.Status == \"revoked\" || b.Status == \"active\" && old.Status == \"active\" || old.Lifetime", "^TestBindingHistoryUniqueness$/^hidden-active$", "--- FAIL: TestBindingHistoryUniqueness/hidden-active", "want binding_conflict"},
+		{"framing-budget", "engine.go", "if limit := e.charge(s); limit != \"\" {", "if limit := Code(\"\"); limit != \"\" {", "^TestFrameRefusalAccounting$/^oversize$", "--- FAIL: TestFrameRefusalAccounting/oversize", "refusal bypassed work buckets"},
+		{"busy-budget", "engine.go", "if c := e.charge(s); c != \"\" {\n\t\treturn e.overloadRefusal(s, c)\n\t}\n\tq, _ := parseAgent(body)", "if c := Code(\"\"); c != \"\" {\n\t\treturn e.overloadRefusal(s, c)\n\t}\n\tq, _ := parseAgent(body)", "^TestFrameRefusalAccounting$/^busy$", "--- FAIL: TestFrameRefusalAccounting/busy", "refusal bypassed work buckets"},
+		{"overload-audit", "engine.go", "emit := e.overload.take(e.rateNow(), 1, 1)", "emit := true", "^TestOverloadRefusalBudget$", "--- FAIL: TestOverloadRefusalBudget", "overload amplified journal writes"},
+		{"missing-journal", "custody_linux.go", "if !s.initialized {", "if false {", "^TestCustodyStartupReconciliation$/^empty-audit$", "--- FAIL: TestCustodyStartupReconciliation/empty-audit", "incomplete custody evidence admitted startup"},
 	}
 	good := true
 	for _, c := range controls {
@@ -62,7 +68,7 @@ func main() {
 		}
 		log := filepath.Join(dir, c.name+".log")
 		os.WriteFile(log, out, 0600)
-		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte("code \"\", want"))
+		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
 		fmt.Printf("mutant=%s test=%s actual_exit=%d killed=%t log=%s\n", c.name, c.test, status, killed, log)
 		if !killed {
 			fmt.Fprintln(os.Stderr, string(out))

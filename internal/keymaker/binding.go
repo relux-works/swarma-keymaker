@@ -3,6 +3,7 @@ package keymaker
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"sync"
 	"syscall"
@@ -49,13 +50,14 @@ type bindingDisk struct {
 	Records []Binding `json:"records"`
 }
 type Store struct {
-	mu       sync.Mutex
-	records  []Binding
-	next     uint64
-	dir      *os.File
-	uid      uint32
-	watchers map[uint64][]chan struct{}
-	failed   bool
+	mu          sync.Mutex
+	records     []Binding
+	next        uint64
+	dir         *os.File
+	uid         uint32
+	watchers    map[uint64][]chan struct{}
+	failed      bool
+	initialized bool // This call durably bootstrapped a provably empty directory.
 }
 
 // NewStore is an in-process store; durable deployments use OpenStore. No caller
@@ -84,6 +86,25 @@ func OpenStore(dir *os.File, uid uint32) (*Store, error) {
 			}
 			return nil, failure("binding store unavailable")
 		}
+		// Absence alone is not first use: any retained entry (including audit or
+		// an old lock file) is evidence requiring operator recovery. Enumerate an
+		// independent directory fd so retries cannot inherit an exhausted cursor.
+		fd, err = syscall.Openat(int(dir.Fd()), ".", syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC, 0)
+		if err != nil {
+			return nil, failure("binding evidence unavailable")
+		}
+		listing := os.NewFile(uintptr(fd), "state")
+		entries, err := listing.ReadDir(1)
+		listing.Close()
+		if len(entries) != 0 || err != io.EOF {
+			return nil, failure("missing binding snapshot with retained evidence")
+		}
+		// Persist even the empty snapshot before any journal/lock artifact is
+		// created. A crash from here on requires recovery, never empty admission.
+		if c := s.persist(); c != "" {
+			return nil, c
+		}
+		s.initialized = true
 		return s, nil
 	}
 	defer f.Close()
@@ -105,11 +126,13 @@ func (s *Store) validate() Code {
 	nums := map[uint64]bool{}
 	active := map[Principal]bool{}
 	paths := map[string]Binding{}
+	var previousNumber uint64
 	for _, b := range s.records {
-		if b.Number == 0 || b.Number >= s.next || nums[b.Number] || !validGeneration(b.Generation) || !validGeneration(b.Registrar.Generation) || b.Owner == "" || b.Epoch == "" || b.RegistryRevision == "" || ValidatePath(b.Path, "agent-identity") != "" || (b.Lifetime != "ephemeral" && b.Lifetime != "persistent") || (b.Status != "active" && b.Status != "unbound" && b.Status != "revoked") {
+		if b.Number <= previousNumber || b.Number >= s.next || nums[b.Number] || !validGeneration(b.Generation) || !validGeneration(b.Registrar.Generation) || b.Owner == "" || b.Epoch == "" || b.RegistryRevision == "" || ValidatePath(b.Path, "agent-identity") != "" || (b.Lifetime != "ephemeral" && b.Lifetime != "persistent") || (b.Status != "active" && b.Status != "unbound" && b.Status != "revoked") {
 			return "binding_conflict"
 		}
 		nums[b.Number] = true
+		previousNumber = b.Number
 		p := Principal{b.UID, b.Generation}
 		key := b.Epoch + ":" + b.Path
 		if b.Status == "active" {
@@ -119,7 +142,10 @@ func (s *Store) validate() Code {
 			active[p] = true
 		}
 		if old, ok := paths[key]; ok {
-			if old.Status == "revoked" || old.Lifetime != "persistent" || b.Status == "active" && old.Status == "active" || old.Owner != b.Owner || old.Lifetime != b.Lifetime {
+			// A later registration is legal only after the preceding persistent
+			// binding was unbound. Checking every edge means no active or revoked
+			// predecessor can be concealed by an intervening historical record.
+			if old.Status != "unbound" || old.Lifetime != "persistent" || old.Owner != b.Owner || old.Lifetime != b.Lifetime {
 				return "binding_conflict"
 			}
 		}

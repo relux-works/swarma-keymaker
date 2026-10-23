@@ -78,19 +78,11 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 		return e
 	}
 	defer lock.Close()
-	store, e := OpenStore(state, uid)
-	if e != nil {
-		return e
-	}
-	auditDir, e := OpenDirectory(cfg.StateDir+"/audit", uid, 0700)
+	store, audit, auditDir, e := openCustodyState(state, uid)
 	if e != nil {
 		return e
 	}
 	defer auditDir.Close()
-	audit, e := OpenJournal(auditDir, uid)
-	if e != nil {
-		return e
-	}
 	defer audit.Close()
 	for _, b := range store.Snapshot() {
 		if b.Epoch != cfg.Epoch || b.RegistryRevision != cfg.RegistryRevision || !registry.ContainsIdentityPath(b.Path) {

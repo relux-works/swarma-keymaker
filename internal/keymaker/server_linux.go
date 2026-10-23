@@ -30,9 +30,17 @@ type Server struct {
 }
 
 func LockState(dir *os.File, uid uint32) (*os.File, error) {
-	f, e := openRelative(dir, "keymaker.lock", syscall.O_RDWR|syscall.O_CREAT, uid, 0600)
+	// Lock the directory inode without creating evidence in a virgin state
+	// directory. Open a separate fd so Close releases exactly this lock.
+	fd, e := syscall.Openat(int(dir.Fd()), ".", syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC, 0)
 	if e != nil {
 		return nil, e
+	}
+	f := os.NewFile(uintptr(fd), "state lock")
+	var st syscall.Stat_t
+	if syscall.Fstat(fd, &st) != nil || st.Uid != uid || st.Mode&07777 != 0700 {
+		f.Close()
+		return nil, failure("unsafe state lock")
 	}
 	if syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
 		f.Close()
@@ -229,8 +237,7 @@ func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peer
 			code = s.Engine.Handle(ctx, session, body, func(b []byte) error { return writeResponse(c, b) })
 			<-s.requests
 		default:
-			q, _ := parseAgent(body)
-			code = s.Engine.refuse(session, q, body, "busy")
+			code = s.Engine.RejectBusy(session, body)
 		}
 		cancel()
 		if code != "" {

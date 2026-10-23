@@ -27,6 +27,59 @@ or an operating-system account allocator. `TestAuditFailureClosesListener`
 checks actual socket closure, no signature/state change, and the bounded
 `audit_unavailable` service-health return on a journal fault.
 
+## Recovery and refusal budgets
+
+`TestMissingSnapshotRecovery` reproduces snapshot loss after durable revocation;
+the intact control preserves the tombstone and advances the next issued number.
+`TestCustodyStartupReconciliation` exercises the same store/journal opener used
+by startup. First use requires a protected, completely empty state directory.
+The state lock uses the directory inode without creating a file. Under that
+lock, startup durably writes an empty snapshot before creating the audit
+directory and journal. A pre-created audit directory, even empty, is retained
+evidence and cannot authorize first use. Subsequent startup requires both a
+valid snapshot and retained, replayable journal evidence. Missing, unsafe,
+incomplete or corrupt evidence fences admission; initialization interrupted
+between these steps also requires operator recovery.
+
+The snapshot determines bindings, tombstones and issued registration numbers.
+The journal independently vetoes admission when evidence is unavailable; it
+never reconstructs a snapshot or grants registration authority. Recovery requires
+the operator to restore and validate the intact pair from retained evidence
+while the service is stopped. Deleting remaining evidence to obtain an empty
+directory is not recovery. No automatic reconciliation or re-admission occurs.
+These checks cannot detect rollback of a complete, internally valid pair without
+an independent checkpoint. Native lifecycle/audit transactions remain K1b work.
+
+`TestBindingHistoryUniqueness` rejects active or revoked predecessors hidden by
+later unbound records. Retained registration numbers must increase in order;
+each persistent path predecessor must already be unbound before a later
+registration. Owner and lifetime remain immutable. The valid
+`[unbound, unbound, active]` control signs for the latest principal and refuses
+the older principals.
+
+`TestFrameRefusalAccounting` uses real oversize frames and saturated dispatch.
+With a fixed budget clock, 52 reconnects drain the real per-principal burst of
+40, produce one overload indication, and count the remaining 11 refusals
+without further journal writes. Restored credit admits a valid identity request.
+`TestOverloadRefusalBudget` checks the framed-request overload path as well.
+Framing, busy and normal requests share the global 200/s burst-256 and
+UID/generation 20/s burst-40 work buckets. They charge before parsing, hashing,
+signing or journal work. Over-budget requests never execute; they share a
+separate global aggregate journal indication budget of 1/s, burst one, with
+operation `overload` and no input digest. Further suppressed writes increment
+`Engine.AggregatedRefusals()`, a process-local counter saturating at the largest
+CCJ-1 integer. This counter is volatile telemetry, not a durable per-attempt
+record. Allowed operation responses still require durable individual audit.
+Socket framing/allocation and generation lookup at connection admission remain
+bounded by frame size, connection caps and deadlines, outside these work buckets.
+This is a bounded-write claim, not throughput or hard-sandbox qualification.
+
+Startup validates the current registry and checks every binding's epoch,
+registry revision and numeric path membership. `Registry.Extends` is a tested
+update primitive; startup has no prior registry snapshot and does not call it.
+Append-only name-history verification must be supplied by the trusted operator
+registry update workflow; its production integration remains unqualified.
+
 ## Reusable multi-UID window
 
 The `multiuid` build tag retains real second-UID cases in `TestMultiUID`:
@@ -121,7 +174,7 @@ cannot detect malicious rollback or rewriting without an independent checkpoint.
 
 The brief supplies vector rows and scope clauses, but no separate attack-surface
 catalog table. The coverage document maps every vector, declares K1b rows, and
-records the two requested narrowing mutants; it does not claim a killed mutant
+records eight narrowing mutants; it does not claim a killed mutant
 for every implementation surface. No prior committed implementation reviewer
 tests existed. Existing vector and specification tooling remains unchanged.
 

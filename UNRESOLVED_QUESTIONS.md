@@ -43,6 +43,14 @@ No unresolved interface may be replaced with an allow-all production stub.
 
 ## Enrollment adapter activation gates
 
+Enrollment approval replay residual: the ten-minute, same-boot approval and
+append-only consumed-approvals record cannot detect restoration that also rolls
+back the consumed record, including a whole-host restore within the same boot
+and TTL, or deliberate file surgery by root. Restoring an approval alone or
+rolling state back to its approved digest does not constitute new confirmation.
+Option C, an external witness outside the restored host, is required to close
+this residual; it is not implemented by the interim local policy.
+
 The registrar dependency pin and bump rule are in [README.md](README.md#registrar-dependency).
 The local adapter and its explicit bounds are in [internal/enrollment/README.md](internal/enrollment/README.md).
 

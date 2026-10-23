@@ -219,17 +219,38 @@ Success emits a second JSON object with `approved: true` and exits 0. Exit 1
 means refusal or I/O failure; malformed command flags exit 2. Start the helper
 with the default reconciliation policy. It accepts only the command's strict
 record with the current full state digest, **full pin digest and protected config
-path hash**; it consumes
-the exact root-owned, single-linked approval inode and fsyncs its removal before
-admitting enrollment. A later restart needs another command invocation. The
-service can read/unlink the approval but cannot create a replacement root-owned
-inode. Approval files and pending markers are operator authority, **excluded
-from service-owned state backups**; copying a root-owned approval as part of
-backup restoration is a new privileged approval, not supported recovery.
+path hash**, a fresh random approval ID and the consumed ledger's random ID.
+Both modes record `/proc/sys/kernel/random/boot_id`, trusted UTC and boot elapsed
+time at confirmation. Approvals expire at ten minutes, including suspended time.
+Startup refuses another boot, unavailable boot identity, an unsynchronized or
+erroneous Linux clock (`adjtimex` query), backwards UTC/boot elapsed time, or a
+UTC/boot elapsed discrepancy exceeding two seconds. This tolerance accommodates
+clock slewing and sampling; boot elapsed time independently bounds the TTL.
+Nanosecond timestamps are decimal strings to preserve exact integers in the
+strict JSON format.
+
+Before granting authority, startup appends the random approval ID to the
+protected `consumed-approvals` record with a full write, file fsync and checked
+close under the Store lock, then unlinks and directory-fsyncs the exact
+root-owned, single-linked receipt. The operator creates and directory-fsyncs
+the service-owned mode-0600 ledger under the publication fence; startup never
+creates, truncates or replaces it. Appends use `O_APPEND`. Missing, substituted,
+malformed, hard-linked, or full ledgers refuse. Entries are never pruned; the
+16 MiB bound requires separate operator recovery when exhausted. A crash after
+recording consumption burns that approval even if its receipt survives.
+
+A later restart needs a fresh command confirmation and random ID. Restoring a
+root-owned receipt, or rolling state back to its approved digest, cannot revive
+a consumed ID. Preserve the consumed record across recovery; restoring it too
+can defeat local replay detection. The whole-host/root-surgery residual and
+future external-witness requirement are recorded in
+[UNRESOLVED_QUESTIONS.md](../../UNRESOLVED_QUESTIONS.md).
 
 Approval publication uses an independently durable pending marker in the
 root-owned pin-config directory (named from the full config-path hash), then a
-full-write/file-fsync/close/rename/directory-fsync sequence. The service cannot
+full-write/file-fsync/close/rename/directory-fsync sequence. Every summary, prompt
+and stdout error is returned. Final JSON and final summary must both succeed
+before the fence is removed, in both modes. The service cannot
 remove that root-directory fence. Any failure retains
 the pending fence, even if rename made an approval visible. Removing the marker
 is the final fallible action. Its removal is intentionally not fsynced afterwards:

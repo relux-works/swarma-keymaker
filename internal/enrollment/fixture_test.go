@@ -29,9 +29,17 @@ var testNow = time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC)
 // This fixture substitutes ownership and can inject explicit read denials. All
 // content, Git objects, SSH signatures, writes and registrar validation are real.
 type fixtureFiles struct {
-	base     string
-	override map[string]Metadata
-	denyRead map[string]error
+	base          string
+	override      map[string]Metadata
+	denyRead      map[string]error
+	approvalClock approvalSource
+}
+
+func (f fixtureFiles) approvalSource() approvalSource {
+	if f.approvalClock != nil {
+		return f.approvalClock
+	}
+	return linuxApprovalSource{}
 }
 
 func (f fixtureFiles) Lstat(path string) (Metadata, error) {

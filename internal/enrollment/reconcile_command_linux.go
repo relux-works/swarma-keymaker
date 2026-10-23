@@ -75,6 +75,11 @@ type commandApproval struct {
 	ConfigPathSHA256 string `json:"config_path_sha256"`
 	PinSHA256        string `json:"pin_sha256"`
 	StateSHA256      string `json:"state_sha256"`
+	ID               string `json:"id"`
+	LedgerID         string `json:"ledger_id"`
+	BootID           string `json:"boot_id"`
+	ConfirmedUTC     int64  `json:"confirmed_utc_ns,string"`
+	ConfirmedBoot    int64  `json:"confirmed_boot_ns,string"`
 }
 
 func pinDigest(c PinConfig) string { b, _ := json.Marshal(c); return digestBytes(b) }
@@ -155,11 +160,19 @@ func inspectReconciliation(ctx context.Context, configPath string, c PinConfig, 
 		switch entry.Name() {
 		case "accepted":
 			r.Evidence = append(r.Evidence, "bootstrap_marker_present")
-		case "high-water.json", "high-water.lock", approvalName:
+		case "high-water.json", "high-water.lock", approvalName, consumedName:
 		default:
 			r.Evidence = append(r.Evidence, entry.Name())
 			interrupted = true
 		}
+	}
+	if ledger, _, _, ledgerErr := openConsumed(c, files, syscall.O_RDONLY); ledgerErr == nil {
+		if ledger.Close() != nil {
+			interrupted = true
+		}
+	} else if !errors.Is(ledgerErr, os.ErrNotExist) {
+		r.Evidence = append(r.Evidence, "consumed_approvals_invalid")
+		interrupted = true
 	}
 	store := newFileStore(ctx, c.StateDir, files)
 	store.owner = *c.ServiceUID
@@ -257,7 +270,7 @@ func stateDifference(local, next *registry.HighWater) string {
 }
 
 // Reconcile confirms existing state for one startup; it never repairs state.
-// The only writes are a one-use approval and its fail-closed publication marker.
+// Writes are a one-use approval, its publication fence and initial replay ledger.
 func Reconcile(ctx context.Context, configPath, confirm string, input io.Reader, out, summary io.Writer) error {
 	if os.Geteuid() != 0 {
 		return fmt.Errorf("operator_root_required")
@@ -320,15 +333,21 @@ func reconcileCommandMode(ctx context.Context, configPath, confirm string, input
 	if err = json.NewEncoder(out).Encode(report); err != nil {
 		return err
 	}
-	fmt.Fprintf(summary, "Pin %s; publisher %s; audience %s\nLocal %s; state SHA256 %s; %s\n", report.PinRevision, report.PublisherFingerprint, report.Audience, report.LocalRevision, report.StateSHA256, report.Reason)
+	if _, err = fmt.Fprintf(summary, "Pin %s; publisher %s; audience %s\nLocal %s; state SHA256 %s; %s\n", report.PinRevision, report.PublisherFingerprint, report.Audience, report.LocalRevision, report.StateSHA256, report.Reason); err != nil {
+		return fmt.Errorf("summary_output_failed: %w", err)
+	}
 	if inspectionErr != nil {
 		if strings.Contains(report.Reason, "registry_rollback") {
-			fmt.Fprintln(summary, "Rollback validation refused: the pin may regress revision, omit an accepted host/sequence, change an accepted ID, or resurrect a tombstone. Retained state was preserved.")
+			if _, err = fmt.Fprintln(summary, "Rollback validation refused: the pin may regress revision, omit an accepted host/sequence, change an accepted ID, or resurrect a tombstone. Retained state was preserved."); err != nil {
+				return fmt.Errorf("summary_output_failed: %w", err)
+			}
 		}
 		return fmt.Errorf("reconciliation_refused: %s", report.Reason)
 	}
 	if confirm == "" {
-		fmt.Fprintf(summary, "After independently establishing pin freshness, type the full state SHA256 to approve one startup: ")
+		if _, err = fmt.Fprintf(summary, "After independently establishing pin freshness, type the full state SHA256 to approve one startup: "); err != nil {
+			return fmt.Errorf("prompt_output_failed: %w", err)
+		}
 		if input == nil {
 			return fmt.Errorf("confirmation_required")
 		}
@@ -358,32 +377,33 @@ func reconcileCommandMode(ctx context.Context, configPath, confirm string, input
 	if _, existingErr := os.Lstat(filepath.Join(c.StateDir, approvalName)); !errors.Is(existingErr, os.ErrNotExist) {
 		return fmt.Errorf("approval_already_present: consume at startup or perform separate operator recovery")
 	}
+	approval, err := newCommandApproval(configPath, c, report.StateSHA256, approvalSourceFor(files))
+	if err != nil {
+		return err
+	}
+	// Both streams must succeed while the root fence is still durable. Nothing
+	// fallible follows fence removal, in either publication mode.
+	output := func() error {
+		report.Approved = true
+		if err := json.NewEncoder(out).Encode(report); err != nil {
+			return fmt.Errorf("approval_output_failed: %w", err)
+		}
+		if _, err := fmt.Fprintln(summary, "Approved one startup. Start the enrollment authority; every later restart requires a new confirmation."); err != nil {
+			return fmt.Errorf("summary_output_failed: %w", err)
+		}
+		return nil
+	}
+	publish := func() error { return publishCommandApproval(ctx, configPath, c, approval, files, ops, output) }
 	if bootstrap {
 		store := newFileStore(ctx, c.StateDir, files)
 		store.owner = *c.ServiceUID
 		store.ops = ops
-		err = (initialPublisher{store}).publish(*high, func() error {
-			// All fallible output precedes clearing the independently durable
-			// root fence. An output failure cannot leave startup consent usable.
-			return publishCommandApproval(ctx, configPath, c, report.StateSHA256, ops, func() error {
-				report.Approved = true
-				return json.NewEncoder(out).Encode(report)
-			})
-		})
-		if err != nil {
+		if err = (initialPublisher{store}).publish(*high, publish); err != nil {
 			return fmt.Errorf("bootstrap_write_failed_fenced: %w", err)
 		}
-	} else {
-		if err = writeCommandApproval(ctx, configPath, c, report.StateSHA256, ops); err != nil {
-			return fmt.Errorf("approval_write_failed_fenced: %w", err)
-		}
-		report.Approved = true
-		// Existing-state publication has committed; an output failure cannot retract consent.
-		if err = json.NewEncoder(out).Encode(report); err != nil {
-			return fmt.Errorf("approval_committed_output_failed: %w", err)
-		}
+	} else if err = publish(); err != nil {
+		return fmt.Errorf("approval_write_failed_fenced: %w", err)
 	}
-	fmt.Fprintln(summary, "Approved one startup. Start the enrollment authority; every later restart requires a new confirmation.")
 	return nil
 }
 
@@ -413,10 +433,7 @@ func readConfirmation(ctx context.Context, input io.Reader) (string, error) {
 	}
 }
 
-func writeCommandApproval(ctx context.Context, configPath string, c PinConfig, digest string, ops durableOps) error {
-	return publishCommandApproval(ctx, configPath, c, digest, ops, nil)
-}
-func publishCommandApproval(ctx context.Context, configPath string, c PinConfig, digest string, ops durableOps, beforeUnfence func() error) error {
+func publishCommandApproval(ctx context.Context, configPath string, c PinConfig, approval commandApproval, files Files, ops durableOps, beforeUnfence func() error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -439,7 +456,12 @@ func publishCommandApproval(ctx context.Context, configPath string, c PinConfig,
 	if err = ops.SyncDir(filepath.Dir(pending)); err != nil {
 		return err
 	}
-	data, err := json.Marshal(commandApproval{Version: 1, ConfigPathSHA256: digestBytes([]byte(configPath)), PinSHA256: pinDigest(c), StateSHA256: digest})
+	ledger, err := prepareConsumedLedger(c, files, ops)
+	if err != nil {
+		return err
+	}
+	approval.LedgerID = ledger
+	data, err := json.Marshal(approval)
 	if err != nil {
 		return err
 	}
@@ -539,7 +561,7 @@ func (r *commandReconciler) checkPinned(ctx context.Context, high *registry.High
 	}
 	for _, entry := range entries {
 		switch entry.Name() {
-		case "accepted", "high-water.json", "high-water.lock", approvalName:
+		case "accepted", "high-water.json", "high-water.lock", approvalName, consumedName:
 		default:
 			return errTrust
 		}
@@ -567,6 +589,18 @@ func (r *commandReconciler) checkPinned(ctx context.Context, high *registry.High
 	if strictJSON(b, &approval) != nil || approval.Version != 1 || approval.ConfigPathSHA256 != digestBytes([]byte(r.configPath)) || approval.PinSHA256 != pinDigest(c) || approval.StateSHA256 != StateDigest(high) {
 		return errTrust
 	}
+	if err = approvalValid(approval, approvalSourceFor(r.files)); err != nil {
+		return err
+	}
+	ops := r.consumeOps
+	if ops == nil {
+		ops = diskOps{}
+	}
+	// Append and fsync consumption before deleting the receipt or granting
+	// authority. A crash after this point burns the ID, including restored bytes.
+	if err = consumeApproval(ctx, c, r.files, approval, ops); err != nil {
+		return err
+	}
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -587,10 +621,6 @@ func (r *commandReconciler) checkPinned(ctx context.Context, high *registry.High
 	st := info.Sys().(*syscall.Stat_t)
 	if st.Nlink != 0 {
 		return errTrust
-	}
-	ops := r.consumeOps
-	if ops == nil {
-		ops = diskOps{}
 	}
 	if err = ops.SyncDir(c.StateDir); err != nil {
 		return err

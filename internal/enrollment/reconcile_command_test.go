@@ -410,32 +410,37 @@ func TestReconcileCommandConfirmationRace(t *testing.T) {
 
 type approvalFaultOps struct {
 	diskOps
-	stage    string
-	syncDirs int
+	stage   string
+	reached bool
 }
 
 func (o *approvalFaultOps) Write(f *os.File, b []byte) (int, error) {
-	if o.stage == "write" {
+	if o.stage == "write" && strings.HasPrefix(filepath.Base(f.Name()), ".reconciliation-") && !strings.HasPrefix(filepath.Base(f.Name()), pendingName) {
+		o.reached = true
 		return 0, errors.New("injected write failure")
 	}
 	return o.diskOps.Write(f, b)
 }
 func (o *approvalFaultOps) Sync(f *os.File) error {
 	if o.stage == "file-sync" && strings.Contains(filepath.Base(f.Name()), ".reconciliation-") && !strings.HasPrefix(filepath.Base(f.Name()), pendingName) {
+		o.reached = true
 		return errors.New("injected file sync failure")
 	}
 	return o.diskOps.Sync(f)
 }
 func (o *approvalFaultOps) Rename(a, b string) error {
 	if o.stage == "rename" {
+		o.reached = true
 		return errors.New("injected rename failure")
 	}
 	return o.diskOps.Rename(a, b)
 }
 func (o *approvalFaultOps) SyncDir(path string) error {
-	o.syncDirs++
-	if o.stage == "directory-sync" && o.syncDirs == 2 {
-		return errors.New("injected directory sync failure")
+	if o.stage == "directory-sync" {
+		if _, err := os.Stat(filepath.Join(path, approvalName)); err == nil {
+			o.reached = true
+			return errors.New("injected directory sync failure")
+		}
 	}
 	return o.diskOps.SyncDir(path)
 }
@@ -447,9 +452,15 @@ func TestReconcileCommandWriteFailureFences(t *testing.T) {
 		t.Run(stage, func(t *testing.T) {
 			f, high := reconciliationFixture(t)
 			before, _ := os.ReadFile(filepath.Join(f.config.StateDir, "high-water.json"))
-			_, err := runFixtureReconcile(f, StateDigest(high), nil, &approvalFaultOps{stage: stage})
-			if err == nil || !strings.Contains(err.Error(), "approval_write_failed_fenced") {
+			ops := &approvalFaultOps{stage: stage}
+			_, err := runFixtureReconcile(f, StateDigest(high), nil, ops)
+			if err == nil || !ops.reached || !strings.Contains(err.Error(), "approval_write_failed_fenced") {
 				t.Fatalf("fault missed: %v", err)
+			}
+			if stage == "directory-sync" {
+				if _, err := os.Stat(filepath.Join(f.config.StateDir, approvalName)); err != nil {
+					t.Fatal("post-rename fault missed visible receipt", err)
+				}
 			}
 			if _, err = os.Stat(pendingPath(f.configPath)); err != nil {
 				t.Fatal("lost failure fence")

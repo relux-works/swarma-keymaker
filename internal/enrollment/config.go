@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"net"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -98,7 +99,9 @@ func protectedRead(files Files, path string, limit int64, owner uint32) ([]byte,
 	return b, nil
 }
 func strictJSON(b []byte, out any) error {
-	if _, err := ccj.Parse(b, ccj.EnrollmentMalformed); err != nil {
+	value, err := ccj.Parse(b, ccj.EnrollmentMalformed)
+	target := reflect.TypeOf(out)
+	if err != nil || target == nil || target.Kind() != reflect.Pointer || !exactJSONMembers(value, target.Elem()) {
 		return errTrust
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -110,6 +113,80 @@ func strictJSON(b []byte, out any) error {
 		return errTrust
 	}
 	return nil
+}
+
+// Check member spellings before encoding/json can apply case-insensitive struct
+// matching. Map keys remain data, but integer keys must have one canonical
+// spelling so that distinct JSON keys cannot collapse into one history entry.
+func exactJSONMembers(value any, target reflect.Type) bool {
+	for target.Kind() == reflect.Pointer {
+		target = target.Elem()
+	}
+	if value == nil {
+		return true // Callers retain their required-value checks.
+	}
+	switch target.Kind() {
+	case reflect.Struct:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return false
+		}
+		fields := make(map[string]reflect.Type, target.NumField())
+		for i := 0; i < target.NumField(); i++ {
+			field := target.Field(i)
+			if field.PkgPath != "" {
+				continue
+			}
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			if name == "-" {
+				continue
+			}
+			// Protected records have no promoted fields or custom unmarshalers.
+			if field.Anonymous {
+				return false
+			}
+			if name == "" {
+				name = field.Name
+			}
+			fields[name] = field.Type
+		}
+		for name, member := range object {
+			field, exists := fields[name]
+			if !exists || !exactJSONMembers(member, field) {
+				return false
+			}
+		}
+	case reflect.Map:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return false
+		}
+		for key, member := range object {
+			if target.Key().Kind() != reflect.String {
+				if target.Key().Kind() != reflect.Int64 {
+					return false
+				}
+				number, err := strconv.ParseInt(key, 10, 64)
+				if err != nil || strconv.FormatInt(number, 10) != key {
+					return false
+				}
+			}
+			if !exactJSONMembers(member, target.Elem()) {
+				return false
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		array, ok := value.([]any)
+		if !ok {
+			return false
+		}
+		for _, member := range array {
+			if !exactJSONMembers(member, target.Elem()) {
+				return false
+			}
+		}
+	}
+	return true
 }
 func loadConfig(path string, files Files) (PinConfig, *format.Policy, error) {
 	var c PinConfig

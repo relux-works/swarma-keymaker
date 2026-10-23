@@ -345,15 +345,11 @@ func runRegistryVector(t *testing.T, v registryVector) {
 	wantHelper := OK
 	if v.Expected.Code != "accept" {
 		wantHelper = EnrollmentUnverified
-		if !r.Available {
-			wantHelper = EnrollmentUnavailable
-		}
 	}
-	actualHelper := loaderHelperCode(err)
-	if !r.Available && err != nil {
-		actualHelper = EnrollmentUnavailable
-	}
-	expectCode(t, wantHelper, actualHelper)
+	// This observes only the loader's diagnostic mapping. Missing local-source
+	// availability is checked by Authority.Reload before the loader; the paired
+	// helper tests cover that public mapping, not a fixture-derived assignment.
+	expectCode(t, wantHelper, loaderHelperCode(err))
 	installed := snapshot != nil && high != nil
 	if installed != v.Expected.State.Installed || installed != v.Expected.State.Ready {
 		t.Fatal("snapshot installation/readiness differs")

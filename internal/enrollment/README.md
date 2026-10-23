@@ -30,7 +30,7 @@ construct/sign the body and repeat authority at its final release barrier.
 
 ## Protected configuration
 
-The JSON file contains exactly these members; unknown and duplicate members
+The JSON file contains exactly these members; unknown, case-aliased and duplicate members
 are refused. This shape shows placeholders, not deployable verification keys:
 
 ```json
@@ -81,13 +81,20 @@ service-owned. State comprises `high-water.json`, a consumed-bootstrap marker
 `accepted`, and `high-water.lock`. High water retains the accepted revision,
 per-host highest sequence/ID/tombstone, complete sequence-ID history, and
 permanent key/name ownership. A locked compare-and-swap publishes a temporary
-file with file fsync, rename and directory fsync. The bootstrap marker is made
-durable before first publication, so interruption cannot infer a fresh bootstrap.
+file with file fsync, rename and directory fsync. Before any temporary high-water
+file is created or written, the bootstrap marker's directory entry is synced,
+then its contents are written, synced and closed, and the directory is synced.
+An empty/partial marker or orphaned temporary file is retained attempt evidence,
+never a new bootstrap. Failed writes are not cleaned up by deleting that marker.
 
 An initial empty state requires the protected `first_use` decision. Disable that
 bootstrap decision after initial acceptance. Missing state with its marker or
 retained in-process evidence, malformed state, a mismatching CAS or restored old
-state fences admission. The service never obtains `Reconciled=true` from mere
+state fences admission. Persisted state (including nested registrar high-water
+members) and operator approval inputs use the same exact, case-sensitive member
+checks as configuration. Integer history keys also require canonical decimal
+spelling, so distinct JSON keys cannot collapse into one sequence entry.
+The service never obtains `Reconciled=true` from mere
 local-file readability. The `Reconciler` receives a copy and must establish
 freshness from independently trusted evidence. A nil reconciler refuses an
 existing-state restart. Successful in-process commits retain the known-latest
@@ -178,9 +185,12 @@ rows use the production Git verifier, ancestry and CAS store. Fixture revision
 labels are instantiated with real signed Git object IDs while preserving the
 specified equality/ancestry/approval relationships. Signed enrollment bytes and
 expected record IDs are unchanged. Aggregate repeats expand actual bytes under
-distinct paths. Exact registrar codes, helper-code mappings, installed/current
-high-water state, retained history and readiness are asserted separately. This
-is registry conformance, not HTTP, nonce, limiter, audit or binding qualification.
+distinct paths. Exact registrar codes, diagnostic-to-helper-code mappings,
+installed/current high-water state, retained history and readiness are asserted
+separately. These rows do not call `Authority.Reload`: local-source availability
+mapping is observed by the separate paired helper tests through that public
+entry point, never assigned from a fixture availability flag. This is registry
+conformance, not HTTP, nonce, limiter, audit or binding qualification.
 
 The runner discovers later published rows automatically after an explicit pin
 bump. New external fixture inputs or event modes fail explicitly until supported;

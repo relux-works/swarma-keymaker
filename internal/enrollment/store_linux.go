@@ -35,14 +35,18 @@ func StateDigest(high *registry.HighWater) string {
 }
 
 type durableOps interface {
+	Write(*os.File, []byte) (int, error)
 	Sync(*os.File) error
+	Close(*os.File) error
 	Rename(string, string) error
 	SyncDir(string) error
 }
 type diskOps struct{}
 
-func (diskOps) Sync(f *os.File) error         { return f.Sync() }
-func (diskOps) Rename(old, next string) error { return os.Rename(old, next) }
+func (diskOps) Write(f *os.File, b []byte) (int, error) { return f.Write(b) }
+func (diskOps) Close(f *os.File) error                  { return f.Close() }
+func (diskOps) Sync(f *os.File) error                   { return f.Sync() }
+func (diskOps) Rename(old, next string) error           { return os.Rename(old, next) }
 func (diskOps) SyncDir(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -123,10 +127,18 @@ func (s *fileStore) read() (*registry.HighWater, error) {
 func (s *fileStore) readLocked() (*registry.HighWater, error) {
 	marker, err := protectedRead(s.files, filepath.Join(s.dir, "accepted"), 32, uint32(os.Geteuid()))
 	if errors.Is(err, os.ErrNotExist) {
-		if _, stateErr := s.files.Lstat(filepath.Join(s.dir, "high-water.json")); errors.Is(stateErr, os.ErrNotExist) {
-			return nil, nil
+		// A leftover temporary file or any other state is retained evidence too.
+		// Only the inert lock created by read() may exist before first use.
+		entries, readErr := os.ReadDir(s.dir)
+		if readErr != nil {
+			return nil, readErr
 		}
-		return nil, errTrust
+		for _, entry := range entries {
+			if entry.Name() != "high-water.lock" {
+				return nil, errTrust
+			}
+		}
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err
@@ -162,11 +174,21 @@ func (s *fileStore) marker() error {
 		return err
 	}
 	f := os.NewFile(uintptr(fd), path)
-	_, err = f.WriteString(acceptedMarker)
+	// First retain the directory entry, even if the marker write is interrupted.
+	// An empty/partial marker is evidence requiring operator recovery, never a
+	// fresh bootstrap. No high-water file is created until the marker is durable.
+	err = s.ops.SyncDir(s.dir)
+	if err == nil {
+		var n int
+		n, err = s.ops.Write(f, []byte(acceptedMarker))
+		if err == nil && n != len(acceptedMarker) {
+			err = io.ErrShortWrite
+		}
+	}
 	if err == nil {
 		err = s.ops.Sync(f)
 	}
-	closeErr := f.Close()
+	closeErr := s.ops.Close(f)
 	if err != nil {
 		return err
 	}
@@ -199,6 +221,11 @@ func (s *fileStore) Commit(previous *registry.HighWater, next registry.HighWater
 	if err != nil {
 		return err
 	}
+	// Consume first use before CAS, cancellation, encoding, or any temporary
+	// high-water I/O. A failed first publication must leave bootstrap evidence.
+	if err = s.marker(); err != nil {
+		return err
+	}
 	if !reflect.DeepEqual(previous, current) {
 		return errTrust
 	}
@@ -215,22 +242,19 @@ func (s *fileStore) Commit(previous *registry.HighWater, next registry.HighWater
 	}
 	tempPath := temp.Name()
 	defer os.Remove(tempPath)
-	n, writeErr := temp.Write(b)
+	n, writeErr := s.ops.Write(temp, b)
 	if writeErr == nil && n != len(b) {
 		writeErr = io.ErrShortWrite
 	}
 	if writeErr == nil {
 		writeErr = s.ops.Sync(temp)
 	}
-	closeErr := temp.Close()
+	closeErr := s.ops.Close(temp)
 	if writeErr != nil {
 		return writeErr
 	}
 	if closeErr != nil {
 		return closeErr
-	}
-	if err = s.marker(); err != nil {
-		return err
 	}
 	if err = s.ctx.Err(); err != nil {
 		return err

@@ -40,7 +40,9 @@ func newFixture(t *testing.T) fixture {
 	}
 	dir := t.TempDir()
 	repo := filepath.Join(dir, "source")
-	if err := runCommand(gitCommand(context.Background(), root, "clone", "--local", "--no-hardlinks", "--quiet", "--no-checkout", "--", root, repo)); err != nil {
+	clone := gitCommand(context.Background(), root, "clone", "--local", "--no-hardlinks", "--quiet", "--no-checkout", "--", root, repo)
+	clone.Env = append(clone.Env, "GIT_ALLOW_PROTOCOL=file") // Test-only local clone; production disallows all transports.
+	if err := runCommand(clone); err != nil {
 		t.Fatal("fixture clone", err)
 	}
 	commit := strings.TrimSpace(string(head))
@@ -344,7 +346,8 @@ func TestReleaseExistingTarget(t *testing.T) {
 }
 
 // A real missing-Go dependency fails after target creation, and cleanup removes
-// only that new target. This is not a mocked successful build or toolchain.
+// only its contents, retaining the directory without a parent-entry unlink.
+// This is not a mocked successful build or toolchain.
 func TestReleaseBuildFailureCleanup(t *testing.T) {
 	f := newFixture(t)
 	control(t, f)
@@ -363,7 +366,7 @@ func TestReleaseBuildFailureCleanup(t *testing.T) {
 	if err := assemble(context.Background(), f.o); err == nil || err.Error() != "offline keymaker build failed" {
 		t.Fatal("missing Go did not fail as intended", err)
 	}
-	absent(t, f.o.target)
+	emptyTarget(t, f.o.target)
 	if raw, err := os.ReadFile(f.o.config); err != nil || !bytes.Equal(raw, f.config) {
 		t.Fatal("build failure changed input")
 	}
@@ -468,7 +471,11 @@ func testReleaseBundle(t *testing.T, withEnrollment bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = json.Unmarshal(raw, &record); err != nil || record.Commit != f.o.commit || record.Version != f.o.version || !record.Trimpath || record.GoVersion == "" || record.GOOS != "linux" || record.GOARCH != runtime.GOARCH {
+	expectedTree, treeErr := commitTree(ctx, f.o.repo, f.o.commit)
+	if treeErr != nil {
+		t.Fatal(treeErr)
+	}
+	if err = json.Unmarshal(raw, &record); err != nil || record.Tree != expectedTree || record.Commit != f.o.commit || record.Version != f.o.version || !record.Trimpath || record.GoVersion == "" || record.GOOS != "linux" || record.GOARCH != runtime.GOARCH {
 		t.Fatal("version metadata differs", err)
 	}
 	t.Logf("built source commit=%s version=%s go=%s target=%s/%s", record.Commit, record.Version, record.GoVersion, record.GOOS, record.GOARCH)
@@ -625,7 +632,7 @@ func TestReleaseOfflineDependencies(t *testing.T) {
 	if err := assemble(context.Background(), f.o); err == nil || err.Error() != "offline keymaker build failed" {
 		t.Fatal("unavailable dependency admitted", err)
 	}
-	absent(t, f.o.target)
+	emptyTarget(t, f.o.target)
 	after, err := snapshotFiles(f.o.moduleCache)
 	if err != nil || !reflect.DeepEqual(before, after) {
 		t.Fatal("build changed read-only dependency source", err)

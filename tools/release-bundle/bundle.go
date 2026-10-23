@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -20,6 +21,7 @@ import (
 type plan struct {
 	repo, target string
 	files        map[string][]byte
+	tree         string
 }
 
 func prepare(ctx context.Context, o options) (plan, error) {
@@ -64,8 +66,12 @@ func prepare(ctx context.Context, o options) (plan, error) {
 	if err != nil || version != o.version {
 		return plan{}, errVersion
 	}
+	tree, err := commitTree(ctx, repo, o.commit)
+	if err != nil || !commitPattern.MatchString(tree) {
+		return plan{}, errCommit
+	}
 	files["swarma-keymaker.service"] = unit
-	return plan{repo: repo, target: target, files: files}, nil
+	return plan{repo: repo, target: target, files: files, tree: tree}, nil
 }
 
 func buildEnv(work, moduleCache string) []string {
@@ -89,6 +95,7 @@ func runCommand(cmd *exec.Cmd) error {
 
 type versionRecord struct {
 	Commit    string `json:"commit"`
+	Tree      string `json:"tree"`
 	Version   string `json:"version"`
 	GoVersion string `json:"go_version"`
 	GOOS      string `json:"goos"`
@@ -109,55 +116,91 @@ func assemble(ctx context.Context, o options) (err error) {
 		o.moduleCache = cache
 	}
 
+	// Pin the selected parent before any Git/input work can yield to another actor.
+	selected, err := targetPath(o.repo, o.target)
+	if err != nil {
+		return err
+	}
+	parent, err := openRootNoLinks(filepath.Dir(selected))
+	if err != nil {
+		return errTarget
+	}
+	defer parent.Close()
 	p, err := prepare(ctx, o)
 	if err != nil {
 		return err
 	}
-	// Mkdir refuses races/existing targets. Cleanup is restricted to this exact
-	// newly-created directory identity; it never removes a pre-existing target.
-	if err = os.Mkdir(p.target, 0700); err != nil {
-		return errTarget
-	}
-	owned, err := os.Lstat(p.target)
+	root, err := createTarget(parent, filepath.Base(selected))
 	if err != nil {
 		return err
 	}
+	defer root.Close()
+	anchor, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	defer anchor.Close()
 	success := false
 	defer func() {
 		if !success {
-			current, statErr := os.Lstat(p.target)
-			if statErr == nil && os.SameFile(owned, current) {
-				if removeErr := os.RemoveAll(p.target); removeErr != nil {
-					err = fmt.Errorf("bundle failed; owned target cleanup failed")
-				}
+			// Remove descendants through the pinned inode, never a substituted path.
+			// Retain the directory itself: Linux has no conditional unlink-by-inode,
+			// and rechecking then unlinking its parent entry would race a replacement.
+			if e := cleanupRoot(root); e != nil {
+				err = fmt.Errorf("bundle failed; owned target cleanup failed")
 			}
+
 		}
 	}()
-	work := filepath.Join(p.target, ".build")
-	for _, dir := range []string{"source", "home", "tmp", "cache", "gopath"} {
-		if err = os.MkdirAll(filepath.Join(work, dir), 0700); err != nil {
+	for _, dir := range []string{".build", ".build/source", ".build/home", ".build/tmp", ".build/cache", ".build/gopath"} {
+		if err = mkdirRootAll(root, dir); err != nil {
 			return err
 		}
 	}
-	if err = extractSource(ctx, p.repo, o.commit, filepath.Join(work, "source")); err != nil {
+	sourceFile, err := openRootFile(root, ".build/source", os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+	source, err := rootFromFile(sourceFile)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	if err = extractSource(ctx, p.repo, o.commit, source); err != nil {
 		return fmt.Errorf("source snapshot refused")
 	}
-	binary := filepath.Join(p.target, "keymaker")
-	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-modcacherw", "-p=2", "-ldflags=-buildid=", "-o", binary, "./cmd/keymaker")
-	build.Dir = filepath.Join(work, "source")
+	if err = verifyTree(source, p.tree); err != nil {
+		return err
+	}
+	// Descriptor 3 anchors all child paths even if the target/parent is renamed.
+	work := "/proc/self/fd/3/.build"
+	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-modcacherw", "-p=2", "-ldflags=-buildid=", "-o", work+"/keymaker", "./cmd/keymaker")
+	build.ExtraFiles = []*os.File{anchor}
+	build.Dir = fmt.Sprintf("/proc/self/fd/%d", sourceFile.Fd())
 	build.Env = buildEnv(work, o.moduleCache)
-	if err = runCommand(build); err != nil {
+	if err = runConfined(build, anchor); err != nil {
 		return fmt.Errorf("offline keymaker build failed")
 	}
-	versionCmd := exec.CommandContext(ctx, binary, "version")
-	versionCmd.Dir = work
+	binary, err := openRootFile(root, ".build/keymaker", os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer binary.Close()
+	st, err := binary.Stat()
+	if err != nil || !st.Mode().IsRegular() {
+		return errInput
+	}
+	versionCmd := exec.CommandContext(ctx, "/proc/self/fd/4", "version")
+	versionCmd.ExtraFiles = []*os.File{anchor, binary}
+	versionCmd.Dir = fmt.Sprintf("/proc/self/fd/%d", sourceFile.Fd())
 	versionCmd.Env = buildEnv(work, o.moduleCache)
 	var version bytes.Buffer
 	versionCmd.Stdout = &version
-	if err = runCommand(versionCmd); err != nil || version.String() != o.version+"\n" {
+	if err = runConfined(versionCmd, anchor); err != nil || version.String() != o.version+"\n" {
 		return errVersion
 	}
-	info, err := buildinfo.ReadFile(binary)
+	info, err := buildinfo.Read(binary)
 	if err != nil {
 		return fmt.Errorf("binary build information unavailable")
 	}
@@ -168,21 +211,30 @@ func assemble(ctx context.Context, o options) (err error) {
 	if settings["-trimpath"] != "true" || settings["GOOS"] != "linux" || settings["GOARCH"] != runtime.GOARCH || settings["CGO_ENABLED"] != "0" {
 		return fmt.Errorf("binary build settings refused")
 	}
-	record := versionRecord{Commit: o.commit, Version: o.version, GoVersion: info.GoVersion, GOOS: "linux", GOARCH: runtime.GOARCH, Trimpath: true}
+	record := versionRecord{Commit: o.commit, Tree: p.tree, Version: o.version, GoVersion: info.GoVersion, GOOS: "linux", GOARCH: runtime.GOARCH, Trimpath: true}
 	metadata, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {
 		return err
 	}
 	p.files["VERSION.json"] = append(metadata, '\n')
 	for name, body := range p.files {
-		if err = os.WriteFile(filepath.Join(p.target, name), body, 0600); err != nil {
+		if err = writeRootFile(root, name, body, 0600); err != nil {
 			return err
 		}
 	}
-	if err = os.Chmod(binary, 0700); err != nil {
+	out, err := openRootFile(root, "keymaker", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
+	if err != nil {
 		return err
 	}
-	if err = os.RemoveAll(work); err != nil {
+	_, err = io.Copy(out, binary)
+	closeErr := out.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err = root.RemoveAll(".build"); err != nil {
 		return err
 	}
 	if err = cleanSource(ctx, p.repo, o.commit); err != nil {
@@ -195,18 +247,14 @@ func assemble(ctx context.Context, o options) (err error) {
 	sort.Strings(names)
 	var manifest strings.Builder
 	for _, name := range names {
-		raw, readErr := readInput(filepath.Join(p.target, name))
-		// The compiled binary can exceed the operator-input budget.
-		if name == "keymaker" {
-			raw, readErr = os.ReadFile(binary)
-		}
+		raw, readErr := readRootFile(root, name)
 		if readErr != nil {
 			return readErr
 		}
 		digest := sha256.Sum256(raw)
 		fmt.Fprintf(&manifest, "%s  %s\n", hex.EncodeToString(digest[:]), name)
 	}
-	if err = os.WriteFile(filepath.Join(p.target, "SHA256SUMS"), []byte(manifest.String()), 0600); err != nil {
+	if err = writeRootFile(root, "SHA256SUMS", []byte(manifest.String()), 0600); err != nil {
 		return err
 	}
 	success = true

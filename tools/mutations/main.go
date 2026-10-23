@@ -115,6 +115,10 @@ func main() {
 			{"packaging-dirty-tree", "source.go", "if len(status) != 0 {", "if false && len(status) != 0 {", "^TestReleaseDirtyTree$/^tracked$", "--- FAIL: TestReleaseDirtyTree/tracked", "dirty source admitted"},
 			{"packaging-unit-drift", "source.go", "if !ok || !bytes.Equal(unit, []byte(block)) {", "if !ok || false && !bytes.Equal(unit, []byte(block)) {", "^TestReleaseUnitMatchesSpec$/^modified$", "--- FAIL: TestReleaseUnitMatchesSpec/modified", "unit drift admitted"},
 			{"packaging-enrollment-policy", "inputs.go", "if _, err := enrollment.ParseConfig(pins); err != nil {", "if _, err := enrollment.ParseConfig(pins); false && err != nil {", "^TestReleaseEnrollmentGate$/^revision$", "--- FAIL: TestReleaseEnrollmentGate/revision", "refusal=<nil> want=release enrollment pin configuration refused"},
+			{"packaging-output-path", "bundle.go", "writeRootFile(root, name, body, 0600)", "os.WriteFile(filepath.Join(p.target, name), body, 0600)", "^TestReleaseOutputSymlink$/^true$", "--- FAIL: TestReleaseOutputSymlink/true", "output symlink overwrote sibling victim"},
+			{"packaging-replacement", "source.go", "\"--no-replace-objects\", ", "", "^TestReleaseReplacementCommit$/^true$", "--- FAIL: TestReleaseReplacementCommit/true", "replacement changed release provenance"},
+			{"packaging-tree-hash", "source.go", "if err != nil || got != expected {", "if err != nil || false && got != expected {", "^TestReleaseExportTreeMismatch$/^true$", "--- FAIL: TestReleaseExportTreeMismatch/true", "export tree mismatch admitted"},
+			{"packaging-child-write", "root_linux.go", "err := restrictWrites(int(root.Fd()))", "err := error(nil)", "^TestReleaseChildWriteBoundary$/^true$", "--- FAIL: TestReleaseChildWriteBoundary/true", "child escape not refused"},
 		}
 	}
 	good := true
@@ -175,7 +179,8 @@ func main() {
 }
 
 // Caller-time weakening adds the forbidden selector and actually uses it. The
-// other controls each replace one uniquely matched authority gate.
+// replacement control removes both Git replacement guards. Other controls
+// replace one uniquely matched authority gate.
 func plant(name, source, old, replacement string) string {
 	mutant := strings.Replace(source, old, replacement, 1)
 	if name == "registration-caller-iat" {
@@ -194,5 +199,14 @@ func plant(name, source, old, replacement string) string {
 		}
 		mutant = strings.Replace(mutant, old, `if _, c := s.lookup(peer.UID, peer.Generation); false && c != "" {`, 1)
 	}
+	if name == "packaging-replacement" {
+		const environment = "\"GIT_NO_REPLACE_OBJECTS=1\", "
+		if strings.Count(mutant, environment) != 1 {
+			fmt.Fprintln(os.Stderr, "replacement environment plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, environment, "", 1)
+	}
+
 	return mutant
 }

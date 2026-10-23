@@ -42,7 +42,8 @@ The target must not exist; its parent must exist, be under operator control and
 have no symlink components. Targets inside source or under system roots such as
 `/etc`, `/usr`, `/var` or `/run` refuse before target access. Use an offline scratch
 location; protected staging remains the owner's section 12.1 responsibility.
-Do not rename or modify inputs, source or the target's parent while building.
+Inputs and source should remain stable for a successful build. Directory-handle
+confinement remains enforced during parent/output substitutions.
 The tool is a local preparation tool using trusted Go and Git executables.
 
 Operator input files must be regular, non-symlinked files, with no symlinked
@@ -60,23 +61,44 @@ copied verbatim. No seed, private key, live state or credentials are copied.
 | name-indices.json | Validated operator name-index registry. |
 | enrollment.json | Optional validated enrollment pin configuration, copied only when supplied. |
 | swarma-keymaker.service | Exact committed section 12.1 unit. |
-| VERSION.json | Full source commit, actual CLI version, Go version, target OS/architecture and trimpath setting. |
+| VERSION.json | Full source commit, verified exported Git tree hash, actual CLI version, Go version, target OS/architecture and trimpath setting. |
 | SHA256SUMS | Sorted SHA256 entries for all release files above, including enrollment.json when present. |
 
-The source snapshot comes from `git archive` of the immutable commit; only
-regular files and directories are extracted. Build HOME, temporary files,
+Every Git subprocess has a scrubbed environment, `--no-replace-objects` and
+`GIT_NO_REPLACE_OBJECTS=1`. Grafts and shallow metadata are disabled, lazy fetching
+and transports are disabled, and nonempty object alternates or symbolic object storage refuse. The raw
+commit object is hash-checked against the requested ID. Its exact tree is
+exported with `git archive`; regular-file bytes, executable modes and directory
+entries are hashed independently using Git's object encoding before building.
+A different export refuses before compilation. Links and other archive types
+refuse. VERSION.json records the full commit and verified tree hash.
+
+The target is created exclusively under a pinned parent. Extraction, final files,
+manifest reads/writes and failure cleanup use directory handles, with
+`openat2` no-symlink resolution and exclusive output creation. The external Go
+build inherits the target descriptor and a Landlock write boundary, including
+its descendants. This Linux tool requires `openat2` and Landlock ABI 3 or later;
+unavailable confinement refuses without starting the build. A parent rename
+cannot redirect operations, and output symlinks never get followed.
+
+Build HOME, temporary files,
 module/cache directories and telemetry configuration are confined to the new
-target's `.build` directory. Pass `-module-cache` with a populated Go module cache containing the exact versions in the committed go.mod/go.sum. Its
+target's `.build` directory. Pass `-module-cache` with a populated Go module
+cache containing the exact versions in the committed go.mod/go.sum. Its
 `cache/download` directory is used only as a read-only `file://` proxy. Go verifies
 module checksums against the committed go.sum; missing dependencies fail closed
-and clean the owned target. No dependency download is attempted over the network. The build uses
+and empty the owned target. No dependency download is attempted over the
+network. The build uses
 `-modcacherw` for its private extracted module cache so both success and failure
 cleanup can remove it; the source download cache stays read-only.
 The tool disables network module resolution,
 workspace/global Go configuration and Git optional index writes. The binary's
 embedded build settings are checked. Source cleanliness and HEAD are rechecked
 before success. Build scratch is removed before manifest creation; failure
-cleans only the newly created target whose directory identity still matches.
+removes descendants through the owned target handle and retains its empty
+directory. The parent entry is never removed after a check: Linux offers no
+atomic conditional unlink-by-inode, so doing so would reintroduce a replacement
+race. An actor's replacement directory and sibling files remain untouched.
 A pre-existing target and operator inputs are never removed or rewritten.
 
 The final directory is private (0700), with binary 0700 and release data 0600;
@@ -115,11 +137,11 @@ commits. They create no fixture commits, use no host signing key/SSH agent and
 touch no system installation paths. Real positive builds with and without
 enrollment run offline and check their manifests with `sha256sum -c`, then
 confirm a bounded corruption makes that command exit 1 naming the changed file.
-Refusal tests preserve inputs and existing targets. Narrow commands and the three overlay controls are in the root README.
+Refusal tests preserve inputs and existing targets. Narrow commands and the seven overlay controls are in the root README.
 No formal attack-surface table was supplied in this brief. These packaging checks
 do not qualify deployment, multi-UID behavior or the unavailable dependencies.
 
-The existing mutation runner's optional packaging group plants three bounded
+The existing mutation runner's optional packaging group plants seven bounded
 weakenings; the eighteen core controls, native subset and five registration
 controls are retained. A plant is killed only
 by exit 1 and its named test plus intended behavioral witness, not a build/setup
@@ -130,6 +152,10 @@ error. Negative witnesses have nearby valid controls.
 | packaging-dirty-tree | Rejecting tracked modifications before bundle creation | TestReleaseDirtyTree/tracked |
 | packaging-unit-drift | Exact unit equality, including a changed UMask | TestReleaseUnitMatchesSpec/modified |
 | packaging-enrollment-policy | Real pin-policy validation rather than syntax-only acceptance | TestReleaseEnrollmentGate/revision |
+| packaging-output-path | Anchored exclusive output writes during link substitution | TestReleaseOutputSymlink/true |
+| packaging-replacement | Both Git replacement guards remain enabled | TestReleaseReplacementCommit/true |
+| packaging-tree-hash | Verify actual exported tree before compilation | TestReleaseExportTreeMismatch/true |
+| packaging-child-write | External build descendants cannot write through an escaping link | TestReleaseChildWriteBoundary/true |
 
 These witnesses do not claim exhaustive mutation coverage. Surviving or unapplied
 plants make the runner fail; they cannot be reported as killed.

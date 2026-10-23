@@ -109,7 +109,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run narrowing controls (default `core`, including native): `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all eighteen are killed |
 | Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Eight native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
-| Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Three named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all three are killed, logs/PIDs in scratch |
+| Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Seven named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all seven are killed, logs/PIDs in scratch |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |
@@ -265,6 +265,12 @@ module cache (locate it with `go env GOMODCACHE`) containing the exact committed
 dependency versions. The assembler uses its download cache as a read-only file
 proxy, with no network fallback; all writable caches stay inside BUNDLE. The
 [packaging contract](packaging/README.md) documents every member and refusal.
+
+The Linux assembler requires `openat2` and Landlock ABI 3 or later. Output and
+cleanup use pinned directory handles; child builds inherit a kernel write
+boundary. A failed build empties its owned target through that handle and retains
+the directory, avoiding an unsafe parent-entry unlink. VERSION.json records both
+the full commit and the independently verified exported Git tree hash.
 
 After assembly, verify SHA256SUMS with the exact command in the Tools table
 before handing files to the owner. Follow only

@@ -229,15 +229,36 @@ clock slewing and sampling; boot elapsed time independently bounds the TTL.
 Nanosecond timestamps are decimal strings to preserve exact integers in the
 strict JSON format.
 
-Before granting authority, startup appends the random approval ID to the
+Before granting authority, startup holds the Store lock and atomically renames
+`reconciliation.json` to `reconciliation.consuming`, then fsyncs the directory.
+Only after this invalidation does it append the random approval ID to the
 protected `consumed-approvals` record with a full write, file fsync and checked
-close under the Store lock, then unlinks and directory-fsyncs the exact
-root-owned, single-linked receipt. The operator creates and directory-fsyncs
-the service-owned mode-0600 ledger under the publication fence; startup never
-creates, truncates or replaces it. Appends use `O_APPEND`. Missing, substituted,
-malformed, hard-linked, or full ledgers refuse. Entries are never pruned; the
-16 MiB bound requires separate operator recovery when exhausted. A crash after
-recording consumption burns that approval even if its receipt survives.
+close. It then unlinks the exact root-owned, single-linked consuming receipt
+and fsyncs the directory again. Authority is granted only after all steps
+succeed. Every error after a successful rename burns that approval: remaining
+consuming evidence or the durably recorded ID prevents reuse.
+
+A leftover `reconciliation.consuming` fences startup and refuses both normal
+reconciliation and bootstrap, even if another approval is present. Neither
+command clears this evidence. Investigate it through separate privileged
+operator recovery, preserving all complete consumed IDs and retained history;
+an interrupted ledger append also needs explicit recovery. After authorized
+cleanup, issue a **new command confirmation**. Cleanup alone grants no consent.
+
+If the atomic rename itself fails with no filesystem effect, nothing durable
+changed. That start is indistinguishable from one that never attempted
+consumption; a later start within the approval TTL may consume that approval
+exactly once. This is the explicit local limit, also recorded in
+[UNRESOLVED_QUESTIONS.md](../../UNRESOLVED_QUESTIONS.md).
+
+The operator creates and directory-fsyncs the service-owned mode-0600 ledger
+under the publication fence; startup never creates, truncates or replaces it.
+Appends use `O_APPEND`. Missing, substituted, malformed, hard-linked, or full
+ledgers refuse after receipt invalidation. Entries are never pruned; the 16 MiB
+bound requires separate operator recovery when exhausted. A crash after rename
+leaves consuming evidence, or a consumed ID if the receipt was already removed.
+Process-crash probes exercise these boundaries; physical power loss remains
+unqualified.
 
 A later restart needs a fresh command confirmation and random ID. Restoring a
 root-owned receipt, or rolling state back to its approved digest, cannot revive

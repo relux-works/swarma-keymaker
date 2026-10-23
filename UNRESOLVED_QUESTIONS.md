@@ -51,6 +51,15 @@ rolling state back to its approved digest does not constitute new confirmation.
 Option C, an external witness outside the restored host, is required to close
 this residual; it is not implemented by the interim local policy.
 
+Consumption first invalidates the approval by atomic rename and directory
+fsync. Every later error leaves consuming evidence or a durable consumed ID;
+leftover evidence requires explicit privileged recovery and a new confirmation.
+If the atomic rename itself fails with no filesystem effect, nothing durable
+changed. That start is indistinguishable from one that never attempted
+consumption; a later start within the approval TTL may consume that approval
+exactly once. This is the explicit local limit; it does not cover failures after
+a successful rename.
+
 The registrar dependency pin and bump rule are in [README.md](README.md#registrar-dependency).
 The local adapter and its explicit bounds are in [internal/enrollment/README.md](internal/enrollment/README.md).
 

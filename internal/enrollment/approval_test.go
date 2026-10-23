@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -121,8 +120,11 @@ func TestReconcileApprovalReplayAfterConsumption(t *testing.T) {
 			}
 			before := reconciliationImage(t, f)
 			assertBootstrapFenced(t, f)
-			assertUnchanged(t, f, before)
-			removeTestApproval(t, f)
+			assertReceiptInvalidated(t, f, before)
+			if e = os.Remove(filepath.Join(f.config.StateDir, consumingName)); e != nil {
+				t.Fatal(e)
+			}
+			assertBootstrapFenced(t, f)
 			expectCommandApproval(t, f, h)
 			if next := readCommandApproval(t, f); next.ID == old.ID || next.LedgerID != old.LedgerID {
 				t.Fatal("fresh confirmation reused ID or reset ledger")
@@ -241,7 +243,9 @@ func (o crashApprovalOps) Close(f *os.File) error {
 
 func (o crashApprovalOps) SyncDir(path string) error {
 	if os.Getenv("APPROVAL_CRASH_STAGE") == "receipt-directory-sync" {
-		os.Exit(73)
+		if _, err := os.Lstat(filepath.Join(path, testConsumingName)); errors.Is(err, os.ErrNotExist) {
+			os.Exit(73)
+		}
 	}
 	return o.diskOps.SyncDir(path)
 }
@@ -286,7 +290,7 @@ func TestReconcileApprovalConsumptionCrash(t *testing.T) {
 				t.Fatal(e)
 			}
 			assertBootstrapFenced(t, f)
-			freshApprovalControl(t, f)
+			repairConsumptionAndConfirm(t, f)
 		})
 	}
 }
@@ -384,8 +388,8 @@ func TestReconcileCommandOutputFailures(t *testing.T) {
 }
 
 // The record cannot be recreated by startup or silently reset by confirmation.
-// Missing, replaced and malformed ledgers refuse before any append; the same
-// protected ledger, repaired only by this fixture, requires fresh confirmation.
+// Missing, replaced and malformed ledgers refuse before any append and keep
+// the receipt invalidated. Repair by this fixture still needs fresh confirmation.
 func TestReconcileConsumedLedgerIntegrity(t *testing.T) {
 	for _, kind := range []string{"missing", "different-generation", "partial", "duplicate-id", "hardlink", "symlink", "mode", "owner"} {
 		t.Run(kind, func(t *testing.T) {
@@ -421,12 +425,9 @@ func TestReconcileConsumedLedgerIntegrity(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			before := directoryImage(t, f.config.StateDir)
+			before := reconciliationImage(t, f)
 			assertBootstrapFenced(t, f)
-			after := directoryImage(t, f.config.StateDir)
-			if !reflect.DeepEqual(before, after) {
-				t.Fatal("startup modified invalid ledger")
-			}
+			assertReceiptInvalidated(t, f, before)
 			delete(f.files.override, path)
 			if kind == "hardlink" {
 				if e = os.Remove(filepath.Join(f.base, "ledger-copy")); e != nil {
@@ -444,7 +445,7 @@ func TestReconcileConsumedLedgerIntegrity(t *testing.T) {
 			if e = os.Chmod(path, 0600); e != nil {
 				t.Fatal(e)
 			}
-			freshApprovalControl(t, f)
+			repairConsumptionAndConfirm(t, f)
 		})
 	}
 }

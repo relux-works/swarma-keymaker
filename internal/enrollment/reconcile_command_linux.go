@@ -25,6 +25,7 @@ import (
 )
 
 const approvalName = "reconciliation.json"
+const consumingName = "reconciliation.consuming"
 const pendingName = ".reconciliation-pending"
 
 // The service must not be able to remove a failed-publication fence. Its path
@@ -596,22 +597,35 @@ func (r *commandReconciler) checkPinned(ctx context.Context, high *registry.High
 	if ops == nil {
 		ops = diskOps{}
 	}
-	// Append and fsync consumption before deleting the receipt or granting
-	// authority. A crash after this point burns the ID, including restored bytes.
+	if err = ctx.Err(); err != nil {
+		return err
+	}
+	// Read-only validation is over. Invalidate the exact root-owned receipt
+	// BEFORE any ledger operation. Every subsequent error leaves either consuming
+	// evidence or a durably consumed ID; no cleanup on a failure path is allowed.
+	named, err := os.Lstat(path)
+	if err != nil || !os.SameFile(info, named) {
+		return errTrust
+	}
+	consuming := filepath.Join(c.StateDir, consumingName)
+	if err = ops.Rename(path, consuming); err != nil {
+		// With no filesystem effect, this is indistinguishable from an unattempted start.
+		return err
+	}
+	if err = ops.SyncDir(c.StateDir); err != nil {
+		return err
+	}
+	named, err = os.Lstat(consuming)
+	if err != nil || !os.SameFile(info, named) {
+		return errTrust
+	}
 	if err = consumeApproval(ctx, c, r.files, approval, ops); err != nil {
 		return err
 	}
 	if err = ctx.Err(); err != nil {
 		return err
 	}
-	// The service may unlink but cannot manufacture a root-owned inode. Check
-	// named/opened identity before unlink and nlink==0 afterwards: hard-linking a
-	// receipt or swapping its path cannot make it reusable across process starts.
-	named, err := os.Lstat(path)
-	if err != nil || !os.SameFile(info, named) {
-		return errTrust
-	}
-	if err = os.Remove(path); err != nil {
+	if err = ops.Remove(consuming); err != nil {
 		return err
 	}
 	info, err = f.Stat()

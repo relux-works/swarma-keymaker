@@ -638,8 +638,8 @@ func (consumeFaultOps) SyncDir(string) error {
 	return errors.New("injected approval-consumption sync failure")
 }
 
-// A consumed approval with failed removal fsync cannot install authority; losing
-// the one-use receipt is conservative. A fresh fixture consumes it successfully.
+// A failed consumption-directory fsync cannot install authority; the renamed
+// receipt stays unusable. A fresh fixture consumes its own approval successfully.
 func TestReconcileCommandConsumptionFailure(t *testing.T) {
 	f, high := reconciliationFixture(t)
 	expectCommandApproval(t, f, high)

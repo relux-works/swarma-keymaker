@@ -380,38 +380,55 @@ Existing `vectors/` files test derivation/byte formats and paired refusal inputs
 they have no natural witness lifecycle format and are unchanged. `KW` IDs are
 local to this supplement. Unless stated otherwise every row starts from valid
 resolved state L, sole-instance exclusion and independently trusted bindings.
-All negatives return no signature/proof/result or authority, keep the specified
-durable evidence and permit only bounded failure telemetry. C remains fenced.
-The expected code is the Keymaker startup/operation verdict, with surface A's
-existing wire mapping. Each negative must be paired with its listed control.
+Every negative is explicitly classified below. Both classes return no success
+signature/proof/result or authority for the rejected operation and preserve the
+specified durable evidence. Their distinct postconditions are:
 
-| ID | Scenario | Expected code and state | Control |
-| --- | --- | --- | --- |
-| KW01 | Restore complete older L after witnessed M, including bindings and audit to a mutually consistent pair | `state_witness_unavailable`; no admission or local/witness reset | KWP1 |
-| KW02 | Restore receipt plus old consumed ledger within TTL or across reboot | `state_witness_unavailable`; no renewed consent or duplicate consumption | KWP1 |
-| KW03 | Restore only consumed IDs, high-water, receipt/consuming fence or retained request results | `state_witness_unavailable`; inventory mismatch, no nonce/effect replay | KWP1 |
-| KW04 | Forge witness head signature, alter digest or omit the challenged binding | `state_witness_unavailable`; no local mutation | KWP1 |
-| KW05 | Replay authentic historical head/receipt with a new challenge while a newer commit or intent exists | `state_witness_unavailable`; stale signatures do not reconcile | KWP1 |
-| KW06 | Latest head is acknowledged intent; local commit never ran, is partial, or completed without resolution | `state_witness_unavailable`; retain exact intent and local evidence; privileged recovery only | KWP3 |
-| KW07 | Local bytes equal intended/previous bytes after an unchanged-state intent; restore erased local pending identity | `state_witness_unavailable`; epoch/intent still fences, no automatic resolution | KWP3 |
-| KW08 | Witness unavailable or operation deadline exceeded at startup | `state_witness_unavailable`; neither socket serves | KWP1 |
-| KW09 | Intent append/ack fails, including lost ack after durable intent | `state_witness_unavailable`; zero local candidate commits, old authority fenced | KWP2 |
-| KW10 | Local commit errors after acknowledged intent, including error after rename/directory sync | `state_witness_unavailable`; no resolution or compensating rollback; preserve indeterminate state | KWP3 |
-| KW11 | Resolution unavailable after successful local commit | `state_witness_unavailable`; new state retained but unusable | KWP4 |
-| KW12 | Replay another stream/station/consumer record or registrar receipt | `state_witness_unavailable`; no cross-consumer reconciliation | KWP1 |
-| KW13 | Purpose-1/2 key signs correct witness-domain bytes, or purpose-3 signature uses SSHSIG/registration domain | `state_witness_unavailable`; wrong key/domain never verifies | KWP2 |
-| KW14 | Surface A selects the witness public key; B tries to register purpose 3 | A: `sign_key_mismatch`; B: `purpose_unknown`; no key use/binding change | KWP5 |
-| KW15 | Witness is behind surviving independent head, changes record at equal sequence or supplies broken continuity | `state_witness_unavailable`; never adopt regression/equivocation | KWP1 |
-| KW16 | Missing local artifact or empty stream is interpreted as bootstrap | `state_witness_unavailable`; no implicit state/stream creation | KWP6 |
-| KW17 | Two different intents compare the same head, or new intent bypasses unresolved intent | `state_witness_unavailable` for loser; no losing commit/release or duplicate sequence | KWP2 |
-| KW18 | Replacement cannot exclude old serving instance | `state_witness_unavailable`; no commit or readiness; CAS is insufficient | KWP1 |
-| KW19 | Exhaust state epoch or leave room for only one witness record | `state_witness_unavailable`; no intent/local write, no wrap/new stream | KWP2 |
-| KW20 | Skip witnessing an A success audit, helper retention/final audit, binding change or refusal audit | `state_witness_unavailable`; no dependent release; unwitnessed tail cannot reconcile | KWP5 |
-| KW21 | Restore old name-index/pin/master-public-epoch policy or remove audit segment without approved archive transition | `state_witness_unavailable`; no revived path, authority or truncated evidence | KWP1 |
-| KW22 | Outage automatically selects A or consumes restored approval | `state_witness_unavailable`; selected mode and pending witness evidence preserved | KWP7 |
-| KW23 | Resolve pending intent solely from restored local equality or choose different candidate under operator recovery | `state_witness_unavailable`; exact external intent retained | KWP3 |
-| KW24 | Read challenge entropy unavailable | `entropy_unavailable`; no latest-read acceptance or readiness | KWP1 |
-| KW25 | Request deadline expires during/after a transition | `request_deadline_exceeded`; no release; any ambiguous intent/commit leaves subsequent operations `state_witness_unavailable` | KWP5 |
+- **service fence:** a witness, integrity or uncertain-transition failure blocks
+  admission/release on both surfaces until the fresh proof or privileged
+  reconciliation required by sections 4–6 succeeds. If that failure prevents a
+  normal witnessed refusal audit, only bounded separate health telemetry is
+  permitted; it cannot substitute for an ordinary refusal audit.
+- **client refusal:** an ordinary invalid request, or a deadline with no
+  uncertain transition, retains its existing refusal code and normal durable
+  witnessed refusal audit. Once that audit transaction resolves, admission
+  remains open or reopens on the same healthy instance; the next valid request
+  succeeds without restart or privileged recovery. The client error alone
+  never creates a persistent service fence. If witnessing that audit itself
+  fails, the separate witness failure follows the service-fence rules above.
+
+The expected code is the Keymaker startup/operation verdict, with surface A's
+existing wire mapping. These classes restate sections 4–6, not new error or
+recovery rules. Each negative must be paired with its listed control.
+
+| ID | Scenario | Class | Expected code and state | Control |
+| --- | --- | --- | --- | --- |
+| KW01 | Restore complete older L after witnessed M, including bindings and audit to a mutually consistent pair | service fence | `state_witness_unavailable`; no admission or local/witness reset | KWP1 |
+| KW02 | Restore receipt plus old consumed ledger within TTL or across reboot | service fence | `state_witness_unavailable`; no renewed consent or duplicate consumption | KWP1 |
+| KW03 | Restore only consumed IDs, high-water, receipt/consuming fence or retained request results | service fence | `state_witness_unavailable`; inventory mismatch, no nonce/effect replay | KWP1 |
+| KW04 | Forge witness head signature, alter digest or omit the challenged binding | service fence | `state_witness_unavailable`; no local mutation | KWP1 |
+| KW05 | Replay authentic historical head/receipt with a new challenge while a newer commit or intent exists | service fence | `state_witness_unavailable`; stale signatures do not reconcile | KWP1 |
+| KW06 | Latest head is acknowledged intent; local commit never ran, is partial, or completed without resolution | service fence | `state_witness_unavailable`; retain exact intent and local evidence; privileged recovery only | KWP3 |
+| KW07 | Local bytes equal intended/previous bytes after an unchanged-state intent; restore erased local pending identity | service fence | `state_witness_unavailable`; epoch/intent still fences, no automatic resolution | KWP3 |
+| KW08 | Witness unavailable or operation deadline exceeded at startup | service fence | `state_witness_unavailable`; neither socket serves | KWP1 |
+| KW09 | Intent append/ack fails, including lost ack after durable intent | service fence | `state_witness_unavailable`; zero local candidate commits, old authority fenced | KWP2 |
+| KW10 | Local commit errors after acknowledged intent, including error after rename/directory sync | service fence | `state_witness_unavailable`; no resolution or compensating rollback; preserve indeterminate state | KWP3 |
+| KW11 | Resolution unavailable after successful local commit | service fence | `state_witness_unavailable`; new state retained but unusable | KWP4 |
+| KW12 | Replay another stream/station/consumer record or registrar receipt | service fence | `state_witness_unavailable`; no cross-consumer reconciliation | KWP1 |
+| KW13 | Purpose-1/2 key signs correct witness-domain bytes, or purpose-3 signature uses SSHSIG/registration domain | service fence | `state_witness_unavailable`; wrong key/domain never verifies | KWP2 |
+| KW14 | Surface A selects the witness public key; B tries to register purpose 3 | client refusal | A: `sign_key_mismatch`; B: `purpose_unknown`; no key use/binding change | KWP5 and KWP8: after each witnessed refusal, a valid purpose-1 A request or purpose-2 B helper request succeeds on the same healthy instance, without restart/recovery |
+| KW15 | Witness is behind surviving independent head, changes record at equal sequence or supplies broken continuity | service fence | `state_witness_unavailable`; never adopt regression/equivocation | KWP1 |
+| KW16 | Missing local artifact or empty stream is interpreted as bootstrap | service fence | `state_witness_unavailable`; no implicit state/stream creation | KWP6 |
+| KW17 | Two different intents compare the same head, or new intent bypasses unresolved intent | service fence | `state_witness_unavailable` for loser; no losing commit/release or duplicate sequence | KWP2 |
+| KW18 | Replacement cannot exclude old serving instance | service fence | `state_witness_unavailable`; no commit or readiness; CAS is insufficient | KWP1 |
+| KW19 | Exhaust state epoch or leave room for only one witness record | service fence | `state_witness_unavailable`; no intent/local write, no wrap/new stream | KWP2 |
+| KW20 | Skip witnessing an A success audit, helper retention/final audit, binding change or refusal audit | service fence | `state_witness_unavailable`; no dependent release; unwitnessed tail cannot reconcile | KWP5 |
+| KW21 | Restore old name-index/pin/master-public-epoch policy or remove audit segment without approved archive transition | service fence | `state_witness_unavailable`; no revived path, authority or truncated evidence | KWP1 |
+| KW22 | Outage automatically selects A or consumes restored approval | service fence | `state_witness_unavailable`; selected mode and pending witness evidence preserved | KWP7 |
+| KW23 | Resolve pending intent solely from restored local equality or choose different candidate under operator recovery | service fence | `state_witness_unavailable`; exact external intent retained | KWP3 |
+| KW24 | Read challenge entropy unavailable | service fence | `entropy_unavailable`; no latest-read acceptance or readiness | KWP1 |
+| KW25 | Request deadline expires with an uncertain intent/commit outcome | service fence | `request_deadline_exceeded`; no release; preserve ambiguous intent/commit evidence and leave subsequent operations `state_witness_unavailable` | KWP3 |
+| KW26 | Request deadline expires before irreversible work or after a fully resolved transition, with no uncertain witness/local outcome | client refusal | `request_deadline_exceeded`; no late release; normal witnessed refusal audit, no persistent fence from the deadline alone | KWP8 |
 
 | ID | Positive control and required observation |
 | --- | --- |
@@ -422,6 +439,7 @@ existing wire mapping. Each negative must be paired with its listed control.
 | KWP5 | Valid purpose-1 A signature and purpose-2 helper proof independently verify after all applicable witness/audit/release steps; internal purpose-3 record verifies only at the witness. |
 | KWP6 | Explicit independent bootstrap authorization enrolls exact nonsecret identity/policy and complete initial state at epoch 1; service startup alone cannot bootstrap. |
 | KWP7 | Explicit evidenced fallback preserves pending C history; re-entry requires exact reconciliation/resolution. A boot/TTL and one-use rules remain enforced. |
+| KWP8 | On the same healthy instance, KW14 wrong-key/purpose requests and KW26 resolved deadline refusals each retain their ordinary witnessed refusal audit; after its resolution, the next valid in-budget request succeeds without restart or privileged recovery. Exercise both A and B and verify no rejected key use, binding effect or late release. |
 
 Implementation qualification MUST demonstrate narrowing controls that remove
 pre-commit intent, accept stale challenge replies, bypass pending-intent fencing,

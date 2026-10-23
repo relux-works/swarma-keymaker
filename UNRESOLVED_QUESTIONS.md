@@ -73,15 +73,22 @@ remains open for activation; unchanged-code checks cannot close it.
 ## Swarm Signer message specification gates
 
 The [message supplement](spec/keymaker-msg.md) is spec only. Purpose 4,
-`sign_message`, and the recommended purpose-5 issuer are not implemented or
+`sign_message`, and the decided purpose-5 issuer are not implemented or
 activated. No portable certified identity chain or current-use verification
-is claimed until these dependencies and base Q10 are qualified.
+is claimed until the remaining alignment and base Q10 qualification gates
+are satisfied. MSG2 and MSG3 are decided, not open alternatives.
 
-| Question | Recommendation, alternative and remaining decision |
+| Open alignment dependency | Remaining evidence |
 | --- | --- |
-| MSG1: waggle S0 format | `swarm-envelope/2` belongs to [waggle](https://github.com/relux-works/waggle). The public `spec/s0-envelope-grants` branch was absent at preparation; no independently accepted head was supplied. Keep `MSG_LABEL` symbolic until that head is forwarded. Align its exact ASCII/no-control-byte grammar and closed distinct-label list, author-only Ed25519 algorithm/role/type combinations, LF boundary, canonical object rules, content ID/signature/key-ID interface, proposed 48000-byte complete-preimage limit and signed generation/registration reference semantics. Both registrar labels and SSHSIG stay outside the author allowlist. Prefix-freedom is not a security requirement. Do not depend on an unreviewed local draft. |
-| MSG2: key continuity across generations | Recommend the same purpose-4 sibling for explicitly re-registered persistent paths within an epoch, with a fresh generation/registration attestation and release authority. "Per its generation" then means an authority lease, not new key bytes or proof of signature creation time. Alternative: fresh explicitly allocated agent identity per generation with externally certified persistent continuity; the four-component registry cannot silently absorb a generation hash or extra component. Curator must select the lifecycle before implementation. |
-| MSG3: attestation key purpose and publication | Recommend a separately reserved internal purpose 5 (`root-attestation`) at a protected installation tuple, externally pinned by the owner, signing only service-built `keymaker-msg-key/1` attestations. Alternative: an independently held owner certification key with no new local purpose, requiring external issuance/refresh. Approve issuer purpose, format, proposed maximum 24-hour validity, root continuity/revocation and publication with independently fresh binding-status evidence. Old certificates or expiry alone cannot prove current authority; there is no root-signing endpoint. |
+| MSG1: waggle S0 format | `swarm-envelope/2` belongs to [waggle](https://github.com/relux-works/waggle). No independently accepted S0 head has been supplied. Keep `MSG_LABEL`, `SIGNER_FIELD` and `KEY_ID_FIELD` symbolic until that head is forwarded. Align exact names and paths for both fields, their canonical value encodings, the mapping from the protected binding to the public signer identity, and unique resolution. Align exact ASCII/no-control-byte labels and closed distinct-label list, author-only Ed25519 algorithm/role/type combinations, LF boundary, canonical object rules, content ID/signature/key-ID interface and signed generation/registration reference semantics. The 48000-byte complete-preimage limit is decided, not an open size choice. Both registrar labels and SSHSIG stay outside the author allowlist. Prefix-freedom is not a security requirement. No unreviewed local draft is an authority. |
+
+### Decided message contracts
+
+| Decision | Contract and remaining qualification |
+| --- | --- |
+| MSG2 — decided: stable key, fresh generation authority | One purpose-4 key per persistent path within an epoch. Every generation and registration gets a fresh authority attestation bound to that generation/registration. A verifier rejects a signature whose attested generation is not active or whose attestation expired, even if an active generation uses identical key bytes. Fresh per-generation paths were not selected. Exact signed generation association remains part of MSG1; active-status proof and deployment still need qualification. |
+| MSG3 — decided: internal purpose 5 | `root-attestation = 5` at a protected installation tuple, pinned by the owner. It signs only service-built attestations; purposes 1–4 never attest and purpose 5 never signs other domains. Validity is a nonempty window of at most 86400 seconds (24 hours); issuer and verifier enforce the ceiling. The independently held issuer alternative was not selected. Exact format, root continuity/revocation, publication and independently fresh status evidence remain base Q10 qualification gates, not another issuer-purpose decision. |
+| Signing language and bounds — decided | Exact accepted label + LF + canonical CCJ-1, with complete-preimage limit 48000 and non-retryable `message_too_large`. The accepted bounded language additionally checks only `SIGNER_FIELD` and `KEY_ID_FIELD` against the calling UID's active binding and purpose-4 key. No envelope assembly or other semantic interpretation. Names/paths stay in MSG1. This spec proposes non-retryable `message_binding_mismatch` for otherwise well-formed foreign field values; missing/ambiguous values reuse `request_malformed`, duplicate JSON members `ccj_noncanonical`. |
 
 Base generation ordering, operator-record verification for persistent revoke,
 socket-group provisioning and owner recovery gates remain in force. No

@@ -578,17 +578,19 @@ restoring protected custody before a new admission attempt.
 | Native control methods on B | No signing key operation | Binding mutations and public metadata only |
 | Native registration helper on B | Configured purpose 2 | Registrar-built `registration/1` preimage only |
 | Internal state witness (separate proposal) | Reserved purpose 3 | `keymaker-witness-record/1` + NUL + service-built CCJ-1 body only |
-| Native `sign_message` on B (proposal) | Proposed purpose 4, active peer's author message sibling | Accepted waggle `MSG_LABEL` + LF + caller-supplied canonical CCJ-1 object only |
-| Internal message-key certification (recommendation) | Proposed purpose 5, externally pinned certification root | `keymaker-msg-key/1` + NUL + service-built attestation body only |
+| Native `sign_message` on B (unimplemented candidate) | Purpose 4, active peer's author message sibling | Accepted waggle `MSG_LABEL` + LF + canonical CCJ-1 object whose signer identity and key ID match that peer's active binding and purpose-4 key |
+| Internal message-key certification (decided, unimplemented) | Purpose 5, owner-pinned certification root | Only `keymaker-msg-key/1` + NUL + service-built attestation body, with validity at most 24 hours |
 
 The last three rows summarize unactivated proposals, not current signing
 capabilities. See the [witness supplement](keymaker-witness.md#31-protected-identity-and-purpose-separation)
 and [message supplement](keymaker-msg.md#1-purpose-registry-and-domain-separation).
-The message proposal explicitly narrows section 7's byte-signing ban and
-section 8's single-signing-method rule only upon separate approval; its
-[change inventory](keymaker-msg.md#9-normative-change-inventory) lists all
-required amendments. Purpose 5 is an open recommendation, not an allocated
-production root key.
+The message candidate's accepted bounded language includes only two body
+checks: caller-bound signer identity and key ID. It narrows section 7's
+byte-signing ban and section 8's single-signing-method rule only on
+activation; its [change inventory](keymaker-msg.md#9-normative-change-inventory) lists all
+required amendments. Purpose 5 and its exclusive attestation use are decided;
+implementation, exact format alignment and root/publication qualification
+remain gates.
 
 No request on one surface may yield a signature accepted in another domain.
 This relies on both distinct purpose-derived keys and non-overlapping

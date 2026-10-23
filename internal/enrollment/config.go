@@ -202,20 +202,60 @@ func locateConfig(path string, files Files) (configLocation, error) {
 	if err != nil {
 		return configLocation{}, err
 	}
-	value, err := ccj.Parse(b, ccj.EnrollmentMalformed)
-	if err != nil {
+	// RawMessage validates complete JSON syntax without interpreting other
+	// members' scalars. Canonical scalar/type/policy checks belong in decodeConfig
+	// after the startup receipt rename, not in this location-only read.
+	var object map[string]json.RawMessage
+	if json.Unmarshal(b, &object) != nil {
 		return configLocation{}, errTrust
 	}
-	object, ok := value.(map[string]any)
-	if !ok {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	if configJSONDuplicates(dec) != nil {
 		return configLocation{}, errTrust
 	}
-	state, ok := object["state_dir"].(string)
-	if !ok || !absolute(state) {
+	var state string
+	if json.Unmarshal(object["state_dir"], &state) != nil || !absolute(state) {
 		return configLocation{}, errTrust
 	}
 	return configLocation{state, b}, nil
 }
+
+// Syntax was checked above. Walk every container to reject duplicate decoded
+// member names, keeping numbers opaque even for fractions or huge exponents.
+func configJSONDuplicates(dec *json.Decoder) error {
+	token, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	var names map[string]bool
+	switch token {
+	case json.Delim('{'):
+		names = make(map[string]bool)
+	case json.Delim('['):
+	default:
+		return nil
+	}
+	for dec.More() {
+		if names != nil {
+			key, err := dec.Token()
+			if err != nil {
+				return err
+			}
+			name := key.(string)
+			if names[name] {
+				return errTrust
+			}
+			names[name] = true
+		}
+		if err := configJSONDuplicates(dec); err != nil {
+			return err
+		}
+	}
+	_, err = dec.Token()
+	return err
+}
+
 func decodeConfig(location configLocation) (PinConfig, *format.Policy, error) {
 	var c PinConfig
 	if err := strictJSON(location.raw, &c); err != nil {

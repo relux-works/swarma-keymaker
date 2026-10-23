@@ -261,10 +261,13 @@ Exhaustive pre-lock refusal list (each is a not-begun outcome):
    Commit failure, or a previously selected state-directory target changed.
    These in-memory guards inspect no consent or retained state and grant nothing.
 2. **Protected config location:** the config or its ancestors cannot be read
-   safely, its bounded JSON has invalid syntax/duplicate members, or its
-   `state_dir` cannot be extracted as one canonical absolute string. Only the protected config
-   is read; no consent or retained state is read and nothing is granted. All other config
-   member/type and semantic pin/policy checks occur after invalidation.
+   safely, it exceeds 1 MiB, its JSON has invalid syntax/duplicate decoded member
+   names at any depth, or its `state_dir` cannot be extracted as one canonical
+   absolute string. Only the protected config is read; no consent or retained
+   state is read and nothing is granted. Other members' scalars remain opaque:
+   canonical scalar restrictions, all other member/type checks and semantic
+   pin/policy checks occur after invalidation, including refusal of fractions,
+   exponent notation, unsafe integers and negative zero.
 3. **Protected directory/lifecycle lease:** the state path/ancestors or opened
    directory inode fail ownership/type/mode/identity checks, cannot be opened,
    or its shared lifecycle lease is unavailable. Only directory metadata is

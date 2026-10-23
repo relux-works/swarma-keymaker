@@ -3,6 +3,7 @@
 package enrollment
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,50 @@ import (
 	"testing"
 	"time"
 )
+
+// Non-location scalar restrictions run after invalidation in BOTH modes.
+// Repairing only config cannot revive consent; explicit recovery plus fresh
+// confirmation admits. Boolean/integer cases are neighboring refusal controls.
+func TestApprovalAttemptNonLocationScalarRetry(t *testing.T) {
+	for _, bootstrap := range []bool{false, true} {
+		for _, token := range []string{"1.5", "1e0", "9007199254740992", "-0", "false", "1"} {
+			t.Run(stringMode(bootstrap)+"/"+token, func(t *testing.T) {
+				f, _, digest := approvalModeFixture(t, bootstrap)
+				approvalTestClock(f)
+				approveMode(t, f, digest, bootstrap)
+				original, err := os.ReadFile(f.configPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bad := bytes.Replace(original, []byte(`"publisher":"`+f.config.Publisher+`"`), []byte(`"publisher":`+token), 1)
+				if bytes.Equal(bad, original) || !json.Valid(bad) {
+					t.Fatal("valid JSON non-location scalar plant did not apply")
+				}
+				if err = os.WriteFile(f.configPath, bad, 0600); err != nil {
+					t.Fatal(err)
+				}
+				before := reconciliationImage(t, f)
+				assertBootstrapFenced(t, f)
+				if _, err = os.Stat(filepath.Join(f.config.StateDir, approvalName)); !errors.Is(err, os.ErrNotExist) {
+					t.Error("non-location scalar refusal preserved consent", err)
+				} else {
+					assertReceiptInvalidated(t, f, before)
+				}
+				if err = os.WriteFile(f.configPath, original, 0600); err != nil {
+					t.Fatal(err)
+				}
+				retry := New(f.configPath, f.files, nil)
+				code := retry.Reload(context.Background())
+				key, admission := authorize(retry)
+				retry.Close()
+				if code != EnrollmentUnverified || admission != EnrollmentUnverified || key != (EnrolledKey{}) {
+					t.Errorf("repairing only config revived consent: reload=%q admission=%q key=%t", code, admission, key != (EnrolledKey{}))
+				}
+				repairConsumptionAndConfirm(t, f)
+			})
+		}
+	}
+}
 
 // A refused clock check burns consent in BOTH publication modes. Recovering
 // only the clock cannot authorize another start; explicit recovery followed by
@@ -193,7 +238,7 @@ func (f *prelockFiles) Read(path string, limit int64) ([]byte, Metadata, error) 
 // no payload outside the protected config. Repairing only that prerequisite
 // allows the original approval exactly once: refusal is not consumption.
 func TestApprovalAttemptPreLockRefusals(t *testing.T) {
-	cases := []string{"closed", "commit-fault", "target-changed", "config-unreadable", "config-unsafe", "config-malformed", "config-state-relative", "directory-unsafe", "directory-lease", "lock-missing", "lock-unsafe", "lock-unreadable", "canceled", "lock-wait-canceled"}
+	cases := []string{"closed", "commit-fault", "target-changed", "config-unreadable", "config-unsafe", "config-malformed", "config-oversize", "config-duplicate", "config-nested-duplicate", "config-escaped-duplicate", "config-trailing-json", "config-state-relative", "directory-unsafe", "directory-lease", "lock-missing", "lock-unsafe", "lock-unreadable", "canceled", "lock-wait-canceled"}
 	for _, bootstrap := range []bool{false, true} {
 		for _, kind := range cases {
 			t.Run(stringMode(bootstrap)+"/"+kind, func(t *testing.T) {
@@ -226,6 +271,28 @@ func TestApprovalAttemptPreLockRefusals(t *testing.T) {
 					restore = func() { delete(files.override, f.configPath) }
 				case "config-malformed":
 					if e := os.WriteFile(f.configPath, []byte("{"), 0600); e != nil {
+						t.Fatal(e)
+					}
+					restore = f.writeConfig
+				case "config-oversize", "config-duplicate", "config-nested-duplicate", "config-escaped-duplicate", "config-trailing-json":
+					original, e := os.ReadFile(f.configPath)
+					if e != nil {
+						t.Fatal(e)
+					}
+					var bad []byte
+					switch kind {
+					case "config-oversize":
+						bad = append(original, bytes.Repeat([]byte(" "), (1<<20)+1-len(original))...)
+					case "config-duplicate":
+						bad = append([]byte(`{"publisher":null,`), original[1:]...)
+					case "config-nested-duplicate":
+						bad = append([]byte(`{"unknown":[{"x":1,"x":2}],`), original[1:]...)
+					case "config-escaped-duplicate":
+						bad = append([]byte(`{"publi\u0073her":null,`), original[1:]...)
+					case "config-trailing-json":
+						bad = append(original, []byte(` {}`)...)
+					}
+					if e = os.WriteFile(f.configPath, bad, 0600); e != nil {
 						t.Fatal(e)
 					}
 					restore = f.writeConfig

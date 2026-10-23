@@ -136,6 +136,14 @@ type AuditRecord struct {
 	Digest        string  `json:"record_digest"`
 }
 type Auditor interface{ Append(AuditRecord) Code }
+
+// AuditClock reports whether UTC is trustworthy. Uncertain time is recorded as
+// null/unknown rather than inventing a timestamp for the operation.
+type AuditClock interface{ UTC() (time.Time, bool) }
+type systemAuditClock struct{}
+
+func (systemAuditClock) UTC() (time.Time, bool) { return time.Now().UTC(), true }
+
 type durableFile interface {
 	io.Writer
 	Sync() error
@@ -162,6 +170,7 @@ type Journal struct {
 	segmentLimit int64
 	totalLimit   int64
 	reserve      int64
+	clock        AuditClock
 }
 
 func auditDigest(r AuditRecord) (string, error) {
@@ -183,9 +192,12 @@ func auditDigest(r AuditRecord) (string, error) {
 }
 func auditName(n uint64) string { return fmt.Sprintf("%016d.jsonl", n) }
 func OpenJournal(dir *os.File, uid uint32) (*Journal, error) {
-	j := &Journal{dir: dir, uid: uid, segment: 1, first: 1, segmentLimit: 64 << 20, totalLimit: 1 << 30, reserve: 16 << 20}
+	return openJournal(dir, uid, systemAuditClock{}, rand.Reader)
+}
+func openJournal(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader) (*Journal, error) {
+	j := &Journal{dir: dir, uid: uid, segment: 1, first: 1, segmentLimit: 64 << 20, totalLimit: (1 << 30) + (16 << 20), reserve: 16 << 20, clock: clock}
 	var nonce [16]byte
-	if _, e := rand.Read(nonce[:]); e != nil {
+	if _, e := io.ReadFull(entropy, nonce[:]); e != nil {
 		return nil, failure("audit instance unavailable")
 	}
 	j.instance = hex.EncodeToString(nonce[:])
@@ -342,8 +354,14 @@ func (j *Journal) Append(r AuditRecord) Code {
 	r.Seq = j.seq + 1
 	r.Instance = j.instance
 	r.Previous = j.previous
-	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	r.Time = &now
+	instant, trusted := j.clock.UTC()
+	if trusted && instant.Year() >= 1970 && instant.Year() <= 9999 {
+		now := instant.UTC().Format("2006-01-02T15:04:05Z")
+		r.Time = &now
+	} else {
+		r.Time = nil
+		r.Result = "unknown"
+	}
 	digest, e := auditDigest(r)
 	if e != nil {
 		j.failed = true
@@ -357,7 +375,7 @@ func (j *Journal) Append(r AuditRecord) Code {
 		return "audit_unavailable"
 	}
 	budget := j.totalLimit - j.reserve
-	if r.Result == "refused" {
+	if r.RefusalCode != nil || r.Result == "refused" {
 		budget = j.totalLimit
 	}
 	if j.total+int64(len(b)) > budget {

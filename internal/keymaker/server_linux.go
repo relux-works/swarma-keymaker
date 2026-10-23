@@ -186,7 +186,9 @@ func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peer
 		defer cancelGeneration()
 		// Subscribe, then re-read, so an update between admission and subscription
 		// cannot leave an idle connection alive under an obsolete snapshot.
-		check := s.Engine.OpenSession(parent, peer)
+		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+		check := s.Engine.OpenSession(ctx, peer)
+		cancel()
 		if check.Admission != "" || check.Generation != session.Generation || check.Binding.Number != session.Binding.Number {
 			c.Close()
 			return

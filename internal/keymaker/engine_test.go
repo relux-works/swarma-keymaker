@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 type fakeGenerations struct {
@@ -18,6 +19,37 @@ type fakeGenerations struct {
 	entries     map[uint32]Generation
 	unavailable bool
 	watchers    map[uint32][]chan struct{}
+}
+
+// Exhausted UID or global buckets refuse before signing and retain precise audit
+// evidence; restoring the independent bucket admits the paired signing control.
+func TestRateLimits(t *testing.T) {
+	for _, scope := range []string{"uid", "global"} {
+		t.Run(scope, func(t *testing.T) {
+			e, _, signer, a, s := fixtureEngine(t)
+			e.rateMu.Lock()
+			if scope == "uid" {
+				e.peers[Principal{s.Peer.UID, s.Generation}] = &bucket{last: time.Now()}
+			} else {
+				e.global = bucket{last: time.Now()}
+			}
+			e.rateMu.Unlock()
+			body := validBody(signer.key[32:], "git")
+			if code := e.Handle(context.Background(), s, body, func([]byte) error { t.Fatal("rate refusal released"); return nil }); code != "rate_limited" || signer.calls.Load() != 0 {
+				t.Fatal("exhausted bucket admitted", code)
+			}
+			if len(a.records) != 1 || a.records[0].RefusalCode == nil || *a.records[0].RefusalCode != "rate_limited" {
+				t.Fatal("rate refusal missing audit")
+			}
+			e.rateMu.Lock()
+			e.global = bucket{}
+			e.peers = map[Principal]*bucket{}
+			e.rateMu.Unlock()
+			if code := e.Handle(context.Background(), s, body, func([]byte) error { return nil }); code != "" || signer.calls.Load() != 1 {
+				t.Fatal("rate control denied", code)
+			}
+		})
+	}
 }
 
 func newGenerations(uid uint32, token string) *fakeGenerations {

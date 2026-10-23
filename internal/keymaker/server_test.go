@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -29,6 +30,72 @@ func (p observedPeer) Credentials(c *net.UnixConn) (Peer, Code) {
 	return v, code
 }
 
+// Already admitted real connections are closed when a binding is revoked or its
+// generation retires/changes. The preceding public response is a positive control;
+// the in-flight signature ordering and precise codes are tested in ReleaseFences.
+func TestLiveConnectionInvalidation(t *testing.T) {
+	for _, change := range []string{"revoke", "retire", "reuse"} {
+		t.Run(change, func(t *testing.T) {
+			f := startRealFixture(t)
+			c, e := net.DialUnix("unix", nil, &net.UnixAddr{Name: f.server.Path, Net: "unix"})
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer c.Close()
+			c.SetDeadline(time.Now().Add(time.Second))
+			if _, e = c.Write(Packet([]byte{11})); e != nil {
+				t.Fatal(e)
+			}
+			body, code := ReadFrame(c)
+			if code != "" || len(body) == 0 || body[0] != 12 {
+				t.Fatal("positive identity control failed", code)
+			}
+			uid := uint32(os.Getuid())
+			b := f.engine.Store.Snapshot()[0]
+			switch change {
+			case "revoke":
+				if code = f.engine.Store.Revoke(context.Background(), fixtureOperator, fixtureOperator, b.Number, approvedAct{}); code != "" {
+					t.Fatal(code)
+				}
+			case "retire":
+				f.generation.set(uid, "retiring", b.Generation)
+			case "reuse":
+				f.generation.set(uid, "active", "replacement")
+			}
+			var next [1]byte
+			if n, err := c.Read(next[:]); n != 0 || err != io.EOF {
+				t.Fatalf("old connection survived: n=%d err=%v", n, err)
+			}
+		})
+	}
+}
+
+// A second holder cannot open the same protected state; releasing the first lock
+// permits a new holder without deleting or replacing the lock inode.
+func TestStateLock(t *testing.T) {
+	d := t.TempDir()
+	os.Chmod(d, 0700)
+	dir, e := OpenDirectory(d, uint32(os.Getuid()), 0700)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer dir.Close()
+	first, e := LockState(dir, uint32(os.Getuid()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if second, err := LockState(dir, uint32(os.Getuid())); err == nil {
+		second.Close()
+		t.Fatal("duplicate state owner")
+	}
+	first.Close()
+	second, e := LockState(dir, uint32(os.Getuid()))
+	if e != nil {
+		t.Fatal(e)
+	}
+	second.Close()
+}
+
 type runningFixture struct {
 	server     *Server
 	engine     *Engine
@@ -38,7 +105,7 @@ type runningFixture struct {
 	seen       chan Peer
 }
 
-func startRealFixture(t *testing.T) *runningFixture {
+func startRealFixture(t *testing.T, overrideUID ...uint32) *runningFixture {
 	t.Helper()
 	state := t.TempDir()
 	os.Chmod(state, 0700)
@@ -67,7 +134,11 @@ func startRealFixture(t *testing.T) *runningFixture {
 	}
 	t.Cleanup(func() { audit.Close(); auditDir.Close() })
 	s := NewStore()
-	b := fixtureBinding(uint32(os.Getuid()))
+	uid := uint32(os.Getuid())
+	if len(overrideUID) > 0 {
+		uid = overrideUID[0]
+	}
+	b := fixtureBinding(uid)
 	b, c := s.Register(fixtureOperator, fixtureOperator, b)
 	if c != "" {
 		t.Fatal(c)
@@ -109,7 +180,7 @@ func startRealFixture(t *testing.T) *runningFixture {
 // Environment is constructed from an allowlist: no inherited Git variables,
 // SSH identities, HOME, command overrides or system/global Git configuration.
 func isolatedEnv(home, socket string) []string {
-	return []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "XDG_CONFIG_HOME=" + filepath.Join(home, "config"), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "SSH_AUTH_SOCK=" + socket, "LC_ALL=C", "LANG=C"}
+	return []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "XDG_CONFIG_HOME=" + filepath.Join(home, "config"), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "SSH_AUTH_SOCK=" + socket, "LC_ALL=C", "LANG=C"}
 }
 func clientCommand(t *testing.T, dir string, env []string, input []byte, name string, args ...string) []byte {
 	t.Helper()

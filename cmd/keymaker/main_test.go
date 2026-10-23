@@ -32,7 +32,7 @@ func TestProductionBinaryGenerationGate(t *testing.T) {
 	}
 	d := t.TempDir()
 	binary := filepath.Join(d, "keymaker")
-	build := exec.Command("go", "build", "-o", binary, ".")
+	build := exec.Command("go", "build", "-buildvcs=false", "-o", binary, ".")
 	if b, e := build.CombinedOutput(); e != nil {
 		t.Fatalf("build failed: %v %s", e, b)
 	}

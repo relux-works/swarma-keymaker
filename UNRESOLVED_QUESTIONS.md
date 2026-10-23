@@ -57,7 +57,7 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
 - The pinned registrar Store contract now states that a Commit error leaves
   durable state indeterminate. The adapter returns neither old nor new authority
   and fences until a new start with operator reconciliation; this is aligned.
-- The published enrollment-1 suite (111 negative/23 positive) runs through the
+- The published enrollment-1 suite (114 negative/25 positive) runs through the
   local adapter's conformance test. All published rows are supported. Later
   unpublished rows need an explicit dependency bump and are not claimed.
 - Binding enforcement, native helper wiring and body construction/signing remain

@@ -100,7 +100,7 @@ that Authority instance:** another live reload cannot recover it. Startup with
 independent reconciliation is required. In particular, directory fsync can fail
 after rename: the replacement may already be visible and its durability is
 indeterminate. No all-error rollback guarantee or compensating-rename guarantee
-is claimed. This follows the [pinned registrar Store contract](https://github.com/relux-works/swarma-registrar/blob/e6fb65082432a91dc319abccc11ab9c068244498/registry/doc.go):
+is claimed. This follows the [pinned registrar Store contract](https://github.com/relux-works/swarma-registrar/blob/fd2df68e861d45c955efa250ede342bc04468066/registry/doc.go):
 a Commit error returns neither snapshot nor replacement high water, durable state
 is indeterminate, and admission stays fenced until operator reconciliation.
 
@@ -172,8 +172,8 @@ current-only keys, failed reloads, generation re-admission, rollback history,
 tombstones, CAS, corrupt/restored state, interrupted writes and restart fencing.
 `TestRegistrarEnrollmentConformance` discovers all enrollment rows in the local
 pinned module directory obtained with `go list -m -json`. Test-time module fetch
-is disabled. All 111 negative and 23 positive published rows run, with no deferred
-conformance rows. The ten codec controls use the public codec; the 124 registry
+is disabled. All 114 negative and 25 positive published rows run, with no deferred
+conformance rows. The ten codec controls use the public codec; the 129 registry
 rows use the production Git verifier, ancestry and CAS store. Fixture revision
 labels are instantiated with real signed Git object IDs while preserving the
 specified equality/ancestry/approval relationships. Signed enrollment bytes and

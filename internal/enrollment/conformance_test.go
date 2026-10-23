@@ -37,6 +37,7 @@ type registryVector struct {
 		Audience string
 		Registry struct {
 			Approved, Available, Descendant bool
+			FirstUse                        *bool  `json:"first_use"`
 			Signature                       bool   `json:"commit_signature_valid"`
 			Persist                         bool   `json:"persist_available"`
 			Exact                           bool   `json:"pin_is_exact"`
@@ -145,7 +146,7 @@ func TestRegistrarEnrollmentConformance(t *testing.T) {
 		counts[phase] = len(found)
 		paths = append(paths, found...)
 	}
-	if counts["0-negative"] < 111 || counts["1-positive"] < 23 {
+	if counts["0-negative"] < 114 || counts["1-positive"] < 25 {
 		t.Fatalf("published enrollment vectors missing: %v", counts)
 	}
 	known := map[string]bool{}
@@ -172,7 +173,7 @@ func TestRegistrarEnrollmentConformance(t *testing.T) {
 			t.Fatal(err)
 		}
 		allowed := map[string]bool{}
-		for _, field := range []string{"approved", "available", "commit_signature_valid", "descendant", "files", "persist_available", "pin_is_exact", "previous_files", "previous_revision", "publisher_key", "previous_publisher_key", "revision", "rollback_state_available", "station_hosts", "nonstation_hosts"} {
+		for _, field := range []string{"approved", "available", "commit_signature_valid", "descendant", "files", "persist_available", "pin_is_exact", "previous_files", "previous_revision", "publisher_key", "previous_publisher_key", "revision", "rollback_state_available", "station_hosts", "nonstation_hosts", "first_use"} {
 			allowed[field] = true
 		}
 		for field := range raw.Fixture.Registry {
@@ -331,7 +332,13 @@ func runRegistryVector(t *testing.T, v registryVector) {
 	if !r.Persist {
 		store.ops = failingOps{stage: "rename"}
 	}
-	snapshot, high, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: inputRevision, Entries: entries, Retained: previous, FirstUse: previous == nil, Reconciled: r.RollbackAvailable})
+	// Older fixtures use the Appendix A initial-bootstrap default. Explicit
+	// first_use input in newer fixtures always takes precedence.
+	firstUse := previous == nil
+	if r.FirstUse != nil {
+		firstUse = *r.FirstUse
+	}
+	snapshot, high, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: inputRevision, Entries: entries, Retained: previous, FirstUse: firstUse, Reconciled: r.RollbackAvailable})
 	if code := registrarCode(t, err); code != v.Expected.Code {
 		t.Fatalf("registrar code=%s want=%s", code, v.Expected.Code)
 	}

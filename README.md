@@ -60,7 +60,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | --- | --- | --- |
 | Go | Test enrollment authority: `go test ./internal/enrollment` | Named verdicts; isolated fixture registries/keys under the Go temporary directory, cleaned by tests |
 | Go | Targeted race check: `GOMAXPROCS=2 go test -race ./internal/enrollment -run 'TestConcurrentReloadAuthorize\|TestStoreCompareAndSwap\|TestInterruptedWriteFencesUntilRestart' -count=1 -p=1` | Race diagnostics and verdicts |
-| Go | Run the published enrollment fixture integration: `GOPROXY=off go test -v ./internal/enrollment -run '^TestRegistrarEnrollmentConformance$' -count=1` | 111 negative/23 positive local pinned-module rows; no test-time fetch |
+| Go | Run the published enrollment fixture integration: `GOPROXY=off go test -v ./internal/enrollment -run '^TestRegistrarEnrollmentConformance$' -count=1` | 114 negative/25 positive local pinned-module rows; no test-time fetch |
 | Go | Vet enrollment authority: `go vet ./internal/enrollment` | Diagnostics on stdout/stderr |
 | gofmt | Check enrollment formatting: `gofmt -l internal/enrollment/*.go` | Empty output expected |
 | Git + OpenSSH | Production uses `/usr/bin/git cat-file` and `merge-base --is-ancestor`; fixture tests invoke `/usr/bin/ssh-keygen -t ed25519` and Git `commit-tree -S` | Local objects and temporary test-only keys; no network or inherited SSH agent |
@@ -130,8 +130,8 @@ replace the pending integration tests listed in the specification.
 
 The enrollment schema, publisher verification, registry snapshot loader and name
 rules belong to `github.com/relux-works/swarma-registrar`. The dependency is pinned
-to reviewed main commit `e6fb65082432a91dc319abccc11ab9c068244498`
-(`v0.0.0-20261023130800-e6fb65082432`). Keymaker supplies caller-side trust,
+to reviewed main commit `fd2df68e861d45c955efa250ede342bc04468066`
+(`v0.0.0-20261023131515-fd2df68e861d`). Keymaker supplies caller-side trust,
 persistence and local authorization; it does not maintain a second loader.
 
 Any registrar API or behavior change requires a separate reviewed pull request

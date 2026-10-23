@@ -70,6 +70,7 @@ func wrapperDir(t *testing.T, f fixture) string {
 // Both cases reach the extracted source and then intentionally fail the fake Go
 // build, preserving the outside directory and retaining an empty pinned target.
 func TestReleaseParentSwap(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
 			f := newFixture(t)
@@ -133,6 +134,7 @@ func TestReleaseParentSwap(t *testing.T) {
 // A link planted after real compilation must not overwrite a sibling victim.
 // The unmodified control assembles a complete bundle through the same CLI.
 func TestReleaseOutputSymlink(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
 			f := newFixture(t)
@@ -187,6 +189,7 @@ func TestReleaseOutputSymlink(t *testing.T) {
 // tree. Both cases build the actual named tree; the pin is captured independently
 // before the replacement plant, using existing commits and no signing key.
 func TestReleaseReplacementCommit(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
 			f := newFixture(t)
@@ -227,6 +230,7 @@ func TestReleaseReplacementCommit(t *testing.T) {
 // GIT_* redirects never enter child environments. Each case restores the same
 // clean source as a control; no registry/network or host keys participate.
 func TestReleaseGitTrustMetadata(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, kind := range []string{"grafts", "shallow", "alternates", "http-alternates", "object-link", "environment"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
@@ -284,6 +288,7 @@ func TestReleaseGitTrustMetadata(t *testing.T) {
 // A different valid archive must fail the actual pre-build tree check, while the
 // unaltered export builds successfully. The wrapper changes only archive bytes.
 func TestReleaseExportTreeMismatch(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
 			f := newFixture(t)
@@ -314,7 +319,8 @@ func TestReleaseExportTreeMismatch(t *testing.T) {
 // refuses with EACCES, preserves its bytes, and the ordinary in-target write
 // succeeds. The parent can still write its own fixture after the child exits.
 func TestReleaseChildWriteBoundary(t *testing.T) {
-	base := t.TempDir()
+	t.Setenv("TMPDIR", privateTestScratch(t))
+	base := privateTestScratch(t)
 	target := filepath.Join(base, "target")
 	if err := os.Mkdir(target, 0700); err != nil {
 		t.Fatal(err)
@@ -375,6 +381,7 @@ func emptyTarget(t *testing.T, name string) {
 // The original directory is emptied through its handle; both the moved-root
 // and unchanged-root controls retain an empty directory without parent unlink.
 func TestReleaseTargetSwapCleanup(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
 			f := newFixture(t)

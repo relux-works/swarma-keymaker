@@ -86,7 +86,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Vet enrollment authority: `go vet ./internal/enrollment` | Diagnostics on stdout/stderr |
 | gofmt | Check enrollment formatting: `gofmt -l internal/enrollment/*.go` | Empty output expected |
 | Git + OpenSSH | Production uses `/usr/bin/git cat-file` and `merge-base --is-ancestor`; fixture tests invoke `/usr/bin/ssh-keygen -t ed25519` and Git `commit-tree -S` | Local objects and temporary test-only keys; no network or inherited SSH agent |
-| Go | Packaging parser and unit checks: `go test ./internal/keymaker -run '^TestPackagingConfig' -count=1`; `go test ./tools/release-bundle -count=1` | Paired refusals, clean-clone fixtures and offline real builds under TMPDIR |
+| Go | Packaging parser and unit checks: `go test ./internal/keymaker -run '^TestPackagingConfig' -count=1`; `go test ./tools/release-bundle -count=1` | Paired refusals, clean-clone fixtures and offline real builds under verified private test TMPDIR roots; caller TMPDIR mode is independent |
 | Go | Packaging static checks: `go vet ./tools/release-bundle ./tools/mutations ./internal/keymaker`; `gofmt -l tools/release-bundle/*.go internal/keymaker/config_linux*.go internal/keymaker/runtime_linux.go` | Diagnostics; empty formatting output expected |
 | Go | Build offline assembler: `go build -trimpath -o "$SCRATCH/release-bundle" ./tools/release-bundle` | Tool binary under scratch |
 | release-bundle | Assemble: `"$SCRATCH/release-bundle" -repo "$SOURCE" -commit "$COMMIT" -version "$VERSION" -target "$BUNDLE" -config "$CONFIG" -name-indices "$REGISTRY" -module-cache "$MODULE_CACHE"` | New offline bundle directory; child work uses private TMPDIR scratch; unknown child files are retained |

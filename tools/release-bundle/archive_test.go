@@ -30,9 +30,10 @@ func archiveFixture(t *testing.T, h *tar.Header) []byte {
 // their potential escape destinations remain inside isolated test fixtures.
 // An ordinary archived source file extracts with its exact bytes as control.
 func TestReleaseArchiveFiles(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, mode := range []string{"parent", "absolute", "backslash", "symlink", "hardlink"} {
 		t.Run(mode, func(t *testing.T) {
-			root := t.TempDir()
+			root := privateTestScratch(t)
 			dest := filepath.Join(root, "source")
 			if err := os.Mkdir(dest, 0700); err != nil {
 				t.Fatal(err)

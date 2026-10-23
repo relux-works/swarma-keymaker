@@ -31,6 +31,9 @@ type fixture struct {
 // signing key. Dirty working files in the developer checkout are not imported.
 func newFixture(t *testing.T) fixture {
 	t.Helper()
+	// Git inspection itself uses production scratch, so isolate it first.
+	dir := privateTestScratch(t)
+	t.Setenv("TMPDIR", dir)
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -39,11 +42,6 @@ func newFixture(t *testing.T) fixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
-	if err := os.Chmod(dir, 0700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("TMPDIR", dir)
 	repo := filepath.Join(dir, "source")
 	clone := gitCommand(context.Background(), root, "clone", "--local", "--no-hardlinks", "--quiet", "--no-checkout", "--", root, repo)
 	clone.Env = append(clone.Env, "GIT_ALLOW_PROTOCOL=file") // Test-only local clone; production disallows all transports.
@@ -96,6 +94,7 @@ func refused(t *testing.T, o options, want error) {
 // separate clean clone is the paired control; immutable snapshots are not a
 // reason to silently admit a dirty checkout.
 func TestReleaseDirtyTree(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, mode := range []string{"tracked", "staged", "untracked"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newFixture(t)
@@ -130,6 +129,7 @@ func TestReleaseDirtyTree(t *testing.T) {
 // The full requested commit must equal HEAD and the source version must equal
 // the operator pin. Neither refusal creates output; the real baseline passes.
 func TestReleaseCommitAndVersion(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	for _, mode := range []string{"short-commit", "other-commit", "wrong-version"} {
 		t.Run(mode, func(t *testing.T) {
@@ -153,6 +153,7 @@ func TestReleaseCommitAndVersion(t *testing.T) {
 // FIFOs, missing files and over-budget files; ordinary complete files pass.
 // All objects and FIFO operations are inside private temporary fixtures.
 func TestReleaseInputFiles(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	dir := filepath.Dir(f.o.config)
 	for _, which := range []string{"config", "registry", "enrollment"} {
@@ -198,6 +199,7 @@ func TestReleaseInputFiles(t *testing.T) {
 // Actual parser failures preserve operator bytes and never create output. The
 // registry's allocation-history validator runs as well as JSON decoding.
 func TestReleaseInputParsers(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	for _, mode := range []string{"config-syntax", "config-unknown", "registry-syntax", "registry-unknown", "registry-history", "registry-duplicate"} {
 		t.Run(mode, func(t *testing.T) {
@@ -237,6 +239,7 @@ func TestReleaseInputParsers(t *testing.T) {
 // aliased and invalid pins refuse without writes or input changes; valid pins
 // are retained byte-for-byte. Omission remains valid and omits the file.
 func TestReleaseEnrollmentGate(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	o := f.o
 	o.enrollment = filepath.Join(filepath.Dir(o.config), "enrollment.json")
@@ -302,6 +305,7 @@ func enrollmentInput(t *testing.T) []byte {
 // Existing files/directories/symlinks are preserved, and missing/symlinked
 // parents refuse. A new target under the normal fixture parent remains valid.
 func TestReleaseExistingTarget(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	parent := filepath.Dir(f.o.target)
 	for _, mode := range []string{"directory", "file", "symlink", "parent-link", "missing-parent"} {
@@ -354,6 +358,7 @@ func TestReleaseExistingTarget(t *testing.T) {
 // only its contents, retaining the directory without a parent-entry unlink.
 // This is not a mocked successful build or toolchain.
 func TestReleaseBuildFailureCleanup(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	control(t, f)
 	git, err := exec.LookPath("git")
@@ -380,7 +385,8 @@ func TestReleaseBuildFailureCleanup(t *testing.T) {
 // Build configuration ignores inherited toolchain/workspace/SSH variables and
 // confines every writable Go directory to the newly owned build work directory.
 func TestReleaseBuildEnvironment(t *testing.T) {
-	work := filepath.Join(t.TempDir(), "work")
+	t.Setenv("TMPDIR", privateTestScratch(t))
+	work := filepath.Join(privateTestScratch(t), "work")
 	t.Setenv("GOFLAGS", "-toolexec=unwanted")
 	t.Setenv("SSH_AUTH_SOCK", "test-only-unavailable")
 	env := map[string]string{}
@@ -417,11 +423,17 @@ func TestReleaseBuildEnvironment(t *testing.T) {
 // exact staged bytes and complete checksums. It creates no service or system
 // files. Sibling inputs/source index remain unchanged; target has no build
 // scratch, while child-created files are retained in private TMPDIR scratch.
-func TestReleaseBundle(t *testing.T) { testReleaseBundle(t, false) }
+func TestReleaseBundle(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
+	testReleaseBundle(t, false)
+}
 
 // A supplied valid pin configuration is copied and checksummed in a real
 // offline build; this validates policy bytes, not installed Git trust or state.
-func TestReleaseBundleWithEnrollment(t *testing.T) { testReleaseBundle(t, true) }
+func TestReleaseBundleWithEnrollment(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
+	testReleaseBundle(t, true)
+}
 func testReleaseBundle(t *testing.T, withEnrollment bool) {
 	f := newFixture(t)
 	f.o.moduleCache = fixtureModuleCache(t)
@@ -575,6 +587,7 @@ func testReleaseBundle(t *testing.T, withEnrollment bool) {
 
 // Malformed flags and missing required inputs refuse without a build.
 func TestReleaseCommandRefusals(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, c := range []struct {
 		args []string
 		want int
@@ -604,7 +617,7 @@ func fixtureModuleCache(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dst := t.TempDir()
+	dst := privateTestScratch(t)
 	for _, line := range strings.Split(strings.TrimSpace(string(sums)), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) != 3 || strings.HasSuffix(fields[1], "/go.mod") {
@@ -629,8 +642,9 @@ func fixtureModuleCache(t *testing.T) string {
 // Missing local dependencies fail closed, clean only the owned target and
 // preserve the empty proxy. Real offline builds above are positive controls.
 func TestReleaseOfflineDependencies(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
-	f.o.moduleCache = t.TempDir()
+	f.o.moduleCache = privateTestScratch(t)
 	before, err := snapshotFiles(f.o.moduleCache)
 	if err != nil {
 		t.Fatal(err)

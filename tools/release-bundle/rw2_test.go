@@ -18,12 +18,10 @@ import (
 // The delayed real mkdirat return exposes the producer's mkdir/open window.
 // Substitution must refuse before adopting unrelated contents; no-swap opens.
 func TestReleaseConcurrentTargetCreation(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
-			base := t.TempDir()
-			if err := os.Chmod(base, 0700); err != nil {
-				t.Fatal(err)
-			}
+			base := privateTestScratch(t)
 			foreign := filepath.Join(base, "foreign")
 			target := filepath.Join(base, "target")
 			if err := os.Mkdir(foreign, 0700); err != nil {
@@ -37,7 +35,9 @@ func TestReleaseConcurrentTargetCreation(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, "strace", "-f", "-e", "trace=mkdirat,openat2", "-e", "inject=mkdirat:delay_exit=500ms:when=1", "-o", filepath.Join(base, "trace"), exe, "-test.run=^TestReleaseCreationHelper$")
-			cmd.Env = append(os.Environ(), "RELEASE_CREATION_HELPER="+base)
+			// The traced helper gets its own already verified scratch. Creating it
+			// here preserves the probe's first-mkdirat target-creation boundary.
+			cmd.Env = append(os.Environ(), "RELEASE_CREATION_HELPER="+base, "TMPDIR="+privateTestScratch(t))
 			var out bytes.Buffer
 			cmd.Stdout = &out
 			cmd.Stderr = &out
@@ -76,8 +76,11 @@ func TestReleaseConcurrentTargetCreation(t *testing.T) {
 func TestReleaseCreationHelper(t *testing.T) {
 	base := os.Getenv("RELEASE_CREATION_HELPER")
 	if base == "" {
+		t.Setenv("TMPDIR", privateTestScratch(t))
 		return
 	}
+	// The parent creates this subprocess's private TMPDIR through the same
+	// helper before tracing; no mkdir may precede the target-creation probe.
 	parent, err := openRootNoLinks(base)
 	if err != nil {
 		os.Exit(3)
@@ -101,9 +104,10 @@ func TestReleaseCreationHelper(t *testing.T) {
 // root opens. Foreign ownership is a stat-policy control, not a chown claim:
 // this unprivileged suite has no authority to create another uid's directory.
 func TestReleaseAdoptedRoot(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, kind := range []string{"empty", "nonempty", "mode", "foreign-stat"} {
 		t.Run(kind, func(t *testing.T) {
-			base := t.TempDir()
+			base := privateTestScratch(t)
 			name := filepath.Join(base, "root")
 			if err := os.Mkdir(name, 0700); err != nil {
 				t.Fatal(err)
@@ -159,9 +163,10 @@ func TestReleaseAdoptedRoot(t *testing.T) {
 // Cleanup removes recorded creations but preserves unknown files, substituted
 // inodes and unknown directory descendants. No recursive ownership inference.
 func TestReleaseCleanupCreatedOnly(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, kind := range []string{"control", "unrelated", "replacement", "descendant"} {
 		t.Run(kind, func(t *testing.T) {
-			base := t.TempDir()
+			base := privateTestScratch(t)
 			root, err := openRootNoLinks(base)
 			if err != nil {
 				t.Fatal(err)
@@ -215,9 +220,10 @@ func TestReleaseCleanupCreatedOnly(t *testing.T) {
 // Group/world writable nonsticky parents refuse before creating any entry.
 // Private and self-owned sticky parents are the paired permitted controls.
 func TestReleaseParentPermissions(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, kind := range []string{"private", "group", "world", "sticky"} {
 		t.Run(kind, func(t *testing.T) {
-			base := t.TempDir()
+			base := privateTestScratch(t)
 			mode := os.FileMode(0700)
 			if kind == "group" {
 				mode = 0770
@@ -259,6 +265,7 @@ func TestReleaseParentPermissions(t *testing.T) {
 // boundary itself: outside writes fail; scratch writes succeed. The parent
 // retains its authority. Actual filter refusal is exercised separately below.
 func TestReleaseGitPreflightBoundary(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
 			f := newFixture(t)
@@ -313,6 +320,7 @@ func fixtureGitConfig(t *testing.T, f fixture, key, value string) {
 // refuse explicitly before any filter runs. Removing the selection restores
 // valid preflight; scripts attempt outside mutation if actually executed.
 func TestReleaseConfiguredFilters(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	for _, kind := range []string{"attributes-file", "local-config", "gitattributes"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newFixture(t)
@@ -361,6 +369,7 @@ func TestReleaseConfiguredFilters(t *testing.T) {
 // execute. Their selected programs are read-only test scripts with a sentinel;
 // a plain clean clone is the positive control for the same raw-byte comparison.
 func TestReleaseConfiguredPrograms(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	f := newFixture(t)
 	base := filepath.Dir(f.o.config)
 	marker := filepath.Join(base, "executed")
@@ -389,12 +398,13 @@ func TestReleaseConfiguredPrograms(t *testing.T) {
 // character device in the fixture, a regular-file substitution exercises the
 // actual open/fstat refusal; synthetic fstat values also narrow the rdev guard.
 func TestReleaseNullDeviceVerification(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	file, err := openNullDevice(os.DevNull)
 	if err != nil {
 		t.Fatal("real null device refused", err)
 	}
 	file.Close()
-	base := t.TempDir()
+	base := privateTestScratch(t)
 	name := filepath.Join(base, "not-null")
 	if err := unix.Mknod(name, unix.S_IFCHR|0600, int(unix.Mkdev(1, 5))); err != nil {
 		if err != unix.EPERM && err != unix.EACCES {

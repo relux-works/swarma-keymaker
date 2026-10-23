@@ -25,6 +25,7 @@ func shippedUnit(t *testing.T) ([]byte, []byte) {
 // The shipped unit equals the complete ordered ini block in section 12.1.
 // Added, removed, reordered or modified settings and missing blocks refuse.
 func TestReleaseUnitMatchesSpec(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	unit, spec := shippedUnit(t)
 	for _, mode := range []string{"added", "removed", "reordered", "modified", "no-section", "no-block"} {
 		t.Run(mode, func(t *testing.T) {
@@ -56,6 +57,7 @@ func TestReleaseUnitMatchesSpec(t *testing.T) {
 // Version inspection accepts the actual CLI constant and rejects missing,
 // computed, non-string and malformed declarations without executing source.
 func TestReleaseSourceVersion(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	raw, err := os.ReadFile("../../cmd/keymaker/main.go")
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +75,8 @@ func TestReleaseSourceVersion(t *testing.T) {
 // Path policy refuses system/source targets lexically before target access.
 // The valid target is absent inside a private temporary fixture directory.
 func TestReleaseTargetPolicy(t *testing.T) {
-	root := t.TempDir()
+	t.Setenv("TMPDIR", privateTestScratch(t))
+	root := privateTestScratch(t)
 	repo := filepath.Join(root, "source")
 	if err := os.Mkdir(repo, 0700); err != nil {
 		t.Fatal(err)
@@ -93,6 +96,7 @@ func TestReleaseTargetPolicy(t *testing.T) {
 
 // Canonical version parsing is independent of unrelated source declarations.
 func TestReleaseSourceVersionControl(t *testing.T) {
+	t.Setenv("TMPDIR", privateTestScratch(t))
 	got, err := sourceVersion([]byte("package main\nconst unrelated = 2\nconst version = \"test-control\"\n"))
 	if err != nil || strings.TrimSpace(got) != "test-control" {
 		t.Fatal(got, err)

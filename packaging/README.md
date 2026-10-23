@@ -146,7 +146,13 @@ all root operations remain with the owner and the specification runbook.
 ## Test bounds
 
 Tests use private temporary fixtures and clean clones of existing signed source
-commits. They create no fixture commits, use no host signing key/SSH agent and
+commits. A single test helper explicitly chmods every fixture root to 0700 and
+verifies its directory type, exact mode and current-user ownership before use.
+Each test selects such a root as TMPDIR before tool/Git inspection; the traced
+creation subprocess receives its own root from its parent before exec, preserving
+its mkdirat probe. This is independent of the caller's TMPDIR mode and umask.
+Explicit nonsticky group/other-writable scratch fixtures still prove production
+refusal, paired with a private-scratch control. They create no fixture commits, use no host signing key/SSH agent and
 touch no system installation paths. Real positive builds with and without
 enrollment run offline and check their manifests with `sha256sum -c`, then
 confirm a bounded corruption makes that command exit 1 naming the changed file.

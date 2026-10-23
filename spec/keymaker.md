@@ -128,6 +128,10 @@ old binding snapshot. Retirement similarly refuses `generation_inactive` or
 be transferred to a newly registered path or generation. Clients MUST verify the
 server socket's protected directory, expected owner and kernel peer UID.
 
+Surface B MUST report an accept-time generation refusal as one audited,
+request-ID-bound typed error for the first well-formed frame within its
+admission deadline, then close without admitting any method.
+
 ### 3.2 Binding record and lifecycle
 
 The service-owned durable record has exactly these semantic members:

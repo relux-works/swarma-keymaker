@@ -122,6 +122,60 @@ func (s *Server) ServeConnAccepted(ctx context.Context, conn net.Conn, accepted 
 	s.serveConn(ctx, conn, connectionState{accepted: accepted, pinned: true})
 }
 
+// ServeConnRefused reports an accept-time generation failure for an already
+// authenticated UID. It owns conn, reads one frame within the admission budget
+// and closes after an audited error. Workload limits still apply, but Identify,
+// ID admission, handlers and successful release are never invoked.
+func (s *Server) ServeConnRefused(ctx context.Context, conn net.Conn, peer Peer, refusal Code) {
+	defer conn.Close()
+	switch refusal {
+	case "generation_inactive", "generation_mismatch", "generation_source_unavailable":
+	default:
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, frameBudget)
+	defer cancel()
+	stop := context.AfterFunc(ctx, func() { conn.Close() })
+	defer stop()
+	deadline, _ := ctx.Deadline()
+	if conn.SetReadDeadline(deadline) != nil {
+		return
+	}
+	body, code := readFrame(conn)
+	if ctx.Err() != nil || !time.Now().Before(deadline) || body == nil && code == "" {
+		return
+	}
+	done, limit := s.observer.Enter(ctx, conn)
+	if done != nil {
+		defer done()
+	} else if limit == "" {
+		return
+	}
+	if limit != "" {
+		code = limit
+	}
+	var req Request
+	var id any
+	if code == "" {
+		obj, err := Decode(body)
+		if err != nil {
+			code = CCJNoncanonical
+		} else {
+			req, id, code = envelope(obj)
+			if code == "" {
+				code = refusal
+			}
+		}
+	}
+	if ctx.Err() != nil || !time.Now().Before(deadline) {
+		return
+	}
+	code = s.observer.Refuse(ctx, conn, &peer, req, body, code)
+	if ctx.Err() == nil {
+		s.replyError(conn, id, code, deadline)
+	}
+}
+
 func (s *Server) serveConn(ctx context.Context, conn net.Conn, state connectionState) {
 	defer conn.Close()
 	stop := context.AfterFunc(ctx, func() { conn.Close() })

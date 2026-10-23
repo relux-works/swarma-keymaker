@@ -99,6 +99,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Reader/writer admission fairness: `GOMAXPROCS=1 go test -race ./internal/enrollment ./internal/keymaker -run '^Test(AdmissionGate\|ReviewR2SocketReloadFairness\|HelperReloadFairnessControl)' -count=3 -p=1` | Finite reader handoff, cancellation, failed-publication fencing, writer progress and real helper socket control |
 | Go | Reload deadline and publication regressions: `GOMAXPROCS=2 go test -race ./internal/keymaker -run '^Test(ReviewHelperReloadDeadline\|HelperReloadPreparesOutsideWrite)$' -count=1 -p=1` | Fixture pin I/O, real daemon sockets and authority barriers; allowed pubkey retention plus refusal-only helper audit |
 | Go | Native integration checks: `go test ./internal/keymaker -run '^TestNative' -count=1`; race: `go test -race ./internal/keymaker -run '^TestNative' -count=1` | Verdicts; temporary fixtures under `TMPDIR` |
+| Go | Native generation admission regressions: `GOMAXPROCS=2 go test -race ./internal/keymaker ./internal/control -run '^Test(NativeGenerationAdmission\|RefusedConnection)' -count=1 -p=1` | Typed audited first-frame refusals, no execution/effect, bounded silent-peer closure and active controls |
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
 | gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
 | Go | Build daemon: `go build -o "$SCRATCH/keymaker" ./cmd/keymaker`; run `"$SCRATCH/keymaker" version` or `"$SCRATCH/keymaker" serve --config "$CONFIG"` | Binary; version or readiness refusal on stderr |
@@ -106,8 +107,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |
 | Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |
 | Go | Compile pending suite: `go test -c -buildvcs=false -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Tagged binary; compilation is not qualification |
-| Go | Run narrowing controls (default `core`, including native): `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all eighteen are killed |
-| Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Eight native plants from the default core group; wrapper 0 only when all are killed |
+| Go | Run narrowing controls (default `core`, including native): `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all nineteen are killed |
+| Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Nine native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Twelve named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all twelve are killed, logs/PIDs in scratch |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |

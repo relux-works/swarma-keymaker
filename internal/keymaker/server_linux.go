@@ -297,17 +297,27 @@ func (s *Server) handleControl(ctx context.Context, c *net.UnixConn, p Peer, cod
 	admitCtx, cancelAdmission := context.WithTimeout(ctx, 2*time.Second)
 	defer cancelAdmission()
 	g, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
-	if refusal != "" || generationCode(g, p.UID) != "" {
-		c.Close()
+	if refusal == "" {
+		refusal = generationCode(g, p.UID)
+	}
+	if refusal != "" {
+		s.controlWire.ServeConnRefused(admitCtx, c, control.Peer{UID: p.UID}, control.Code(refusal))
 		return
 	}
 	change, cancel := s.Engine.Generations.Watch(p.UID, g.Generation)
-	defer cancel()
 	current, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
-	if refusal != "" || generationCode(current, p.UID) != "" || current.Generation != g.Generation {
-		c.Close()
+	if refusal == "" {
+		refusal = generationCode(current, p.UID)
+	}
+	if refusal == "" && current.Generation != g.Generation {
+		refusal = "generation_mismatch"
+	}
+	if refusal != "" {
+		cancel()
+		s.controlWire.ServeConnRefused(admitCtx, c, control.Peer{UID: p.UID}, control.Code(refusal))
 		return
 	}
+	defer cancel()
 	cancelAdmission()
 	connectionCtx, cancelConnection := context.WithCancel(ctx)
 	defer cancelConnection()

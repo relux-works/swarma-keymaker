@@ -49,6 +49,8 @@ or production signed-act qualification.
 
 | Contract | Named evidence | Bound |
 | --- | --- | --- |
+| Generation refusal at connection admission | `TestNativeGenerationAdmissionRefusal`, `TestNativeGenerationAdmissionMethods`, `TestNativeGenerationAdmissionOneFrame` | Initial/confirmation inactive, mismatch and unavailable checks return exact code/retryable/ID and one UID-attributed audit; no Identify, ID admission, method dispatch, binding/result/nonce effect or held watcher; active hello/pubkey and verified-helper controls |
+| Refused connection bounds and framing | `TestNativeGenerationAdmissionMalformed`, `TestNativeGenerationAdmissionDeadline`, `TestNativeGenerationAdmissionMissingPeer`, control `TestRefusedConnectionObservers`, `TestRefusedConnectionBounds` | Oversize/malformed/truncated/canonical/schema errors remain fatal; silent/partial readers keep original admission deadline and hold no shared locks/slot; unknown kernel peer remains silent; work budgets and audit-failure override retained |
 | No helper signing path | `TestNativeHelperUnsupported` | Unsupported response, unchanged state, zero instrumented Sign calls and own-pubkey control |
 | UID and generation operator authority | `TestNativeOperatorGeneration`, assigned wrong-UID vectors | Configured tuple, no wire role switch |
 | Exact self pubkey and register schema | `TestNativePubkeySelectors`, `TestNativeRegisterGuards` | Selector/schema/UID-range/target evidence refusals leave state unchanged; own-key/valid registration controls |
@@ -77,12 +79,14 @@ or production signed-act qualification.
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` uses bounded Go overlays,
 never overwrites source, and requires a named assertion witness rather than a
 compile/setup failure. The ten existing K1a controls remain. The four original
-native controls plus three lifecycle controls and one concurrent replay control
-bring the wrapper to eighteen; wrapper exit 0 means every mutant's named test
+native controls plus three lifecycle controls, one concurrent replay control
+and one generation-admission control bring the wrapper to nineteen; wrapper
+exit 0 means every mutant's named test
 exited 1 with the intended witness.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
 | --- | --- | --- | --- |
+| `native-generation-admission-refusal` | Replace the one-frame refusal with the former silent close | `TestNativeGenerationAdmissionRefusal/generation_inactive/initial` | Killed; real single-UID socket must return the exact framed generation refusal instead of frame_truncated/zero bytes |
 | `native-replay-before-target-barrier` | Move the authoritative retained lookup outside the generation barrier, preserving Store synchronization and all authority predicates | `TestNativeConcurrentTargetReplay/same-id-retired`, `/same-id-reused` | Killed; the winner commits while the retry waits, and the still-current caller must recover its result after target retirement or reuse |
 | `native-operator` | Remove exact configured operator tuple check | `TestNativeVectors/register-wrong-uid/negative` | Killed; real kernel UID projected against a different configured operator; not live multi-UID qualification |
 | `native-persistent-revoke` | Remove persistent-as-ephemeral refusal | `TestNativeVectors/revoke-persistent-as-ephemeral/negative` | Killed; exact required code, not generic failure |
@@ -149,7 +153,8 @@ domain `registration/1`, no retained result change and continuing hello admissio
 
 Helper narrowing controls run with `go run ./tools/mutations/main.go -group helper
 -scratch "$SCRATCH"`. The seven selected plants fail a named behavioral assertion;
-setup/compilation errors do not count. The other mutation groups are unchanged.
+setup/compilation errors do not count. Helper controls are separate from the
+native and core groups above.
 
 | Mutant | Property narrowed to | Named failing test | Outcome |
 | --- | --- | --- | --- |

@@ -1,0 +1,151 @@
+{
+  "format": "keymaker-paths/1",
+  "seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "registry": {
+    "products": [
+      {
+        "name": "sample",
+        "index": 1,
+        "projects": [
+          {
+            "name": "core",
+            "index": 1,
+            "agents": [
+              {
+                "name": "station-a",
+                "index": 1
+              },
+              {
+                "name": "station-b",
+                "index": 2
+              }
+            ]
+          },
+          {
+            "name": "carrier",
+            "index": 2,
+            "agents": [
+              {
+                "name": "installation",
+                "index": 1
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "other",
+        "index": 2,
+        "projects": [
+          {
+            "name": "core",
+            "index": 1,
+            "agents": [
+              {
+                "name": "station-a",
+                "index": 1
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "vectors": [
+    {
+      "id": "identity-a",
+      "names": {
+        "purpose": "agent-identity",
+        "product": "sample",
+        "project": "core",
+        "agent": "station-a"
+      },
+      "path": "m/1'/1'/1'/1'",
+      "hardened_indices": [
+        2147483649,
+        2147483649,
+        2147483649,
+        2147483649
+      ],
+      "public_key_hex": "235885a73fee9784df0dcc49faa05adc0fb75a6d507d36739f119389c32fc051",
+      "chain_code_hex": "a93e9c905f283ff46898f6f007dd114b745f3a9a7010bede439ba7ea8803addc",
+      "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICNYhac/7peE3w3MSfqgWtwPt1ptUH02c58Rk4nDL8BR"
+    },
+    {
+      "id": "identity-b",
+      "names": {
+        "purpose": "agent-identity",
+        "product": "sample",
+        "project": "core",
+        "agent": "station-b"
+      },
+      "path": "m/1'/1'/1'/2'",
+      "hardened_indices": [
+        2147483649,
+        2147483649,
+        2147483649,
+        2147483650
+      ],
+      "public_key_hex": "e5b8675e8fd50b67d6411d25907201e991341c861f935a972d8a6429f5cc5460",
+      "chain_code_hex": "cde40ec5d7c9ec790b352c569d53133e61a4083d933503eb5076f4b9fd583b02",
+      "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOW4Z16P1Qtn1kEdJZByAemRNByGH5Naly2KZCn1zFRg"
+    },
+    {
+      "id": "host-registration",
+      "names": {
+        "purpose": "host-registration",
+        "product": "sample",
+        "project": "carrier",
+        "agent": "installation"
+      },
+      "path": "m/2'/1'/2'/1'",
+      "hardened_indices": [
+        2147483650,
+        2147483649,
+        2147483650,
+        2147483649
+      ],
+      "public_key_hex": "7b8cdac3a9e4778139795e1b9da23716f8579b2111221ca6dfa5055167d815ad",
+      "chain_code_hex": "e735221b2412e29a1baed503822079aeb98c294bac7bc3903e6a98113548f7b9",
+      "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHuM2sOp5HeBOXleG52iNxb4V5shESIcpt+lBVFn2BWt"
+    },
+    {
+      "id": "scoped-name",
+      "names": {
+        "purpose": "agent-identity",
+        "product": "other",
+        "project": "core",
+        "agent": "station-a"
+      },
+      "path": "m/1'/2'/1'/1'",
+      "hardened_indices": [
+        2147483649,
+        2147483650,
+        2147483649,
+        2147483649
+      ],
+      "public_key_hex": "73778d5dbbb048aff746bff04e411bba9da2a697c2cb4d97cd23561c86bc06cd",
+      "chain_code_hex": "509340e803e6531501784083b0765bcec3d6eba290e7adccdae1be0a9dbe4ee3",
+      "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHN3jV27sEiv90a/8E5BG7qdoqaXwstNl80jVhyGvAbN"
+    },
+    {
+      "id": "purpose-separation",
+      "names": {
+        "purpose": "host-registration",
+        "product": "sample",
+        "project": "core",
+        "agent": "station-a"
+      },
+      "path": "m/2'/1'/1'/1'",
+      "hardened_indices": [
+        2147483650,
+        2147483649,
+        2147483649,
+        2147483649
+      ],
+      "public_key_hex": "c6923bd08753e294704047bb7c942330f9bfdd3cd514bba6066eb23b905daf30",
+      "chain_code_hex": "57f6138a26dcddce55789afc93f45b5c33f8ea75a6c3cad1fe1bbc43f4b700b3",
+      "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMaSO9CHU+KUcEBHu3yUIzD5v9081RS7pgZusjuQXa8w"
+    }
+  ]
+}

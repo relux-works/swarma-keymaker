@@ -1,0 +1,2541 @@
+{
+  "format": "keymaker-refusals/1",
+  "note": "Negative-first candidate contract fixtures, not executed service tests. Kernel credentials, journal state and verifier verdicts are injected facts, never request credentials. Public test values only. Every positive differs in exactly mutation_path. No rejection may return signatures/private material or mutate bindings/enrollment; permitted audit records are the only effects.",
+  "negative": [
+    {
+      "id": "binding-wrong-uid",
+      "claim": "A kernel UID cannot operate a different UID binding.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30002,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "peer_binding_mismatch",
+      "positive_control": "ok-binding-wrong-uid",
+      "mutation_path": "/peer_uid"
+    },
+    {
+      "id": "binding-retired-generation",
+      "claim": "A retired account has no signing authority.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "removed",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "generation_inactive",
+      "positive_control": "ok-binding-retired-generation",
+      "mutation_path": "/generation_evidence/state"
+    },
+    {
+      "id": "binding-retiring-generation",
+      "claim": "Retirement closes admission before account removal.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "retiring",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "generation_inactive",
+      "positive_control": "ok-binding-retiring-generation",
+      "mutation_path": "/generation_evidence/state"
+    },
+    {
+      "id": "binding-reused-uid",
+      "claim": "A fresh generation cannot inherit the old numerical UID binding.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000002"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "generation_mismatch",
+      "positive_control": "ok-binding-reused-uid",
+      "mutation_path": "/generation_evidence/generation"
+    },
+    {
+      "id": "binding-source-unavailable",
+      "claim": "Missing generation evidence must not fall back to numeric UID.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": false,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "generation_source_unavailable",
+      "positive_control": "ok-binding-source-unavailable",
+      "mutation_path": "/generation_evidence/available"
+    },
+    {
+      "id": "connection-revoked-before_release",
+      "claim": "Open-connection work cannot release from a revoked binding.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "revoked",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "identity_revoked",
+      "positive_control": "ok-connection-revoked-before_release",
+      "mutation_path": "/binding/status"
+    },
+    {
+      "id": "connection-retired-before_release",
+      "claim": "Open connections cannot retain authority after retirement.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "retiring",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "generation_inactive",
+      "positive_control": "ok-connection-retired-before_release",
+      "mutation_path": "/generation_evidence/state"
+    },
+    {
+      "id": "connection-reused-before_release",
+      "claim": "A live connection cannot adopt a new incarnation.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000002"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_code": "generation_mismatch",
+      "positive_control": "ok-connection-reused-before_release",
+      "mutation_path": "/generation_evidence/generation"
+    },
+    {
+      "id": "connection-revoked-next_request",
+      "claim": "Open-connection work cannot release from a revoked binding.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "revoked",
+          "lifetime": "ephemeral"
+        },
+        "phase": "next_request"
+      },
+      "expected_code": "identity_revoked",
+      "positive_control": "ok-connection-revoked-next_request",
+      "mutation_path": "/binding/status"
+    },
+    {
+      "id": "connection-retired-next_request",
+      "claim": "Open connections cannot retain authority after retirement.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "retiring",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "next_request"
+      },
+      "expected_code": "generation_inactive",
+      "positive_control": "ok-connection-retired-next_request",
+      "mutation_path": "/generation_evidence/state"
+    },
+    {
+      "id": "connection-reused-next_request",
+      "claim": "A live connection cannot adopt a new incarnation.",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000002"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "next_request"
+      },
+      "expected_code": "generation_mismatch",
+      "positive_control": "ok-connection-reused-next_request",
+      "mutation_path": "/generation_evidence/generation"
+    },
+    {
+      "id": "derive-nonhardened",
+      "claim": "Every operational level must be hardened.",
+      "input": {
+        "evaluation": "derive_path",
+        "path": "m/1'/1'/1'/1",
+        "purpose": "agent-identity"
+      },
+      "expected_code": "path_not_hardened",
+      "positive_control": "ok-derive-nonhardened",
+      "mutation_path": "/path"
+    },
+    {
+      "id": "derive-unknown-purpose",
+      "claim": "Unknown purposes cannot become signing keys.",
+      "input": {
+        "evaluation": "derive_path",
+        "path": "m/1'/1'/1'/1'",
+        "purpose": "unknown-purpose"
+      },
+      "expected_code": "purpose_unknown",
+      "positive_control": "ok-derive-unknown-purpose",
+      "mutation_path": "/purpose"
+    },
+    {
+      "id": "derive-extra-level",
+      "claim": "An extra child level is outside the operational contract.",
+      "input": {
+        "evaluation": "derive_path",
+        "path": "m/1'/1'/1'/1'/1'",
+        "purpose": "agent-identity"
+      },
+      "expected_code": "path_invalid",
+      "positive_control": "ok-derive-extra-level",
+      "mutation_path": "/path"
+    },
+    {
+      "id": "ssh-raw-data",
+      "claim": "Raw bytes cannot be signed on the agent socket.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000004b0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000000b726177206d65737361676500000000",
+        "eof": true
+      },
+      "expected_code": "sign_data_not_sshsig",
+      "positive_control": "ok-ssh-raw-data",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-namespace",
+      "claim": "A different SSHSIG namespace is not an allowed Git signature.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000a00d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed000000605353485349470000000466696c65000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_code": "namespace_not_permitted",
+      "positive_control": "ok-ssh-namespace",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-userauth",
+      "claim": "An SSH authentication request is not a Git SSHSIG preimage.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000db0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000009b000000200000000000000000000000000000000000000000000000000000000000000000320000000c666978747572652d757365720000000e7373682d636f6e6e656374696f6e000000097075626c69636b6579010000000b7373682d65643235353139000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed00000000",
+        "eof": true
+      },
+      "expected_code": "sign_data_not_sshsig",
+      "positive_control": "ok-ssh-userauth",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-reserved",
+      "claim": "v0 has no nonempty SSHSIG reserved-field extension.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000a80d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed000000685353485349470000000367697400000009657874656e73696f6e0000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_code": "sshsig_malformed",
+      "positive_control": "ok-ssh-reserved",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-short-digest",
+      "claim": "Declared hash algorithm requires the matching digest size.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000007e0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000003e5353485349470000000367697400000000000000067368613531320000001f0000000000000000000000000000000000000000000000000000000000000000000000",
+        "eof": true
+      },
+      "expected_code": "sshsig_malformed",
+      "positive_control": "ok-ssh-short-digest",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-trailing",
+      "claim": "A valid SSHSIG prefix does not admit trailing signature input.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000a00d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000006053534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb631577800000000",
+        "eof": true
+      },
+      "expected_code": "sshsig_malformed",
+      "positive_control": "ok-ssh-trailing",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-flags",
+      "claim": "Ed25519 cannot inherit RSA or unknown sign flags.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000001",
+        "eof": true
+      },
+      "expected_code": "sign_flags_unsupported",
+      "positive_control": "ok-ssh-flags",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-foreign-key",
+      "claim": "An arbitrary public key does not select another identity.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d656432353531390000002000000000000000000000000000000000000000000000000000000000000000000000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_code": "sign_key_mismatch",
+      "positive_control": "ok-ssh-foreign-key",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-add-identity",
+      "claim": "Unsupported agent mutation cannot alter custody state.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000000111",
+        "eof": true
+      },
+      "expected_code": "agent_message_unsupported",
+      "positive_control": "ok-ssh-add-identity",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-remove-identity",
+      "claim": "Unsupported agent mutation cannot alter custody state.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000003812000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "eof": true
+      },
+      "expected_code": "agent_message_unsupported",
+      "positive_control": "ok-ssh-remove-identity",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-remove-all",
+      "claim": "Unsupported agent mutation cannot alter custody state.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000000113",
+        "eof": true
+      },
+      "expected_code": "agent_message_unsupported",
+      "positive_control": "ok-ssh-remove-all",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-lock",
+      "claim": "Unsupported agent mutation cannot alter custody state.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000000c160000000766697874757265",
+        "eof": true
+      },
+      "expected_code": "agent_message_unsupported",
+      "positive_control": "ok-ssh-lock",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-unlock",
+      "claim": "Unsupported agent mutation cannot alter custody state.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000000c170000000766697874757265",
+        "eof": true
+      },
+      "expected_code": "agent_message_unsupported",
+      "positive_control": "ok-ssh-unlock",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "ssh-add-constrained",
+      "claim": "Unsupported agent mutation cannot alter custody state.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000000119",
+        "eof": true
+      },
+      "expected_code": "agent_message_unsupported",
+      "positive_control": "ok-ssh-add-constrained",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "domain-registration-on-agent",
+      "claim": "Registration preimages cannot be signed as SSHSIG.",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000790d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed00000039737761726d612d72656769737472617220726567697374726174696f6e2f310a7b2274797065223a22726567697374726174696f6e2f31227d00000000",
+        "eof": true
+      },
+      "expected_code": "sign_data_not_sshsig",
+      "positive_control": "ok-domain-registration-on-agent",
+      "mutation_path": "/frame_hex",
+      "expected_wire_hex": "0000000105"
+    },
+    {
+      "id": "native-oversize",
+      "claim": "An over-cap length is rejected from its header before reading a body.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "00010001",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "frame_too_large",
+      "positive_control": "ok-native-oversize",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-truncated",
+      "claim": "EOF after an incomplete frame is a precise truncation refusal.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "frame_truncated",
+      "positive_control": "ok-native-truncated",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-zero-length",
+      "claim": "Zero length cannot be an empty successful object.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "00000000",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "frame_malformed",
+      "positive_control": "ok-native-zero-length",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-noncanonical",
+      "claim": "Semantically valid JSON with extra whitespace is noncanonical.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000567b226d6574686f64223a202268656c6c6f222c2022726571756573745f6964223a20223030303030303030303030303030303030303030303030303030303030303031222c202276657273696f6e73223a205b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "ccj_noncanonical",
+      "positive_control": "ok-native-noncanonical",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-duplicate-key",
+      "claim": "Duplicate JSON object members refuse before map decoding.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000627b226d6574686f64223a2268656c6c6f222c226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "ccj_noncanonical",
+      "positive_control": "ok-native-duplicate-key",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-negative-zero",
+      "claim": "Negative zero must not normalise into an allowed version.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000527b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b2d305d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "ccj_noncanonical",
+      "positive_control": "ok-native-negative-zero",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-float",
+      "claim": "Floating-point spelling is outside CCJ-1.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000537b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b312e305d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "ccj_noncanonical",
+      "positive_control": "ok-native-float",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-unsafe-integer",
+      "claim": "Unsafe integers cannot silently round.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000607b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b393030373139393235343734303939325d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "ccj_noncanonical",
+      "positive_control": "ok-native-unsafe-integer",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-invalid-unicode",
+      "claim": "Invalid UTF-8 is not repaired into canonical bytes.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6cff222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "ccj_noncanonical",
+      "positive_control": "ok-native-invalid-unicode",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-unknown-version",
+      "claim": "Version negotiation cannot accept an unimplemented version.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b325d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "version_unsupported",
+      "positive_control": "ok-native-unknown-version",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "native-claimed-uid",
+      "claim": "A request member cannot become caller credentials.",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "0000005d7b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c22756964223a33303030312c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_code": "request_malformed",
+      "positive_control": "ok-native-claimed-uid",
+      "mutation_path": "/frame_hex"
+    },
+    {
+      "id": "register-wrong-uid",
+      "claim": "Station callers cannot register identity bindings.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "peer_generation": "00000000000000000000000000000001",
+        "operator_uid": 900,
+        "operator_generation": "00000000000000000000000000000001",
+        "request": {
+          "method": "register",
+          "params": {
+            "target_uid": 30001,
+            "target_generation": "00000000000000000000000000000001",
+            "owner": "fixture-owner",
+            "names": {
+              "purpose": "agent-identity",
+              "product": "sample",
+              "project": "core",
+              "agent": "station-a"
+            },
+            "lifetime": "ephemeral"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "target_state": "active",
+        "target_binding": "absent"
+      },
+      "expected_code": "role_not_permitted",
+      "positive_control": "ok-register-wrong-uid",
+      "mutation_path": "/peer_uid"
+    },
+    {
+      "id": "revoke-wrong-uid",
+      "claim": "A non-operator cannot revoke a persistent identity.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "operator_uid": 900,
+        "operator_record_verdict": "valid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "role_not_permitted",
+      "positive_control": "ok-revoke-wrong-uid",
+      "mutation_path": "/peer_uid"
+    },
+    {
+      "id": "revoke-persistent-as-ephemeral",
+      "claim": "Even its registrant cannot relabel persistent revocation as cleanup.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "valid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "ephemeral",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "persistent_revoke_requires_operator",
+      "positive_control": "ok-revoke-persistent-as-ephemeral",
+      "mutation_path": "/request/params/mode"
+    },
+    {
+      "id": "revoke-no-act-verifier",
+      "claim": "UID authority cannot substitute for the absent signed-act verifier.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "unavailable",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "operator_record_unavailable",
+      "positive_control": "ok-revoke-no-act-verifier",
+      "mutation_path": "/operator_record_verdict"
+    },
+    {
+      "id": "revoke-invalid-act",
+      "claim": "Altered or untrusted signed records cannot authorise revocation.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "invalid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "operator_record_invalid",
+      "positive_control": "ok-revoke-invalid-act",
+      "mutation_path": "/operator_record_verdict"
+    },
+    {
+      "id": "helper-uid-absent",
+      "claim": "Group access cannot authorise a UID absent from uid_map.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30002,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "uid_not_permitted",
+      "positive_control": "ok-helper-uid-absent",
+      "mutation_path": "/peer_uid"
+    },
+    {
+      "id": "helper-name-not-mapped",
+      "claim": "A caller can sign only names explicitly permitted for its UID.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_other"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "name_not_permitted",
+      "positive_control": "ok-helper-name-not-mapped",
+      "mutation_path": "/enrollment/uid_map/30001"
+    },
+    {
+      "id": "helper-wrong-audience",
+      "claim": "The client cannot retarget registration to another server.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "other.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "audience_mismatch",
+      "positive_control": "ok-helper-wrong-audience",
+      "mutation_path": "/request/params/aud"
+    },
+    {
+      "id": "helper-enrollment-missing",
+      "claim": "Missing enrollment is not group-only permission.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": false,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "enrollment_unavailable",
+      "positive_control": "ok-helper-enrollment-missing",
+      "mutation_path": "/enrollment/available"
+    },
+    {
+      "id": "helper-enrollment-unverified",
+      "claim": "Unverified enrollment cannot authorise a host key.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": false,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "enrollment_unverified",
+      "positive_control": "ok-helper-enrollment-unverified",
+      "mutation_path": "/enrollment/verified"
+    },
+    {
+      "id": "helper-enrollment-revoked",
+      "claim": "Revoked enrollment cannot mint fresh login evidence.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "revoked",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "host_revoked",
+      "positive_control": "ok-helper-enrollment-revoked",
+      "mutation_path": "/enrollment/state"
+    },
+    {
+      "id": "helper-map-required",
+      "claim": "There is no legacy mode with an absent uid_map.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": null,
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "uid_map_required",
+      "positive_control": "ok-helper-map-required",
+      "mutation_path": "/enrollment/uid_map"
+    },
+    {
+      "id": "helper-key-unenrolled",
+      "claim": "A derived host key must still be in enrolled keys.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": false
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "key_not_enrolled",
+      "positive_control": "ok-helper-key-unenrolled",
+      "mutation_path": "/enrollment/key_enrolled"
+    },
+    {
+      "id": "helper-reused-uid",
+      "claim": "An old uid_map must not auto-admit a recycled UID generation.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000002",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "generation_mismatch",
+      "positive_control": "ok-helper-reused-uid",
+      "mutation_path": "/generation"
+    },
+    {
+      "id": "domain-native-sign",
+      "claim": "Native control cannot expose arbitrary byte signing.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "sign",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "operation_unsupported",
+      "positive_control": "ok-domain-native-sign",
+      "mutation_path": "/request/method"
+    },
+    {
+      "id": "domain-decrypt-deferred",
+      "claim": "A deferred operation cannot be silently enabled.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "decrypt",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "operation_unsupported",
+      "positive_control": "ok-domain-decrypt-deferred",
+      "mutation_path": "/request/method"
+    },
+    {
+      "id": "no-material-private_key",
+      "claim": "A caller cannot request key reconstruction material on any public-key path.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {
+            "private_key": true
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "request_malformed",
+      "positive_control": "ok-no-material-private_key",
+      "mutation_path": "/request/params/private_key"
+    },
+    {
+      "id": "no-material-chain_code",
+      "claim": "A caller cannot request key reconstruction material on any public-key path.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {
+            "chain_code": true
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "request_malformed",
+      "positive_control": "ok-no-material-chain_code",
+      "mutation_path": "/request/params/chain_code"
+    },
+    {
+      "id": "no-material-extended_private_key",
+      "claim": "A caller cannot request key reconstruction material on any public-key path.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {
+            "extended_private_key": true
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "request_malformed",
+      "positive_control": "ok-no-material-extended_private_key",
+      "mutation_path": "/request/params/extended_private_key"
+    },
+    {
+      "id": "no-material-parent_seed",
+      "claim": "A caller cannot request key reconstruction material on any public-key path.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {
+            "parent_seed": true
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "request_malformed",
+      "positive_control": "ok-no-material-parent_seed",
+      "mutation_path": "/request/params/parent_seed"
+    },
+    {
+      "id": "no-material-sibling_seed",
+      "claim": "A caller cannot request key reconstruction material on any public-key path.",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {
+            "sibling_seed": true
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_code": "request_malformed",
+      "positive_control": "ok-no-material-sibling_seed",
+      "mutation_path": "/request/params/sibling_seed"
+    },
+    {
+      "id": "audit-append-failure",
+      "claim": "No signature may be released when audit append fails.",
+      "input": {
+        "evaluation": "audit_release",
+        "operation": "sign",
+        "audit_writable": false,
+        "audit_sync_ok": true,
+        "binding_status": "active"
+      },
+      "expected_code": "audit_unavailable",
+      "positive_control": "ok-audit-append-failure",
+      "mutation_path": "/audit_writable"
+    },
+    {
+      "id": "audit-sync-failure",
+      "claim": "A buffered audit write is insufficient to release a signature.",
+      "input": {
+        "evaluation": "audit_release",
+        "operation": "sign",
+        "audit_writable": true,
+        "audit_sync_ok": false,
+        "binding_status": "active"
+      },
+      "expected_code": "audit_unavailable",
+      "positive_control": "ok-audit-sync-failure",
+      "mutation_path": "/audit_sync_ok"
+    }
+  ],
+  "positive": [
+    {
+      "id": "ok-binding-wrong-uid",
+      "claim": "own binding authorised",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "own binding authorised"
+    },
+    {
+      "id": "ok-binding-retired-generation",
+      "claim": "active generation authorised",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "active generation authorised"
+    },
+    {
+      "id": "ok-binding-retiring-generation",
+      "claim": "active generation authorised",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "active generation authorised"
+    },
+    {
+      "id": "ok-binding-reused-uid",
+      "claim": "matching generation authorised",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "matching generation authorised"
+    },
+    {
+      "id": "ok-binding-source-unavailable",
+      "claim": "available active evidence authorised",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "available active evidence authorised"
+    },
+    {
+      "id": "ok-connection-revoked-before_release",
+      "claim": "active binding permits before_release",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "active binding permits before_release"
+    },
+    {
+      "id": "ok-connection-retired-before_release",
+      "claim": "active generation permits before_release",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "active generation permits before_release"
+    },
+    {
+      "id": "ok-connection-reused-before_release",
+      "claim": "unchanged generation permits before_release",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "before_release"
+      },
+      "expected_result": "unchanged generation permits before_release"
+    },
+    {
+      "id": "ok-connection-revoked-next_request",
+      "claim": "active binding permits next_request",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "next_request"
+      },
+      "expected_result": "active binding permits next_request"
+    },
+    {
+      "id": "ok-connection-retired-next_request",
+      "claim": "active generation permits next_request",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "next_request"
+      },
+      "expected_result": "active generation permits next_request"
+    },
+    {
+      "id": "ok-connection-reused-next_request",
+      "claim": "unchanged generation permits next_request",
+      "input": {
+        "evaluation": "binding_authorize",
+        "peer_uid": 30001,
+        "connection_generation": "00000000000000000000000000000001",
+        "generation_evidence": {
+          "available": true,
+          "state": "active",
+          "generation": "00000000000000000000000000000001"
+        },
+        "binding": {
+          "uid": 30001,
+          "generation": "00000000000000000000000000000001",
+          "path": "m/1'/1'/1'/1'",
+          "status": "active",
+          "lifetime": "ephemeral"
+        },
+        "phase": "next_request"
+      },
+      "expected_result": "unchanged generation permits next_request"
+    },
+    {
+      "id": "ok-derive-nonhardened",
+      "claim": "four hardened identity levels derive",
+      "input": {
+        "evaluation": "derive_path",
+        "path": "m/1'/1'/1'/1'",
+        "purpose": "agent-identity"
+      },
+      "expected_result": "four hardened identity levels derive"
+    },
+    {
+      "id": "ok-derive-unknown-purpose",
+      "claim": "known identity purpose derives",
+      "input": {
+        "evaluation": "derive_path",
+        "path": "m/1'/1'/1'/1'",
+        "purpose": "agent-identity"
+      },
+      "expected_result": "known identity purpose derives"
+    },
+    {
+      "id": "ok-derive-extra-level",
+      "claim": "exactly four levels derive",
+      "input": {
+        "evaluation": "derive_path",
+        "path": "m/1'/1'/1'/1'",
+        "purpose": "agent-identity"
+      },
+      "expected_result": "exactly four levels derive"
+    },
+    {
+      "id": "ok-ssh-raw-data",
+      "claim": "valid git SSHSIG preimage signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "valid git SSHSIG preimage signed"
+    },
+    {
+      "id": "ok-ssh-namespace",
+      "claim": "git namespace signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "git namespace signed"
+    },
+    {
+      "id": "ok-ssh-userauth",
+      "claim": "git SSHSIG preimage signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "git SSHSIG preimage signed"
+    },
+    {
+      "id": "ok-ssh-reserved",
+      "claim": "empty reserved field signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "empty reserved field signed"
+    },
+    {
+      "id": "ok-ssh-short-digest",
+      "claim": "sha512 digest of 64 bytes signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "sha512 digest of 64 bytes signed"
+    },
+    {
+      "id": "ok-ssh-trailing",
+      "claim": "exactly consumed SSHSIG signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "exactly consumed SSHSIG signed"
+    },
+    {
+      "id": "ok-ssh-flags",
+      "claim": "zero Ed25519 flags signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "zero Ed25519 flags signed"
+    },
+    {
+      "id": "ok-ssh-foreign-key",
+      "claim": "own bound key signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "own bound key signed"
+    },
+    {
+      "id": "ok-ssh-add-identity",
+      "claim": "REQUEST_IDENTITIES returns exactly own public key",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000010b",
+        "eof": true
+      },
+      "expected_result": "REQUEST_IDENTITIES returns exactly own public key"
+    },
+    {
+      "id": "ok-ssh-remove-identity",
+      "claim": "REQUEST_IDENTITIES returns exactly own public key",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000010b",
+        "eof": true
+      },
+      "expected_result": "REQUEST_IDENTITIES returns exactly own public key"
+    },
+    {
+      "id": "ok-ssh-remove-all",
+      "claim": "REQUEST_IDENTITIES returns exactly own public key",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000010b",
+        "eof": true
+      },
+      "expected_result": "REQUEST_IDENTITIES returns exactly own public key"
+    },
+    {
+      "id": "ok-ssh-lock",
+      "claim": "REQUEST_IDENTITIES returns exactly own public key",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000010b",
+        "eof": true
+      },
+      "expected_result": "REQUEST_IDENTITIES returns exactly own public key"
+    },
+    {
+      "id": "ok-ssh-unlock",
+      "claim": "REQUEST_IDENTITIES returns exactly own public key",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000010b",
+        "eof": true
+      },
+      "expected_result": "REQUEST_IDENTITIES returns exactly own public key"
+    },
+    {
+      "id": "ok-ssh-add-constrained",
+      "claim": "REQUEST_IDENTITIES returns exactly own public key",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "000000010b",
+        "eof": true
+      },
+      "expected_result": "REQUEST_IDENTITIES returns exactly own public key"
+    },
+    {
+      "id": "ok-domain-registration-on-agent",
+      "claim": "Git domain preimage signed",
+      "input": {
+        "evaluation": "ssh_agent",
+        "peer_uid": 30001,
+        "binding_public_key_hex": "a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed",
+        "binding_status": "active",
+        "frame_hex": "0000009f0d000000330000000b7373682d6564323535313900000020a4b2856bfec510abab89753fac1ac0e1112364e7d250545963f135f2a33188ed0000005f53534853494700000003676974000000000000000673686135313200000040c968167d0a59001db0134a2562f414fa2ed12a5e2036724797927d105019a49ecf27dc3175022ee36de3d57e8abbc6d9687dd0ff80c57333e94b8232aeb6315700000000",
+        "eof": true
+      },
+      "expected_result": "Git domain preimage signed"
+    },
+    {
+      "id": "ok-native-oversize",
+      "claim": "bounded canonical hello accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "bounded canonical hello accepted"
+    },
+    {
+      "id": "ok-native-truncated",
+      "claim": "complete hello frame accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "complete hello frame accepted"
+    },
+    {
+      "id": "ok-native-zero-length",
+      "claim": "nonempty canonical hello accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "nonempty canonical hello accepted"
+    },
+    {
+      "id": "ok-native-noncanonical",
+      "claim": "canonical hello bytes accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "canonical hello bytes accepted"
+    },
+    {
+      "id": "ok-native-duplicate-key",
+      "claim": "single canonical method member accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "single canonical method member accepted"
+    },
+    {
+      "id": "ok-native-negative-zero",
+      "claim": "canonical integer version accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "canonical integer version accepted"
+    },
+    {
+      "id": "ok-native-float",
+      "claim": "canonical integer version accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "canonical integer version accepted"
+    },
+    {
+      "id": "ok-native-unsafe-integer",
+      "claim": "safe integer version accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "safe integer version accepted"
+    },
+    {
+      "id": "ok-native-invalid-unicode",
+      "claim": "valid UTF-8 hello accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "valid UTF-8 hello accepted"
+    },
+    {
+      "id": "ok-native-unknown-version",
+      "claim": "version 1 negotiated",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "version 1 negotiated"
+    },
+    {
+      "id": "ok-native-claimed-uid",
+      "claim": "hello without claimed UID accepted",
+      "input": {
+        "evaluation": "native_framing",
+        "surface": "control",
+        "frame_hex": "000000517b226d6574686f64223a2268656c6c6f222c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c2276657273696f6e73223a5b315d7d",
+        "eof": true,
+        "negotiated": false
+      },
+      "expected_result": "hello without claimed UID accepted"
+    },
+    {
+      "id": "ok-register-wrong-uid",
+      "claim": "configured operator registers active target",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "peer_generation": "00000000000000000000000000000001",
+        "operator_uid": 900,
+        "operator_generation": "00000000000000000000000000000001",
+        "request": {
+          "method": "register",
+          "params": {
+            "target_uid": 30001,
+            "target_generation": "00000000000000000000000000000001",
+            "owner": "fixture-owner",
+            "names": {
+              "purpose": "agent-identity",
+              "product": "sample",
+              "project": "core",
+              "agent": "station-a"
+            },
+            "lifetime": "ephemeral"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "target_state": "active",
+        "target_binding": "absent"
+      },
+      "expected_result": "configured operator registers active target"
+    },
+    {
+      "id": "ok-revoke-wrong-uid",
+      "claim": "operator and verified exact act revoke persistent identity",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "valid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "operator and verified exact act revoke persistent identity"
+    },
+    {
+      "id": "ok-revoke-persistent-as-ephemeral",
+      "claim": "operator mode and verified act revoke persistent identity",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "valid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "operator mode and verified act revoke persistent identity"
+    },
+    {
+      "id": "ok-revoke-no-act-verifier",
+      "claim": "verified exact act authorises persistent revoke",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "valid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "verified exact act authorises persistent revoke"
+    },
+    {
+      "id": "ok-revoke-invalid-act",
+      "claim": "valid exact signed record authorises revoke",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 900,
+        "operator_uid": 900,
+        "operator_record_verdict": "valid",
+        "binding_lifetime": "persistent",
+        "request": {
+          "method": "revoke",
+          "params": {
+            "registration_number": 1,
+            "mode": "operator",
+            "operator_record": {
+              "fixture": "verified-act-interface-only"
+            }
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "valid exact signed record authorises revoke"
+    },
+    {
+      "id": "ok-helper-uid-absent",
+      "claim": "mapped UID obtains registration envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "mapped UID obtains registration envelope"
+    },
+    {
+      "id": "ok-helper-name-not-mapped",
+      "claim": "name mapped to caller obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "name mapped to caller obtains envelope"
+    },
+    {
+      "id": "ok-helper-wrong-audience",
+      "claim": "configured audience obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "configured audience obtains envelope"
+    },
+    {
+      "id": "ok-helper-enrollment-missing",
+      "claim": "available pinned enrollment obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "available pinned enrollment obtains envelope"
+    },
+    {
+      "id": "ok-helper-enrollment-unverified",
+      "claim": "verified pinned enrollment obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "verified pinned enrollment obtains envelope"
+    },
+    {
+      "id": "ok-helper-enrollment-revoked",
+      "claim": "active enrollment obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "active enrollment obtains envelope"
+    },
+    {
+      "id": "ok-helper-map-required",
+      "claim": "required uid_map authorises own name",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "required uid_map authorises own name"
+    },
+    {
+      "id": "ok-helper-key-unenrolled",
+      "claim": "enrolled host key obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "enrolled host key obtains envelope"
+    },
+    {
+      "id": "ok-helper-reused-uid",
+      "claim": "explicitly admitted generation obtains envelope",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": {
+            "30001": [
+              "sample_core_worker"
+            ]
+          },
+          "names": [
+            "sample_core_worker"
+          ],
+          "key_enrolled": true
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "explicitly admitted generation obtains envelope"
+    },
+    {
+      "id": "ok-domain-native-sign",
+      "claim": "self public-key lookup succeeds",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "self public-key lookup succeeds"
+    },
+    {
+      "id": "ok-domain-decrypt-deferred",
+      "claim": "implemented public-key lookup succeeds",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "implemented public-key lookup succeeds"
+    },
+    {
+      "id": "ok-no-material-private_key",
+      "claim": "public metadata only; no reconstructive secret material",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "public metadata only; no reconstructive secret material"
+    },
+    {
+      "id": "ok-no-material-chain_code",
+      "claim": "public metadata only; no reconstructive secret material",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "public metadata only; no reconstructive secret material"
+    },
+    {
+      "id": "ok-no-material-extended_private_key",
+      "claim": "public metadata only; no reconstructive secret material",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "public metadata only; no reconstructive secret material"
+    },
+    {
+      "id": "ok-no-material-parent_seed",
+      "claim": "public metadata only; no reconstructive secret material",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "public metadata only; no reconstructive secret material"
+    },
+    {
+      "id": "ok-no-material-sibling_seed",
+      "claim": "public metadata only; no reconstructive secret material",
+      "input": {
+        "evaluation": "native_method",
+        "surface": "control",
+        "peer_uid": 30001,
+        "request": {
+          "method": "pubkey",
+          "params": {},
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        }
+      },
+      "expected_result": "public metadata only; no reconstructive secret material"
+    },
+    {
+      "id": "ok-audit-append-failure",
+      "claim": "durable audit permits signature release",
+      "input": {
+        "evaluation": "audit_release",
+        "operation": "sign",
+        "audit_writable": true,
+        "audit_sync_ok": true,
+        "binding_status": "active"
+      },
+      "expected_result": "durable audit permits signature release"
+    },
+    {
+      "id": "ok-audit-sync-failure",
+      "claim": "synced audit permits signature release",
+      "input": {
+        "evaluation": "audit_release",
+        "operation": "sign",
+        "audit_writable": true,
+        "audit_sync_ok": true,
+        "binding_status": "active"
+      },
+      "expected_result": "synced audit permits signature release"
+    }
+  ]
+}

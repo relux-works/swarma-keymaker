@@ -11,5 +11,15 @@
   "operator_principal": {
     "uid": 0,
     "generation": "REPLACE_WITH_OPERATOR_GENERATION"
+  },
+  "registration_helper": {
+    "names": {
+      "purpose": "host-registration",
+      "product": "example",
+      "project": "project",
+      "agent": "agent"
+    },
+    "enrollment_config": "/etc/swarma-keymaker/enrollment-pins.json",
+    "approval_file": "/etc/swarma-keymaker/enrollment-approval.json"
   }
 }

@@ -93,3 +93,73 @@ func TestPackagingConfigSemantics(t *testing.T) {
 		}
 	}
 }
+
+// The example's optional helper uses main's exact nested schema through the
+// single serve/offline decoder. Omission disables it; malformed authority
+// objects refuse before any file access. Registry resolution/readiness is not
+// established by this byte-only configuration test.
+func TestPackagingRegistrationHelper(t *testing.T) {
+	raw, err := os.ReadFile("../../packaging/config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"omitted", "null", "wrong-type", "missing-names", "missing-enrollment", "missing-approval", "missing-purpose", "unknown-helper", "unknown-name", "wrong-name-type"} {
+		t.Run(kind, func(t *testing.T) {
+			var fields map[string]any
+			if err := json.Unmarshal(raw, &fields); err != nil {
+				t.Fatal(err)
+			}
+			helper, ok := fields["registration_helper"].(map[string]any)
+			if !ok {
+				t.Fatal("example missing helper schema")
+			}
+			names := helper["names"].(map[string]any)
+			switch kind {
+			case "omitted":
+				delete(fields, "registration_helper")
+			case "null":
+				fields["registration_helper"] = nil
+			case "wrong-type":
+				fields["registration_helper"] = true
+			case "missing-names":
+				delete(helper, "names")
+			case "missing-enrollment":
+				delete(helper, "enrollment_config")
+			case "missing-approval":
+				delete(helper, "approval_file")
+			case "missing-purpose":
+				delete(names, "purpose")
+			case "unknown-helper":
+				helper["caller_key"] = "forbidden"
+			case "unknown-name":
+				names["path"] = "forbidden"
+			case "wrong-name-type":
+				names["agent"] = false
+			}
+			changed, err := json.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg, offline := ParseConfig(bytes.NewReader(changed))
+			var served productionConfig
+			online := StrictJSON(bytes.NewReader(changed), &served)
+			if kind == "omitted" {
+				if offline != nil || online != nil || cfg.Registration != nil || served.Registration != nil {
+					t.Fatal("helper omission control refused", offline, online)
+				}
+			} else if offline == nil || online == nil {
+				t.Fatal("malformed optional helper admitted", kind, offline, online)
+			}
+			cfg, err = ParseConfig(bytes.NewReader(raw))
+			if err != nil {
+				t.Fatal("helper example control refused", err)
+			}
+			if err := StrictJSON(bytes.NewReader(raw), &served); err != nil {
+				t.Fatal("served helper example refused", err)
+			}
+			if cfg.Registration == nil || served.Registration == nil || cfg.Registration.Names.Purpose != "host-registration" || cfg.Registration.EnrollmentConfig == "" || cfg.Registration.ApprovalFile == "" {
+				t.Fatal("helper example lost required members")
+			}
+		})
+	}
+}

@@ -7,7 +7,8 @@ The release tool checks the unit and specification from the requested commit.
 removals, reordering and changed settings. Packaging adds no unit settings.
 
 `config.example.json` uses the actual daemon Config decoder, also exposed as
-`keymaker.ParseConfig` for offline use. Every member below is required; unknown,
+`keymaker.ParseConfig` for offline use. The base members below are required; `registration_helper`
+is optional, and every member within a supplied helper is required. Unknown,
 missing, null and incorrectly typed members refuse. Duplicate members and trailing
 JSON refuse. Parsing does not inspect installation paths or establish ownership,
 account membership, state recovery or service readiness.
@@ -24,6 +25,7 @@ account membership, state recovery or service readiness.
 | operator_principal | object with uint32 uid and string generation | Complete operator UID/generation authority tuple; replace both placeholders. |
 | master_epoch | nonempty string | Operator-pinned master epoch; replace the example text. |
 | registry_revision | nonempty string | Operator-pinned registry revision; replace the example text. |
+| registration_helper | optional object | `names` contains exactly string purpose/product/project/agent; `enrollment_config` and `approval_file` are string paths for protected enrollment inputs. The example uses purpose `host-registration`; remove the whole object to disable the helper. |
 
 Use an operator-supplied configuration, not an unchanged example. The allocator
 in section 12.1 owns the numeric IDs; the offline parser accepts zero placeholders
@@ -128,8 +130,11 @@ runbook's enrollment copy; omission does not qualify that step.
 
 `control_gid` and `operator_principal` use the landed native-control schema.
 Socket mode is fixed at 0660 in the daemon, not a configurable member. Enrollment
-pins use a separate configuration selected by the enrollment command's `--config`;
-the serve configuration has no enrollment path member.
+pins use a separate configuration selected by the enrollment command's `--config`.
+The optional serve `registration_helper` selects protected enrollment pins and
+independent approval with its `enrollment_config` and `approval_file` members.
+Those paths are parsed offline, not opened or reconciled by bundle assembly;
+`-enrollment` still explicitly supplies the validated bytes to bundle.
 
 The generation adapter and signed operator verifier remain activation gates.
 Section 12.1 also needs owner reconciliation with the dedicated `state_dir`

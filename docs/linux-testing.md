@@ -139,8 +139,25 @@ boolean supplies authority. Production always supplies nil and refuses
 persistent operator revocation. `sign_registration` is unsupported and an
 instrumented Signer observes zero signing calls beside a valid pubkey control.
 
-Control peer identity and generation are checked at hello and every request.
-Hello needs no binding. The configured operator tuple gates all mutations.
+Control admission passes the validated accept-time UID/generation to
+`ServeConnAccepted`; the wire loop compares every identified tuple before ID
+admission, including the first hello. Delayed notifications cannot authorize
+adoption of a new generation. `TestNativeAcceptTupleBeforeHello` pairs a changed
+incarnation with unchanged and fresh-connection controls; the changed socket
+retains no hello ID. `TestAcceptedTupleBeforeHello` also checks changed UID and
+missing accepted generation at the transport boundary.
+
+Hello needs no binding. The first self `pubkey` pins its registration number
+and atomically subscribes to that binding's revocation/unbind while holding the
+Store lock. Revocation closes idle sockets; synchronous request, transaction
+and release checks reject an obsolete pin even if notification lags. The binding
+may be replaced only on a fresh connection. `TestNativeConnectionBindingPin`
+performs real revoke/re-register requests and preserves the fresh-connection
+control. `TestNativeHelloDoesNotPinBinding` shows that hello-only sockets can
+first use a later registered self binding, then close on its revocation.
+An operator using only hello and mutations has no station binding requirement;
+mutation targets do not pin its self identity. Its first self pubkey does.
+The configured operator tuple gates all mutations.
 Register and ephemeral cleanup use `GenerationSource.WithEvidence` to hold
 caller and target generation evidence under one retirement barrier; this avoids
 nested authority lookups or check/write races. Cleanup requires that exact target
@@ -148,9 +165,22 @@ to be retiring/removed and the operator to be the original registrar. A future
 authoritative adapter must implement that multi-principal ordering contract,
 as well as `WithActive`; the unavailable adapter grants neither.
 
-Success release, including hello, occurs inside `WithActive`, the final Store
-checks and durable audit. `TestNativeReleaseFence` covers hello and pubkey in
-both orderings. Its watch notification is deliberately delayed to isolate the
+Hello and self-read success release occurs inside `WithActive`, final Store
+checks and durable audit. Each mutation uses one `WithEvidence` release barrier
+with the exact predicates carried from its fresh effect: active caller and
+active register target, or exact retired target for ephemeral cleanup. Signed-act
+operator revoke requires the caller predicate and verified act for its specific
+binding, without inventing an active-target requirement. Exact historical
+replays use current caller authority and their retained original result; they
+never re-execute the effect or carry a stale fresh-target predicate.
+`TestNativeMutationReleasePrincipals` checks caller retirement, target retirement
+and target reuse before the actual write; `TestNativeMutationReleaseWins` checks
+both principals and the identical-principal case with the write already inside
+the barrier. `TestNativeEphemeralReleaseEvidence` covers retired target reuse,
+and `TestNativeMutationHistoricalRelease` keeps same-connection historical
+retry semantics beside a rejected new ID. A committed effect remains durably
+recoverable if its first response loses the release race. `TestNativeReleaseFence`
+covers hello and pubkey in both orderings. Its watch notification is deliberately delayed to isolate the
 actual final barrier from the independent idle closer; authority still changes
 before the retirement-wins barrier. These controlled orderings do not qualify
 cross-process journal ordering.
@@ -301,7 +331,7 @@ cannot detect malicious rollback or rewriting without an independent checkpoint.
 
 The brief supplies vector rows and scope clauses, but no separate attack-surface
 catalog table. The coverage document maps every vector, declares deferred helper rows, and
-records fourteen narrowing mutants; it does not claim a killed mutant
+records seventeen narrowing mutants; it does not claim a killed mutant
 for every implementation surface. Existing committed wire/core reviewer tests are retained under their original
 names; the narrow validation does not substitute for the reviewer's full suite. Existing vector and specification tooling remains unchanged.
 

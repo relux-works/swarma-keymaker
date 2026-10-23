@@ -54,6 +54,9 @@ or production signed-act qualification.
 | Exact self pubkey and register schema | `TestNativePubkeySelectors`, `TestNativeRegisterGuards` | Selector/schema/UID-range/target evidence refusals leave state unchanged; own-key/valid registration controls |
 | Ephemeral retirement | `TestNativeEphemeralRetirement`, `TestNativeOriginalRegistrar` | Active/replaced targets and changed registrar refuse; exact retiring/removed target plus original registrar admits cleanup |
 | Actual write barrier | `TestNativeReleaseFence/{hello,pubkey}/{retirement-wins,release-wins}` | Delayed notification isolates final authority barrier; retirement-wins has no success or retained result; release-wins orders write first |
+| Mutation release evidence | `TestNativeMutationReleasePrincipals`, `TestNativeMutationReleaseWins`, `TestNativeEphemeralReleaseEvidence`, `TestNativeMutationHistoricalRelease` | First release retains caller/target predicates in one barrier; both orderings and target reuse; historical replay remains caller-authorized |
+| Accepted tuple before hello | `TestNativeAcceptTupleBeforeHello`, `TestAcceptedTupleBeforeHello` | Delayed notification cannot admit a replacement generation or retain its hello ID; unchanged and fresh-connection controls |
+| First self binding on connection | `TestNativeConnectionBindingPin`, `TestNativeHelloDoesNotPinBinding` | Real revoke/re-registration cannot be adopted by the old socket; fresh socket admits; idle pinned socket closes; hello/operator mutations do not select a self binding |
 | Safe socket publication | `TestNativeSocketPermissions` | Invalid group/existing file/symlink/stage refuse; intact exact 0660/UID/GID; existing evidence preserved |
 | Shared work/rate and health | `TestNativeSharedConnectionBudget`, `TestNativeSharedWorkBudget`, `TestNativeSharedRateBudget`, `TestNativeAuditClosesBothSurfaces` | Mixed sockets share the eight-per-UID cap; saturated slots/rate refuse on both listeners; restored credit admits; sync fault closes both without success |
 | Audit reserve | `TestNativeAuditReserve` | Control/refusal evidence can use the reserved tail; ordinary agent success cannot; small writer budget, not journal load qualification |
@@ -70,8 +73,8 @@ or production signed-act qualification.
 
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` uses bounded Go overlays,
 never overwrites source, and requires a named assertion witness rather than a
-compile/setup failure. The ten existing K1a controls remain. These four added
-controls bring the wrapper to fourteen; wrapper exit 0 means every mutant's
+compile/setup failure. The ten existing K1a controls remain. The four original
+native controls plus three lifecycle controls bring the wrapper to seventeen; wrapper exit 0 means every mutant's
 named test exited 1 with the intended witness.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
@@ -80,8 +83,11 @@ named test exited 1 with the intended witness.
 | `native-persistent-revoke` | Remove persistent-as-ephemeral refusal | `TestNativeVectors/revoke-persistent-as-ephemeral/negative` | Killed; exact required code, not generic failure |
 | `native-socket-permissions` | Replace group/mode validation with 0666 fallback | `TestNativeSocketPermissions/invalid-group` | Killed; unassignable group cannot admit a daemon |
 | `native-release-fence` | Remove generation barrier around actual native release | `TestNativeReleaseFence/hello/retirement-wins` | Killed; delayed watch cannot mask an unsafe success write |
+| `native-target-release` | Keep only caller evidence at fresh mutation release | `TestNativeMutationReleasePrincipals/target` | Killed; a target retired after commit cannot receive a first success |
+| `native-binding-pin` | Bypass first self binding pin and subscription | `TestNativeConnectionBindingPin` | Killed; old connection cannot adopt replacement while a fresh one succeeds |
+| `native-accepted-generation` | Drop validated accept tuple before wire loop | `TestNativeAcceptTupleBeforeHello/true` | Killed; replacement before first frame cannot negotiate or retain an ID |
 
-No surviving mutant is claimed killed. The new four controls do not constitute
+No surviving mutant is claimed killed. These controls do not constitute
 exhaustive mutation coverage. All existing reviewer test names remain present.
 
 ## Out of integration contract

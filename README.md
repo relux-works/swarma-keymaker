@@ -87,7 +87,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |
 | Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |
 | Go | Compile pending suite: `go test -c -buildvcs=false -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Tagged binary; compilation is not qualification |
-| Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all fourteen are killed |
+| Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all seventeen are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
@@ -124,15 +124,28 @@ authorization, durable retries and audit. Its Observer is mandatory: every
 framed attempt obtains shared work credit before parsing/hashing; every refusal
 is durably reported or closes service health. Handler receives the complete
 admitted Request, including its exact ID, without per-peer request guessing.
-A successful hello pins the connection's UID and generation. A changed tuple or
-failed generation evidence refuses and closes; continuing work requires a fresh
+The daemon calls `ServeConnAccepted` with its validated UID/generation tuple
+before reading hello. `ServeConn` remains available to transport owners that
+pin at first successful hello. A changed tuple or failed generation evidence refuses and closes; continuing work requires a fresh
 connection. `ReleaseFence.WithActive` must serialize authoritative generation,
 final result/binding checks and durable audit with the actual response write for
 hello and methods. Encoding and write-deadline setup precede the barrier; a
 retirement that wins the barrier suppresses success and closes after a typed
 refusal where transport permits it. A partial success write closes without a
-second reply. The native adapter uses the core's `GenerationSource.WithActive`;
-a lookup followed by an unprotected write does not satisfy its contract.
+second reply. The native adapter uses `GenerationSource.WithActive` for
+hello/self reads and one `WithEvidence` barrier for mutation release, carrying
+every generation predicate required by the fresh effect through the actual write. Exact historical
+retries recover their original result under current caller authority.
+A lookup followed by an unprotected write does not satisfy this contract.
+
+Hello does not select a binding. The first self `pubkey` pins that connection's
+registration number; revocation/unbinding closes it, including while idle.
+Request, transaction and release checks also reject an invalid pin without
+waiting for notification. A replacement requires a fresh connection. Operator
+mutations address target registrations without adopting them as the operator's
+self identity, so an operator connection that has used only hello/mutations
+requires no station binding. If it requests its own pubkey, that self binding
+then pins the connection in the same way.
 
 Exact retries may pass the request-ID interface for handler-owned result recovery;
 changed arguments must be refused by that generation-scoped interface.

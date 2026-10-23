@@ -24,7 +24,7 @@ publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 | --- | --- |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
-| `go.mod` | Standard-library-only module and Go version |
+| `go.mod`, `go.sum` | Go version and exact registrar dependency pin |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
 | `cmd/keymaker/` | Production `serve` and `version` entry points |
 | `internal/keymaker/` | Linux custody, derivation, bindings, audit and SSH-agent server |
@@ -38,7 +38,8 @@ publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
 ## Tools
 
-Linux and Go 1.26 are required; `go.mod` uses only the standard library.
+Linux and Go 1.26 are required. Enrollment validation uses the pinned registrar
+packages below; the core, wire layer and offline tools use the Go standard library.
 The single-UID integration needs Git and OpenSSH (`ssh-keygen`). The runbook
 checker needs Bash and uses `/usr/sbin/visudo` when installed. Multi-UID
 qualification additionally requires the owner's
@@ -113,3 +114,18 @@ changed arguments must be refused by that generation-scoped interface.
 The native wire checks validate transport behavior with injected peers. They do
 not qualify a production daemon, enforce real kernel peer authentication or
 replace the pending integration tests listed in the specification.
+
+## Registrar dependency
+
+The enrollment schema, publisher verification, registry snapshot loader and name
+rules belong to `github.com/relux-works/swarma-registrar`. The dependency is pinned
+to reviewed main commit `c01ab884ed69d1c677b801e92a94ec3b7a836205`
+(`v0.0.0-20261023123306-c01ab884ed69`). Keymaker supplies caller-side trust,
+persistence and local authorization; it does not maintain a second loader.
+
+Any registrar API or behavior change requires a separate reviewed pull request
+there and must land on its main first. Raise this dependency only in an explicit
+pin-bump commit here: run `go get github.com/relux-works/swarma-registrar@<full-commit-id>`,
+review and commit both `go.mod` and `go.sum`, update this pin, and run the affected
+enrollment tests against that exact revision. A branch name or an API inventory
+check is not behavior approval.

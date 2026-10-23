@@ -505,7 +505,9 @@ The local helper maps missing/unreadable registry evidence to
 `enrollment_unverified`, and a verified host tombstone to `host_revoked`.
 Registrar loader diagnostics retain their registrar meanings; these mappings
 are helper response codes, not renamed document formats. A missing station
-uid_map refuses `uid_map_required`; no group fallback is available.
+uid_map is a schema violation that fails the entire registrar snapshot load;
+the helper refuses `enrollment_unverified`. While any record is invalid, the
+whole registry is unusable. No group-only fallback is available.
 
 Consume uid_map as the draft section 4.2 **array of objects**, not an object
 keyed by decimal UID strings. Resolve exactly one integer-UID row, then its
@@ -1129,7 +1131,7 @@ strings. Registrar-owned signed-document verdicts retain registrar spelling.
 | `version_unsupported`, `hello_required`, `hello_already_negotiated` | Invalid negotiation state |
 | `request_deadline_exceeded`, `request_expired` | Request budget or retained helper result lifetime ended |
 | `enrollment_unavailable`, `enrollment_unverified`, `enrollment_unsupported`, `host_revoked` | Unavailable, untrusted, unsupported or revoked enrollment |
-| `uid_map_required`, `uid_not_permitted`, `name_not_permitted`, `audience_mismatch` | Required map, mapped principal, name or audience check failed |
+| `uid_not_permitted`, `name_not_permitted`, `audience_mismatch` | Mapped principal, name or audience check failed |
 | `key_not_enrolled`, `key_not_valid_now` | Host purpose key absent or outside enrolled window |
 | `entropy_unavailable`, `clock_untrusted` | Cannot safely create fresh admission proof |
 | `rate_limited`, `busy`, `state_capacity_exceeded`, `audit_unavailable` | Resource or durable-evidence admission closure |

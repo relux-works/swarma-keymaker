@@ -1139,7 +1139,7 @@
         },
         "binding_status": "active"
       },
-      "expected_code": "uid_map_required",
+      "expected_code": "enrollment_unverified",
       "positive_control": "ok-helper-map-required",
       "mutation_path": "/enrollment/uid_map"
     },

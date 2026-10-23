@@ -29,7 +29,7 @@ type PeerSource interface {
 // The ReleaseFence, rather than this return boundary, covers actual wire release.
 // It must not implement a generic signing operation behind these method names.
 type Handler interface {
-	Handle(ctx context.Context, peer Peer, method string, params Object) (Object, Code)
+	Handle(ctx context.Context, peer Peer, request Request) (Object, Code)
 }
 
 // RequestIDs admits IDs in the caller's UID+generation scope, including hello.
@@ -56,20 +56,31 @@ type ReleaseFence interface {
 	WithActive(ctx context.Context, peer Peer, request Request, result Object, release func() Code) Code
 }
 
+// Observer supplies shared workload admission and durable refusal reporting.
+// Enter returns a release function for the active-request slot. Refuse must
+// establish durable audit or return audit_unavailable and close admission.
+// A nil peer means authority was not established; conn still carries kernel
+// credentials. Raw body bytes may be digested, never retained in audit.
+type Observer interface {
+	Enter(context.Context, net.Conn) (func(), Code)
+	Refuse(context.Context, net.Conn, *Peer, Request, []byte, Code) Code
+}
+
 // Server owns no listeners, socket paths, peer credentials or global budgets.
 // Its dependencies must be safe for concurrent calls and honor cancellation.
 type Server struct {
-	handler Handler
-	peers   PeerSource
-	ids     RequestIDs
-	fence   ReleaseFence
+	handler  Handler
+	peers    PeerSource
+	ids      RequestIDs
+	fence    ReleaseFence
+	observer Observer
 }
 
-func New(handler Handler, peers PeerSource, ids RequestIDs, fence ReleaseFence) (*Server, error) {
-	if handler == nil || peers == nil || ids == nil || fence == nil {
+func New(handler Handler, peers PeerSource, ids RequestIDs, fence ReleaseFence, observer Observer) (*Server, error) {
+	if handler == nil || peers == nil || ids == nil || fence == nil || observer == nil {
 		return nil, errors.New("control dependencies are required")
 	}
-	return &Server{handler: handler, peers: peers, ids: ids, fence: fence}, nil
+	return &Server{handler: handler, peers: peers, ids: ids, fence: fence, observer: observer}, nil
 }
 
 // Serve accepts from a supplied listener and runs one goroutine per connection.
@@ -100,126 +111,153 @@ func (s *Server) ServeConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
-	negotiated := false
-	var accepted Peer
-	helloDeadline := time.Now().Add(frameBudget)
-	for {
-		readDeadline := time.Now().Add(frameBudget)
-		if !negotiated {
-			readDeadline = helloDeadline
+	state := connectionState{helloDeadline: time.Now().Add(frameBudget)}
+	for s.serveOne(ctx, conn, &state) {
+	}
+}
+
+type connectionState struct {
+	negotiated    bool
+	accepted      Peer
+	helloDeadline time.Time
+}
+
+func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionState) bool {
+	readDeadline := time.Now().Add(frameBudget)
+	if !state.negotiated {
+		readDeadline = state.helloDeadline
+	}
+	if parent, ok := ctx.Deadline(); ok && parent.Before(readDeadline) {
+		readDeadline = parent
+	}
+	if conn.SetReadDeadline(readDeadline) != nil {
+		return false
+	}
+	body, code := readFrame(conn)
+	completed := time.Now()
+	if ctx.Err() != nil {
+		return false
+	}
+	if body == nil && code == "" {
+		return false
+	}
+	done, limit := s.observer.Enter(ctx, conn)
+	if done != nil {
+		defer done()
+	}
+	if limit != "" {
+		code = limit
+	}
+	report := func(peer *Peer, request Request, refusal Code) Code {
+		return s.observer.Refuse(ctx, conn, peer, request, body, refusal)
+	}
+	if code != "" {
+		s.replyError(conn, nil, report(nil, Request{}, code), time.Now().Add(frameBudget))
+		return false
+	}
+	if done == nil {
+		return false
+	}
+	obj, err := Decode(body)
+	if err != nil {
+		s.replyError(conn, nil, report(nil, Request{}, CCJNoncanonical), time.Now().Add(frameBudget))
+		return false
+	}
+	req, id, code := envelope(obj)
+	closeAfter := false
+	switch {
+	case code == RequestMalformed:
+	case !state.negotiated && req.Method != "hello":
+		code = HelloRequired
+	case state.negotiated && req.Method == "hello":
+		code = HelloAlreadyNegotiated
+	case code == VersionUnsupported:
+		closeAfter = true
+	}
+	deadline := completed.Add(req.Timeout)
+	if !state.negotiated {
+		deadline = state.helloDeadline
+	}
+	if req.Timeout == 0 {
+		deadline = completed.Add(frameBudget)
+	}
+	requestCtx, cancel := context.WithDeadline(ctx, deadline)
+	var result Object
+	var peer Peer
+	var established *Peer
+	if code == "" && requestCtx.Err() == nil {
+		peer, code = s.peers.Identify(requestCtx, conn)
+		if code == "" {
+			established = &peer
 		}
-		if parent, ok := ctx.Deadline(); ok && parent.Before(readDeadline) {
-			readDeadline = parent
+		if code == "" && peer.Generation == "" {
+			code = "generation_source_unavailable"
 		}
-		if conn.SetReadDeadline(readDeadline) != nil {
-			return
-		}
-		body, code := readFrame(conn)
-		completed := time.Now()
-		if ctx.Err() != nil {
-			return
-		}
-		if code != "" {
-			s.replyError(conn, nil, code, time.Now().Add(frameBudget))
-			return
-		}
-		if body == nil {
-			return
-		}
-		obj, err := Decode(body)
-		if err != nil {
-			s.replyError(conn, nil, CCJNoncanonical, time.Now().Add(frameBudget))
-			return
-		}
-		req, id, code := envelope(obj)
-		closeAfter := false
-		switch {
-		case code == RequestMalformed:
-		case !negotiated && req.Method != "hello":
-			code = HelloRequired
-		case negotiated && req.Method == "hello":
-			code = HelloAlreadyNegotiated
-		case code == VersionUnsupported:
-			closeAfter = true
-		}
-		deadline := completed.Add(req.Timeout)
-		if !negotiated {
-			deadline = helloDeadline
-		}
-		if req.Timeout == 0 {
-			deadline = completed.Add(frameBudget)
-		}
-		requestCtx, cancel := context.WithDeadline(ctx, deadline)
-		var result Object
-		var peer Peer
-		if code == "" && requestCtx.Err() == nil {
-			peer, code = s.peers.Identify(requestCtx, conn)
-			if code == "" && peer.Generation == "" {
-				code = "generation_source_unavailable"
-			}
-			if code == "" && negotiated && peer != accepted {
-				code = "generation_mismatch"
-			}
-			if code == "" {
-				switch req.Method {
-				case "hello", "pubkey", "register", "revoke", "sign_registration":
-				default:
-					code = OperationUnsupported
-				}
-			}
-			if code == "" && requestCtx.Err() == nil {
-				code = s.ids.Admit(requestCtx, peer, req)
-			}
-			if code == "" && requestCtx.Err() == nil {
-				if req.Method == "hello" {
-					result = Object{"version": int64(1)}
-				} else {
-					result, code = s.handler.Handle(requestCtx, peer, req.Method, req.Params)
-				}
-			}
-		}
-		closeAfter = closeAfter || generationFailure(code)
-		if requestCtx.Err() != nil || !time.Now().Before(deadline) {
-			code = DeadlineExceeded
-			result = nil
-		}
-		if !negotiated && code == DeadlineExceeded {
-			closeAfter = true
-		}
-		if ctx.Err() != nil {
-			cancel()
-			return
+		if code == "" && state.negotiated && peer != state.accepted {
+			code = "generation_mismatch"
 		}
 		if code == "" {
-			var err error
-			code, err = s.release(requestCtx, conn, peer, req, result, deadline)
-			cancel()
-			if err != nil {
-				return
+			switch req.Method {
+			case "hello", "pubkey", "register", "revoke", "sign_registration":
+			default:
+				code = OperationUnsupported
 			}
-			if code == "" {
-				if req.Method == "hello" {
-					accepted = peer
-					negotiated = true
-				}
-				continue
+		}
+		if code == "" && requestCtx.Err() == nil {
+			code = s.ids.Admit(requestCtx, peer, req)
+		}
+		if code == "" && requestCtx.Err() == nil {
+			if req.Method == "hello" {
+				result = Object{"version": int64(1)}
+			} else {
+				result, code = s.handler.Handle(requestCtx, peer, req)
 			}
-			// The authoritative fence refused before any success byte was written.
-			// A result-free error may be sent, then this authority lifetime ends.
-			closeAfter = true
-		} else {
-			cancel()
-		}
-		if ctx.Err() != nil {
-			return
-		}
-		if !s.replyError(conn, id, code, time.Now().Add(frameBudget)) {
-			return
-		}
-		if closeAfter {
-			return
 		}
 	}
+	closeAfter = closeAfter || generationFailure(code)
+	if requestCtx.Err() != nil || !time.Now().Before(deadline) {
+		code = DeadlineExceeded
+		result = nil
+	}
+	if !state.negotiated && code == DeadlineExceeded {
+		closeAfter = true
+	}
+	if ctx.Err() != nil {
+		cancel()
+		return false
+	}
+	if code == "" {
+		var err error
+		code, err = s.release(requestCtx, conn, peer, req, result, deadline)
+		cancel()
+		if err != nil {
+			return false
+		}
+		if code == "" {
+			if req.Method == "hello" {
+				state.accepted = peer
+				state.negotiated = true
+			}
+			return true
+		}
+		// The authoritative fence refused before any success byte was written.
+		// A result-free error may be sent, then this authority lifetime ends.
+		closeAfter = true
+	} else {
+		cancel()
+	}
+	if ctx.Err() != nil {
+		return false
+	}
+	code = report(established, req, code)
+	closeAfter = closeAfter || code == "audit_unavailable"
+	if !s.replyError(conn, id, code, time.Now().Add(frameBudget)) {
+		return false
+	}
+	if closeAfter {
+		return false
+	}
+	return true
 }
 
 func generationFailure(code Code) bool {

@@ -19,8 +19,8 @@ import (
 
 type handlerFunc func(context.Context, Peer, string, Object) (Object, Code)
 
-func (f handlerFunc) Handle(c context.Context, p Peer, m string, o Object) (Object, Code) {
-	return f(c, p, m, o)
+func (f handlerFunc) Handle(c context.Context, p Peer, r Request) (Object, Code) {
+	return f(c, p, r.Method, r.Params)
 }
 
 type peerFunc func(context.Context, net.Conn) (Peer, Code)
@@ -66,7 +66,7 @@ func testServer(t *testing.T, handler Handler, peers PeerSource, ids RequestIDs,
 	} else if len(fences) > 1 {
 		t.Fatal("multiple test fences")
 	}
-	s, err := New(handler, peers, ids, fence)
+	s, err := New(handler, peers, ids, fence, testObserver{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -712,11 +712,11 @@ func TestRequiredDependencies(t *testing.T) {
 		i RequestIDs
 		f ReleaseFence
 	}{{nil, p, ids, fence}, {h, nil, ids, fence}, {h, p, nil, fence}, {h, p, ids, nil}} {
-		if _, err := New(deps.h, deps.p, deps.i, deps.f); err == nil {
+		if _, err := New(deps.h, deps.p, deps.i, deps.f, testObserver{}); err == nil {
 			t.Fatal("missing dependency accepted")
 		}
 	}
-	if _, err := New(h, p, ids, fence); err != nil {
+	if _, err := New(h, p, ids, fence, testObserver{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -886,4 +886,12 @@ func TestHelloOwnDeadline(t *testing.T) {
 	if admissions.Load() != 0 {
 		t.Fatal("expired hello reached ID admission")
 	}
+}
+
+// Wire tests use a fixed available observer; core tests qualify durable audit.
+type testObserver struct{}
+
+func (testObserver) Enter(context.Context, net.Conn) (func(), Code) { return func() {}, "" }
+func (testObserver) Refuse(_ context.Context, _ net.Conn, _ *Peer, _ Request, _ []byte, c Code) Code {
+	return c
 }

@@ -4,18 +4,24 @@ The authoritative decision list and safe defaults are in
 [`spec/keymaker.md`, section 14](spec/keymaker.md#14-open-questions-and-activation-gates).
 
 - Q1 and Q4: helper ownership split and module naming — decided.
-- Q2 and Q3: deferred decrypt and interim administrator authority — pending curator ruling.
-- Q6–Q7: generation adapter/retirement ordering and signed operator-record
-  verification — activation gates.
-- Q8–Q11: name-index approval, control-group provisioning, external root
-  attestation/rotation and the reusable Linux test window — qualification gates.
-- Q12: executable-qualified enrollment is valid data but not an available v0
+- Q2 and Q3: decrypt out of v0 (`operation_unsupported`) and configured
+  operator-only register/revoke intake — decided. Persistent revoke refuses
+  until the signed operator-act verifier exists; Q7 remains its activation gate.
+- Q6: interim decision — the authoritative journal format belongs to
+  `swarma-user-manager`; its publication is the remaining gate. K1 reads that
+  format. A reviewed root-run manual writer is production authority until the
+  module writer exists; retirement recorded late is not fenced (section 3.1).
+- Q7: signed operator-record verification — activation gate.
+- Q8: explicit, append-only, scoped name-to-index registry — decided.
+- Q9–Q11: control-group provisioning, external root attestation/rotation and
+  the reusable Linux test window — qualification gates.
+- Q12: decided — executable-qualified enrollment is valid data but not an available v0
   enforcement capability. All matched rows with `exe` refuse locally, including
   matching procfs snapshots. No UID-only fallback is allowed.
 
 ## Q5: registrar draft alignment and explicit differences
 
-Reference: [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/15b2604a9c8827c6f64365c15b45d0d933a08a1b/spec/registrar.md),
+Reference: [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/bf9af1edae06835a88906c197e8b74bb5f8d6f5a/spec/registrar.md),
 sections 2–5. Its constants remain under review; a changed revision requires
 explicit consumer updates and re-qualification before activation.
 
@@ -25,9 +31,9 @@ explicit consumer updates and re-qualification before activation.
 | Earlier localpart proposal allowed slash and ignored the configured-audience mxid bound | Withdrawn; use registrar structured/explicit-legacy rules and its 255-byte mxid bound. Negative slash and length-bound cases added. |
 | Earlier encoding details were assumptions | Body construction, Ed25519 encoding, envelope/signature/nonce, time and half-open key windows now reference the draft owner sections instead of duplicating their schema. |
 | Native helper requires canonical frame bytes; registrar HTTP accepts noncanonical JSON wire spellings | Intentional transport distinction. The same semantic body uses the same CCJ-1 scalar-order codec and canonical signature preimage. Do not relax native frames or reject registrar HTTP whitespace by analogy. |
-| Draft requires an additional offline enrollment-publisher pin and whole-history rollback checks | Keymaker must use the same approved pin and verification rule; publisher authority remains a registrar draft proposal awaiting content approval. No owner-device signature is inferred from it. |
+| E1: shared enrollment authority and snapshot verification | Decided: the owner holds the offline Ed25519 enrollment-publisher key; both services verify the pinned signed registry commit and phase-0 envelope signature using the same out-of-band pins in root-owned config, per registrar section 4.3. Snapshot phase ordering, historical legacy-name ownership and rollback/reload rules follow section 4.4 without a Keymaker variant. |
 | A retained native helper response may contain a nonce already consumed by registrar HTTP admission | Same-ID helper retry retrieves evidence, not another HTTP success. A fresh admission uses a new native ID and independent nonce; joint retry tests remain a gate. |
-| Registrar accepts syntactically valid executable-qualified rows; v0 cannot attest per-operation executable identity | Explicit local capability refusal `enrollment_unsupported`, not a registrar format change. Wrong, unavailable and matching executable snapshots all refuse. Future enablement is Q12. |
+| Registrar accepts syntactically valid executable-qualified rows; v0 cannot attest per-operation executable identity | Explicit local capability refusal `enrollment_unsupported`, not a registrar format change. Wrong, unavailable and matching executable snapshots all refuse. v0 refusal is decided in Q12; future enablement requires a separate design. |
 | Enrollment maps UIDs, while local custody also needs binding/generation evidence | Active station binding and protected per-UID generation admission remain additional local checks; no extra enrollment wire member is invented. Joint revocation/re-admission tests remain required. |
 
 The helper's wrapper and local refusal codes remain Keymaker-owned; registrar

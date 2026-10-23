@@ -19,7 +19,7 @@ Public design references (drafts remain drafts):
 - [CIP-0019, Carrier admission (draft)](https://github.com/relux-works/curator-spec/blob/a77686c8112d60841236f2107d7e085e48361f6e/cips/CIP-0019-carrier-admission-by-public-key.md): helper and enrollment constraints.
 - [CIP-0010, Credentials (draft)](https://github.com/relux-works/curator-spec/blob/a77686c8112d60841236f2107d7e085e48361f6e/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md): identity keys and provider credentials have different authorities.
 - [Credential broker specification, section 13.1](https://github.com/relux-works/swarma-credential-broker/blob/ec7fb3d0670449b074521d51f3e03b59f0142a69/spec/broker.md#131-transport): Unix framing, canonical objects and deadlines.
-- [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/15b2604a9c8827c6f64365c15b45d0d933a08a1b/spec/registrar.md): authority for `registration/1`, `enrollment/1`, signed envelopes and `uid_map` meaning. This candidate aligns to sections 2–5 at that draft revision; changing constants requires a reviewed alignment update, not a silent deployment change.
+- [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/bf9af1edae06835a88906c197e8b74bb5f8d6f5a/spec/registrar.md): authority for `registration/1`, `enrollment/1`, signed envelopes and `uid_map` meaning. This candidate aligns to sections 2–5 at that draft revision; changing constants requires a reviewed alignment update, not a silent deployment change.
 - [SLIP-0010](https://github.com/satoshilabs/slips/blob/master/slip-0010.md): Ed25519 hardened derivation and published test vectors 1 and 2.
 - [SSH agent protocol, draft-miller-ssh-agent-17](https://www.ietf.org/archive/id/draft-miller-ssh-agent-17.txt): protocol subset below; a work in progress, not an RFC.
 - [OpenSSH PROTOCOL.sshsig](https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.sshsig), sections 2–3: detached signature format and signed preimage.
@@ -73,10 +73,14 @@ GenerationSource.lookup(uid) -> {uid, generation, state, revision, fenced}
 GenerationSource.with_active(uid, generation, bounded_commit) -> result
 ```
 
-`generation` is exactly 32 lowercase hexadecimal digits representing a random
-128-bit account-incarnation token, not a counter. State is `creating`, `active`,
-`retiring` or `removed`. `lookup` MUST read the authoritative user-manager
-journal through a read-only verified adapter. Missing, ambiguous, unreadable,
+The authoritative generation journal format belongs to `swarma-user-manager`
+and its v0 specification; Keymaker MUST NOT define another journal format.
+For each UID, Keymaker needs the generation token, lifecycle state, a revision
+or ordering, and integrity/provenance evidence. Their encoding belongs to the
+user-manager specification. The interface above is semantic, not a journal
+schema; `fenced` is a local admission verdict. K1 implements the read-only
+adapter against that published format. `lookup` MUST read the authoritative
+journal through this verified adapter. Missing, ambiguous, unreadable,
 restored-but-unreconciled or fenced evidence MUST refuse. Only `active` permits
 admission. A cached success MUST NOT authorise later work.
 
@@ -86,13 +90,24 @@ check, durable result and response release against retirement. No Keymaker
 state lock may be held while waiting on a remote service. A retirement that
 wins this ordering MUST prevent subsequent release. A response released first
 is already issued; later retirement cannot recall its signature. The concrete
-user-manager adapter and ordering proof are an activation gate (Q6).
+ordering contract belongs to the user-manager journal format (Q6).
 
-Until that adapter exists, the production implementation stub MUST return
-`generation_source_unavailable`. It MUST NOT infer activity from `getpwuid`,
-the process table or a static UID table. A root-protected synthetic journal is
-allowed only in an explicitly isolated test instance; it does not qualify
-production generation enforcement. Unit fixtures may inject the interface.
+Until that format is published, the production source MUST return
+`generation_source_unavailable`. Once published, and until the user-manager
+writer exists, the operator writes entries using a reviewed root-run procedure
+in that same format. This is the real authoritative journal with a manual
+writer and qualifies as the production generation source, not a static UID
+table. Keymaker MUST NOT infer activity from `getpwuid` or the process table.
+Root-protected synthetic journals remain isolated test fixtures, not production
+authority; unit fixtures may inject the interface.
+
+The `with_active` ordering requirement still applies to retirement recorded in
+the journal. A manual entry alone does not establish cross-process serialization
+of a concurrent update and release; the procedure and adapter must follow the
+published journal's ordering contract. Keymaker revalidates at release. In this
+interim, retirement fencing depends on the operator recording `retiring` or
+`removed` before account removal. A retirement recorded late is not fenced;
+manual writing provides no automatic coordination with OS account removal.
 
 Each accepted connection records `(peer_uid, generation_at_accept)`. Each
 operation and its release MUST revalidate this tuple. A live connection MUST
@@ -163,6 +178,8 @@ Unbounded names cannot be injected into 31 bits by truncating a hash without
 collisions. v0 therefore requires a protected, append-only name-index registry,
 distributed with the master recovery metadata. Mapping is deterministic given
 the registry, not a stateless function of a display name.
+
+Here, `product` is the colony, `project` is the swarm cell, and `agent` is the station.
 
 - Names MUST match ASCII `[a-z][a-z0-9-]{0,62}` exactly. No case folding,
   Unicode normalization, aliases or whitespace trimming is performed.
@@ -262,7 +279,7 @@ credential. `target_generation` must match authoritative evidence. Ordinary
 requests MUST NOT have `uid`, `generation`, `identity` or `path` selectors.
 
 v0 register/revoke intake is limited to the configured operator principal
-(Q3, pending curator ruling). Operator UID possession does not stand in for
+(Q3, decided). Operator UID possession does not stand in for
 a human signature where required. `mode` is `operator` or `ephemeral`.
 `operator_record` is an opaque signed-record object for the future platform
 verifier, or null for `ephemeral`. A verified operator record must bind this
@@ -473,15 +490,15 @@ checks and expiry. Re-registration of an unrelated identity is not implicit
 helper re-admission.
 
 Keymaker MUST revalidate the exact local registry pin and snapshot using the
-registrar draft sections 4.3–4.4. Both services use the same approved full
-commit object ID, audience, maintainer-key verification rule and separately
-pinned offline enrollment-publisher key. The draft's extra publisher pin is
-still a proposal: Q5 records that dependency, not an invented owner-device
-signature. No mutable branch, network fetch or agent-writable working copy
-is authority. Validate the whole historical snapshot, persist accepted
-revision/sequence/ID/tombstones atomically before use, and never continue
-signing from an old cache after a failed reload. Lost rollback evidence
-fences helper admission until external reconciliation.
+registrar draft sections 4.3–4.4 at the revision pinned in section 1. E1 is
+decided: the owner holds the offline Ed25519 enrollment-publisher key, and
+both services use the same out-of-band verification pins in root-owned
+configuration. Both MUST verify the pinned signed registry commit and the
+phase-0 enrollment envelope signature against those pins as specified in
+registrar section 4.3; Keymaker adds no variant of its own. Snapshot verification
+phase ordering, historical ownership of legacy names, atomic installation,
+rollback evidence and reload/restore fencing follow registrar section 4.4,
+without a separate Keymaker restatement of those rules.
 
 The local helper maps missing/unreadable registry evidence to
 `enrollment_unavailable`, unverifiable/invalid/rollback evidence to
@@ -1026,26 +1043,29 @@ tests in this initial repository. Future rework MUST retain them by name.
    registrar owns signed documents and uid_map semantics. This supersedes the
    earlier single-owner-helper assumption. Signed-format publication still gates
    production helper activation.
-2. **Q2 — pending curator ruling:** decrypt is deferred. Default is typed
-   unsupported refusal; no decrypt or general byte-signing fallback.
-3. **Q3 — pending curator ruling:** configured operator-only register/revoke
-   intake in v0, dispatcher later with published grants. Persistent revoke
-   additionally needs a verified signed operator act; missing verifier refuses.
+2. **Q2 — decided:** decrypt is out of v0 and refuses
+   `operation_unsupported`; no decrypt or general byte-signing fallback.
+3. **Q3 — decided:** v0 register/revoke intake is limited to the configured
+   operator principal. Persistent revoke refuses until the signed operator-act
+   verifier exists; Q7 remains its activation gate.
 4. **Q4 — decided:** repository/module is `swarma-keymaker`,
    role is per-station key custody, lore name Keymaker; no module rename.
 5. **Q5 — registrar draft alignment gate:** sections 2–5 of the cited draft
    now define the body/envelope, CCJ-1, names, uid_map arrays and snapshot pins.
-   Remaining differences/proposals are enumerated in UNRESOLVED_QUESTIONS.md;
+   Remaining differences/dependencies are enumerated in UNRESOLVED_QUESTIONS.md;
    revised draft constants require explicit consumer re-qualification.
-6. **Q6 — generation-source gate:** publish authoritative journal adapter,
-   operator-principal generations and retirement/release ordering. Production
-   stub denies all dependent operations. An isolated fixture proves no live
-   integration, restore freshness or cross-service atomicity.
+6. **Q6 — interim decision:** format publication by `swarma-user-manager`
+   is the remaining gate. K1 implements its read-only adapter; until the writer
+   exists, the operator uses a reviewed root-run procedure in that same real
+   journal format. Until publication, production refuses
+   `generation_source_unavailable`. Release revalidation fences recorded
+   retirement; an operator update made late does not fence account removal.
+   Section 3.1 retains `with_active` ordering and states the manual-writer limit.
 7. **Q7 — signed-act gate:** publish operator-record verification, pins,
    replay and canonical argument binding. No unsigned persistent revoke.
-8. **Q8 — index-registry decision:** approve explicit immutable scoped indices,
-   approval workflow, registry recovery and epoch binding. A truncated hash
-   cannot supply the required collision-free mapping.
+8. **Q8 — decided:** the explicit, append-only, scoped name-to-index registry
+   is approved. Field names and path syntax stay as specified in section 4.2;
+   a truncated hash cannot supply the required collision-free mapping.
 9. **Q9 — provisioning gate:** qualify dedicated service user and narrowly
    managed helper-group membership for service/callers. Group access is never
    a replacement for required uid_map or active generation evidence.
@@ -1055,7 +1075,7 @@ tests in this initial repository. Future rework MUST retain them by name.
 11. **Q11 — privileged evidence gate:** owner pre-provisions section 12's
     reusable two-UID window and constrained non-root sudo; no privileged action
     or service deployment is part of this spec-only slice.
-12. **Q12 — executable-qualified capability:** registrar-valid exe rows are
+12. **Q12 — decided:** registrar-valid exe rows are
     refused locally in v0, including matching snapshots. A future design must
     qualify per-operation executable identity and descriptor delegation, not
     rely on a racy procfs path comparison.

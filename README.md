@@ -2,20 +2,23 @@
 
 Role: per-station key custody. Lore name: Keymaker.
 
-Keymaker holds an installation's key material and performs narrowly permitted
+Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
 generation. Private identity keys never enter station processes.
 
-**Status: v0 core under development.** Linux custody primitives and offline
-tests are present; production generation admission remains unavailable.
+**Status: Linux v0 core ready for review.** The SSH-agent subset, durable binding
+store and audit journal have fixture-backed tests, including real Unix/OpenSSH/
+Git integration. Production `keymaker serve` refuses
+`generation_source_unavailable` until the authoritative journal format and
+ordering adapter exist. No fixture authority is compiled into that command.
+Native method integration, enrollment and the registration helper are separate work.
 There is no deployed security boundary or installer in this repository.
 
 `internal/control` implements bounded CCJ-1 framing, version negotiation and
 sequential request dispatch. Peer/generation authority, request-ID admission,
 method execution and final release fencing are required injected interfaces;
-no production control adapters are supplied.
-The proposed Linux v0 and publication gates are in
-[`spec/keymaker.md`](spec/keymaker.md).
+no production control adapters are supplied. The proposed Linux v0 and
+publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
 | Path | Contents |
 | --- | --- |
@@ -23,17 +26,28 @@ The proposed Linux v0 and publication gates are in
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `go.mod` | Standard-library-only module and Go version |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
-| `internal/keymaker/` | Linux custody, derivation, bindings and generation interfaces |
-| `tools/vectors/` | Reproducible Go derivation generator and fixture checks |
-| `tools/runbook-check/` | Offline regression of the specification's shell guards, using stubs |
-| `UNRESOLVED_QUESTIONS.md` | Index of decisions and activation gates |
+| `cmd/keymaker/` | Production `serve` and `version` entry points |
+| `internal/keymaker/` | Linux custody, derivation, bindings, audit and SSH-agent server |
+| `cmd/keymaker-window/`, `internal/testwindow/` | Nonroot integration-window harness; separate from the daemon |
+| `docs/k1a-coverage.md` | Every refusal-vector row mapped to execution or explicit K1b scope |
+| `docs/linux-testing.md` | Test isolation, window configuration and remaining qualification gates |
+| `tools/mutations/` | Bounded UID and namespace control plants using Go overlays |
+| `tools/vectors/` | Reproducible derivation generator and fixture checks |
+| `tools/runbook-check/` | Offline specification shell-guard checks using stubs |
+| `UNRESOLVED_QUESTIONS.md` | Specification decisions and activation gates |
 
 ## Tools
 
-Run commands from the repository root. The implementation and both tools use
-only the Go standard library (Go 1.26); the runbook check also needs Bash.
-Tests use temporary Unix sockets and injected peers, not service credentials
-or host account-management commands.
+Linux and Go 1.26 are required; `go.mod` uses only the standard library.
+The single-UID integration needs Git and OpenSSH (`ssh-keygen`). The runbook
+checker needs Bash. Multi-UID qualification additionally requires the owner's
+pre-provisioned test accounts and noninteractive sudo permissions.
+
+Run from the repository root. Set `SCRATCH` to an existing absolute scratch
+path outside tracked files; export `TMPDIR="$SCRATCH"` so Go test fixtures
+follow it. A canonical path without `..` or symlink components is required by
+the protected-directory tests. The multi-UID fixture parent separately needs
+client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
@@ -41,13 +55,35 @@ or host account-management commands.
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |
 | Go | Bounded decoder fuzzing: `GOMAXPROCS=2 go test ./internal/control -run '^$' -fuzz '^FuzzCCJRoundTrip$' -fuzztime=20s -parallel=1` | Verdicts and Go fuzz cache; failing corpus under `internal/control/testdata/fuzz/` |
-| Go | Check core packages: `go test ./internal/keymaker` | Test verdicts; temporary fixtures follow `TMPDIR` |
-| Go | Check published SLIP-0010 controls, regenerate in memory and compare: `go run ./tools/vectors/main.go -check` | Summary on stdout; refuses mismatched fixtures |
-| Go | Regenerate Keymaker derivation examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
-| Go + Bash | Check actual marked shell preflights with stubbed NSS and mutations: `go run ./tools/runbook-check/main.go -check` | Named regression verdicts on stdout; no host writes |
-| Go + Bash | Plant the inverted-getent regression in memory: `go run ./tools/runbook-check/main.go -plant` | Expected nonzero exit 1 naming `TestRunbookCollisionBeforeMutation`; production files unchanged |
-| Python 3 | Check all JSON: `python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("vectors").glob("*.json")]'` | Exit status; no files |
-| Git | Inspect scope: `git diff --check`; verify signed commits: `git log --format="%h %G?"` | Diagnostics on stdout |
+| Go | Narrow core/CLI/harness checks: `go test ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window` | Verdicts; temporary fixtures under `TMPDIR` |
+| Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
+| gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
+| Go | Build daemon: `go build -o "$SCRATCH/keymaker" ./cmd/keymaker`; run `"$SCRATCH/keymaker" version` or `"$SCRATCH/keymaker" serve --config "$CONFIG"` | Binary; version or readiness refusal on stderr |
+| Go | Build canonical window runner: `go build -o "$SCRATCH/keymaker-window" ./cmd/keymaker-window` | Runner binary in scratch |
+| Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |
+| Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |
+| Go | Compile pending suite: `go test -c -buildvcs=false -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Tagged binary; compilation is not qualification |
+| Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when both are killed |
+| Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
+| Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
+| Go + Bash | Shell guard regressions: `go run ./tools/runbook-check/main.go -check` | Named offline verdicts; no account writes |
+| Go + Bash | Shell guard plant: `go run ./tools/runbook-check/main.go -plant` | Expected nonzero exit 1 naming the collision regression |
+| Python 3 | JSON syntax: `python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("vectors").glob("*.json")]'` | Exit status; no files |
+| Git | Scope: `git diff --check`; signatures: `git log --format="%h %G?"` | Diagnostics and signature verdicts |
+
+| Direct window-runner status | Meaning |
+| --- | --- |
+| 0 | PASS (with `-check`, provisioning preflight only) |
+| 1 | Test or execution failure |
+| 2 | Usage or configuration error |
+| 3 | PENDING; stderr is exactly `PENDING: test window not provisioned` |
+
+`make test-multiuid` prints, for example, `multiuid runner status: 3 (PENDING)`.
+Make's own exit 2 does not distinguish failure from PENDING. CI and reviewers
+requiring that distinction call the compiled runner directly. A missing window
+is never a skipped or passing multi-UID qualification.
+
+## Native wire layer
 
 The wire loop takes a caller-supplied listener or connection and enforces one
 sequential request at a time. Clients must wait for replies; it does not inspect

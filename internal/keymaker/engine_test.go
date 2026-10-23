@@ -187,8 +187,9 @@ func validBody(public []byte, namespace string) []byte {
 }
 func checkResponse(t *testing.T, response, public []byte, body []byte) {
 	t.Helper()
-	payload, c := ReadFrame(bytes.NewReader(response))
-	if c != "" || len(payload) == 0 {
+	raw := bytes.NewReader(response)
+	payload, c := ReadFrame(raw)
+	if c != "" || len(payload) == 0 || raw.Len() != 0 {
 		t.Fatal("invalid success packet", c)
 	}
 	if body[0] == 11 {

@@ -39,7 +39,8 @@ func TestProductionBinaryGenerationGate(t *testing.T) {
 	cmd := exec.Command(binary, "serve", "--config", filepath.Join(d, "unused.json"))
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + d, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "SSH_AUTH_SOCK=" + filepath.Join(d, "absent.sock")}
 	out, e := cmd.CombinedOutput()
-	if e == nil || strings.TrimSpace(string(out)) != "generation_source_unavailable" {
+	exit, failed := e.(*exec.ExitError)
+	if !failed || exit.ExitCode() != 1 || strings.TrimSpace(string(out)) != "generation_source_unavailable" {
 		t.Fatalf("production admission must refuse: %v %s", e, out)
 	}
 }

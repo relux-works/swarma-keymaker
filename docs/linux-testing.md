@@ -89,19 +89,22 @@ actual kernel UID, exact journal verdict and unchanged bindings. No test is
 skipped. The compiled runner reports PENDING before invoking this suite when
 provisioning is absent. Compiling the tagged suite is not a live test pass.
 
-The owner supplies a JSON configuration, for example:
+After the owner provisions the shared test window, the runner supplies its own
+readable JSON configuration. The minimal setup writes no root state file or
+runner configuration. Using the section 12 defaults, for example:
 
 ```json
 {
-  "runner_user": "test-runner",
-  "client_a": "test-client-a",
-  "client_b": "test-client-b",
-  "registration_group": "test-registration",
+  "runner_user": "<runner>",
+  "client_a": "platform-test-a",
+  "client_b": "platform-test-b",
+  "registration_group": "platform-test-reg",
   "scratch_dir": "/tmp"
 }
 ```
 
-Names are configuration, never compiled into the harness. All accounts must
+Replace `<runner>` with the actual unprivileged account. Names are
+configuration, never compiled into the harness. All accounts must
 have distinct nonzero UIDs. The runner must be the current user; only A belongs
 to the test group. Pre-provisioned sudo permission must allow `sudo -n -u A/B`
 and runner-as-self with the test group. Optional `runner_uid`, `client_a_uid`,
@@ -138,23 +141,30 @@ child, syncs a retained report outside the work tree, checks directory/manifest
 identity, then removes only its own tree. A report or identity failure retains
 the work tree. There is no pattern-based process killing or global cleanup.
 
-## Differences from specification section 12
+## Alignment with specification section 12
 
-The task permits the minimal names-only, pre-provisioned window. This runner
-therefore accepts runner-readable configuration without requiring section 12's
-root-owned numeric-pinned config or root state file. Numeric pins are optional;
-nonroot identities, current runner, sudo readback and asymmetric group membership
-are still checked. That is a test-harness provisioning relaxation, not production
+Section 12 describes the minimal shared window: two nonroot system test
+accounts, only A in the test group, and the root-owned 0440 sudoers drop-in
+`/etc/sudoers.d/agent-platform-test`. It does not require a root state file or
+root-owned numeric-pinned runner configuration. The runner accepts names-only
+readable JSON; numeric pins and root ownership are optional hardening. It still
+checks distinct nonzero UIDs, the current runner, sudo readbacks and A-only
+group membership. These checks establish test provisioning, never production
 generation authority or a change to service ownership rules.
 
-Section 12 sketches `keymaker-integration run/cleanup` with caller-created
-work directory and report path. The implemented command is `keymaker-window`,
-which creates its own directory, records its own process and automatically
-retains a report outside that directory before cleanup. There is no standalone
+The canonical `keymaker-window` command creates its own directory, records
+its own process and automatically retains a durable report outside that
+directory before cleanup, as described in section 12. There is no standalone
 cleanup command for abandoned runs. Interrupted trees remain for owner inspection;
 the runner never guesses that another process or directory belongs to it.
 Surface A needs no registration-group socket; the harness verifies group access
 but does not implement surface B's group-restricted socket setup.
+
+Owner rollback first removes the sudoers drop-in, then deletes the two test
+accounts and test group. Because the window is shared and has no state file,
+the owner must inspect ownership and confirm all consumers are idle before
+removal. Runner cleanup never removes these shared resources, its configuration
+or retained reports.
 
 ## Remaining qualification gates
 

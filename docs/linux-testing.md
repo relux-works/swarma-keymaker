@@ -33,6 +33,10 @@ checks actual socket closure, no signature/state change, and the bounded
 the intact control preserves the tombstone and advances the next issued number.
 `TestCustodyStartupReconciliation` exercises the same store/journal opener used
 by startup. First use requires a protected, completely empty state directory.
+Configure `state_dir` as a dedicated binding/journal directory, with
+`master_file` and `socket_dir` outside it; a pre-existing seed is not proof that
+binding state is new. The production activation workflow must provision this
+layout before the unavailable generation adapter can be enabled.
 The state lock uses the directory inode without creating a file. Under that
 lock, startup durably writes an empty snapshot before creating the audit
 directory and journal. A pre-created audit directory, even empty, is retained

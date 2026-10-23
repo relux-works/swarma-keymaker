@@ -6,24 +6,29 @@ Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
 generation. Private identity keys never enter station processes.
 
-**Status: Linux v0 core ready for review.** The SSH-agent subset, durable binding
+**Status: Linux v0 core and local enrollment authority ready for review.** The SSH-agent subset, durable binding
 store and audit journal have fixture-backed tests, including real Unix/OpenSSH/
 Git integration. Production `keymaker serve` refuses
 `generation_source_unavailable` until the authoritative journal format and
 ordering adapter exist. No fixture authority is compiled into that command.
-Native method integration, enrollment and the registration helper are separate work.
+Native method integration and the registration helper are separate work.
 There is no deployed security boundary or installer in this repository.
 
 `internal/control` implements bounded CCJ-1 framing, version negotiation and
 sequential request dispatch. Peer/generation authority, request-ID admission,
 method execution and final release fencing are required injected interfaces;
-no production control adapters are supplied. The proposed Linux v0 and
-publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
+no production control adapters are supplied.
+
+`internal/enrollment` supplies protected pins, isolated signed-Git verification,
+durable rollback state and local enrollment authority using the registrar
+packages. Every restart requires explicit operator reconciliation. The proposed
+Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
 | Path | Contents |
 | --- | --- |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
+| `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
 | `go.mod`, `go.sum` | Go version and exact registrar dependency pin |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
 | `cmd/keymaker/` | Production `serve` and `version` entry points |
@@ -53,6 +58,12 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Test enrollment authority: `go test ./internal/enrollment` | Named verdicts; isolated fixture registries/keys under the Go temporary directory, cleaned by tests |
+| Go | Targeted race check: `GOMAXPROCS=2 go test -race ./internal/enrollment -run 'TestConcurrentReloadAuthorize\|TestStoreCompareAndSwap\|TestInterruptedWriteFencesUntilRestart' -count=1 -p=1` | Race diagnostics and verdicts |
+| Go | Run the published enrollment fixture integration: `GOPROXY=off go test -v ./internal/enrollment -run '^TestRegistrarEnrollmentConformance$' -count=1` | 111 negative/23 positive local pinned-module rows; no test-time fetch |
+| Go | Vet enrollment authority: `go vet ./internal/enrollment` | Diagnostics on stdout/stderr |
+| gofmt | Check enrollment formatting: `gofmt -l internal/enrollment/*.go` | Empty output expected |
+| Git + OpenSSH | Production uses `/usr/bin/git cat-file` and `merge-base --is-ancestor`; fixture tests invoke `/usr/bin/ssh-keygen -t ed25519` and Git `commit-tree -S` | Local objects and temporary test-only keys; no network or inherited SSH agent |
 | Go | Test the native wire layer: `go test ./internal/control/...` | Test verdicts; temporary sockets cleaned by tests |
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |

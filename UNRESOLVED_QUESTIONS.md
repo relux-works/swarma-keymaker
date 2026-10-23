@@ -40,3 +40,25 @@ The helper's wrapper and local refusal codes remain Keymaker-owned; registrar
 loader diagnostics are not silently renamed into signed-format rules. The
 helper is Ed25519-only in v0 although the registrar also supports P-256.
 No unresolved interface may be replaced with an allow-all production stub.
+
+## Enrollment adapter activation gates
+
+The registrar dependency pin and bump rule are in [README.md](README.md#registrar-dependency).
+The local adapter and its explicit bounds are in [internal/enrollment/README.md](internal/enrollment/README.md).
+
+- A missing station `uid_map` is a registrar schema failure that fences the whole
+  snapshot. The helper returns `enrollment_unverified`; `uid_map_required` was
+  removed. No alternate parser or group fallback is provided.
+- The shared interim normal-restart policy requires an explicit operator
+  reconciliation after every start. Local readability alone cannot establish
+  freshness. The shipped `OperatorReconciler` requires a root-protected approval
+  for a fresh startup challenge and exact state digest. An external-witness
+  policy requires a future design decision and is not shipped.
+- The pinned registrar Store contract now states that a Commit error leaves
+  durable state indeterminate. The adapter returns neither old nor new authority
+  and fences until a new start with operator reconciliation; this is aligned.
+- The published enrollment-1 suite (111 negative/23 positive) runs through the
+  local adapter's conformance test. All published rows are supported. Later
+  unpublished rows need an explicit dependency bump and are not claimed.
+- Binding enforcement, native helper wiring and body construction/signing remain
+  integration obligations; local enrollment authority alone cannot issue a proof.

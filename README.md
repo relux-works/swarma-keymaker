@@ -40,7 +40,8 @@ publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
 Linux and Go 1.26 are required; `go.mod` uses only the standard library.
 The single-UID integration needs Git and OpenSSH (`ssh-keygen`). The runbook
-checker needs Bash. Multi-UID qualification additionally requires the owner's
+checker needs Bash and uses `/usr/sbin/visudo` when installed. Multi-UID
+qualification additionally requires the owner's
 pre-provisioned test accounts and noninteractive sudo permissions.
 
 Run from the repository root. Set `SCRATCH` to an existing absolute scratch
@@ -66,10 +67,16 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all ten are killed |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
-| Go + Bash | Check actual marked shell preflights with stubbed NSS and mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; temporary path fixtures under `TMPDIR`, then removed; no account writes |
-| Go + Bash | Plant inverted-getent and window-path bypass regressions in memory: `go run ./tools/runbook-check/main.go -plant` | Expected exit 1 naming collision/lookup and `TestRunbookWindowPathBeforeMutation` failures; production files unchanged |
+| Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |
+| Go + Bash + visudo | Plant lookup/path bypasses, unsupported `requiretty` and validation-after-allocation in memory: `go run ./tools/runbook-check/main.go -plant` | Expected exit 1 naming guard, `TestRunbookWindowSudoersCompatibility` and `TestRunbookWindowValidationBeforeMutation` failures; missing parser is SKIPPED; production files unchanged |
 | Python 3 | JSON syntax: `python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("vectors").glob("*.json")]'` | Exit status; no files |
 | Git | Scope: `git diff --check`; signatures: `git log --format="%h %G?"` | Diagnostics and signature verdicts |
+
+The parser case is counted as passed only when the real parser executes and
+accepts the exact constrained rules. An absent parser is printed as SKIPPED with
+a reason and a separate count; compatibility remains unverified. All account,
+group, install and rename steps in the order checks are stubs; the generated
+policy is parsed from private scratch without changing installed sudoers.
 
 | Direct window-runner status | Meaning |
 | --- | --- |

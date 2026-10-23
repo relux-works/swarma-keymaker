@@ -820,6 +820,7 @@ TEST_A=${TEST_A:-platform-test-a}
 TEST_B=${TEST_B:-platform-test-b}
 TEST_GROUP=${TEST_GROUP:-platform-test-reg}
 WINDOW_SUDOERS=/etc/sudoers.d/agent-platform-test
+WINDOW_SUDOERS_NEW=/etc/sudoers.d/.agent-platform-test.new
 for window_name in "$RUNNER_USER" "$TEST_A" "$TEST_B" "$TEST_GROUP"; do
   case "$window_name" in ''|*[!a-z0-9_-]*|-*|[0-9]*) exit 1 ;; esac
 done
@@ -828,17 +829,28 @@ test "$RUNNER_USER" != "$TEST_A"
 test "$RUNNER_USER" != "$TEST_B"
 RUNNER_UID=$(id -u -- "$RUNNER_USER")
 test "$RUNNER_UID" -ne 0
+# runbook-check:begin window-provision
 # runbook-check:begin window-preflight
 require_absent passwd "$TEST_A"
 require_absent passwd "$TEST_B"
 require_absent group "$TEST_A"
 require_absent group "$TEST_B"
 require_absent group "$TEST_GROUP"
-if [ -e "$WINDOW_SUDOERS" ] || [ -L "$WINDOW_SUDOERS" ]; then
-  printf 'existing window path: %s\n' "$WINDOW_SUDOERS" >&2
-  exit 1
-fi
+for window_path in "$WINDOW_SUDOERS" "$WINDOW_SUDOERS_NEW"; do
+  if [ -e "$window_path" ] || [ -L "$window_path" ]; then
+    printf 'existing window path: %s\n' "$window_path" >&2
+    exit 1
+  fi
+done
 # runbook-check:end window-preflight
+WINDOW_TMP=$(mktemp -d)
+trap 'rm -rf -- "$WINDOW_TMP"' EXIT
+# runbook-check:begin window-sudoers-content
+printf '%s ALL=(%s,%s) NOPASSWD: ALL\n%s ALL=(%s:%s) NOPASSWD: ALL\n' \
+  "$RUNNER_USER" "$TEST_A" "$TEST_B" \
+  "$RUNNER_USER" "$RUNNER_USER" "$TEST_GROUP" > "$WINDOW_TMP/agent-platform-test"
+# runbook-check:end window-sudoers-content
+visudo -cf "$WINDOW_TMP/agent-platform-test"
 # runbook-check:begin window-allocation
 groupadd --system "$TEST_GROUP"
 useradd --system --no-create-home --home-dir /nonexistent \
@@ -847,28 +859,28 @@ useradd --system --no-create-home --home-dir /nonexistent \
   --shell /usr/sbin/nologin "$TEST_B"
 # runbook-check:end window-allocation
 usermod -a -G "$TEST_GROUP" "$TEST_A"
-(
-  umask 0337
-  set -o noclobber
-  printf 'Defaults:%s !requiretty\n%s ALL=(%s,%s) NOPASSWD: ALL\n%s ALL=(%s:%s) NOPASSWD: ALL\n' \
-    "$RUNNER_USER" "$RUNNER_USER" "$TEST_A" "$TEST_B" \
-    "$RUNNER_USER" "$RUNNER_USER" "$TEST_GROUP" > "$WINDOW_SUDOERS"
-)
-chown root:root "$WINDOW_SUDOERS"
-chmod 0440 "$WINDOW_SUDOERS"
-visudo -cf "$WINDOW_SUDOERS"
+install -o root -g root -m 0440 "$WINDOW_TMP/agent-platform-test" "$WINDOW_SUDOERS_NEW"
+mv -T -- "$WINDOW_SUDOERS_NEW" "$WINDOW_SUDOERS"
+visudo -c
 id "$TEST_A"
 id "$TEST_B"
+# runbook-check:end window-provision
 ```
 
 Both accounts have no created home, a nologin shell and no assigned password;
 `useradd` without a password leaves the account locked. Only A belongs to the
 new test group. The sudoers drop-in permits arbitrary fixture commands only
 as A, B, or the runner with that group. It has no root or wildcard Runas target
-and does not add the runner to a privileged group. `!requiretty` permits
-noninteractive test clients, not additional identities. A failed partial setup
-requires owner inspection before retrying; no absent state file proves that an
-existing account or path is safe to delete. No production secrets are involved.
+and does not add the runner to a privileged group. sudo-rs's `visudo` rejects
+`requiretty`, so this window emits only the two constrained Runas rules.
+The private temporary candidate is parsed before any account, group or installed
+file change; unknown run-as accounts do not prevent that syntax validation.
+Both destination paths must be absent, including dangling symlinks. The validated
+file is installed as root:root 0440 under the dotted staging name (ignored by
+sudo), then moved with `mv -T` to the final name. A full `visudo -c` checks the
+resulting policy. A failed partial setup requires owner inspection before
+retrying; no absent state file proves that an existing account or path is safe
+to delete. No production secrets are involved.
 
 ### 12.3 Verify and run as the unprivileged runner
 

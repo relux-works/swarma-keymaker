@@ -237,3 +237,26 @@ func (r Registry) Extends(old Registry) Code {
 	}
 	return ""
 }
+
+func (r Registry) ContainsIdentityPath(path string) bool {
+	if ValidatePath(path, "agent-identity") != "" || r.Validate() != "" {
+		return false
+	}
+	indices, _ := parsePath(path)
+	for _, p := range r.Products {
+		if p.Index|0x80000000 != indices[1] {
+			continue
+		}
+		for _, j := range p.Projects {
+			if j.Index|0x80000000 != indices[2] {
+				continue
+			}
+			for _, a := range j.Agents {
+				if a.Index|0x80000000 == indices[3] {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}

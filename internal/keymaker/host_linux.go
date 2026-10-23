@@ -3,6 +3,7 @@
 package keymaker
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -169,7 +170,10 @@ func StrictJSON(r io.Reader, v any) error {
 	if err != nil || len(b) > 256<<20 {
 		return failure("state capacity exceeded")
 	}
-	d := json.NewDecoder(strings.NewReader(string(b)))
+	if duplicateJSON(b) {
+		return failure("ambiguous JSON evidence")
+	}
+	d := json.NewDecoder(bytes.NewReader(b))
 	d.DisallowUnknownFields()
 	if err = d.Decode(v); err != nil {
 		return failure("invalid configuration")
@@ -230,4 +234,78 @@ func (UnavailableGeneration) Watch(uint32, string) (<-chan struct{}, func()) {
 	c := make(chan struct{})
 	close(c)
 	return c, func() {}
+}
+
+// safeAncestors is a production configuration preflight. Test-only injected
+// runtimes do not relax deployment ownership or writable-ancestor checks.
+func safeAncestors(path string, uid uint32) error {
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return failure("unsafe configured path")
+	}
+	for d := path; ; d = filepath.Dir(d) {
+		st, e := os.Lstat(d)
+		if e != nil || !st.IsDir() || st.Mode().Perm()&022 != 0 {
+			return failure("unsafe configured ancestor")
+		}
+		owner := st.Sys().(*syscall.Stat_t).Uid
+		if owner != 0 && owner != uid {
+			return failure("unsafe configured ancestor owner")
+		}
+		if d == "/" {
+			return nil
+		}
+	}
+}
+func duplicateJSON(b []byte) bool {
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	var value func(int) bool
+	value = func(depth int) bool {
+		if depth > 16 {
+			return false
+		}
+		token, e := d.Token()
+		if e != nil {
+			return false
+		}
+		delim, ok := token.(json.Delim)
+		if !ok {
+			return true
+		}
+		switch delim {
+		case '{':
+			seen := map[string]bool{}
+			for d.More() {
+				key, e := d.Token()
+				if e != nil {
+					return false
+				}
+				name, ok := key.(string)
+				if !ok || seen[name] {
+					return false
+				}
+				seen[name] = true
+				if !value(depth + 1) {
+					return false
+				}
+			}
+			end, e := d.Token()
+			return e == nil && end == json.Delim('}')
+		case '[':
+			for d.More() {
+				if !value(depth + 1) {
+					return false
+				}
+			}
+			end, e := d.Token()
+			return e == nil && end == json.Delim(']')
+		default:
+			return false
+		}
+	}
+	if !value(0) {
+		return true
+	}
+	_, e := d.Token()
+	return e != io.EOF
 }

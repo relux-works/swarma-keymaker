@@ -187,3 +187,18 @@ func TestMasterStorageGuards(t *testing.T) {
 		})
 	}
 }
+
+// A corrupted protected JSON record cannot choose a later duplicate field; a
+// valid nearby record remains accepted. This is local-state parsing, not surface B.
+func TestStateJSONRejectsAmbiguity(t *testing.T) {
+	for _, raw := range []string{`{"next_registration_number":1,"next_registration_number":2,"records":[]}`, `{"records":[{"uid":1,"uid":2}]}`} {
+		var v any
+		if StrictJSON(bytes.NewBufferString(raw), &v) == nil {
+			t.Fatal("duplicate evidence accepted")
+		}
+	}
+	var good map[string]any
+	if e := StrictJSON(bytes.NewBufferString(`{"records":[],"next_registration_number":1}`), &good); e != nil {
+		t.Fatal(e)
+	}
+}

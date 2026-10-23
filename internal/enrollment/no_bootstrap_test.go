@@ -72,7 +72,7 @@ func (f *earlyBootstrapFiles) Lstat(path string) (Metadata, error) {
 	}
 	return m, err
 }
-func TestBootstrapPreMarkerFailuresNeverAdmit(t *testing.T) {
+func TestBootstrapPreIntentCommitFailureRequiresReconciliation(t *testing.T) {
 	for _, stage := range []string{"commit-lock", "state-read", "marker-create"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newFixture(t)

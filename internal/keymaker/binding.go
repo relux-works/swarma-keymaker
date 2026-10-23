@@ -25,13 +25,18 @@ type GenerationSource interface {
 	WithActive(context.Context, uint32, string, func() Code) Code
 	// WithEvidence validates all named generations under the same retirement
 	// barrier and holds it through the callback. No nested Lookup is permitted.
+	// A condition with Verdict records its current predicate verdict instead of
+	// refusing before the callback. The callback must enforce that verdict before
+	// any effect requiring this condition. This supports atomic retained-result
+	// selection under the Store lock without reacquiring the generation barrier.
 	WithEvidence(context.Context, []GenerationCondition, func() Code) Code
 	Watch(uint32, string) (<-chan struct{}, func())
 }
 
 type GenerationCondition struct {
 	Principal Principal
-	Retired   bool // Require retiring/removed instead of active for cleanup.
+	Retired   bool  // Require retiring/removed instead of active for cleanup.
+	Verdict   *Code // Optional deferred predicate; initialize to unavailable.
 }
 
 // Generation tokens are opaque; their encoding belongs to the user-manager journal.

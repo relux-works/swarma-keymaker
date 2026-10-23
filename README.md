@@ -87,7 +87,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |
 | Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |
 | Go | Compile pending suite: `go test -c -buildvcs=false -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Tagged binary; compilation is not qualification |
-| Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all seventeen are killed |
+| Go | Run narrowing controls (default `core`, including native): `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all eighteen are killed |
+| Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Eight native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
@@ -135,7 +136,11 @@ refusal where transport permits it. A partial success write closes without a
 second reply. The native adapter uses `GenerationSource.WithActive` for
 hello/self reads and one `WithEvidence` barrier for mutation release, carrying
 every generation predicate required by the fresh effect through the actual write. Exact historical
-retries recover their original result under current caller authority.
+retries recover their original result under current caller authority. Transaction
+selection rechecks retained state under the Store lock inside the generation
+barrier before applying fresh-target predicates, including concurrent retries.
+`GenerationCondition.Verdict` defers a target predicate to that callback; it must
+be enforced before a fresh effect. Release conditions never defer predicates.
 A lookup followed by an unprotected write does not satisfy this contract.
 
 Hello does not select a binding. The first self `pubkey` pins that connection's

@@ -322,16 +322,24 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		connection.prepared = c == "" && replay != nil
 		return replay, control.Code(c)
 	}
-	plan, c := n.plan(ctx, p, r)
-	if c != "" {
-		return nil, control.Code(c)
-	}
+	plan, planCode := n.plan(ctx, p, r)
 	conditions := []GenerationCondition{{Principal: p}}
 	if plan.target != nil {
 		conditions = append(conditions, *plan.target)
 	}
+	// Observe the target predicate under the same generation barrier as the
+	// caller, but defer its refusal until after retained-result selection. An
+	// earlier lookup is only a fast replay path: it cannot decide that execution
+	// is fresh. Another connection can commit that ID while this one waits for
+	// the barrier. The authoritative lookup and fresh-target gate below both
+	// hold Store.mu inside that barrier, with no intervening commit possible.
+	effectConditions := append([]GenerationCondition(nil), conditions...)
+	targetCode := Code("generation_source_unavailable")
+	if plan.target != nil {
+		effectConditions[1].Verdict = &targetCode
+	}
 	var result control.Object
-	c = n.Engine.Generations.WithEvidence(ctx, conditions, func() Code {
+	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func() Code {
 		s := n.Engine.Store
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -346,6 +354,12 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 			result, c = s.resultObject(old)
 			connection.prepared = c == ""
 			return c
+		}
+		if planCode != "" {
+			return planCode
+		}
+		if plan.target != nil && targetCode != "" {
+			return targetCode
 		}
 		if ctx.Err() != nil {
 			return "request_deadline_exceeded"

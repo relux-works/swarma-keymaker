@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core or registration controls")
+	group := flag.String("group", "core", "core (including native), native or registration controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "registration") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|registration]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -32,6 +32,29 @@ func main() {
 	}
 	socketGuard := "\tif syscall.Fchownat(fd, \"control.sock\", os.Getuid(), int(gid), 0x100 /* Linux AT_SYMLINK_NOFOLLOW */) != nil || syscall.Fchmodat(fd, \"control.sock\", 0660, 0) != nil {\n\t\treturn fail()\n\t}\n\tst, err := os.Lstat(staged)\n\tif err != nil {\n\t\treturn fail()\n\t}\n\tstat := st.Sys().(*syscall.Stat_t)\n\tif st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || stat.Uid != uint32(os.Getuid()) || stat.Gid != gid {\n\t\treturn fail()\n\t}\n"
 	socketFallback := "\t_ = syscall.Fchmodat(fd, \"control.sock\", 0666, 0)\n\tst, err := os.Lstat(staged)\n\tif err != nil { return fail() }\n\tstat := st.Sys().(*syscall.Stat_t)\n"
+	// Move only the authoritative retained snapshot before the generation
+	// barrier, retaining Store synchronization and every authority predicate.
+	replayInside := `	var result control.Object
+	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func() Code {
+		s := n.Engine.Store
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if c := connection.bindingActive(s); c != "" {
+			return c
+		}
+		old, c := s.retained(p, r)`
+	replayOutside := `	var result control.Object
+	n.Engine.Store.mu.Lock()
+	outside, outsideCode := n.Engine.Store.retained(p, r)
+	n.Engine.Store.mu.Unlock()
+	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func() Code {
+		s := n.Engine.Store
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if c := connection.bindingActive(s); c != "" {
+			return c
+		}
+		old, c := outside, outsideCode`
 	controls := []struct{ name, file, old, new, test, needle, witness string }{
 		{"peer-uid", "binding.go", "if b.UID != peer.UID {", "if false {", "^TestRefusalVectors$/^binding-wrong-uid$/^negative$", "--- FAIL: TestRefusalVectors/binding-wrong-uid/negative", "code \"\", want"},
 		{"namespace", "wire.go", "if string(namespace) != \"git\" {", "if len(namespace) < 0 {", "^TestRefusalVectors$/^ssh-namespace$/^negative$", "--- FAIL: TestRefusalVectors/ssh-namespace/negative", "code \"\", want"},
@@ -46,10 +69,21 @@ func main() {
 		{"native-operator", "native.go", "if p != n.Config.Operator {", "if false {", "^TestNativeVectors$/^register-wrong-uid$/^negative$", "--- FAIL: TestNativeVectors/register-wrong-uid/negative", "want role_not_permitted"},
 		{"native-persistent-revoke", "native.go", "if b.Lifetime == \"persistent\" && mode == \"ephemeral\" {", "if false {", "^TestNativeVectors$/^revoke-persistent-as-ephemeral$/^negative$", "--- FAIL: TestNativeVectors/revoke-persistent-as-ephemeral/negative", "want persistent_revoke_requires_operator"},
 		{"native-socket-permissions", "native_socket_linux.go", socketGuard, socketFallback, "^TestNativeSocketPermissions$/^invalid-group$", "--- FAIL: TestNativeSocketPermissions/invalid-group", "unsafe control group or path admitted"},
+		{"native-replay-before-target-barrier", "native.go", replayInside, replayOutside, "^TestNativeConcurrentTargetReplay$/^same-id-(retired|reused)$", "--- FAIL: TestNativeConcurrentTargetReplay/same-id-retired", "REGRESSION: concurrent exact retry refused after committed result became available"},
 		{"native-target-release", "native.go", "connection.conditions = conditions", "connection.conditions = conditions[:1]", "^TestNativeMutationReleasePrincipals$/^target$", "--- FAIL: TestNativeMutationReleasePrincipals/target", "mutation release lost target authority but emitted result"},
 		{"native-binding-pin", "native.go", "if c := connection.pin(n.Engine.Store, b); c != \"\" {", "if c := Code(\"\"); c != \"\" {", "^TestNativeConnectionBindingPin$", "--- FAIL: TestNativeConnectionBindingPin", "old control connection adopted replacement binding"},
 		{"native-accepted-generation", "server_linux.go", "s.controlWire.ServeConnAccepted(nativeCtx, c, control.Peer{UID: p.UID, Generation: g.Generation})", "s.controlWire.ServeConn(nativeCtx, c)", "^TestNativeAcceptTupleBeforeHello$/^true$", "--- FAIL: TestNativeAcceptTupleBeforeHello/true", "accepted tuple changed before hello but emitted success"},
 		{"native-release-fence", "native.go", "return n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, release)", "return release()", "^TestNativeReleaseFence$/^hello$/^retirement-wins$", "--- FAIL: TestNativeReleaseFence/hello/retirement-wins", "native retirement released success"},
+	}
+	// Preserve the default custody controls; native selects only their subset.
+	if *group == "native" {
+		all := controls
+		controls = nil
+		for _, c := range all {
+			if strings.HasPrefix(c.name, "native-") {
+				controls = append(controls, c)
+			}
+		}
 	}
 	pkg := "./internal/keymaker"
 	if *group == "registration" {

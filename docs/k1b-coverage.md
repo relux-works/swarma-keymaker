@@ -62,6 +62,9 @@ or production signed-act qualification.
 | Audit reserve | `TestNativeAuditReserve` | Control/refusal evidence can use the reserved tail; ordinary agent success cannot; small writer budget, not journal load qualification |
 | Mutation retry accounting | `TestNativeMutationRetryBudget` | Four exact retries consume burst, fifth refuses without state change; restored credit recovers one effect |
 | Durable complete arguments/results | `TestNativeDurableRetries`, `TestNativeConcurrentRetry`, `TestNativeCanonicalRetainedArguments` | Changed method/args/signed evidence conflict; exact retry/restart/concurrent attempt produces one effect; timeout change is not new identity |
+| Concurrent revoke planning | `TestNativeConcurrentRevokeReplay/{same-id,different-id,changed-arguments}` | The retained winner outranks a stale revoked-plan refusal; a fresh ID sees the tombstone and changed arguments conflict, without another effect |
+| Fresh target verdict | `TestNativeFreshTargetEvidence/{active,retired,reused,missing,unverified,verdict-not-recorded}` | Only the active control commits; exact inactive/mismatched/unavailable refusals retain no intent, result, binding or allocated number; an unrecorded verdict fails closed |
+| Concurrent target changes | `TestNativeConcurrentTargetReplay/{same-id,same-id-retired,same-id-reused,different-id,changed-arguments,retired-caller}`, `TestNativeMutationHistoricalRelease` | A paused real-socket request sees the concurrent winner before target refusal; original result, unchanged snapshot and one effect; fresh retired target, changed arguments, distinct ID and retired caller refuse under their respective contracts |
 | Crash windows | `TestNativeTransactionCrash` | Intent-only and result-journal-only fence; durable result before response replays after restart; intact control |
 | Retained schema | `TestNativeRetainedSchema`, `TestSnapshotSchemaRequired` | Missing/null/unknown caller/entry members, noncanonical args, invalid ID/method/status/result and duplicate IDs reject without rewrite; intact paired reopen |
 | Protected config shape | `TestNativeConfigSchema` | Required group/operator/UID/generation; no numeric-zero default authority; file provisioning is not exercised |
@@ -74,11 +77,13 @@ or production signed-act qualification.
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` uses bounded Go overlays,
 never overwrites source, and requires a named assertion witness rather than a
 compile/setup failure. The ten existing K1a controls remain. The four original
-native controls plus three lifecycle controls bring the wrapper to seventeen; wrapper exit 0 means every mutant's
-named test exited 1 with the intended witness.
+native controls plus three lifecycle controls and one concurrent replay control
+bring the wrapper to eighteen; wrapper exit 0 means every mutant's named test
+exited 1 with the intended witness.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
 | --- | --- | --- | --- |
+| `native-replay-before-target-barrier` | Move the authoritative retained lookup outside the generation barrier, preserving Store synchronization and all authority predicates | `TestNativeConcurrentTargetReplay/same-id-retired`, `/same-id-reused` | Killed; the winner commits while the retry waits, and the still-current caller must recover its result after target retirement or reuse |
 | `native-operator` | Remove exact configured operator tuple check | `TestNativeVectors/register-wrong-uid/negative` | Killed; real kernel UID projected against a different configured operator; not live multi-UID qualification |
 | `native-persistent-revoke` | Remove persistent-as-ephemeral refusal | `TestNativeVectors/revoke-persistent-as-ephemeral/negative` | Killed; exact required code, not generic failure |
 | `native-socket-permissions` | Replace group/mode validation with 0666 fallback | `TestNativeSocketPermissions/invalid-group` | Killed; unassignable group cannot admit a daemon |

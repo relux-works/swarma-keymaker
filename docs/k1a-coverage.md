@@ -1,8 +1,9 @@
 # K1a coverage map
 
-This implementation follows the normative reference at `25ea2ad`. All 70
-negative vector IDs are accounted for below: 31 executed K1a pairs and 39
-explicitly deferred K1b pairs. No in-scope vector is unexecuted.
+The original K1a implementation follows the normative reference at `25ea2ad`.
+Its 31 executed pairs remain below. [K1b coverage](k1b-coverage.md) maps the
+additional 23 native daemon pairs and the 16 explicitly deferred helper rows;
+together the documents account for all 70 vector IDs.
 
 Each executed row runs `TestRefusalVectors/<id>/negative` first, then
 `TestRefusalVectors/<id>/control`. Tests assert the exact code, no released
@@ -55,57 +56,13 @@ invalidation tests; static inputs alone do not prove a race fence.
 | `audit-append-failure` | `audit_release` | `TestRefusalVectors/audit-append-failure/negative` |
 | `audit-sync-failure` | `audit_release` | `TestRefusalVectors/audit-sync-failure/negative` |
 
-## Rows outside this task
+## Rows outside the original K1a assignment
 
-The assignment's explicit “Out of K1a (goes to K1b): surface B native control
-ops (pubkey/register/revoke), registration helper, enrollment loading” clause
-excludes the following rows. Native decrypt/material-export probes remain
-listed here because their evaluation endpoint is native; no decrypt or export
-path is implemented by the agent. Agent unknown opcodes already refuse.
-These rows are not claimed passing and are not silently covered by fixture
-syntax checks.
-
-| Row ID | Deferred evaluation |
-| --- | --- |
-| `native-oversize` | `native_framing` (K1b clause above) |
-| `native-truncated` | `native_framing` (K1b clause above) |
-| `native-zero-length` | `native_framing` (K1b clause above) |
-| `native-noncanonical` | `native_framing` (K1b clause above) |
-| `native-duplicate-key` | `native_framing` (K1b clause above) |
-| `native-negative-zero` | `native_framing` (K1b clause above) |
-| `native-float` | `native_framing` (K1b clause above) |
-| `native-unsafe-integer` | `native_framing` (K1b clause above) |
-| `native-invalid-unicode` | `native_framing` (K1b clause above) |
-| `native-unknown-version` | `native_framing` (K1b clause above) |
-| `native-claimed-uid` | `native_framing` (K1b clause above) |
-| `register-wrong-uid` | `native_method` (K1b clause above) |
-| `revoke-wrong-uid` | `native_method` (K1b clause above) |
-| `revoke-persistent-as-ephemeral` | `native_method` (K1b clause above) |
-| `revoke-no-act-verifier` | `native_method` (K1b clause above) |
-| `revoke-invalid-act` | `native_method` (K1b clause above) |
-| `helper-uid-absent` | `registration_helper` (K1b clause above) |
-| `helper-name-not-mapped` | `registration_helper` (K1b clause above) |
-| `helper-wrong-audience` | `registration_helper` (K1b clause above) |
-| `helper-enrollment-missing` | `registration_helper` (K1b clause above) |
-| `helper-enrollment-unverified` | `registration_helper` (K1b clause above) |
-| `helper-enrollment-revoked` | `registration_helper` (K1b clause above) |
-| `helper-map-required` | `registration_helper` (K1b clause above) |
-| `helper-key-unenrolled` | `registration_helper` (K1b clause above) |
-| `helper-reused-uid` | `registration_helper` (K1b clause above) |
-| `domain-native-sign` | `native_method` (K1b clause above) |
-| `domain-decrypt-deferred` | `native_method` (K1b clause above) |
-| `no-material-private_key` | `native_method` (K1b clause above) |
-| `no-material-chain_code` | `native_method` (K1b clause above) |
-| `no-material-extended_private_key` | `native_method` (K1b clause above) |
-| `no-material-parent_seed` | `native_method` (K1b clause above) |
-| `no-material-sibling_seed` | `native_method` (K1b clause above) |
-| `helper-revoked-binding-fresh-connection` | `registration_helper` (K1b clause above) |
-| `helper-missing-binding` | `registration_helper` (K1b clause above) |
-| `helper-wrong-executable` | `registration_helper` (K1b clause above) |
-| `helper-undeterminable-executable` | `registration_helper` (K1b clause above) |
-| `helper-matching-executable` | `registration_helper` (K1b clause above) |
-| `helper-name-slash` | `registration_helper` (K1b clause above) |
-| `helper-mxid-length` | `registration_helper` (K1b clause above) |
+The original assignment excluded native control, helper and enrollment work.
+Native control's 23 pairs are now exercised by K1b integration; the 16
+`helper-*` rows remain outside integration because the task explicitly excludes
+the registration helper. Their complete row table and acceptance-clause reason
+are in [K1b coverage](k1b-coverage.md). They are not claimed passing.
 
 ## Additional evidence and limits
 
@@ -133,7 +90,7 @@ syntax checks.
 
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` plants only Go overlay
 files and requires the intended assertion failure; compilation/setup errors do
-not count. Its own exit is 0 only when all ten mutant subprocesses exit 1 for the
+not count. Its own exit is 0 only when all fourteen mutant subprocesses (the ten original K1a controls below and four native controls in the K1b map) exit 1 for the
 named assertion. No source file is overwritten.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
@@ -149,8 +106,8 @@ named assertion. No source file is overwritten.
 | Remove cross-binding check, retain missing-file refusal | An older valid snapshot cannot grant revoked signing authority beside the later journal | `TestSnapshotJournalDivergence/snapshot-before-revoke` | Killed (mutant test exit 1); demonstrates the forbidden signature over a real socket with the actual Master |
 | Make records optional, retain other schema checks | The decoder must require explicit records independently of the journal veto | `TestSnapshotSchemaRequired/revoked/missing-records` | Killed (mutant test exit 1); isolates omitted-member admission, with paired tombstone preservation checked separately |
 
-No surviving mutant is claimed killed. Only these ten specified narrowing
-mutants were planted. No separate implementation attack-surface table was
-provided in the brief; this vector map is not a claim of mutation coverage for
+No surviving mutant is claimed killed. These ten K1a narrowing
+mutants remain in the wrapper alongside the four native controls. No separate implementation attack-surface
+table was provided in the brief; this vector map is not a claim of mutation coverage for
 every implementation line or deferred surface. See [Linux testing](linux-testing.md)
 for recovery rules, actual limits and remaining deployment/generation gates.

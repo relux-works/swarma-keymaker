@@ -6,19 +6,21 @@ Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
 generation. Private identity keys never enter station processes.
 
-**Status: Linux v0 core and local enrollment authority ready for review.** The SSH-agent subset, durable binding
-store and audit journal have fixture-backed tests, including real Unix/OpenSSH/
-Git integration. Production `keymaker serve` refuses
-`generation_source_unavailable` until the authoritative journal format and
-ordering adapter exist. No fixture authority is compiled into that command.
-Native method integration and registration-helper wiring are separate work.
-The pure registration proof builder has local fixture-backed checks.
-There is no deployed security boundary or installer in this repository.
+**Status: Linux v0 core, native integration and local enrollment authority ready for review.** Both the
+SSH-agent subset and native control socket use the same binding/result store,
+audit journal, generation authority and admission limits. Tests include real
+Unix sockets and OpenSSH/Git with fixture authority. Production `keymaker serve`
+still refuses `generation_source_unavailable` until the authoritative generation
+journal and ordering adapter exist. No fixture authority is compiled into it.
+Persistent operator revocation remains closed without a signed-act verifier;
+`sign_registration` is unsupported. Registration-helper wiring is separate work.
+The pure registration proof builder has local fixture-backed checks. There is no
+deployed security boundary or installer here.
 
-`internal/control` implements bounded CCJ-1 framing, version negotiation and
-sequential request dispatch. Peer/generation authority, request-ID admission,
-method execution and final release fencing are required injected interfaces;
-no production control adapters are supplied.
+`internal/control` provides bounded CCJ-1 framing and dispatch.
+`internal/keymaker` supplies its kernel peer, durable request-ID, method,
+workload/audit and final release adapters. The normative contract and publication
+gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
 `internal/enrollment` supplies protected pins, isolated signed-Git verification,
 durable rollback state and local enrollment authority using the registrar
@@ -36,9 +38,10 @@ Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 | `go.mod`, `go.sum` | Go version and exact registrar dependency pin |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
 | `cmd/keymaker/` | Production `serve` and `version` entry points |
-| `internal/keymaker/` | Linux custody, derivation, bindings, audit and SSH-agent server |
+| `internal/keymaker/` | Linux custody, derivation, bindings/results, audit and both socket servers |
 | `cmd/keymaker-window/`, `internal/testwindow/` | Nonroot integration-window harness; separate from the daemon |
-| `docs/k1a-coverage.md` | Every refusal-vector row mapped to execution or explicit K1b scope |
+| `docs/k1a-coverage.md` | Surface A coverage and retained recovery controls |
+| `docs/k1b-coverage.md` | Native daemon coverage, recovery limits and deferred helper rows |
 | `docs/linux-testing.md` | Test isolation, window configuration and remaining qualification gates |
 | `tools/mutations/` | Bounded authorization, recovery and refusal control plants using Go overlays |
 | `tools/vectors/` | Reproducible derivation generator and fixture checks |
@@ -76,7 +79,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |
 | Go | Bounded decoder fuzzing: `GOMAXPROCS=2 go test ./internal/control -run '^$' -fuzz '^FuzzCCJRoundTrip$' -fuzztime=20s -parallel=1` | Verdicts and Go fuzz cache; failing corpus under `internal/control/testdata/fuzz/` |
-| Go | Narrow core/CLI/harness checks: `go test ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window` | Verdicts; temporary fixtures under `TMPDIR` |
+| Go | Native integration checks: `go test ./internal/keymaker -run '^TestNative' -count=1`; race: `go test -race ./internal/keymaker -run '^TestNative' -count=1` | Verdicts; temporary fixtures under `TMPDIR` |
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
 | gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
 | Go | Build daemon: `go build -o "$SCRATCH/keymaker" ./cmd/keymaker`; run `"$SCRATCH/keymaker" version` or `"$SCRATCH/keymaker" serve --config "$CONFIG"` | Binary; version or readiness refusal on stderr |
@@ -84,7 +87,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |
 | Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |
 | Go | Compile pending suite: `go test -c -buildvcs=false -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Tagged binary; compilation is not qualification |
-| Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all ten are killed |
+| Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all fourteen are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
@@ -115,9 +118,12 @@ is never a skipped or passing multi-UID qualification.
 
 The wire loop takes a caller-supplied listener or connection and enforces one
 sequential request at a time. Clients must wait for replies; it does not inspect
-kernel receive queues to infer when clients wrote subsequent bytes. Socket
-provisioning, connection/workload limits, method-specific parameter schemas,
-authorization, durable retries and audit remain core integration obligations.
+kernel receive queues to infer when clients wrote subsequent bytes. The core daemon supplies
+socket provisioning, shared connection/workload limits, exact parameter schemas,
+authorization, durable retries and audit. Its Observer is mandatory: every
+framed attempt obtains shared work credit before parsing/hashing; every refusal
+is durably reported or closes service health. Handler receives the complete
+admitted Request, including its exact ID, without per-peer request guessing.
 A successful hello pins the connection's UID and generation. A changed tuple or
 failed generation evidence refuses and closes; continuing work requires a fresh
 connection. `ReleaseFence.WithActive` must serialize authoritative generation,
@@ -125,15 +131,29 @@ final result/binding checks and durable audit with the actual response write for
 hello and methods. Encoding and write-deadline setup precede the barrier; a
 retirement that wins the barrier suppresses success and closes after a typed
 refusal where transport permits it. A partial success write closes without a
-second reply. The interface can wrap the core's `GenerationSource.WithActive`;
+second reply. The native adapter uses the core's `GenerationSource.WithActive`;
 a lookup followed by an unprotected write does not satisfy its contract.
 
 Exact retries may pass the request-ID interface for handler-owned result recovery;
 changed arguments must be refused by that generation-scoped interface.
 
-The native wire checks validate transport behavior with injected peers. They do
-not qualify a production daemon, enforce real kernel peer authentication or
-replace the pending integration tests listed in the specification.
+The wire package tests use injected peers; `TestNative*` separately exercises the
+real dual-surface daemon, Linux `SO_PEERCRED`, Master and paired durable Store.
+These are fixture-authority tests, not production generation-journal or live
+multi-UID qualification. See [coverage](docs/k1b-coverage.md).
+
+Protected daemon configuration includes numeric `service_uid`, `service_gid`,
+`control_gid` and `operator_principal: {"uid": <number>, "generation": "<token>"}`,
+plus `socket_dir`, `state_dir`, `master_file`, `registry_file`, `master_epoch`
+and `registry_revision`. Every member is required; paths must satisfy protected
+ownership rules. `control_gid` selects the helper group; startup fails if it
+cannot publish an exactly 0660 service-owned socket with that group. The
+operator's complete UID/generation tuple, rather than group membership, grants
+register/revoke intake. No supplied object can enable the absent act verifier.
+Native public results contain `public_key` (base64 of 32 raw Ed25519 bytes),
+`path`, `registration_number` and `master_epoch`; they contain no key material
+beyond the public key. A revoke result contains the registration number and
+`status: "revoked"`.
 
 ## Registrar dependency
 

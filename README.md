@@ -36,10 +36,16 @@ Keymaker stream, witnessed state epochs and startup/commit recovery rules.
 It is spec only: option A remains in use, and witness placement, keys,
 freshness, exclusion and lifecycle qualification remain open activation gates.
 
+The [Swarm Signer message proposal](spec/keymaker-msg.md) defines a purpose-4
+message key, constrained native signing, certification and paired text vectors.
+It is spec only: Seraph format alignment, generation/key continuity and the
+attestation issuer/publication model remain open. No new method is enabled.
+
 | Path | Contents |
 | --- | --- |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
+| `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
 | `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |

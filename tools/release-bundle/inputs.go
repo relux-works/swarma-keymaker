@@ -98,6 +98,9 @@ func targetPath(repo, name string) (string, error) {
 	return abs, nil
 }
 func validateInputs(o options) (map[string][]byte, error) {
+	if o.enrollment != "" {
+		return nil, errEnrollment
+	}
 	config, err := readInput(o.config)
 	if err != nil {
 		return nil, err
@@ -112,12 +115,6 @@ func validateInputs(o options) (map[string][]byte, error) {
 	var parsed keymaker.Registry
 	if keymaker.StrictJSON(bytes.NewReader(registry), &parsed) != nil || parsed.Validate() != "" {
 		return nil, errRegistry
-	}
-	if o.enrollment != "" {
-		if _, err := readInput(o.enrollment); err != nil {
-			return nil, err
-		}
-		return nil, errEnrollment
 	}
 	return map[string][]byte{"config.json": config, "name-indices.json": registry}, nil
 }

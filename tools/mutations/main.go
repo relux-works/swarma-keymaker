@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration or helper controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper or packaging controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -109,6 +109,13 @@ func main() {
 				_, pc := h.builder.Restore(ctx, raw, in)`, "^TestHelperDurableRetry$", "--- FAIL: TestHelperDurableRetry", "same-ID retry minted a new nonce"},
 		}
 	}
+	if *group == "packaging" {
+		pkg = "./tools/release-bundle"
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"packaging-dirty-tree", "source.go", "if len(status) != 0 {", "if false && len(status) != 0 {", "^TestReleaseDirtyTree$/^tracked$", "--- FAIL: TestReleaseDirtyTree/tracked", "dirty source admitted"},
+			{"packaging-unit-drift", "source.go", "if !ok || !bytes.Equal(unit, []byte(block)) {", "if !ok || false && !bytes.Equal(unit, []byte(block)) {", "^TestReleaseUnitMatchesSpec$/^modified$", "--- FAIL: TestReleaseUnitMatchesSpec/modified", "unit drift admitted"},
+		}
+	}
 	good := true
 	for _, c := range controls {
 		source := filepath.Join(root, pkg, c.file)
@@ -150,7 +157,10 @@ func main() {
 			}
 		}
 		log := filepath.Join(dir, c.name+".log")
-		os.WriteFile(log, out, 0600)
+		if os.WriteFile(log, out, 0600) != nil {
+			fmt.Fprintln(os.Stderr, c.name, "evidence log unavailable")
+			os.Exit(2)
+		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
 		fmt.Printf("mutant=%s test=%s actual_exit=%d killed=%t pid=%d log=%s\n", c.name, c.test, status, killed, pid, log)
 		if !killed {

@@ -80,7 +80,7 @@ its newly created target.
 
 This branch targets the standard-library-only baseline. PR #5's enrollment
 validator is not available here. With no `-enrollment`, enrollment.json is
-omitted. Any supplied regular enrollment input refuses with exactly
+omitted. Any supplied enrollment path refuses without opening it, with exactly
 `enrollment validation unavailable at this revision`; it is never accepted by a
 syntax-only JSON check. A follow-up after PR #5 must integrate its signed
 snapshot/pins validator and review offline dependency availability before adding
@@ -104,7 +104,21 @@ all root operations remain with the owner and the specification runbook.
 Tests use private temporary fixtures and clean clones of existing signed source
 commits. They create no fixture commits, use no host signing key/SSH agent and
 touch no system installation paths. A real positive build runs offline and checks
-its manifest with `sha256sum -c`; refusal tests preserve inputs and existing
+its manifest with `sha256sum -c`, then confirms a bounded corruption makes that
+actual command exit 1 naming the changed file; refusal tests preserve inputs and existing
 targets. Narrow commands and the two overlay controls are in the root README.
 No formal attack-surface table was supplied in this brief. These packaging checks
 do not qualify deployment, multi-UID behavior or the unavailable dependencies.
+
+The existing mutation runner's optional packaging group plants two bounded
+weakenings; the default ten core controls are unchanged. A plant is killed only
+by exit 1 and its named test plus intended behavioral witness, not a build/setup
+error. Both baseline negatives have valid clean/unit controls.
+
+| Mutant | Narrows the gate to | Named failing test |
+| --- | --- | --- |
+| packaging-dirty-tree | Rejecting tracked modifications before bundle creation | TestReleaseDirtyTree/tracked |
+| packaging-unit-drift | Exact unit equality, including a changed UMask | TestReleaseUnitMatchesSpec/modified |
+
+These witnesses do not claim exhaustive mutation coverage. Surviving or unapplied
+plants make the runner fail; they cannot be reported as killed.

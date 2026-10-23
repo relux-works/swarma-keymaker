@@ -73,33 +73,41 @@ entries are hashed independently using Git's object encoding before building.
 A different export refuses before compilation. Links and other archive types
 refuse. VERSION.json records the full commit and verified tree hash.
 
-The target is created exclusively under a pinned parent. Extraction, final files,
-manifest reads/writes and failure cleanup use directory handles, with
-`openat2` no-symlink resolution and exclusive output creation. The external Go
-build inherits the target descriptor and a Landlock write boundary, including
-its descendants. This Linux tool requires `openat2` and Landlock ABI 3 or later;
-unavailable confinement refuses without starting the build. A parent rename
-cannot redirect operations, and output symlinks never get followed.
+The target is created exclusively relative to a pinned parent. A parent writable
+by other users refuses unless sticky and owned by the caller or root. The opened
+root must be a directory owned by our euid, mode 0700 and empty. Final files and
+manifest use `openat2` no-symlink resolution and exclusive creation. A ledger
+records producer-created objects by device/inode from their creation handles,
+and keeps those inodes and parent handles open until cleanup. Cleanup checks
+identity, uses only nonrecursive unlink/rmdir, and preserves unknown entries,
+substitutions and nonempty directories. The target itself remains after failure.
 
-Build HOME, temporary files,
-module/cache directories and telemetry configuration are confined to the new
-target's `.build` directory. Pass `-module-cache` with a populated Go module
-cache containing the exact versions in the committed go.mod/go.sum. Its
-`cache/download` directory is used only as a read-only `file://` proxy. Go verifies
-module checksums against the committed go.sum; missing dependencies fail closed
-and empty the owned target. No dependency download is attempted over the
-network. The build uses
-`-modcacherw` for its private extracted module cache so both success and failure
-cleanup can remove it; the source download cache stays read-only.
-The tool disables network module resolution,
-workspace/global Go configuration and Git optional index writes. The binary's
-embedded build settings are checked. Source cleanliness and HEAD are rechecked
-before success. Build scratch is removed before manifest creation; failure
-removes descendants through the owned target handle and retains its empty
-directory. The parent entry is never removed after a check: Linux offers no
-atomic conditional unlink-by-inode, so doing so would reintroduce a replacement
-race. An actor's replacement directory and sibling files remain untouched.
-A pre-existing target and operator inputs are never removed or rewritten.
+Every Git child and external Go build inherits a Landlock write boundary and
+pinned scratch descriptor. Linux `openat2` and Landlock ABI >=3 are required;
+unavailable confinement refuses before starting the child. Git requires a
+narrow exception: a pinned `/dev/null` O_PATH descriptor, fstat-verified as
+character device 1:3, allows only read/write (no truncate/create/remove/rename).
+Builds have no device exception. Installed tool executables are trusted.
+Repository-local configuration grants no authority to execute programs. Filters
+selected for any tracked path via attributes refuse explicitly. Cleanliness
+compares raw bytes/executable bits to tree objects plus staged/untracked metadata;
+no clean/smudge, textconv, external diff, fsmonitor or hook is run.
+
+Set TMPDIR to a private, disposable directory. Each Git child gets private
+`release-git-*` scratch; builds use `release-build-*` scratch for HOME, source,
+cache, temporary files and binary. Child-created files have no parent-side
+creation handles, so are never claimed by cleanup: nonempty scratch is retained
+and its path reported. Review then dispose of that scratch separately. The
+release target contains only final bundle entries. Unknown inserted entries
+are preserved even on failure. A parent/target rename cannot redirect writes.
+
+Pass `-module-cache` with the exact committed dependency versions in its
+`cache/download` directory, used as a read-only `file://` proxy. No network
+fallback is enabled; missing dependencies fail closed. The build uses
+`-modcacherw` for its private extracted module cache, disables workspace/global
+Go configuration and checks embedded build settings. Source cleanliness and
+HEAD are rechecked before success. Pre-existing targets and inputs are never
+removed or rewritten.
 
 The final directory is private (0700), with binary 0700 and release data 0600;
 the owner's runbook assigns installation ownership and modes. Exit 0 means the
@@ -137,11 +145,11 @@ commits. They create no fixture commits, use no host signing key/SSH agent and
 touch no system installation paths. Real positive builds with and without
 enrollment run offline and check their manifests with `sha256sum -c`, then
 confirm a bounded corruption makes that command exit 1 naming the changed file.
-Refusal tests preserve inputs and existing targets. Narrow commands and the seven overlay controls are in the root README.
+Refusal tests preserve inputs and existing targets. Narrow commands and the twelve overlay controls are in the root README.
 No formal attack-surface table was supplied in this brief. These packaging checks
 do not qualify deployment, multi-UID behavior or the unavailable dependencies.
 
-The existing mutation runner's optional packaging group plants seven bounded
+The existing mutation runner's optional packaging group plants twelve bounded
 weakenings; the eighteen core controls, native subset and five registration
 controls are retained. A plant is killed only
 by exit 1 and its named test plus intended behavioral witness, not a build/setup
@@ -156,6 +164,12 @@ error. Negative witnesses have nearby valid controls.
 | packaging-replacement | Both Git replacement guards remain enabled | TestReleaseReplacementCommit/true |
 | packaging-tree-hash | Verify actual exported tree before compilation | TestReleaseExportTreeMismatch/true |
 | packaging-child-write | External build descendants cannot write through an escaping link | TestReleaseChildWriteBoundary/true |
+| packaging-recursive-cleanup | Unknown contents are never treated as owned creations | TestReleaseCleanupCreatedOnly/unrelated |
+| packaging-root-verification | Nonempty adopted roots refuse untouched | TestReleaseAdoptedRoot/nonempty |
+| packaging-git-boundary | Every Git child is confined before exec | TestReleaseGitPreflightBoundary/true |
+| packaging-filters | Conversion filters are explicitly refused | TestReleaseConfiguredFilters/attributes-file |
+| packaging-null-rdev | Null-device exception requires character device 1:3 | TestReleaseNullDeviceVerification |
+
 
 These witnesses do not claim exhaustive mutation coverage. Surviving or unapplied
 plants make the runner fail; they cannot be reported as killed.

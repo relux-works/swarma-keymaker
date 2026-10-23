@@ -85,13 +85,6 @@ func buildEnv(work, moduleCache string) []string {
 		"GOENV=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=" + proxy, "GOSUMDB=off", "GOTELEMETRY=off", "CGO_ENABLED=0", "GOOS=linux", "GOARCH=" + runtime.GOARCH, "GOMAXPROCS=2",
 	}
 }
-func runCommand(cmd *exec.Cmd) error {
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stderr, "release child pid=%d\n", cmd.Process.Pid)
-	return cmd.Wait()
-}
 
 type versionRecord struct {
 	Commit    string `json:"commit"`
@@ -135,29 +128,42 @@ func assemble(ctx context.Context, o options) (err error) {
 		return err
 	}
 	defer root.Close()
-	anchor, err := root.Open(".")
+	owned := &createdObjects{}
+	defer owned.close()
+	success := false
+	defer func() {
+		if !success || err != nil {
+			// Remove only objects recorded by their creation handles, never unknown entries.
+			// Retain the directory itself: Linux has no conditional unlink-by-inode,
+			// and rechecking then unlinking its parent entry would race a replacement.
+			if e := owned.cleanup(root); e != nil {
+				err = fmt.Errorf("bundle failed; owned target cleanup failed")
+			}
+		}
+	}()
+	scratch, _, releaseScratch, err := privateScratch("release-build-")
 	if err != nil {
 		return err
 	}
-	defer anchor.Close()
-	success := false
+	defer releaseScratch()
+	scratchOwned := &createdObjects{}
+	defer scratchOwned.close()
 	defer func() {
-		if !success {
-			// Remove descendants through the pinned inode, never a substituted path.
-			// Retain the directory itself: Linux has no conditional unlink-by-inode,
-			// and rechecking then unlinking its parent entry would race a replacement.
-			if e := cleanupRoot(root); e != nil {
-				err = fmt.Errorf("bundle failed; owned target cleanup failed")
-			}
-
+		if e := scratchOwned.cleanup(scratch); e != nil {
+			err = fmt.Errorf("private scratch cleanup failed")
 		}
 	}()
+	buildAnchor, err := scratch.Open(".")
+	if err != nil {
+		return err
+	}
+	defer buildAnchor.Close()
 	for _, dir := range []string{".build", ".build/source", ".build/home", ".build/tmp", ".build/cache", ".build/gopath"} {
-		if err = mkdirRootAll(root, dir); err != nil {
+		if err = mkdirRootAll(scratch, dir, scratchOwned); err != nil {
 			return err
 		}
 	}
-	sourceFile, err := openRootFile(root, ".build/source", os.O_RDONLY, 0)
+	sourceFile, err := openRootFile(scratch, ".build/source", os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -167,22 +173,22 @@ func assemble(ctx context.Context, o options) (err error) {
 		return err
 	}
 	defer source.Close()
-	if err = extractSource(ctx, p.repo, o.commit, source); err != nil {
+	if err = extractSource(ctx, p.repo, o.commit, source, scratchOwned); err != nil {
 		return fmt.Errorf("source snapshot refused")
 	}
 	if err = verifyTree(source, p.tree); err != nil {
 		return err
 	}
-	// Descriptor 3 anchors all child paths even if the target/parent is renamed.
+	// Descriptor 3 anchors child scratch independently of target/parent names.
 	work := "/proc/self/fd/3/.build"
 	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-modcacherw", "-p=2", "-ldflags=-buildid=", "-o", work+"/keymaker", "./cmd/keymaker")
-	build.ExtraFiles = []*os.File{anchor}
+	build.ExtraFiles = []*os.File{buildAnchor}
 	build.Dir = fmt.Sprintf("/proc/self/fd/%d", sourceFile.Fd())
 	build.Env = buildEnv(work, o.moduleCache)
-	if err = runConfined(build, anchor); err != nil {
+	if err = runConfined(build, buildAnchor); err != nil {
 		return fmt.Errorf("offline keymaker build failed")
 	}
-	binary, err := openRootFile(root, ".build/keymaker", os.O_RDONLY, 0)
+	binary, err := openRootFile(scratch, ".build/keymaker", os.O_RDONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -192,12 +198,12 @@ func assemble(ctx context.Context, o options) (err error) {
 		return errInput
 	}
 	versionCmd := exec.CommandContext(ctx, "/proc/self/fd/4", "version")
-	versionCmd.ExtraFiles = []*os.File{anchor, binary}
+	versionCmd.ExtraFiles = []*os.File{buildAnchor, binary}
 	versionCmd.Dir = fmt.Sprintf("/proc/self/fd/%d", sourceFile.Fd())
 	versionCmd.Env = buildEnv(work, o.moduleCache)
 	var version bytes.Buffer
 	versionCmd.Stdout = &version
-	if err = runConfined(versionCmd, anchor); err != nil || version.String() != o.version+"\n" {
+	if err = runConfined(versionCmd, buildAnchor); err != nil || version.String() != o.version+"\n" {
 		return errVersion
 	}
 	info, err := buildinfo.Read(binary)
@@ -218,11 +224,11 @@ func assemble(ctx context.Context, o options) (err error) {
 	}
 	p.files["VERSION.json"] = append(metadata, '\n')
 	for name, body := range p.files {
-		if err = writeRootFile(root, name, body, 0600); err != nil {
+		if err = owned.writeFile(root, name, body, 0600); err != nil {
 			return err
 		}
 	}
-	out, err := openRootFile(root, "keymaker", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
+	out, err := owned.createFile(root, "keymaker", 0700)
 	if err != nil {
 		return err
 	}
@@ -233,9 +239,6 @@ func assemble(ctx context.Context, o options) (err error) {
 	}
 	if closeErr != nil {
 		return closeErr
-	}
-	if err = root.RemoveAll(".build"); err != nil {
-		return err
 	}
 	if err = cleanSource(ctx, p.repo, o.commit); err != nil {
 		return err
@@ -254,7 +257,7 @@ func assemble(ctx context.Context, o options) (err error) {
 		digest := sha256.Sum256(raw)
 		fmt.Fprintf(&manifest, "%s  %s\n", hex.EncodeToString(digest[:]), name)
 	}
-	if err = writeRootFile(root, "SHA256SUMS", []byte(manifest.String()), 0600); err != nil {
+	if err = owned.writeFile(root, "SHA256SUMS", []byte(manifest.String()), 0600); err != nil {
 		return err
 	}
 	success = true

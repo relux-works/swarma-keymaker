@@ -35,6 +35,19 @@ func waitFile(t *testing.T, name string) {
 	}
 	t.Fatal("fixture synchronization not reached", name)
 }
+func waitScratch(t *testing.T, pattern string) string {
+	t.Helper()
+	end := time.Now().Add(40 * time.Second)
+	for time.Now().Before(end) {
+		matches, _ := filepath.Glob(filepath.Join(os.TempDir(), pattern))
+		if len(matches) == 1 {
+			return matches[0]
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("fixture scratch synchronization not reached", pattern)
+	return ""
+}
 func runOptions(ctx context.Context, o options) (int, string) {
 	args := []string{"-repo", o.repo, "-commit", o.commit, "-version", o.version, "-target", o.target, "-config", o.config, "-name-indices", o.registry}
 	if o.moduleCache != "" {
@@ -55,7 +68,7 @@ func wrapperDir(t *testing.T, f fixture) string {
 
 // Swapping the checked parent before target creation never redirects extraction.
 // Both cases reach the extracted source and then intentionally fail the fake Go
-// build, preserving the outside directory and cleaning the pinned target inode.
+// build, preserving the outside directory and retaining an empty pinned target.
 func TestReleaseParentSwap(t *testing.T) {
 	for _, attack := range []bool{false, true} {
 		t.Run(fmt.Sprint(attack), func(t *testing.T) {
@@ -73,7 +86,7 @@ func TestReleaseParentSwap(t *testing.T) {
 				t.Fatal(err)
 			}
 			bin := wrapperDir(t, f)
-			ready, release := filepath.Join(base, "ready"), filepath.Join(base, "release")
+			ready, release := "/proc/self/fd/3/ready", "/proc/self/fd/3/release"
 			script(t, filepath.Join(bin, "git"), "for a in \"$@\"; do last=$a; done\ncase \"$last\" in *:cmd/keymaker/main.go)\n"+pause(ready, release)+";; esac\nexec "+shellQuote(git)+" \"$@\"\n")
 			script(t, filepath.Join(bin, "go"), pause("/proc/self/fd/3/.build/ready", "/proc/self/fd/3/.build/release")+"exit 77\n")
 			t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
@@ -85,7 +98,7 @@ func TestReleaseParentSwap(t *testing.T) {
 			}
 			done := make(chan result, 1)
 			go func() { code, diagnostic := runOptions(ctx, f.o); done <- result{code, diagnostic} }()
-			waitFile(t, ready)
+			readyFile := waitScratch(t, "release-git-*/ready")
 			actual := parent
 			if attack {
 				actual = parent + "-moved"
@@ -96,12 +109,12 @@ func TestReleaseParentSwap(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			writeFixture(t, release, nil)
+			writeFixture(t, filepath.Join(filepath.Dir(readyFile), "release"), nil)
 			selected := filepath.Join(actual, "bundle")
-			waitFile(t, filepath.Join(selected, ".build/ready"))
-			_, sourceErr := os.Stat(filepath.Join(selected, ".build/source/go.mod"))
+			buildReady := waitScratch(t, "release-build-*/.build/ready")
+			_, sourceErr := os.Stat(filepath.Join(filepath.Dir(buildReady), "source/go.mod"))
 			entries, outsideErr := os.ReadDir(outside)
-			writeFixture(t, filepath.Join(selected, ".build/release"), nil)
+			writeFixture(t, filepath.Join(filepath.Dir(buildReady), "release"), nil)
 			got := <-done
 			if got.code != 1 || !strings.Contains(got.diagnostic, "offline keymaker build failed") {
 				t.Fatal("wrong controlled failure", got)
@@ -143,13 +156,13 @@ func TestReleaseOutputSymlink(t *testing.T) {
 			}
 			done := make(chan result, 1)
 			go func() { code, diagnostic := runOptions(ctx, f.o); done <- result{code, diagnostic} }()
-			waitFile(t, filepath.Join(f.o.target, ".build/ready"))
+			buildReady := waitScratch(t, "release-build-*/.build/ready")
 			if attack {
 				if err := os.Symlink(victim, filepath.Join(f.o.target, "config.json")); err != nil {
 					t.Fatal(err)
 				}
 			}
-			writeFixture(t, filepath.Join(f.o.target, ".build/release"), nil)
+			writeFixture(t, filepath.Join(filepath.Dir(buildReady), "release"), nil)
 			got := <-done
 			after, err := os.ReadFile(victim)
 			if err != nil || !bytes.Equal(after, original) {
@@ -159,7 +172,10 @@ func TestReleaseOutputSymlink(t *testing.T) {
 				if got.code != 1 {
 					t.Fatal("output link admitted", got)
 				}
-				emptyTarget(t, f.o.target)
+				st, err := os.Lstat(filepath.Join(f.o.target, "config.json"))
+				if err != nil || st.Mode()&os.ModeSymlink == 0 {
+					t.Fatal("cleanup deleted unrelated output link", err)
+				}
 			} else if got.code != 0 {
 				t.Fatal("valid bundle refused", got)
 			}
@@ -369,7 +385,7 @@ func TestReleaseTargetSwapCleanup(t *testing.T) {
 			defer cancel()
 			done := make(chan int, 1)
 			go func() { code, _ := runOptions(ctx, f.o); done <- code }()
-			waitFile(t, filepath.Join(f.o.target, ".build/ready"))
+			buildReady := waitScratch(t, "release-build-*/.build/ready")
 			selected := f.o.target
 			if attack {
 				selected += "-moved"
@@ -381,7 +397,7 @@ func TestReleaseTargetSwapCleanup(t *testing.T) {
 				}
 				writeFixture(t, filepath.Join(f.o.target, "foreign"), []byte("preserve"))
 			}
-			writeFixture(t, filepath.Join(selected, ".build/release"), nil)
+			writeFixture(t, filepath.Join(filepath.Dir(buildReady), "release"), nil)
 			if code := <-done; code != 1 {
 				t.Fatal("controlled build did not refuse", code)
 			}

@@ -89,7 +89,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Packaging parser and unit checks: `go test ./internal/keymaker -run '^TestPackagingConfig' -count=1`; `go test ./tools/release-bundle -count=1` | Paired refusals, clean-clone fixtures and offline real builds under TMPDIR |
 | Go | Packaging static checks: `go vet ./tools/release-bundle ./tools/mutations ./internal/keymaker`; `gofmt -l tools/release-bundle/*.go internal/keymaker/config_linux*.go internal/keymaker/runtime_linux.go` | Diagnostics; empty formatting output expected |
 | Go | Build offline assembler: `go build -trimpath -o "$SCRATCH/release-bundle" ./tools/release-bundle` | Tool binary under scratch |
-| release-bundle | Assemble: `"$SCRATCH/release-bundle" -repo "$SOURCE" -commit "$COMMIT" -version "$VERSION" -target "$BUNDLE" -config "$CONFIG" -name-indices "$REGISTRY" -module-cache "$MODULE_CACHE"` | New offline bundle directory; all temporary build work remains inside it |
+| release-bundle | Assemble: `"$SCRATCH/release-bundle" -repo "$SOURCE" -commit "$COMMIT" -version "$VERSION" -target "$BUNDLE" -config "$CONFIG" -name-indices "$REGISTRY" -module-cache "$MODULE_CACHE"` | New offline bundle directory; child work uses private TMPDIR scratch; unknown child files are retained |
 | sha256sum | Verify before the root step: `(cd "$BUNDLE" && sha256sum -c SHA256SUMS)` | Every listed file must report OK; exit 0 required |
 | Go | Test the native wire layer: `go test ./internal/control/...` | Test verdicts; temporary sockets cleaned by tests |
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
@@ -109,7 +109,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run narrowing controls (default `core`, including native): `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all eighteen are killed |
 | Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Eight native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
-| Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Seven named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all seven are killed, logs/PIDs in scratch |
+| Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Twelve named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all twelve are killed, logs/PIDs in scratch |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |
@@ -263,14 +263,30 @@ operator-controlled scratch parent, outside SOURCE and system paths. CONFIG and
 REGISTRY are regular operator-supplied files. MODULE_CACHE is a prepopulated Go
 module cache (locate it with `go env GOMODCACHE`) containing the exact committed
 dependency versions. The assembler uses its download cache as a read-only file
-proxy, with no network fallback; all writable caches stay inside BUNDLE. The
+proxy, with no network fallback; writable child caches use private TMPDIR scratch. The
 [packaging contract](packaging/README.md) documents every member and refusal.
 
-The Linux assembler requires `openat2` and Landlock ABI 3 or later. Output and
-cleanup use pinned directory handles; child builds inherit a kernel write
-boundary. A failed build empties its owned target through that handle and retains
-the directory, avoiding an unsafe parent-entry unlink. VERSION.json records both
-the full commit and the independently verified exported Git tree hash.
+The Linux assembler requires `openat2` and Landlock ABI 3 or later. It trusts
+no repository-local configuration to authorize program execution: filters
+selected for tracked paths are refused explicitly; cleanliness compares raw file
+hashes and index metadata without Git conversion programs. Hooks, fsmonitor,
+textconv and external diff are disabled or excluded by the selected commands.
+Every Git child has a private scratch write boundary. Git alone may also open a
+pinned, verified `/dev/null` character device (major 1, minor 3) for read/write;
+that inode gets no truncate, create, remove or rename rights. Builds have no
+such exception. Trusted installed Git/Go executables remain prerequisites.
+
+The target parent must be private to its owner, or sticky and owned by the
+caller or root. Output uses pinned directory handles and exclusive files. An
+adopted root must be empty, mode 0700 and owned by the caller. Failure cleanup
+checks each recorded creation's device/inode through its pinned parent handle,
+never recursively deletes unknown contents, and retains the target directory.
+Child-created cache/binary files cannot be attributed by parent-side creation
+handles: private `release-build-*` scratch under TMPDIR is retained and its path
+is printed. Use a private, disposable TMPDIR, then dispose of it separately after
+reviewing the bundle. The tool removes only its recorded source/scratch objects;
+unknown entries, including actor substitutions, remain untouched. VERSION.json
+records the full commit and independently verified exported Git tree hash.
 
 After assembly, verify SHA256SUMS with the exact command in the Tools table
 before handing files to the owner. Follow only

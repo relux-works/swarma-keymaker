@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,6 +40,10 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", dir)
 	repo := filepath.Join(dir, "source")
 	clone := gitCommand(context.Background(), root, "clone", "--local", "--no-hardlinks", "--quiet", "--no-checkout", "--", root, repo)
 	clone.Env = append(clone.Env, "GIT_ALLOW_PROTOCOL=file") // Test-only local clone; production disallows all transports.
@@ -410,7 +415,8 @@ func TestReleaseBuildEnvironment(t *testing.T) {
 
 // One real clean-commit offline build qualifies version, trimpath metadata,
 // exact staged bytes and complete checksums. It creates no service or system
-// files. Sibling inputs/source index remain unchanged and build scratch is gone.
+// files. Sibling inputs/source index remain unchanged; target has no build
+// scratch, while child-created files are retained in private TMPDIR scratch.
 func TestReleaseBundle(t *testing.T) { testReleaseBundle(t, false) }
 
 // A supplied valid pin configuration is copied and checksummed in a real
@@ -656,4 +662,14 @@ func snapshotFiles(root string) (map[string]string, error) {
 		return nil
 	})
 	return out, err
+}
+
+// Fixture-only commands may write their own clone; production Git always uses
+// runGitConfined. Narrowing overlays can invoke this helper to remove that gate.
+func runCommand(cmd *exec.Cmd) error {
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "release child pid=%d\n", cmd.Process.Pid)
+	return cmd.Wait()
 }

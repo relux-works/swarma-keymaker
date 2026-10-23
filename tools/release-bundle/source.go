@@ -20,6 +20,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -34,7 +36,7 @@ func gitEnv() []string {
 	return []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0", "GIT_NO_REPLACE_OBJECTS=1", "GIT_NO_LAZY_FETCH=1", "GIT_GRAFT_FILE=/dev/null", "GIT_SHALLOW_FILE=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_COUNT=0", "GIT_ALLOW_PROTOCOL="}
 }
 func gitCommand(ctx context.Context, repo string, args ...string) *exec.Cmd {
-	full := append([]string{"--no-optional-locks", "--no-replace-objects", "-c", "core.commitGraph=false", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", repo}, args...)
+	full := append([]string{"--no-optional-locks", "--no-replace-objects", "-c", "core.commitGraph=false", "-c", "core.bare=false", "-c", "core.worktree=" + repo, "-c", "diff.external=", "-c", "core.untrackedCache=false", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-C", repo}, args...)
 	cmd := exec.CommandContext(ctx, "git", full...)
 	cmd.Env = gitEnv()
 	return cmd
@@ -44,10 +46,139 @@ func gitRead(ctx context.Context, repo string, args ...string) ([]byte, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	// Never repeat repository command diagnostics containing operator input.
-	if err := runCommand(cmd); err != nil {
+	if err := runGitConfined(cmd); err != nil {
 		return nil, fmt.Errorf("source inspection failed")
 	}
 	return out.Bytes(), nil
+}
+
+// All Git children, including archive and config/attribute inspection, inherit
+// the same kernel write boundary as the build. Repository metadata is read-only.
+func runGitConfined(cmd *exec.Cmd) error {
+	root, _, cleanup, err := privateScratch("release-git-")
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	anchor, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	defer anchor.Close()
+	cmd.ExtraFiles = []*os.File{anchor}
+	cmd.Env = append(cmd.Env, "HOME=/proc/self/fd/3", "TMPDIR=/proc/self/fd/3", "XDG_CONFIG_HOME=/proc/self/fd/3")
+	null, err := openNullDevice(os.DevNull)
+	if err != nil {
+		return err
+	}
+	defer null.Close()
+	return runConfined(cmd, anchor, null)
+}
+
+var errFilter = errors.New("release source has a configured Git filter; filters are refused")
+
+type sourceEntry struct{ name, mode, hash string }
+
+func sourceEntries(ctx context.Context, repo, commit string) ([]sourceEntry, error) {
+	raw, err := gitRead(ctx, repo, "ls-tree", "-rz", "--full-tree", commit)
+	if err != nil {
+		return nil, err
+	}
+	var entries []sourceEntry
+	for _, record := range bytes.Split(raw, []byte{0}) {
+		if len(record) == 0 {
+			continue
+		}
+		meta, name, ok := strings.Cut(string(record), "\t")
+		fields := strings.Fields(meta)
+		if !ok || len(fields) != 3 || fields[1] != "blob" || (fields[0] != "100644" && fields[0] != "100755") || !commitPattern.MatchString(fields[2]) || path.Clean(name) != name || path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") {
+			return nil, errCommit
+		}
+		entries = append(entries, sourceEntry{name, fields[0], fields[2]})
+	}
+	return entries, nil
+}
+func refuseFilters(ctx context.Context, repo string, entries []sourceEntry) error {
+	var names bytes.Buffer
+	for _, e := range entries {
+		names.WriteString(e.name)
+		names.WriteByte(0)
+	}
+	cmd := gitCommand(ctx, repo, "check-attr", "-z", "--stdin", "filter")
+	cmd.Stdin = &names
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := runGitConfined(cmd); err != nil {
+		return errCommit
+	}
+	fields := bytes.Split(out.Bytes(), []byte{0})
+	if len(fields) != len(entries)*3+1 {
+		return errCommit
+	}
+	for i := 0; i+2 < len(fields); i += 3 {
+		if string(fields[i]) != entries[i/3].name || string(fields[i+1]) != "filter" {
+			return errCommit
+		}
+		value := string(fields[i+2])
+		if value != "unspecified" && value != "unset" {
+			return errFilter
+		}
+	}
+	return nil
+}
+
+// No git status or conversion layer: compare raw bytes/executable bits to the
+// named immutable tree, and inspect only index/untracked metadata with Git.
+func worktreeStatus(ctx context.Context, repo, commit string) ([]byte, error) {
+	entries, err := sourceEntries(ctx, repo, commit)
+	if err != nil {
+		return nil, err
+	}
+	if err := refuseFilters(ctx, repo, entries); err != nil {
+		return nil, err
+	}
+	root, err := openRootNoLinks(repo)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	dirty := false
+	for _, entry := range entries {
+		file, e := openRootFile(root, entry.name, unix.O_RDONLY, 0)
+		if e != nil {
+			dirty = true
+			continue
+		}
+		st, e := file.Stat()
+		if e != nil || !st.Mode().IsRegular() {
+			file.Close()
+			dirty = true
+			continue
+		}
+		h := sha1.New()
+		fmt.Fprintf(h, "blob %d\x00", st.Size())
+		_, e = io.Copy(h, file)
+		file.Close()
+		mode := "100644"
+		if st.Mode()&0111 != 0 {
+			mode = "100755"
+		}
+		if e != nil || hex.EncodeToString(h.Sum(nil)) != entry.hash || mode != entry.mode {
+			dirty = true
+		}
+	}
+	staged, err := gitRead(ctx, repo, "diff-index", "--cached", "--raw", "--no-ext-diff", "--no-textconv", commit, "--")
+	if err != nil {
+		return nil, err
+	}
+	untracked, err := gitRead(ctx, repo, "ls-files", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil, err
+	}
+	if dirty || len(staged) != 0 || len(untracked) != 0 {
+		return []byte("dirty"), nil
+	}
+	return nil, nil
 }
 func cleanSource(ctx context.Context, repo, commit string) error {
 	// Alternates are not a self-contained immutable source. Resolve the actual
@@ -78,7 +209,7 @@ func cleanSource(ctx context.Context, repo, commit string) error {
 	if err != nil || strings.TrimSpace(string(head)) != commit {
 		return errCommit
 	}
-	status, err := gitRead(ctx, repo, "status", "--porcelain=v1", "--untracked-files=all", "--ignore-submodules=none")
+	status, err := worktreeStatus(ctx, repo, commit)
 	if err != nil {
 		return err
 	}
@@ -138,25 +269,15 @@ func sourceVersion(raw []byte) (string, error) {
 }
 
 // git archive supplies an immutable source snapshot. Only ordinary files and
-// directories are materialized under the newly owned target, never links.
-func extractSource(ctx context.Context, repo, commit string, dest *os.Root) error {
-	cmd := gitCommand(ctx, repo, "archive", "--format=tar", commit+"^{tree}")
-	pipe, err := cmd.StdoutPipe()
+// directories are materialized under private scratch, never links.
+func extractSource(ctx context.Context, repo, commit string, dest *os.Root, ledgers ...*createdObjects) error {
+	raw, err := gitRead(ctx, repo, "archive", "--format=tar", commit+"^{tree}")
 	if err != nil {
 		return err
 	}
-	if err = cmd.Start(); err != nil {
-		return err
-	}
-	fmt.Fprintf(os.Stderr, "release child pid=%d\n", cmd.Process.Pid)
-	readErr := extractTarRoot(pipe, dest)
-	pipe.Close()
-	waitErr := cmd.Wait()
-	if readErr != nil {
-		return readErr
-	}
-	return waitErr
+	return extractTarRoot(bytes.NewReader(raw), dest, ledgers...)
 }
+
 func extractTar(r io.Reader, dest string) error {
 	root, err := openRootNoLinks(dest)
 	if err != nil {
@@ -165,7 +286,7 @@ func extractTar(r io.Reader, dest string) error {
 	defer root.Close()
 	return extractTarRoot(r, root)
 }
-func extractTarRoot(r io.Reader, dest *os.Root) error {
+func extractTarRoot(r io.Reader, dest *os.Root, ledgers ...*createdObjects) error {
 	tarReader := tar.NewReader(r)
 	var total int64
 	for {
@@ -186,7 +307,7 @@ func extractTarRoot(r io.Reader, dest *os.Root) error {
 		file := filepath.FromSlash(name)
 		switch h.Typeflag {
 		case tar.TypeDir:
-			if err := mkdirRootAll(dest, file); err != nil {
+			if err := mkdirRootAll(dest, file, ledgers...); err != nil {
 				return err
 			}
 		case tar.TypeReg, tar.TypeRegA:
@@ -194,14 +315,20 @@ func extractTarRoot(r io.Reader, dest *os.Root) error {
 				return fmt.Errorf("source archive size refused")
 			}
 			total += h.Size
-			if err := mkdirRootAll(dest, filepath.Dir(file)); err != nil {
+			if err := mkdirRootAll(dest, filepath.Dir(file), ledgers...); err != nil {
 				return err
 			}
 			mode := os.FileMode(0600)
 			if h.Mode&0111 != 0 {
 				mode = 0700
 			}
-			f, err := openRootFile(dest, file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+			var f *os.File
+			var err error
+			if len(ledgers) > 0 {
+				f, err = ledgers[0].createFile(dest, file, mode)
+			} else {
+				f, err = openRootFile(dest, file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+			}
 			if err != nil {
 				return err
 			}

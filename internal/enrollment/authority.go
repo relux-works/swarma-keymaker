@@ -99,19 +99,15 @@ func (a *Authority) Reload(ctx context.Context) Code {
 		a.fence = localCode(err)
 		return a.fence
 	}
-	firstUse := retained == nil
-	if firstUse {
-		if !config.FirstUse || a.retained != nil {
-			return a.fence
-		}
-	} else if a.retained != nil {
+	if retained == nil {
+		return a.fence
+	}
+	if a.retained != nil {
 		if !reflect.DeepEqual(retained, a.retained) {
 			return a.fence
 		}
-	} else {
-		if a.reconcile == nil || a.reconcile.Check(ctx, retained.Clone()) != nil {
-			return a.fence
-		}
+	} else if a.reconcile == nil || a.reconcile.Check(ctx, retained.Clone()) != nil {
+		return a.fence
 	}
 	if err = safeRepository(ctx, a.files, config.Registry); err != nil {
 		a.fence = localCode(err)
@@ -123,7 +119,7 @@ func (a *Authority) Reload(ctx context.Context) Code {
 		a.fence = localCode(err)
 		return a.fence
 	}
-	snapshot, high, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: config.Revision, Entries: entries, Retained: retained, FirstUse: firstUse, Reconciled: !firstUse})
+	snapshot, high, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: config.Revision, Entries: entries, Retained: retained, Reconciled: true})
 	if err != nil {
 		a.commitFault = store.failed
 		a.fence = mapDiagnostic(err)

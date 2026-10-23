@@ -21,7 +21,9 @@ no production control adapters are supplied.
 
 `internal/enrollment` supplies protected pins, isolated signed-Git verification,
 durable rollback state and local enrollment authority using the registrar
-packages. Every restart requires explicit operator reconciliation. The proposed
+packages. First acceptance requires an explicit operator bootstrap through the
+reconcile command; the service never initializes empty state. Every restart
+requires explicit operator reconciliation. The proposed
 Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 
 | Path | Contents |

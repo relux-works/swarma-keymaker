@@ -42,8 +42,7 @@ are refused. This shape shows placeholders, not deployable verification keys:
   "registry": "/var/lib/enrollment-registry.git",
   "state_dir": "/var/lib/keymaker/enrollment",
   "stations": {"sample": true},
-  "generations": {"30001": "00000000000000000000000000000001"},
-  "first_use": false
+  "generations": {"30001": "00000000000000000000000000000001"}
 }
 ```
 
@@ -87,10 +86,19 @@ then its contents are written, synced and closed, and the directory is synced.
 An empty/partial marker or orphaned temporary file is retained attempt evidence,
 never a new bootstrap. Failed writes are not cleaned up by deleting that marker.
 
-An initial empty state requires the protected `first_use` decision. Disable that
-bootstrap decision after initial acceptance. Missing state with its marker or
-retained in-process evidence, malformed state, a mismatching CAS or restored old
-state fences admission. Persisted state (including nested registrar high-water
+The service never bootstraps. Empty or missing high water, lock-only leftovers,
+partial markers and orphaned entries always fence admission. The removed
+`first_use` configuration member is unknown and refuses even when false.
+First acceptance is an explicit operator action through
+`keymaker enrollment reconcile --config /etc/keymaker/enrollment.json --bootstrap`
+(the command is supplied by the reconciliation layer). It verifies the pinned
+snapshot read-only, presents its full state digest and requires exact confirmation
+before initial publication. Only a directory without any prior evidence is
+eligible; failed attempts require another explicit operator decision or repair.
+The service store opens an existing lock and performs CAS only against existing
+accepted high water. It cannot create initial state or acceptance markers.
+Missing state, a mismatching CAS or restored old state fences admission.
+Persisted state (including nested registrar high-water
 members) and operator approval inputs use the same exact, case-sensitive member
 checks as configuration. Integer history keys also require canonical decimal
 spelling, so distinct JSON keys cannot collapse into one sequence entry.
@@ -132,8 +140,8 @@ store it is also the SHA-256 of the exact `high-water.json` bytes. The operator
 must establish freshness before approving that digest; merely copying a local
 file hash is not reconciliation. Earlier-start approvals, wrong digests and
 unsafe files cannot authorize a restart. Reload after the new approval performs
-full validation again. There is no service CLI yet; this root input and the Go
-API are the integration contract. An external-witness policy is not shipped.
+full validation again. The reconciliation command is supplied by the stacked operator layer; this
+Go API remains available for explicit injected startup policies. An external-witness policy is not shipped.
 
 ## Check order and helper codes
 

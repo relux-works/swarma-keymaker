@@ -31,7 +31,7 @@ func TestSignedGitFixture(t *testing.T) {
 		t.Fatalf("signature: %v", err)
 	}
 	store := newFileStore(context.Background(), f.config.StateDir, f.files)
-	_, _, err = (registry.Loader{Policy: policy, Verifier: v, Store: store}).Load(registry.Input{Revision: f.config.Revision, Entries: entries, FirstUse: true})
+	_, _, err = (registry.Loader{Policy: policy, Verifier: v, Store: initialPublisher{store}}).Load(registry.Input{Revision: f.config.Revision, Entries: entries, FirstUse: true})
 	if err != nil {
 		t.Fatalf("loader: %v store_failed=%t", err, store.failed)
 	}
@@ -179,7 +179,7 @@ func TestProtectedGitStorage(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			a = New(f.configPath, f.files, nil)
+			a = f.authority()
 			expectCode(t, OK, a.Reload(context.Background()))
 			_, code := authorize(a)
 			expectCode(t, OK, code)
@@ -246,9 +246,9 @@ func TestGitOutputBound(t *testing.T) {
 func TestUnreadableGitEvidence(t *testing.T) {
 	f := newFixture(t)
 	f.config.Revision = f.commit(f.valid(), "", true)
-	f.writeConfig()
+	a := f.authority()
 	f.files.denyRead = map[string]error{filepath.Join(f.repo, "config"): os.ErrPermission}
-	a := New(f.configPath, f.files, nil)
+	a.files = f.files
 	expectCode(t, EnrollmentUnavailable, a.Reload(context.Background()))
 	_, code := authorize(a)
 	expectCode(t, EnrollmentUnavailable, code)

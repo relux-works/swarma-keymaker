@@ -9,41 +9,41 @@ import (
 	"testing"
 )
 
-// A case alias cannot override explicit bootstrap refusal or create admission.
-// Canonical false still refuses first use; canonical true is the nearby control.
+// Removed first_use and all case aliases refuse as unknown members. An explicit
+// operator publication with the current schema is the nearby positive control.
 func TestConfigBootstrapCaseAlias(t *testing.T) {
 	f := newFixture(t)
 	f.config.Revision = f.commit(f.valid(), "", true)
-	f.config.FirstUse = false
 	f.writeConfig()
 	original, err := os.ReadFile(f.configPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, alias := range []string{"First_Use", "FIRST_USE"} {
-		t.Run(alias, func(t *testing.T) {
-			bad := append([]byte(nil), original[:len(original)-1]...)
-			bad = append(bad, []byte(`,"`+alias+`":true}`)...)
-			if err := os.WriteFile(f.configPath, bad, 0600); err != nil {
-				t.Fatal(err)
-			}
-			a := New(f.configPath, f.files, nil)
-			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
-			result, code := authorize(a)
-			expectCode(t, EnrollmentUnverified, code)
-			if result != (EnrolledKey{}) {
-				t.Fatal("alias released admission data")
-			}
-			if _, err := os.Stat(filepath.Join(f.config.StateDir, "accepted")); !os.IsNotExist(err) {
-				t.Fatal("invalid config consumed bootstrap")
-			}
-		})
+	for _, alias := range []string{"first_use", "First_Use", "FIRST_USE"} {
+		for _, value := range []string{"true", "false"} {
+			t.Run(alias+"/"+value, func(t *testing.T) {
+				bad := append([]byte(nil), original[:len(original)-1]...)
+				bad = append(bad, []byte(`,"`+alias+`":`+value+`}`)...)
+				if err := os.WriteFile(f.configPath, bad, 0600); err != nil {
+					t.Fatal(err)
+				}
+				a := New(f.configPath, f.files, nil)
+				expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
+				result, code := authorize(a)
+				expectCode(t, EnrollmentUnverified, code)
+				if result != (EnrolledKey{}) {
+					t.Fatal("alias released admission data")
+				}
+				if _, err := os.Stat(filepath.Join(f.config.StateDir, "accepted")); !os.IsNotExist(err) {
+					t.Fatal("invalid config consumed bootstrap")
+				}
+			})
+		}
 	}
 	if err := os.WriteFile(f.configPath, original, 0600); err != nil {
 		t.Fatal(err)
 	}
 	expectCode(t, EnrollmentUnverified, New(f.configPath, f.files, nil).Reload(context.Background()))
-	f.config.FirstUse = true
 	a := f.authority()
 	expectCode(t, OK, a.Reload(context.Background()))
 	_, code := authorize(a)

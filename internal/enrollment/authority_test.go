@@ -89,10 +89,12 @@ func runHelperVector(t *testing.T, raw []byte, want Code) {
 	entries := []registry.Entry{{Path: "enrollments/1.json", Bytes: signedRecord(t, body, seed)}}
 	f.config.Revision = f.commit(entries, "", true)
 	f.config.Generations["30001"] = in["admitted_generation"].(string)
-	if !enrollment["available"].(bool) {
-		f.config.Registry = filepath.Join(f.base, "missing.git")
-	}
 	a := f.authority()
+	if !enrollment["available"].(bool) {
+		// Accepted operator state isolates registry availability from missing-state fencing.
+		f.config.Registry = filepath.Join(f.base, "missing.git")
+		f.writeConfig()
+	}
 	reload := a.Reload(context.Background())
 	if want == EnrollmentUnverified || want == EnrollmentUnavailable {
 		expectCode(t, want, reload)

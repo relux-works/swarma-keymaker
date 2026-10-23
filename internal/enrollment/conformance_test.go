@@ -295,7 +295,7 @@ func runRegistryVector(t *testing.T, v registryVector) {
 	f.writeConfig()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	store := newFileStore(ctx, f.config.StateDir, f.files)
+	store := conformanceStore{newFileStore(ctx, f.config.StateDir, f.files)}
 	var previous *registry.HighWater
 	if len(previousEntries) > 0 {
 		publisher := r.PreviousPublisher

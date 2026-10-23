@@ -45,7 +45,6 @@ type PinConfig struct {
 	StateDir    string            `json:"state_dir"`
 	Stations    map[string]bool   `json:"stations"`
 	Generations map[string]string `json:"generations"`
-	FirstUse    bool              `json:"first_use"`
 }
 
 var errTrust = errors.New("unverified local trust")

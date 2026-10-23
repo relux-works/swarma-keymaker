@@ -12,22 +12,19 @@ import (
 	"time"
 )
 
-// A first temporary-file fsync failure consumes bootstrap just as rename and
-// directory-sync failures do. Same-process and restarted admission must refuse;
-// a genuinely fresh, successful bootstrap is the positive control.
+// Explicit operator publication failures retain evidence and service restarts
+// refuse. A successful operator publication plus reconciliation is the control.
 func TestBootstrapCommitRequiresReconciliation(t *testing.T) {
 	for _, stage := range []string{"file-sync", "rename", "directory-sync"} {
 		t.Run(stage, func(t *testing.T) {
 			f := newFixture(t)
 			f.config.Revision = f.commit(f.valid(), "", true)
-			a := f.authority()
-			a.storeOps = failingOps{stage: stage}
-			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
-			if !a.commitFault {
-				t.Fatal("commit error did not fence live authority")
+			if _, err := f.operatorBootstrap(failingOps{stage: stage}); err == nil {
+				t.Fatal("failed operator publication succeeded")
 			}
-			a.storeOps = nil
-			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
+			if _, err := f.operatorBootstrap(diskOps{}); err == nil {
+				t.Fatal("operator publication retried over evidence")
+			}
 			if _, err := os.Stat(filepath.Join(f.config.StateDir, "accepted")); err != nil {
 				t.Fatal("bootstrap evidence missing after Commit error")
 			}
@@ -145,21 +142,17 @@ func (o *bootstrapOps) SyncDir(path string) error {
 	return o.step(name)
 }
 
-// Every first-publication I/O failure leaves an acceptance/intent entry, poisons
-// live authority and refuses a new nil-reconciler instance without rewriting
-// evidence. The fault-free control records marker durability before temp I/O.
+// Each operator publication failure leaves attempt evidence and refuses retry
+// over it. Service restart never infers consent. The control checks durable order.
 func TestBootstrapFailureBoundaries(t *testing.T) {
 	stages := []string{"marker-create-dir-sync", "marker-write", "marker-partial-write", "marker-short-write", "marker-sync", "marker-close", "marker-directory-sync", "temp-write", "temp-partial-write", "temp-short-write", "temp-sync", "temp-close", "rename", "directory-sync"}
 	for _, stage := range stages {
 		t.Run(stage, func(t *testing.T) {
 			f := newFixture(t)
 			f.config.Revision = f.commit(f.valid(), "", true)
-			a := f.authority()
 			ops := &bootstrapOps{stage: stage}
-			a.storeOps = ops
-			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
-			if !ops.visited || !a.commitFault {
-				t.Fatal("fault was not reached and fenced")
+			if _, err := f.operatorBootstrap(ops); err == nil || !ops.visited {
+				t.Fatal("operator fault was not reached and refused", err)
 			}
 			marker := filepath.Join(f.config.StateDir, "accepted")
 			before, err := os.ReadFile(marker)
@@ -171,8 +164,9 @@ func TestBootstrapFailureBoundaries(t *testing.T) {
 					t.Fatal("failure published a high-water file")
 				}
 			}
-			a.storeOps = nil
-			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
+			if _, err := f.operatorBootstrap(diskOps{}); err == nil {
+				t.Fatal("operator publication retried over evidence")
+			}
 			restart := New(f.configPath, f.files, nil)
 			expectCode(t, EnrollmentUnverified, restart.Reload(context.Background()))
 			result, code := authorize(restart)
@@ -189,9 +183,12 @@ func TestBootstrapFailureBoundaries(t *testing.T) {
 	t.Run("durable-order-control", func(t *testing.T) {
 		f := newFixture(t)
 		f.config.Revision = f.commit(f.valid(), "", true)
-		a := f.authority()
 		ops := &bootstrapOps{}
-		a.storeOps = ops
+		high, err := f.operatorBootstrap(ops)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a := New(f.configPath, f.files, exactReconciler{high})
 		expectCode(t, OK, a.Reload(context.Background()))
 		want := []string{"marker-create-dir-sync", "marker-write", "marker-sync", "marker-close", "marker-directory-sync", "temp-write", "temp-sync", "temp-close", "rename", "directory-sync"}
 		if !reflect.DeepEqual(ops.events, want) {
@@ -252,13 +249,12 @@ func TestBootstrapCrashChild(t *testing.T) {
 	}
 	base := os.Getenv("KEYMAKER_BOOTSTRAP_FIXTURE")
 	files := fixtureFiles{base: base, override: map[string]Metadata{}}
-	a := New(filepath.Join(base, "pins.json"), files, nil)
-	a.storeOps = &bootstrapOps{stage: stage, crash: true}
-	t.Fatalf("crash point not reached: %s", a.Reload(context.Background()))
+	_, err := bootstrapFixture(context.Background(), filepath.Join(base, "pins.json"), files, &bootstrapOps{stage: stage, crash: true})
+	t.Fatalf("crash point not reached: %v", err)
 }
 
 // An orphaned temporary file is attempted-bootstrap evidence even with no
-// marker. Only an empty directory plus the inert read lock is a fresh control.
+// marker. Only an explicit operator publication can establish the control.
 func TestBootstrapOrphanIsNotFirstUse(t *testing.T) {
 	f := newFixture(t)
 	f.config.Revision = f.commit(f.valid(), "", true)
@@ -272,7 +268,7 @@ func TestBootstrapOrphanIsNotFirstUse(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	a := New(f.configPath, f.files, nil)
+	a := f.authority()
 	expectCode(t, OK, a.Reload(context.Background()))
 	_, code := authorize(a)
 	expectCode(t, OK, code)

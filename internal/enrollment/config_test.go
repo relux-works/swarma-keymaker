@@ -81,7 +81,7 @@ func TestPinConfigurationRefusals(t *testing.T) {
 				t.Fatal("unsafe pins returned authority")
 			}
 			restore()
-			a = New(f.configPath, f.files, nil)
+			a = f.reconciledAuthority()
 			expectCode(t, OK, a.Reload(context.Background()))
 			_, code := authorize(a)
 			expectCode(t, OK, code)

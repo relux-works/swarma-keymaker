@@ -99,7 +99,7 @@ func newFixture(t *testing.T) *fixture {
 	if err = os.Mkdir(state, 0700); err != nil {
 		t.Fatal(err)
 	}
-	f.config = PinConfig{Maintainers: []string{f.public}, Publisher: public(1), Audience: testAudience, Registry: f.repo, StateDir: state, Stations: map[string]bool{"sample": true}, Generations: map[string]string{"30001": testGeneration}, FirstUse: true}
+	f.config = PinConfig{Maintainers: []string{f.public}, Publisher: public(1), Audience: testAudience, Registry: f.repo, StateDir: state, Stations: map[string]bool{"sample": true}, Generations: map[string]string{"30001": testGeneration}}
 	return f
 }
 func (f *fixture) run(program string, input []byte, args ...string) []byte {
@@ -143,7 +143,56 @@ func (f *fixture) writeConfig() {
 		f.t.Fatal(err)
 	}
 }
-func (f *fixture) authority() *Authority { f.writeConfig(); return New(f.configPath, f.files, nil) }
+
+// Initial fixture state uses the same explicit operator publisher as the CLI.
+// This convenience is never used by the empty-state refusal regressions.
+func (f *fixture) authority() *Authority {
+	f.writeConfig()
+	return f.reconciledAuthority()
+}
+
+func (f *fixture) reconciledAuthority() *Authority {
+	high, err := bootstrapFixture(context.Background(), f.configPath, f.files, diskOps{})
+	if err != nil {
+		return New(f.configPath, f.files, nil)
+	}
+	return New(f.configPath, f.files, exactReconciler{high})
+}
+
+func (f *fixture) operatorBootstrap(ops durableOps) (*registry.HighWater, error) {
+	f.writeConfig()
+	return bootstrapFixture(context.Background(), f.configPath, f.files, ops)
+}
+
+func bootstrapFixture(ctx context.Context, path string, files Files, ops durableOps) (*registry.HighWater, error) {
+	c, policy, err := loadConfig(path, files)
+	if err != nil {
+		return nil, err
+	}
+	if err = safeRepository(ctx, files, c.Registry); err != nil {
+		return nil, err
+	}
+	v := newGitVerifier(ctx, c.Registry, c.Revision, c.Maintainers)
+	entries, err := v.entries()
+	if err != nil {
+		return nil, err
+	}
+	s := newFileStore(ctx, c.StateDir, files)
+	s.ops = ops
+	_, high, err := (registry.Loader{Policy: policy, Verifier: v, Store: initialPublisher{s}}).Load(registry.Input{Revision: c.Revision, Entries: entries, FirstUse: true})
+	return high, err
+}
+
+// The conformance harness explicitly supplies initial operator publication;
+// service Store.Commit itself never accepts an empty retained state.
+type conformanceStore struct{ *fileStore }
+
+func (s conformanceStore) Commit(previous *registry.HighWater, next registry.HighWater) error {
+	if previous == nil {
+		return (initialPublisher{s.fileStore}).Commit(nil, next)
+	}
+	return s.fileStore.Commit(previous, next)
+}
 func baseBody() map[string]any {
 	return map[string]any{
 		"type": "enrollment/1", "host": "sample", "seq": int64(1), "state": "active",

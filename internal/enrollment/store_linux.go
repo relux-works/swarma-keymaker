@@ -62,16 +62,21 @@ type fileStore struct {
 	files  Files
 	ops    durableOps
 	failed bool
+	owner  uint32
 }
 
 func newFileStore(ctx context.Context, dir string, files Files) *fileStore {
-	return &fileStore{ctx: ctx, dir: dir, files: files, ops: diskOps{}}
+	return &fileStore{ctx: ctx, dir: dir, files: files, ops: diskOps{}, owner: uint32(os.Geteuid())}
 }
-func (s *fileStore) lock() (*os.File, error) {
+
+// Service reads and commits open only the lock created by operator publication.
+func (s *fileStore) lock() (*os.File, error) { return s.openLock(false) }
+
+func (s *fileStore) openLock(create bool) (*os.File, error) {
 	if err := s.ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := safeParents(s.files, s.dir, uint32(os.Geteuid())); err != nil {
+	if err := safeParents(s.files, s.dir, s.owner); err != nil {
 		return nil, err
 	}
 	m, err := s.files.Lstat(s.dir)
@@ -82,14 +87,27 @@ func (s *fileStore) lock() (*os.File, error) {
 		return nil, errTrust
 	}
 	path := filepath.Join(s.dir, "high-water.lock")
-	fd, err := syscall.Open(path, syscall.O_CREAT|syscall.O_RDWR|syscall.O_CLOEXEC|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0600)
+	flags := syscall.O_RDWR | syscall.O_CLOEXEC | syscall.O_NOFOLLOW | syscall.O_NONBLOCK
+	if create {
+		flags |= syscall.O_CREAT | syscall.O_EXCL
+	}
+	fd, err := syscall.Open(path, flags, 0600)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, errTrust
+	}
 	if err != nil {
 		return nil, err
 	}
 	f := os.NewFile(uintptr(fd), path)
+	if create {
+		if err := s.setOwner(f); err != nil {
+			f.Close()
+			return nil, err
+		}
+	}
 	// Check the opened inode via the same metadata adapter used by fixtures.
 	m, err = s.files.Lstat(path)
-	if err != nil || !safeMeta(m, false, uint32(os.Geteuid())) {
+	if err != nil || !safeMeta(m, false, s.owner) {
 		f.Close()
 		return nil, errTrust
 	}
@@ -125,20 +143,9 @@ func (s *fileStore) read() (*registry.HighWater, error) {
 	return s.readLocked()
 }
 func (s *fileStore) readLocked() (*registry.HighWater, error) {
-	marker, err := protectedRead(s.files, filepath.Join(s.dir, "accepted"), 32, uint32(os.Geteuid()))
+	marker, err := protectedRead(s.files, filepath.Join(s.dir, "accepted"), 32, s.owner)
 	if errors.Is(err, os.ErrNotExist) {
-		// A leftover temporary file or any other state is retained evidence too.
-		// Only the inert lock created by read() may exist before first use.
-		entries, readErr := os.ReadDir(s.dir)
-		if readErr != nil {
-			return nil, readErr
-		}
-		for _, entry := range entries {
-			if entry.Name() != "high-water.lock" {
-				return nil, errTrust
-			}
-		}
-		return nil, nil
+		return nil, errTrust
 	}
 	if err != nil {
 		return nil, err
@@ -146,7 +153,7 @@ func (s *fileStore) readLocked() (*registry.HighWater, error) {
 	if string(marker) != acceptedMarker {
 		return nil, errTrust
 	}
-	b, err := protectedRead(s.files, filepath.Join(s.dir, "high-water.json"), maxStateBytes, uint32(os.Geteuid()))
+	b, err := protectedRead(s.files, filepath.Join(s.dir, "high-water.json"), maxStateBytes, s.owner)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, errTrust
 	}
@@ -158,44 +165,6 @@ func (s *fileStore) readLocked() (*registry.HighWater, error) {
 		return nil, errTrust
 	}
 	return record.High.Clone(), nil
-}
-func (s *fileStore) marker() error {
-	path := filepath.Join(s.dir, "accepted")
-	if b, err := protectedRead(s.files, path, 32, uint32(os.Geteuid())); err == nil {
-		if string(b) == acceptedMarker {
-			return nil
-		}
-		return errTrust
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	fd, err := syscall.Open(path, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_EXCL|syscall.O_CLOEXEC|syscall.O_NOFOLLOW, 0600)
-	if err != nil {
-		return err
-	}
-	f := os.NewFile(uintptr(fd), path)
-	// First retain the directory entry, even if the marker write is interrupted.
-	// An empty/partial marker is evidence requiring operator recovery, never a
-	// fresh bootstrap. No high-water file is created until the marker is durable.
-	err = s.ops.SyncDir(s.dir)
-	if err == nil {
-		var n int
-		n, err = s.ops.Write(f, []byte(acceptedMarker))
-		if err == nil && n != len(acceptedMarker) {
-			err = io.ErrShortWrite
-		}
-	}
-	if err == nil {
-		err = s.ops.Sync(f)
-	}
-	closeErr := s.ops.Close(f)
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	return s.ops.SyncDir(s.dir)
 }
 
 // Commit performs a locked CAS and fsync/rename/fsync publication. Any error
@@ -221,14 +190,15 @@ func (s *fileStore) Commit(previous *registry.HighWater, next registry.HighWater
 	if err != nil {
 		return err
 	}
-	// Consume first use before CAS, cancellation, encoding, or any temporary
-	// high-water I/O. A failed first publication must leave bootstrap evidence.
-	if err = s.marker(); err != nil {
-		return err
-	}
 	if !reflect.DeepEqual(previous, current) {
 		return errTrust
 	}
+	return s.publish(next)
+}
+
+// publish is shared by existing-state CAS and explicit operator initialization.
+// Its caller holds the state lock; it never makes a freshness decision.
+func (s *fileStore) publish(next registry.HighWater) (err error) {
 	if err = s.ctx.Err(); err != nil {
 		return err
 	}
@@ -242,6 +212,10 @@ func (s *fileStore) Commit(previous *registry.HighWater, next registry.HighWater
 	}
 	tempPath := temp.Name()
 	defer os.Remove(tempPath)
+	if err = s.setOwner(temp); err != nil {
+		temp.Close()
+		return err
+	}
 	n, writeErr := s.ops.Write(temp, b)
 	if writeErr == nil && n != len(b) {
 		writeErr = io.ErrShortWrite
@@ -263,4 +237,16 @@ func (s *fileStore) Commit(previous *registry.HighWater, next registry.HighWater
 		return err
 	}
 	return s.ops.SyncDir(s.dir)
+}
+
+// Only operator publication can target another UID; service writes keep their
+// configured owner. Ownership is fixed before file fsync and publication.
+func (s *fileStore) setOwner(f *os.File) error {
+	if s.owner == uint32(os.Geteuid()) {
+		return nil
+	}
+	if os.Geteuid() != 0 {
+		return errTrust
+	}
+	return f.Chown(int(s.owner), -1)
 }

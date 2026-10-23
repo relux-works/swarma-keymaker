@@ -119,16 +119,15 @@ func TestRegistryRollbackRefusals(t *testing.T) {
 	}
 }
 
-// First-use authority requires the protected bootstrap decision. After accepting
-// state, even first_use=true cannot bypass missing acceptance/state evidence.
+// Empty state always refuses in the service; explicit operator publication and
+// exact reconciliation admit. Missing accepted state remains fenced on restart.
 func TestExplicitFirstUseAndMissingState(t *testing.T) {
 	f := newFixture(t)
 	f.config.Revision = f.commit(f.valid(), "", true)
-	f.config.FirstUse = false
-	a := f.authority()
-	expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
-	f.config.FirstUse = true
 	f.writeConfig()
+	a := New(f.configPath, f.files, nil)
+	expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
+	a = f.authority()
 	expectCode(t, OK, a.Reload(context.Background()))
 	_, code := authorize(a)
 	expectCode(t, OK, code)
@@ -322,9 +321,9 @@ func TestInterruptedWriteFencesUntilRestart(t *testing.T) {
 func TestInterruptedBootstrapIsNotFirstUse(t *testing.T) {
 	f := newFixture(t)
 	f.config.Revision = f.commit(f.valid(), "", true)
-	a := f.authority()
-	a.storeOps = failingOps{stage: "rename"}
-	expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
+	if _, err := f.operatorBootstrap(failingOps{stage: "rename"}); err == nil {
+		t.Fatal("operator publication unexpectedly succeeded")
+	}
 	if _, err := os.Stat(filepath.Join(f.config.StateDir, "accepted")); err != nil {
 		t.Fatal("missing retained acceptance evidence")
 	}

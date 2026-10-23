@@ -177,8 +177,9 @@ type nativePauseReplay struct {
 }
 
 func (g *nativePauseReplay) WithActive(ctx context.Context, uid uint32, token string, fn func() Code) Code {
+	claimed := g.armed.CompareAndSwap(true, false)
 	c := g.delayedGenerationWatch.WithActive(ctx, uid, token, fn)
-	if g.armed.CompareAndSwap(true, false) {
+	if claimed {
 		close(g.entered)
 		select {
 		case <-g.resume:
@@ -187,6 +188,83 @@ func (g *nativePauseReplay) WithActive(ctx context.Context, uid uint32, token st
 		}
 	}
 	return c
+}
+
+// An invocation already returning a hello callback must not consume a pause
+// armed for the next request. Channels force that callback-unwind ordering;
+// armed-at-entry is the paired control. This tests fixture ownership directly,
+// while TestNativeConcurrentRevokeReplay covers the actual socket requests.
+func TestNativePauseReplayOwnership(t *testing.T) {
+	for _, mode := range []string{"arm-during-previous-callback", "armed-at-entry"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			uid := uint32(os.Getuid())
+			resume := make(chan struct{})
+			g := &nativePauseReplay{delayedGenerationWatch: delayedGenerationWatch{newGenerations(uid, nativeToken)}, entered: make(chan struct{}), resume: resume}
+			if mode == "arm-during-previous-callback" {
+				callbackEntered, returnCallback := make(chan struct{}), make(chan struct{})
+				previous := make(chan Code, 1)
+				go func() {
+					previous <- g.WithActive(ctx, uid, nativeToken, func() Code {
+						close(callbackEntered)
+						select {
+						case <-returnCallback:
+							return "fixture_previous"
+						case <-ctx.Done():
+							return "request_deadline_exceeded"
+						}
+					})
+				}()
+				select {
+				case <-callbackEntered:
+				case <-ctx.Done():
+					t.Fatal("previous authority callback did not enter")
+				}
+				g.armed.Store(true)
+				close(returnCallback)
+				select {
+				case code := <-previous:
+					if code != "fixture_previous" {
+						t.Fatal("previous callback verdict changed", code)
+					}
+				case <-g.entered:
+					t.Fatal("previous invocation consumed a newly armed replay pause")
+				case <-ctx.Done():
+					t.Fatal("previous invocation did not return")
+				}
+			} else {
+				g.armed.Store(true)
+			}
+			next := make(chan Code, 1)
+			var callbackRan atomic.Bool
+			go func() {
+				next <- g.WithActive(ctx, uid, nativeToken, func() Code {
+					callbackRan.Store(true)
+					return "fixture_next"
+				})
+			}()
+			select {
+			case <-g.entered:
+			case code := <-next:
+				t.Fatal("armed invocation returned without pausing", code)
+			case <-ctx.Done():
+				t.Fatal("armed invocation did not pause")
+			}
+			if !callbackRan.Load() || g.armed.Load() {
+				t.Fatal("pause did not follow the claimed invocation's authority callback")
+			}
+			close(resume)
+			select {
+			case code := <-next:
+				if code != "fixture_next" {
+					t.Fatal("resumed callback verdict changed", code)
+				}
+			case <-ctx.Done():
+				t.Fatal("armed invocation did not resume")
+			}
+		})
+	}
 }
 
 // A concurrently committed revoke also outranks a now-stale fresh plan refusal.

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 	"github.com/relux-works/swarma-keymaker/internal/keymaker"
 )
 
@@ -18,7 +19,7 @@ var (
 	errTarget     = errors.New("release target must be new, outside source and system paths")
 	errConfig     = errors.New("release configuration refused")
 	errRegistry   = errors.New("release name-index registry refused")
-	errEnrollment = errors.New("enrollment validation unavailable at this revision")
+	errEnrollment = errors.New("release enrollment pin configuration refused")
 )
 
 const inputLimit = 8 << 20
@@ -98,9 +99,6 @@ func targetPath(repo, name string) (string, error) {
 	return abs, nil
 }
 func validateInputs(o options) (map[string][]byte, error) {
-	if o.enrollment != "" {
-		return nil, errEnrollment
-	}
 	config, err := readInput(o.config)
 	if err != nil {
 		return nil, err
@@ -116,5 +114,16 @@ func validateInputs(o options) (map[string][]byte, error) {
 	if keymaker.StrictJSON(bytes.NewReader(registry), &parsed) != nil || parsed.Validate() != "" {
 		return nil, errRegistry
 	}
-	return map[string][]byte{"config.json": config, "name-indices.json": registry}, nil
+	files := map[string][]byte{"config.json": config, "name-indices.json": registry}
+	if o.enrollment != "" {
+		pins, err := readInput(o.enrollment)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := enrollment.ParseConfig(pins); err != nil {
+			return nil, errEnrollment
+		}
+		files["enrollment.json"] = pins
+	}
+	return files, nil
 }

@@ -114,6 +114,7 @@ func main() {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
 			{"packaging-dirty-tree", "source.go", "if len(status) != 0 {", "if false && len(status) != 0 {", "^TestReleaseDirtyTree$/^tracked$", "--- FAIL: TestReleaseDirtyTree/tracked", "dirty source admitted"},
 			{"packaging-unit-drift", "source.go", "if !ok || !bytes.Equal(unit, []byte(block)) {", "if !ok || false && !bytes.Equal(unit, []byte(block)) {", "^TestReleaseUnitMatchesSpec$/^modified$", "--- FAIL: TestReleaseUnitMatchesSpec/modified", "unit drift admitted"},
+			{"packaging-enrollment-policy", "inputs.go", "if _, err := enrollment.ParseConfig(pins); err != nil {", "if _, err := enrollment.ParseConfig(pins); false && err != nil {", "^TestReleaseEnrollmentGate$/^revision$", "--- FAIL: TestReleaseEnrollmentGate/revision", "refusal=<nil> want=release enrollment pin configuration refused"},
 		}
 	}
 	good := true

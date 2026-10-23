@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -145,7 +148,7 @@ func TestReleaseCommitAndVersion(t *testing.T) {
 func TestReleaseInputFiles(t *testing.T) {
 	f := newFixture(t)
 	dir := filepath.Dir(f.o.config)
-	for _, which := range []string{"config", "registry"} {
+	for _, which := range []string{"config", "registry", "enrollment"} {
 		for _, mode := range []string{"symlink", "ancestor", "directory", "fifo", "missing", "large"} {
 			t.Run(which+"-"+mode, func(t *testing.T) {
 				o := f.o
@@ -173,8 +176,10 @@ func TestReleaseInputFiles(t *testing.T) {
 				}
 				if which == "config" {
 					o.config = bad
-				} else {
+				} else if which == "registry" {
 					o.registry = bad
+				} else {
+					o.enrollment = bad
 				}
 				refused(t, o, errInput)
 				control(t, f)
@@ -221,37 +226,70 @@ func TestReleaseInputParsers(t *testing.T) {
 	}
 }
 
-// Every supplied enrollment path fails the explicit revision gate without
-// opening or parsing it. Omission is the valid control; no substitute runs.
+// Supplied enrollment pins use the real policy parser. Malformed, unknown,
+// aliased and invalid pins refuse without writes or input changes; valid pins
+// are retained byte-for-byte. Omission remains valid and omits the file.
 func TestReleaseEnrollmentGate(t *testing.T) {
 	f := newFixture(t)
 	o := f.o
 	o.enrollment = filepath.Join(filepath.Dir(o.config), "enrollment.json")
-	writeFixture(t, o.enrollment, []byte("not syntax-validated"))
-	for _, mode := range []string{"regular", "missing", "symlink", "directory"} {
-		t.Run(mode, func(t *testing.T) {
-			gated := o
-			if mode != "regular" {
-				gated.enrollment += "-" + mode
-				if mode == "symlink" {
-					if err := os.Symlink(o.enrollment, gated.enrollment); err != nil {
-						t.Fatal(err)
-					}
-				}
-				if mode == "directory" {
-					if err := os.Mkdir(gated.enrollment, 0700); err != nil {
-						t.Fatal(err)
-					}
-				}
+	valid := enrollmentInput(t)
+	for _, tc := range []struct {
+		name string
+		raw  []byte
+	}{
+		{"syntax", []byte("{")},
+		{"oversized", append(append([]byte(nil), valid...), bytes.Repeat([]byte(" "), 1<<20)...)},
+		{"unknown", bytes.Replace(valid, []byte(`"audience":`), []byte(`"unknown":true,"audience":`), 1)},
+		{"alias", bytes.Replace(valid, []byte(`"audience":`), []byte(`"Audience":`), 1)},
+		{"duplicate", bytes.Replace(valid, []byte(`"audience":`), []byte(`"audience":"other.invalid","audience":`), 1)},
+		{"revision", bytes.Replace(valid, []byte(strings.Repeat("a", 40)), []byte("main"), 1)},
+		{"generation-alias", bytes.Replace(valid, []byte(`"30001":`), []byte(`"030001":`), 1)},
+		{"service-uid", bytes.Replace(valid, []byte(`"service_uid":30001`), []byte(`"service_uid":0`), 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if bytes.Equal(tc.raw, valid) {
+				t.Fatal("negative not applied")
 			}
-			refused(t, gated, errEnrollment)
-			control(t, f)
+			writeFixture(t, o.enrollment, tc.raw)
+			refused(t, o, errEnrollment)
+			if got, err := os.ReadFile(o.enrollment); err != nil || !bytes.Equal(got, tc.raw) {
+				t.Fatal("enrollment refusal changed input")
+			}
+			writeFixture(t, o.enrollment, valid)
+			files, err := validateInputs(o)
+			if err != nil || !bytes.Equal(files["enrollment.json"], valid) {
+				t.Fatal("valid enrollment refused or changed", err)
+			}
+			absent(t, o.target)
 		})
 	}
-	if errEnrollment.Error() != "enrollment validation unavailable at this revision" {
-		t.Fatal("dependency gate message drift")
+	files, err := validateInputs(f.o)
+	if err != nil || files["enrollment.json"] != nil {
+		t.Fatal("omission differs", err)
 	}
-	control(t, f)
+}
+func enrollmentInput(t *testing.T) []byte {
+	t.Helper()
+	// Fixed public test seed; this creates no files or signatures and uses no host credentials.
+	public := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{1}, 32)).Public().(ed25519.PublicKey)
+	blob := make([]byte, 4)
+	binary.BigEndian.PutUint32(blob, 11)
+	blob = append(blob, []byte("ssh-ed25519")...)
+	n := make([]byte, 4)
+	binary.BigEndian.PutUint32(n, 32)
+	blob = append(blob, n...)
+	blob = append(blob, public...)
+	raw, err := json.Marshal(map[string]any{
+		"maintainers": []string{"ssh-ed25519 " + base64.StdEncoding.EncodeToString(blob)},
+		"revision":    strings.Repeat("a", 40), "publisher": "ed25519:" + base64.RawURLEncoding.EncodeToString(public),
+		"audience": "example.invalid", "registry": "/registry.git", "state_dir": "/enrollment-state",
+		"stations": map[string]bool{"sample": true}, "generations": map[string]string{"30001": strings.Repeat("1", 32)}, "service_uid": 30001,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 
 // Existing files/directories/symlinks are preserved, and missing/symlinked
@@ -338,7 +376,7 @@ func TestReleaseBuildEnvironment(t *testing.T) {
 	t.Setenv("GOFLAGS", "-toolexec=unwanted")
 	t.Setenv("SSH_AUTH_SOCK", "test-only-unavailable")
 	env := map[string]string{}
-	for _, v := range buildEnv(work) {
+	for _, v := range buildEnv(work, "") {
 		k, v, _ := strings.Cut(v, "=")
 		env[k] = v
 	}
@@ -352,6 +390,16 @@ func TestReleaseBuildEnvironment(t *testing.T) {
 			t.Fatal("ambient authority inherited", key)
 		}
 	}
+	proxy := buildEnv(work, filepath.Join(work, "read-only cache"))
+	found := false
+	for _, v := range proxy {
+		if strings.HasPrefix(v, "GOPROXY=") {
+			found = v == "GOPROXY=file://"+strings.ReplaceAll(filepath.Join(work, "read-only cache", "cache", "download"), " ", "%20")
+		}
+	}
+	if !found {
+		t.Fatal("local proxy has network fallback or unsafe URL")
+	}
 	if env["GOPROXY"] != "off" || env["GOSUMDB"] != "off" || env["GOWORK"] != "off" || env["GOTOOLCHAIN"] != "local" {
 		t.Fatal("offline build configuration differs")
 	}
@@ -360,8 +408,24 @@ func TestReleaseBuildEnvironment(t *testing.T) {
 // One real clean-commit offline build qualifies version, trimpath metadata,
 // exact staged bytes and complete checksums. It creates no service or system
 // files. Sibling inputs/source index remain unchanged and build scratch is gone.
-func TestReleaseBundle(t *testing.T) {
+func TestReleaseBundle(t *testing.T) { testReleaseBundle(t, false) }
+
+// A supplied valid pin configuration is copied and checksummed in a real
+// offline build; this validates policy bytes, not installed Git trust or state.
+func TestReleaseBundleWithEnrollment(t *testing.T) { testReleaseBundle(t, true) }
+func testReleaseBundle(t *testing.T, withEnrollment bool) {
 	f := newFixture(t)
+	f.o.moduleCache = fixtureModuleCache(t)
+	proxyBefore, err := snapshotFiles(f.o.moduleCache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pins []byte
+	if withEnrollment {
+		pins = enrollmentInput(t)
+		f.o.enrollment = filepath.Join(filepath.Dir(f.o.config), "enrollment.json")
+		writeFixture(t, f.o.enrollment, pins)
+	}
 	index := filepath.Join(f.o.repo, ".git/index")
 	before, err := os.ReadFile(index)
 	if err != nil {
@@ -369,10 +433,17 @@ func TestReleaseBundle(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	args := []string{"-repo", f.o.repo, "-commit", f.o.commit, "-version", f.o.version, "-target", f.o.target, "-config", f.o.config, "-name-indices", f.o.registry}
+	args := []string{"-repo", f.o.repo, "-commit", f.o.commit, "-version", f.o.version, "-target", f.o.target, "-config", f.o.config, "-name-indices", f.o.registry, "-module-cache", f.o.moduleCache}
+	if withEnrollment {
+		args = append(args, "-enrollment", f.o.enrollment)
+	}
 	var out, diagnostic bytes.Buffer
 	if code := run(ctx, args, &out, &diagnostic); code != 0 {
 		t.Fatalf("actual bundle build exit=%d: %s", code, &diagnostic)
+	}
+	proxyAfter, err := snapshotFiles(f.o.moduleCache)
+	if err != nil || !reflect.DeepEqual(proxyBefore, proxyAfter) {
+		t.Fatal("build changed dependency cache", err)
 	}
 	entries, err := os.ReadDir(f.o.target)
 	if err != nil {
@@ -386,6 +457,9 @@ func TestReleaseBundle(t *testing.T) {
 		}
 	}
 	want := []string{"SHA256SUMS", "VERSION.json", "config.json", "keymaker", "name-indices.json", "swarma-keymaker.service"}
+	if withEnrollment {
+		want = append(want[:3], append([]string{"enrollment.json"}, want[3:]...)...)
+	}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatal("bundle inventory differs", names)
 	}
@@ -448,7 +522,11 @@ func TestReleaseBundle(t *testing.T) {
 		t.Fatal("owner checksum command failed", err)
 	}
 	t.Logf("sha256sum -c actual_exit=0: %s", &checksumOutput)
-	for name, want := range map[string][]byte{"config.json": f.config, "name-indices.json": f.registry} {
+	copiedInputs := map[string][]byte{"config.json": f.config, "name-indices.json": f.registry}
+	if withEnrollment {
+		copiedInputs["enrollment.json"] = pins
+	}
+	for name, want := range copiedInputs {
 		got, err := os.ReadFile(filepath.Join(f.o.target, name))
 		if err != nil || !bytes.Equal(got, want) {
 			t.Fatal("copied input differs", name)
@@ -493,4 +571,82 @@ func TestReleaseCommandRefusals(t *testing.T) {
 			t.Fatal(got, c.want)
 		}
 	}
+}
+
+// File-proxy dependencies come from an isolated copy of the exact committed
+// go.sum entries. No tests modify the host's module cache or fetch the network.
+func fixtureModuleCache(t *testing.T) string {
+	t.Helper()
+	cache := os.Getenv("GOMODCACHE")
+	if cache == "" {
+		cmd := exec.Command("go", "env", "GOMODCACHE")
+		cmd.Env = append(os.Environ(), "GOTELEMETRY=off")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal("module cache location", err)
+		}
+		cache = strings.TrimSpace(string(out))
+	}
+	sums, err := os.ReadFile("../../go.sum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dst := t.TempDir()
+	for _, line := range strings.Split(strings.TrimSpace(string(sums)), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 3 || strings.HasSuffix(fields[1], "/go.mod") {
+			continue
+		}
+		for _, ext := range []string{".mod", ".info", ".zip"} {
+			rel := filepath.Join("cache", "download", fields[0], "@v", fields[1]+ext)
+			raw, err := os.ReadFile(filepath.Join(cache, rel))
+			if err != nil {
+				t.Fatal("offline dependency must already be cached", err)
+			}
+			dest := filepath.Join(dst, rel)
+			if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
+				t.Fatal(err)
+			}
+			writeFixture(t, dest, raw)
+		}
+	}
+	return dst
+}
+
+// Missing local dependencies fail closed, clean only the owned target and
+// preserve the empty proxy. Real offline builds above are positive controls.
+func TestReleaseOfflineDependencies(t *testing.T) {
+	f := newFixture(t)
+	f.o.moduleCache = t.TempDir()
+	before, err := snapshotFiles(f.o.moduleCache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := assemble(context.Background(), f.o); err == nil || err.Error() != "offline keymaker build failed" {
+		t.Fatal("unavailable dependency admitted", err)
+	}
+	absent(t, f.o.target)
+	after, err := snapshotFiles(f.o.moduleCache)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatal("build changed read-only dependency source", err)
+	}
+}
+func snapshotFiles(root string) (map[string]string, error) {
+	out := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(raw)
+		out[path] = hex.EncodeToString(sum[:])
+		return nil
+	})
+	return out, err
 }

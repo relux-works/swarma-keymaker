@@ -121,13 +121,9 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
   curator content approval. Other existing refusal meanings are unchanged.
   Registrar self-check failures retain their typed spellings and return no proof.
 
-## Offline packaging baseline gates
 
-- The optional enrollment input refuses `enrollment validation unavailable at
-  this revision`. The follow-up after PR #5 must integrate its validator/pins and
-  qualify offline dependency inputs; no syntax-only substitute is shipped.
-- The existing control_gid field has no native control-socket effect in this
-  baseline. That effect and the later operator_uid field depend on PR #6.
+## Offline packaging activation gates
+
 - Section 12.1 creates the master seed parent but not the dedicated child
   state_dir expected by the custody loader. The owner must reconcile this
   provisioning gap before activation. Packaging records the dependency without

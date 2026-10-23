@@ -12,6 +12,7 @@ import (
 
 type options struct {
 	repo, commit, version, target, config, registry, enrollment string
+	moduleCache                                                 string
 }
 
 func run(ctx context.Context, args []string, out, errOut io.Writer) int {
@@ -24,7 +25,8 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) int {
 	fs.StringVar(&o.target, "target", "", "new directory outside source and system paths")
 	fs.StringVar(&o.config, "config", "", "operator configuration")
 	fs.StringVar(&o.registry, "name-indices", "", "operator name-index registry")
-	fs.StringVar(&o.enrollment, "enrollment", "", "optional enrollment (validator required)")
+	fs.StringVar(&o.enrollment, "enrollment", "", "optional enrollment pin configuration")
+	fs.StringVar(&o.moduleCache, "module-cache", "", "read-only populated Go module cache for offline builds")
 	if fs.Parse(args) != nil || fs.NArg() != 0 {
 		return 2
 	}

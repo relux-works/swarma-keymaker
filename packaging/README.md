@@ -46,8 +46,11 @@ Do not rename or modify inputs, source or the target's parent while building.
 The tool is a local preparation tool using trusted Go and Git executables.
 
 Operator input files must be regular, non-symlinked files, with no symlinked
-ancestors and at most 8 MiB each. The configuration uses ParseConfig; the name
-registry uses the daemon's StrictJSON and Registry.Validate. Validated bytes are
+ancestors and at most 8 MiB each (enrollment pins are further limited to 1 MiB by their
+parser). The configuration uses ParseConfig; the name
+registry uses the daemon's StrictJSON and Registry.Validate. Optional enrollment
+pins use enrollment.ParseConfig, sharing the landed strict schema and policy
+checks; it does no Git, approval or retained-state operations. Validated bytes are
 copied verbatim. No seed, private key, live state or credentials are copied.
 
 | Target entry | Contents |
@@ -55,14 +58,21 @@ copied verbatim. No seed, private key, live state or credentials are copied.
 | keymaker | Linux binary for the builder's architecture, compiled with `-trimpath`, CGO disabled and no embedded local VCS paths. |
 | config.json | Validated operator configuration. |
 | name-indices.json | Validated operator name-index registry. |
+| enrollment.json | Optional validated enrollment pin configuration, copied only when supplied. |
 | swarma-keymaker.service | Exact committed section 12.1 unit. |
 | VERSION.json | Full source commit, actual CLI version, Go version, target OS/architecture and trimpath setting. |
-| SHA256SUMS | Sorted SHA256 entries for all five files above. |
+| SHA256SUMS | Sorted SHA256 entries for all release files above, including enrollment.json when present. |
 
 The source snapshot comes from `git archive` of the immutable commit; only
 regular files and directories are extracted. Build HOME, temporary files,
 module/cache directories and telemetry configuration are confined to the new
-target's `.build` directory. The tool disables network module resolution,
+target's `.build` directory. Pass `-module-cache` with a populated Go module cache containing the exact versions in the committed go.mod/go.sum. Its
+`cache/download` directory is used only as a read-only `file://` proxy. Go verifies
+module checksums against the committed go.sum; missing dependencies fail closed
+and clean the owned target. No dependency download is attempted over the network. The build uses
+`-modcacherw` for its private extracted module cache so both success and failure
+cleanup can remove it; the source download cache stays read-only.
+The tool disables network module resolution,
 workspace/global Go configuration and Git optional index writes. The binary's
 embedded build settings are checked. Source cleanliness and HEAD are rechecked
 before success. Build scratch is removed before manifest creation; failure
@@ -78,14 +88,13 @@ its newly created target.
 
 ## Explicit dependency gates
 
-This branch targets the standard-library-only baseline. PR #5's enrollment
-validator is not available here. With no `-enrollment`, enrollment.json is
-omitted. Any supplied enrollment path refuses without opening it, with exactly
-`enrollment validation unavailable at this revision`; it is never accepted by a
-syntax-only JSON check. A follow-up after PR #5 must integrate its signed
-snapshot/pins validator and review offline dependency availability before adding
-that file. This revision cannot execute the runbook's unconditional enrollment
-copy or qualify production enrollment.
+With no `-enrollment`, enrollment.json is omitted. A supplied path must pass
+all regular-file checks and the actual enrollment pin-config parser. Invalid,
+unknown, duplicate and aliased members refuse; no syntax-only substitute is used.
+Offline parsing does not load the referenced Git registry, establish file
+protection, verify a snapshot or perform operator reconciliation. Those remain
+protected-runtime enrollment checks. Supply the pin configuration for the
+runbook's enrollment copy; omission does not qualify that step.
 
 `control_gid` and `operator_principal` use the landed native-control schema.
 Socket mode is fixed at 0660 in the daemon, not a configurable member. Enrollment
@@ -103,22 +112,24 @@ all root operations remain with the owner and the specification runbook.
 
 Tests use private temporary fixtures and clean clones of existing signed source
 commits. They create no fixture commits, use no host signing key/SSH agent and
-touch no system installation paths. A real positive build runs offline and checks
-its manifest with `sha256sum -c`, then confirms a bounded corruption makes that
-actual command exit 1 naming the changed file; refusal tests preserve inputs and existing
-targets. Narrow commands and the two overlay controls are in the root README.
+touch no system installation paths. Real positive builds with and without
+enrollment run offline and check their manifests with `sha256sum -c`, then
+confirm a bounded corruption makes that command exit 1 naming the changed file.
+Refusal tests preserve inputs and existing targets. Narrow commands and the three overlay controls are in the root README.
 No formal attack-surface table was supplied in this brief. These packaging checks
 do not qualify deployment, multi-UID behavior or the unavailable dependencies.
 
-The existing mutation runner's optional packaging group plants two bounded
-weakenings; the default ten core controls are unchanged. A plant is killed only
+The existing mutation runner's optional packaging group plants three bounded
+weakenings; the eighteen core controls, native subset and five registration
+controls are retained. A plant is killed only
 by exit 1 and its named test plus intended behavioral witness, not a build/setup
-error. Both baseline negatives have valid clean/unit controls.
+error. Negative witnesses have nearby valid controls.
 
 | Mutant | Narrows the gate to | Named failing test |
 | --- | --- | --- |
 | packaging-dirty-tree | Rejecting tracked modifications before bundle creation | TestReleaseDirtyTree/tracked |
 | packaging-unit-drift | Exact unit equality, including a changed UMask | TestReleaseUnitMatchesSpec/modified |
+| packaging-enrollment-policy | Real pin-policy validation rather than syntax-only acceptance | TestReleaseEnrollmentGate/revision |
 
 These witnesses do not claim exhaustive mutation coverage. Surviving or unapplied
 plants make the runner fail; they cannot be reported as killed.

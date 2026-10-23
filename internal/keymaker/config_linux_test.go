@@ -70,6 +70,8 @@ func TestPackagingConfigSemantics(t *testing.T) {
 	}
 	for _, bad := range [][]byte{
 		append(append([]byte(nil), raw...), []byte("{}")...),
+		bytes.Replace(raw, []byte(`"operator_principal"`), []byte(`"Operator_Principal"`), 1),
+		bytes.Replace(raw, []byte(`"generation"`), []byte(`"Generation"`), 1),
 		bytes.Replace(raw, []byte(`"service_uid": 0`), []byte(`"service_uid": 0, "service_uid": 1`), 1),
 		bytes.Replace(raw, []byte(`"service_uid": 0`), []byte(`"service_uid": 4294967296`), 1),
 		bytes.Replace(raw, []byte(`"service_uid": 0`), []byte(`"service_uid": -1`), 1),

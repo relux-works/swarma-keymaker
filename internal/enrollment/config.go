@@ -256,6 +256,17 @@ func configJSONDuplicates(dec *json.Decoder) error {
 	return err
 }
 
+// ParseConfig validates offline pin-configuration bytes with the same strict
+// schema and policy checks used after startup invalidation. It performs no file,
+// Git, state or approval operations; parsing alone grants no enrollment authority.
+func ParseConfig(raw []byte) (PinConfig, error) {
+	if len(raw) > 1<<20 {
+		return PinConfig{}, errTrust
+	}
+	config, _, err := decodeConfig(configLocation{raw: raw})
+	return config, err
+}
+
 func decodeConfig(location configLocation) (PinConfig, *format.Policy, error) {
 	var c PinConfig
 	if err := strictJSON(location.raw, &c); err != nil {

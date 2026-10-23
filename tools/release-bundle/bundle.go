@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,11 +68,15 @@ func prepare(ctx context.Context, o options) (plan, error) {
 	return plan{repo: repo, target: target, files: files}, nil
 }
 
-func buildEnv(work string) []string {
+func buildEnv(work, moduleCache string) []string {
+	proxy := "off"
+	if moduleCache != "" {
+		proxy = (&url.URL{Scheme: "file", Path: filepath.Join(moduleCache, "cache", "download")}).String()
+	}
 	return []string{
 		"PATH=" + os.Getenv("PATH"), "LC_ALL=C", "HOME=" + filepath.Join(work, "home"), "XDG_CONFIG_HOME=" + filepath.Join(work, "home"),
 		"TMPDIR=" + filepath.Join(work, "tmp"), "GOTMPDIR=" + filepath.Join(work, "tmp"), "GOCACHE=" + filepath.Join(work, "cache"), "GOPATH=" + filepath.Join(work, "gopath"),
-		"GOENV=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off", "GOTELEMETRY=off", "CGO_ENABLED=0", "GOOS=linux", "GOARCH=" + runtime.GOARCH, "GOMAXPROCS=2",
+		"GOENV=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=" + proxy, "GOSUMDB=off", "GOTELEMETRY=off", "CGO_ENABLED=0", "GOOS=linux", "GOARCH=" + runtime.GOARCH, "GOMAXPROCS=2",
 	}
 }
 func runCommand(cmd *exec.Cmd) error {
@@ -92,6 +97,18 @@ type versionRecord struct {
 }
 
 func assemble(ctx context.Context, o options) (err error) {
+	if o.moduleCache != "" {
+		cache, e := pathWithoutLinks(o.moduleCache, false)
+		if e != nil {
+			return errInput
+		}
+		st, e := os.Stat(cache)
+		if e != nil || !st.IsDir() {
+			return errInput
+		}
+		o.moduleCache = cache
+	}
+
 	p, err := prepare(ctx, o)
 	if err != nil {
 		return err
@@ -126,15 +143,15 @@ func assemble(ctx context.Context, o options) (err error) {
 		return fmt.Errorf("source snapshot refused")
 	}
 	binary := filepath.Join(p.target, "keymaker")
-	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-p=2", "-ldflags=-buildid=", "-o", binary, "./cmd/keymaker")
+	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildvcs=false", "-mod=readonly", "-modcacherw", "-p=2", "-ldflags=-buildid=", "-o", binary, "./cmd/keymaker")
 	build.Dir = filepath.Join(work, "source")
-	build.Env = buildEnv(work)
+	build.Env = buildEnv(work, o.moduleCache)
 	if err = runCommand(build); err != nil {
 		return fmt.Errorf("offline keymaker build failed")
 	}
 	versionCmd := exec.CommandContext(ctx, binary, "version")
 	versionCmd.Dir = work
-	versionCmd.Env = buildEnv(work)
+	versionCmd.Env = buildEnv(work, o.moduleCache)
 	var version bytes.Buffer
 	versionCmd.Stdout = &version
 	if err = runCommand(versionCmd); err != nil || version.String() != o.version+"\n" {

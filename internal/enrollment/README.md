@@ -424,3 +424,12 @@ before/after publication and its unpaused control at one scheduler processor;
 `TestAdmissionGateWriterProgress` checks sustained readers and 40 publications;
 `TestAdmissionGateFailedPublication` checks that immediate valid recovery cannot
 erase the failed fence for its reserved cohort.
+
+## Offline pin configuration parsing
+
+`ParseConfig([]byte)` exposes the same strict member, scalar and policy decoder
+used after startup invalidation, with the protected loader's 1 MiB byte bound.
+The release assembler uses it before copying optional enrollment.json. It reads
+no files or Git objects, changes no retained state, consumes no approval and
+grants no authority. Installed protection, signature/snapshot verification and
+operator reconciliation still belong to the runtime paths described above.

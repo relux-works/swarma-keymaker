@@ -86,10 +86,10 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Vet enrollment authority: `go vet ./internal/enrollment` | Diagnostics on stdout/stderr |
 | gofmt | Check enrollment formatting: `gofmt -l internal/enrollment/*.go` | Empty output expected |
 | Git + OpenSSH | Production uses `/usr/bin/git cat-file` and `merge-base --is-ancestor`; fixture tests invoke `/usr/bin/ssh-keygen -t ed25519` and Git `commit-tree -S` | Local objects and temporary test-only keys; no network or inherited SSH agent |
-| Go | Packaging parser and unit checks: `go test ./internal/keymaker -run '^TestPackagingConfig' -count=1`; `go test ./tools/release-bundle -count=1` | Paired refusals, clean-clone fixtures and one offline real build under TMPDIR |
+| Go | Packaging parser and unit checks: `go test ./internal/keymaker -run '^TestPackagingConfig' -count=1`; `go test ./tools/release-bundle -count=1` | Paired refusals, clean-clone fixtures and offline real builds under TMPDIR |
 | Go | Packaging static checks: `go vet ./tools/release-bundle ./tools/mutations ./internal/keymaker`; `gofmt -l tools/release-bundle/*.go internal/keymaker/config_linux*.go internal/keymaker/runtime_linux.go` | Diagnostics; empty formatting output expected |
 | Go | Build offline assembler: `go build -trimpath -o "$SCRATCH/release-bundle" ./tools/release-bundle` | Tool binary under scratch |
-| release-bundle | Assemble: `"$SCRATCH/release-bundle" -repo "$SOURCE" -commit "$COMMIT" -version "$VERSION" -target "$BUNDLE" -config "$CONFIG" -name-indices "$REGISTRY"` | New offline bundle directory; all temporary build work remains inside it |
+| release-bundle | Assemble: `"$SCRATCH/release-bundle" -repo "$SOURCE" -commit "$COMMIT" -version "$VERSION" -target "$BUNDLE" -config "$CONFIG" -name-indices "$REGISTRY" -module-cache "$MODULE_CACHE"` | New offline bundle directory; all temporary build work remains inside it |
 | sha256sum | Verify before the root step: `(cd "$BUNDLE" && sha256sum -c SHA256SUMS)` | Every listed file must report OK; exit 0 required |
 | Go | Test the native wire layer: `go test ./internal/control/...` | Test verdicts; temporary sockets cleaned by tests |
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
@@ -109,7 +109,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run narrowing controls (default `core`, including native): `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all eighteen are killed |
 | Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Eight native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
-| Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Two named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when both are killed, logs/PIDs in scratch |
+| Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Three named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all three are killed, logs/PIDs in scratch |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |
@@ -254,18 +254,24 @@ cases. Without configured provisioning it still returns exact PENDING/status 3;
 compilation does not qualify real foreign-UID execution. Follow the existing
 fixture HOME/no SSH_AUTH_SOCK isolation and keep artifacts in task scratch.
 
+
 ## Offline release handoff
 
 Set SOURCE to a clean checkout at the full reviewed COMMIT and VERSION to its
 `keymaker version` string. Set BUNDLE to a new directory under an existing
 operator-controlled scratch parent, outside SOURCE and system paths. CONFIG and
-REGISTRY are regular operator-supplied files; the
+REGISTRY are regular operator-supplied files. MODULE_CACHE is a prepopulated Go
+module cache (locate it with `go env GOMODCACHE`) containing the exact committed
+dependency versions. The assembler uses its download cache as a read-only file
+proxy, with no network fallback; all writable caches stay inside BUNDLE. The
 [packaging contract](packaging/README.md) documents every member and refusal.
 
 After assembly, verify SHA256SUMS with the exact command in the Tools table
 before handing files to the owner. Follow only
 [specification section 12.1](spec/keymaker.md#121-explicit-preflight-and-dynamic-service-ids)
-for protected staging and the root step. This baseline omits enrollment.json and
-refuses any supplied enrollment input until PR #5's validator is integrated.
+for protected staging and the root step. Supply `-enrollment "$ENROLLMENT_CONFIG"`
+to include the validated local enrollment pin configuration as enrollment.json;
+omission leaves it out. Parsing does not qualify installed ownership, registry
+signatures, snapshot freshness or operator reconciliation.
 The control socket uses the landed native schema. Production activation
 remains gated; this tool does not install or run a service.

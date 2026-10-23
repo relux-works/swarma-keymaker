@@ -281,7 +281,8 @@ func TestReconcileCommandInterruptedState(t *testing.T) {
 }
 
 // A missing, service-forged, other-pin, wrong-digest, aliased, hard-linked or
-// old-format receipt cannot be consumed; every refusal preserves all bytes.
+// old-format receipt cannot grant authority; present receipts become consuming
+// evidence while other state/config/ledger bytes remain unchanged.
 func TestReconcileCommandRecordRefusals(t *testing.T) {
 	for _, name := range []string{"missing", "forged", "other-pin", "other-config", "wrong-digest", "case-alias", "hard-link", "old-format"} {
 		t.Run(name, func(t *testing.T) {
@@ -292,7 +293,7 @@ func TestReconcileCommandRecordRefusals(t *testing.T) {
 			case "missing":
 				os.Remove(path)
 			case "forged":
-				f.files.override[path] = Metadata{Mode: 0644, UID: uint32(os.Geteuid()), Links: 1}
+				f.files.override[filepath.Join(f.config.StateDir, consumingName)] = Metadata{Mode: 0644, UID: uint32(os.Geteuid()), Links: 1}
 			case "other-pin":
 				c := f.config
 				c.Audience = "another.example.invalid"
@@ -319,7 +320,11 @@ func TestReconcileCommandRecordRefusals(t *testing.T) {
 			a := New(f.configPath, f.files, nil)
 			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
 			a.Close()
-			assertUnchanged(t, f, before)
+			if name == "missing" {
+				assertUnchanged(t, f, before)
+			} else {
+				assertReceiptInvalidated(t, f, before)
+			}
 			control, h := reconciliationFixture(t)
 			expectCommandApproval(t, control, h)
 			startApproved(t, control)

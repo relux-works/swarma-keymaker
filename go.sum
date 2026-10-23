@@ -1,8 +1,4 @@
-github.com/relux-works/swarma-registrar v0.0.0-20261023123306-c01ab884ed69 h1:Wqiz0BUy4dS4cC5rx0VsGJ3MCc5d4clY16v5VrzlcIg=
-github.com/relux-works/swarma-registrar v0.0.0-20261023123306-c01ab884ed69/go.mod h1:4bnxh4kC6jNAovfx5i8t1OdnhytaM/ZeD/zXoQQTKwA=
-github.com/relux-works/swarma-registrar v0.0.0-20261023130800-e6fb65082432 h1:F0PJZ8JCtnSUSA0A4mIYc3oL1IS2ANGrdPiyYuZUduw=
-github.com/relux-works/swarma-registrar v0.0.0-20261023130800-e6fb65082432/go.mod h1:4bnxh4kC6jNAovfx5i8t1OdnhytaM/ZeD/zXoQQTKwA=
-github.com/relux-works/swarma-registrar v0.0.0-20261023131515-fd2df68e861d h1:gf+tRUH2loWOCuhQ2/BmmZKF3wfmzEAejp5h6aadQYE=
-github.com/relux-works/swarma-registrar v0.0.0-20261023131515-fd2df68e861d/go.mod h1:4bnxh4kC6jNAovfx5i8t1OdnhytaM/ZeD/zXoQQTKwA=
 github.com/relux-works/swarma-registrar v0.0.0-20261023150327-263ca7fcfd97 h1:GebhuH2oxOvEBVkLglp5jDcylE30dR+dSQE5jhZSZiY=
 github.com/relux-works/swarma-registrar v0.0.0-20261023150327-263ca7fcfd97/go.mod h1:4bnxh4kC6jNAovfx5i8t1OdnhytaM/ZeD/zXoQQTKwA=
+golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
+golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=

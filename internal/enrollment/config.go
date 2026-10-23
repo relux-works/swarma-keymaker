@@ -189,39 +189,74 @@ func exactJSONMembers(value any, target reflect.Type) bool {
 	}
 	return true
 }
-func loadConfig(path string, files Files) (PinConfig, *format.Policy, error) {
-	var c PinConfig
+
+// configLocation contains only the protected bytes and the path required to
+// acquire the lock. No other config member is typed or validated before it.
+type configLocation struct {
+	stateDir string
+	raw      []byte
+}
+
+func locateConfig(path string, files Files) (configLocation, error) {
 	b, err := protectedRead(files, path, 1<<20, 0)
 	if err != nil {
+		return configLocation{}, err
+	}
+	value, err := ccj.Parse(b, ccj.EnrollmentMalformed)
+	if err != nil {
+		return configLocation{}, errTrust
+	}
+	object, ok := value.(map[string]any)
+	if !ok {
+		return configLocation{}, errTrust
+	}
+	state, ok := object["state_dir"].(string)
+	if !ok || !absolute(state) {
+		return configLocation{}, errTrust
+	}
+	return configLocation{state, b}, nil
+}
+func decodeConfig(location configLocation) (PinConfig, *format.Policy, error) {
+	var c PinConfig
+	if err := strictJSON(location.raw, &c); err != nil {
 		return c, nil, err
 	}
-	if err = strictJSON(b, &c); err != nil {
-		return c, nil, err
+	p, err := validateConfig(c)
+	return c, p, err
+}
+func loadConfig(path string, files Files) (PinConfig, *format.Policy, error) {
+	location, err := locateConfig(path, files)
+	if err != nil {
+		return PinConfig{}, nil, err
 	}
+	return decodeConfig(location)
+}
+
+func validateConfig(c PinConfig) (*format.Policy, error) {
 	if !revisionPattern.MatchString(c.Revision) || !absolute(c.Registry) || !absolute(c.StateDir) || len(c.Maintainers) == 0 || !canonicalAudience(c.Audience) || len(c.Stations) == 0 {
-		return c, nil, errTrust
+		return nil, errTrust
 	}
 	if c.ServiceUID != nil && (*c.ServiceUID == 0 || *c.ServiceUID == 4294967295) {
-		return c, nil, errTrust
+		return nil, errTrust
 	}
 	for _, key := range c.Maintainers {
 		if _, err := parseMaintainer(key); err != nil {
-			return c, nil, err
+			return nil, err
 		}
 	}
 	for host := range c.Stations {
 		if !hostPattern.MatchString(host) {
-			return c, nil, errTrust
+			return nil, errTrust
 		}
 	}
 	for uid, generation := range c.Generations {
 		n, err := strconv.ParseUint(uid, 10, 32)
 		if err != nil || n == 0 || n == 4294967295 || strconv.FormatUint(n, 10) != uid || !generationPattern.MatchString(generation) || generation == strings.Repeat("0", 32) {
-			return c, nil, errTrust
+			return nil, errTrust
 		}
 	}
 	p, err := format.NewPolicy(c.Audience, c.Publisher, c.Stations)
-	return c, p, err
+	return p, err
 }
 
 // Matrix server names are canonical ASCII DNS/IPv4 or bracketed IPv6, with an

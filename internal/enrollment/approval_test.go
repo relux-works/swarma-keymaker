@@ -120,7 +120,12 @@ func TestReconcileApprovalReplayAfterConsumption(t *testing.T) {
 			}
 			before := reconciliationImage(t, f)
 			assertBootstrapFenced(t, f)
-			assertReceiptInvalidated(t, f, before)
+			if kind == "rollback-to-approved-digest" {
+				// The earlier mismatched-state attempt already invalidated it.
+				assertUnchanged(t, f, before)
+			} else {
+				assertReceiptInvalidated(t, f, before)
+			}
 			if e = os.Remove(filepath.Join(f.config.StateDir, consumingName)); e != nil {
 				t.Fatal(e)
 			}
@@ -135,7 +140,7 @@ func TestReconcileApprovalReplayAfterConsumption(t *testing.T) {
 }
 
 // Both command modes bind boot identity and trusted UTC/boot time. Every stale
-// or untrustworthy startup refuses without consuming anything, then fresh
+// or untrustworthy startup invalidates consent, then explicit recovery and fresh
 // confirmation on that same state succeeds. The one-nanosecond TTL boundary
 // has a valid adjacent control; these are injected clocks, not host clock edits.
 func TestReconcileApprovalBootAndTime(t *testing.T) {
@@ -174,10 +179,10 @@ func TestReconcileApprovalBootAndTime(t *testing.T) {
 					}
 					before := reconciliationImage(t, f)
 					assertBootstrapFenced(t, f)
-					assertUnchanged(t, f, before)
+					assertReceiptInvalidated(t, f, before)
 					clock.err = nil
 					clock.instant = original
-					freshApprovalControl(t, f)
+					repairConsumptionAndConfirm(t, f)
 				})
 			}
 			t.Run("just-inside-ttl", func(t *testing.T) {

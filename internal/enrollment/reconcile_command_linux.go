@@ -523,123 +523,134 @@ type commandReconciler struct {
 }
 
 func (r *commandReconciler) Check(ctx context.Context, high *registry.HighWater) error {
-	c, _, err := loadConfig(r.configPath, r.files)
+	location, err := locateConfig(r.configPath, r.files)
 	if err != nil {
 		return err
 	}
-	return r.checkPinned(ctx, high, c)
+	result, err := r.startup(ctx, location)
+	if err != nil {
+		return err
+	}
+	if high == nil || !reflect.DeepEqual(result.high, high) {
+		return errTrust
+	}
+	return nil
 }
-func (r *commandReconciler) checkPinned(ctx context.Context, high *registry.HighWater, c PinConfig) error {
-	if high == nil || ctx.Err() != nil {
-		return errTrust
-	}
-	if err := commandConfig(c, r.files); err != nil {
-		return err
-	}
-	if uint32(os.Geteuid()) != *c.ServiceUID {
-		return errTrust
-	}
-	// Serialize receipt reads/consumption across startup instances. Lifecycle
-	// leases are shared, so without this lock two starts could hold the same
-	// root-owned inode before either unlinks it.
-	store := newFileStore(ctx, c.StateDir, r.files)
-	lock, err := store.lock()
-	if err != nil {
-		return err
-	}
-	defer unlock(lock)
-	actual, err := store.readLocked()
-	if err != nil || !reflect.DeepEqual(actual, high) {
-		return errTrust
-	}
 
-	if _, err := os.Lstat(pendingPath(r.configPath)); !errors.Is(err, os.ErrNotExist) {
-		return errTrust
-	}
-	entries, err := os.ReadDir(c.StateDir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		switch entry.Name() {
-		case "accepted", "high-water.json", "high-water.lock", approvalName, consumedName:
-		default:
-			return errTrust
-		}
-	}
-	path := filepath.Join(c.StateDir, approvalName)
-	fd, err := syscall.Open(path, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return err
-	}
-	f := os.NewFile(uintptr(fd), path)
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-	m, err := openedMetadata(r.files, f)
-	if err != nil || !safeMeta(m, false, 0) || m.Links != 1 || m.Mode.Perm() != 0644 {
-		return errTrust
-	}
-	b, err := io.ReadAll(io.LimitReader(f, 4097))
-	if err != nil || len(b) > 4096 {
-		return errTrust
-	}
-	var approval commandApproval
-	if strictJSON(b, &approval) != nil || approval.Version != 1 || approval.ConfigPathSHA256 != digestBytes([]byte(r.configPath)) || approval.PinSHA256 != pinDigest(c) || approval.StateSHA256 != StateDigest(high) {
-		return errTrust
-	}
-	if err = approvalValid(approval, approvalSourceFor(r.files)); err != nil {
-		return err
-	}
+type startupResult struct {
+	high   *registry.HighWater
+	config PinConfig
+	policy *format.Policy
+}
+
+// startup is the production fresh-start consumption boundary. Lock acquisition
+// begins the attempt: its first filesystem operation invalidates the receipt.
+func (r *commandReconciler) startup(ctx context.Context, location configLocation) (startupResult, error) {
 	ops := r.consumeOps
 	if ops == nil {
 		ops = diskOps{}
 	}
+	consuming := filepath.Join(location.stateDir, consumingName)
+	store := newFileStore(ctx, location.stateDir, r.files)
+	lock, err := store.lock()
+	if err != nil {
+		return startupResult{}, err
+	}
+	defer unlock(lock)
+	if err = ops.RenameNoReplace(filepath.Join(location.stateDir, approvalName), consuming); err != nil {
+		return startupResult{}, err
+	}
+	if err = ops.SyncDir(location.stateDir); err != nil {
+		return startupResult{}, err
+	}
+	// Every check below is post-invalidation. Never restore or erase the evidence
+	// on a failure, including cancellation, malformed records and transient clocks.
+	c, policy, err := decodeConfig(location)
+	if err != nil {
+		return startupResult{}, err
+	}
+	if err = commandConfig(c, r.files); err != nil {
+		return startupResult{}, err
+	}
+	if uint32(os.Geteuid()) != *c.ServiceUID {
+		return startupResult{}, errTrust
+	}
 	if err = ctx.Err(); err != nil {
-		return err
+		return startupResult{}, err
 	}
-	// Read-only validation is over. Invalidate the exact root-owned receipt
-	// BEFORE any ledger operation. Every subsequent error leaves either consuming
-	// evidence or a durably consumed ID; no cleanup on a failure path is allowed.
-	named, err := os.Lstat(path)
+	high, err := store.readLocked()
+	if err != nil {
+		return startupResult{}, err
+	}
+	if high == nil {
+		return startupResult{}, errTrust
+	}
+	if _, err = os.Lstat(pendingPath(r.configPath)); !errors.Is(err, os.ErrNotExist) {
+		return startupResult{}, errTrust
+	}
+	entries, err := os.ReadDir(c.StateDir)
+	if err != nil {
+		return startupResult{}, err
+	}
+	for _, entry := range entries {
+		switch entry.Name() {
+		case "accepted", "high-water.json", "high-water.lock", consumingName, consumedName:
+		default:
+			return startupResult{}, errTrust
+		}
+	}
+	fd, err := syscall.Open(consuming, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return startupResult{}, err
+	}
+	f := os.NewFile(uintptr(fd), consuming)
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return startupResult{}, err
+	}
+	m, err := openedMetadata(r.files, f)
+	if err != nil || !safeMeta(m, false, 0) || m.Links != 1 || m.Mode.Perm() != 0644 {
+		return startupResult{}, errTrust
+	}
+	named, err := os.Lstat(consuming)
 	if err != nil || !os.SameFile(info, named) {
-		return errTrust
+		return startupResult{}, errTrust
 	}
-	consuming := filepath.Join(c.StateDir, consumingName)
-	if err = ops.Rename(path, consuming); err != nil {
-		// With no filesystem effect, this is indistinguishable from an unattempted start.
-		return err
+	b, err := io.ReadAll(io.LimitReader(f, 4097))
+	if err != nil || len(b) > 4096 {
+		return startupResult{}, errTrust
 	}
-	if err = ops.SyncDir(c.StateDir); err != nil {
-		return err
+	var approval commandApproval
+	if strictJSON(b, &approval) != nil || approval.Version != 1 || approval.ConfigPathSHA256 != digestBytes([]byte(r.configPath)) || approval.PinSHA256 != pinDigest(c) || approval.StateSHA256 != StateDigest(high) {
+		return startupResult{}, errTrust
 	}
-	named, err = os.Lstat(consuming)
-	if err != nil || !os.SameFile(info, named) {
-		return errTrust
+	if err = approvalValid(approval, approvalSourceFor(r.files)); err != nil {
+		return startupResult{}, err
 	}
 	if err = consumeApproval(ctx, c, r.files, approval, ops); err != nil {
-		return err
+		return startupResult{}, err
 	}
 	if err = ctx.Err(); err != nil {
-		return err
+		return startupResult{}, err
 	}
 	if err = ops.Remove(consuming); err != nil {
-		return err
+		return startupResult{}, err
 	}
 	info, err = f.Stat()
 	if err != nil {
-		return err
+		return startupResult{}, err
 	}
-	st := info.Sys().(*syscall.Stat_t)
-	if st.Nlink != 0 {
-		return errTrust
+	if info.Sys().(*syscall.Stat_t).Nlink != 0 {
+		return startupResult{}, errTrust
 	}
 	if err = ops.SyncDir(c.StateDir); err != nil {
-		return err
+		return startupResult{}, err
 	}
-	return ctx.Err()
+	if err = ctx.Err(); err != nil {
+		return startupResult{}, err
+	}
+	return startupResult{high, c, policy}, nil
 }
 
 func newReconciliationReport(c PinConfig, bootstrap bool) ReconciliationReport {

@@ -229,27 +229,61 @@ clock slewing and sampling; boot elapsed time independently bounds the TTL.
 Nanosecond timestamps are decimal strings to preserve exact integers in the
 strict JSON format.
 
-Before granting authority, startup holds the Store lock and atomically renames
-`reconciliation.json` to `reconciliation.consuming`, then fsyncs the directory.
-Only after this invalidation does it append the random approval ID to the
-protected `consumed-approvals` record with a full write, file fsync and checked
-close. It then unlinks the exact root-owned, single-linked consuming receipt
-and fsyncs the directory again. Authority is granted only after all steps
-succeed. Every error after a successful rename burns that approval: remaining
-consuming evidence or the durably recorded ID prevents reuse.
+### Startup consumption contract
 
-A leftover `reconciliation.consuming` fences startup and refuses both normal
-reconciliation and bootstrap, even if another approval is present. Neither
-command clears this evidence. Investigate it through separate privileged
-operator recovery, preserving all complete consumed IDs and retained history;
-an interrupted ledger append also needs explicit recovery. After authorized
-cleanup, issue a **new command confirmation**. Cleanup alone grants no consent.
+This state machine applies to a fresh Authority using the default command
+approval policy. An already admitted Authority reload and explicitly injected
+reconciliation policies do not consume command approvals.
 
-If the atomic rename itself fails with no filesystem effect, nothing durable
-changed. That start is indistinguishable from one that never attempted
-consumption; a later start within the approval TTL may consume that approval
-exactly once. This is the explicit local limit, also recorded in
-[UNRESOLVED_QUESTIONS.md](../../UNRESOLVED_QUESTIONS.md).
+- **Not begun:** only the exhaustive pre-lock gates below may refuse. They read
+  no consent or retained-state contents, write nothing, and grant nothing.
+- **Attempt begun:** acquiring the exclusive Store lock begins the attempt.
+  Its first filesystem action is an atomic, non-replacing rename of
+  `reconciliation.json` to `reconciliation.consuming`, followed by directory
+  fsync. No receipt/state read, parsing, digest, pin, boot, TTL, clock, ledger,
+  pending-marker or directory-evidence validation precedes that rename.
+- **Invalidated:** validate the consuming inode, protected policy, retained state,
+  receipt format/bindings/digests, boot identity, TTL and clock. Then append the
+  approval ID with full write, file fsync and checked close. Unlink the consuming
+  inode, check zero links, and fsync the directory before granting authority.
+  Any refusal or crash after successful rename leaves consuming evidence or a
+  consumed ID. No failure path restores consent or removes its evidence.
+- **Granted:** the approval has been consumed exactly once. Another start needs
+  a new confirmation. A leftover consuming file fences startup and BOTH command
+  modes, even beside another receipt. Recovery requires a separate privileged
+  investigation/cleanup preserving complete consumed IDs and retained history,
+  followed by a NEW confirmation. Neither command clears this evidence; cleanup
+  alone grants no consent.
+
+Exhaustive pre-lock refusal list (each is a not-begun outcome):
+
+1. **Lifetime/target guard:** this Authority is closed, has a prior indeterminate
+   Commit failure, or a previously selected state-directory target changed.
+   These in-memory guards inspect no consent or retained state and grant nothing.
+2. **Protected config location:** the config or its ancestors cannot be read
+   safely, its bounded JSON has invalid syntax/duplicate members, or its
+   `state_dir` cannot be extracted as one canonical absolute string. Only the protected config
+   is read; no consent or retained state is read and nothing is granted. All other config
+   member/type and semantic pin/policy checks occur after invalidation.
+3. **Protected directory/lifecycle lease:** the state path/ancestors or opened
+   directory inode fail ownership/type/mode/identity checks, cannot be opened,
+   or its shared lifecycle lease is unavailable. Only directory metadata is
+   inspected; no consent or retained state is read and nothing is granted.
+4. **Existing Store lock acquisition:** protected parent/directory/lock metadata
+   or opening/statting the existing regular lock file fails, or exclusive flock
+   cannot be acquired. No lock file is created and no consent or retained-state
+   contents are read; nothing is granted.
+5. **Cancellation/deadline before lock:** an already canceled context, or a
+   deadline/cancellation while waiting for the Store lock, refuses without
+   reading consent or retained state, writing files, or granting authority.
+
+There are exactly two retry windows in this local consumption contract: an
+atomic rename failure with no filesystem effect, and a refusal on the exhaustive
+pre-lock list. Both are indistinguishable from an attempt that never began;
+a later start within the approval TTL may consume the unchanged approval at
+most once. Every error after a successful rename is terminal for that approval.
+The separately accepted whole-host/root restoration residual remains below and
+in [UNRESOLVED_QUESTIONS.md](../../UNRESOLVED_QUESTIONS.md).
 
 The operator creates and directory-fsyncs the service-owned mode-0600 ledger
 under the publication fence; startup never creates, truncates or replaces it.

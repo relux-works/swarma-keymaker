@@ -103,11 +103,14 @@ func (a *Authority) Reload(ctx context.Context) Code {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	config, policy, err := loadConfig(a.configPath, a.files)
+	// Locate only the protected state path before a fresh default startup. No
+	// retained state or consent is read until its Store lock and first rename.
+	location, err := locateConfig(a.configPath, a.files)
 	if err != nil {
 		a.fence = localCode(err)
 		return a.fence
 	}
+	config := PinConfig{StateDir: location.stateDir}
 	if a.stateDir != "" && config.StateDir != a.stateDir {
 		return a.fence
 	}
@@ -122,31 +125,37 @@ func (a *Authority) Reload(ctx context.Context) Code {
 	if a.storeOps != nil {
 		store.ops = a.storeOps
 	}
-	retained, err := store.read()
-	if err != nil {
-		a.fence = localCode(err)
-		return a.fence
-	}
-	if retained == nil {
-		return a.fence
-	}
-	if a.retained != nil {
-		if !reflect.DeepEqual(retained, a.retained) {
+	var retained *registry.HighWater
+	var policy *format.Policy
+	if r, ok := a.reconcile.(*commandReconciler); ok && a.retained == nil {
+		result, err := r.startup(ctx, location)
+		if err != nil {
 			return a.fence
 		}
+		retained, config, policy = result.high, result.config, result.policy
 	} else {
-		var reconcileErr error
-		if r, ok := a.reconcile.(*commandReconciler); ok {
-			reconcileErr = r.checkPinned(ctx, retained.Clone(), config)
-		} else if a.reconcile != nil {
-			reconcileErr = a.reconcile.Check(ctx, retained.Clone())
-		} else {
-			reconcileErr = errTrust
+		config, policy, err = decodeConfig(location)
+		if err != nil {
+			a.fence = localCode(err)
+			return a.fence
 		}
-		if reconcileErr != nil {
+		retained, err = store.read()
+		if err != nil {
+			a.fence = localCode(err)
+			return a.fence
+		}
+		if retained == nil {
+			return a.fence
+		}
+		if a.retained != nil {
+			if !reflect.DeepEqual(retained, a.retained) {
+				return a.fence
+			}
+		} else if a.reconcile == nil || a.reconcile.Check(ctx, retained.Clone()) != nil {
 			return a.fence
 		}
 	}
+
 	if err = safeRepository(ctx, a.files, config.Registry); err != nil {
 		a.fence = localCode(err)
 		return a.fence

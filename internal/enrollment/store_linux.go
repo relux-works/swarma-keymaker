@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/relux-works/swarma-registrar/registry"
+	"golang.org/x/sys/unix"
 )
 
 const maxStateBytes = 16 << 20
@@ -39,6 +40,7 @@ type durableOps interface {
 	Sync(*os.File) error
 	Close(*os.File) error
 	Rename(string, string) error
+	RenameNoReplace(string, string) error
 	Remove(string) error
 	SyncDir(string) error
 }
@@ -48,7 +50,12 @@ func (diskOps) Write(f *os.File, b []byte) (int, error) { return f.Write(b) }
 func (diskOps) Close(f *os.File) error                  { return f.Close() }
 func (diskOps) Sync(f *os.File) error                   { return f.Sync() }
 func (diskOps) Rename(old, next string) error           { return os.Rename(old, next) }
-func (diskOps) Remove(path string) error                { return os.Remove(path) }
+
+// RenameNoReplace preserves prior consuming evidence without a pre-rename probe.
+func (diskOps) RenameNoReplace(old, next string) error {
+	return unix.Renameat2(unix.AT_FDCWD, old, unix.AT_FDCWD, next, unix.RENAME_NOREPLACE)
+}
+func (diskOps) Remove(path string) error { return os.Remove(path) }
 func (diskOps) SyncDir(path string) error {
 	f, err := os.Open(path)
 	if err != nil {

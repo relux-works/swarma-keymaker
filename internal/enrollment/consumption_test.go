@@ -38,11 +38,11 @@ func (o *consumptionStepOps) hit(stage string) error {
 	}
 	return syscall.EIO
 }
-func (o *consumptionStepOps) Rename(old, next string) error {
+func (o *consumptionStepOps) RenameNoReplace(old, next string) error {
 	if e := o.hit("rename"); e != nil {
 		return e
 	}
-	if e := o.diskOps.Rename(old, next); e != nil {
+	if e := o.diskOps.RenameNoReplace(old, next); e != nil {
 		return e
 	}
 	return o.hit("after-rename")

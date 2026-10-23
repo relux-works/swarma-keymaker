@@ -1,0 +1,226 @@
+{
+  "repository": "https://github.com/relux-works/swarma-user-manager",
+  "commit": "33d0b941dcd4a7ee6d2b5b4ee03c4357056034df",
+  "files": [
+    {
+      "file": "README.md",
+      "path": "vectors/gen-journal/README.md",
+      "sha256": "ab644c72c46b0e876e9fc00ed14ed8df63cf61c1ec119241cf1fe716c996de4a"
+    },
+    {
+      "file": "active-removed.jsonl",
+      "path": "vectors/gen-journal/active-removed.jsonl",
+      "sha256": "f5d8e63aef859d196d84876798fd5bfc402de3576e024afc4fa14536958eaa7f"
+    },
+    {
+      "file": "active.jsonl",
+      "path": "vectors/gen-journal/active.jsonl",
+      "sha256": "647a2493447602ea6c767db333f921d98f23a1f84a0176056af63c618e119c46"
+    },
+    {
+      "file": "bad-time.jsonl",
+      "path": "vectors/gen-journal/bad-time.jsonl",
+      "sha256": "8d87fb19be7a94993bd1b5273081c9b060f143a01af45891e1a15ee78d205dab"
+    },
+    {
+      "file": "blank-line.jsonl",
+      "path": "vectors/gen-journal/blank-line.jsonl",
+      "sha256": "afb65ea1dd452397f7947a00922750016572bc4e7a938573c140a5933b0f85f0"
+    },
+    {
+      "file": "broken-chain.jsonl",
+      "path": "vectors/gen-journal/broken-chain.jsonl",
+      "sha256": "e915dd016db237f9cebd9188e22541a4638361831b32931742c9290d3018520e"
+    },
+    {
+      "file": "creating.jsonl",
+      "path": "vectors/gen-journal/creating.jsonl",
+      "sha256": "bc3192646b921aae14ab1c4a0a636313dacd3bd215d7dde53917562323071398"
+    },
+    {
+      "file": "crlf.jsonl",
+      "path": "vectors/gen-journal/crlf.jsonl",
+      "sha256": "c840cee5430353a380ec0e4fb606a6ad5749660d718b8f9757dee19b6033a6b9"
+    },
+    {
+      "file": "duplicate-field.jsonl",
+      "path": "vectors/gen-journal/duplicate-field.jsonl",
+      "sha256": "94fc71d909c0b5124aff0f07df62275755e5a74d3d3e67642e620d0f14630e4c"
+    },
+    {
+      "file": "equal-seq-fork.jsonl",
+      "path": "vectors/gen-journal/equal-seq-fork.jsonl",
+      "sha256": "ec9b13065ff419ca82282c006d381fad5e8802ac360a708c5562d6095910fd7a"
+    },
+    {
+      "file": "floor-ancestor.jsonl",
+      "path": "vectors/gen-journal/floor-ancestor.jsonl",
+      "sha256": "d07339d8161af60f9ec7b98ceb995ec6c70f33d566e8aef46541df00abd42cff"
+    },
+    {
+      "file": "fraction-uid.jsonl",
+      "path": "vectors/gen-journal/fraction-uid.jsonl",
+      "sha256": "4605af70bbb808f6a8b8e23749a2820a43bde0b464e38178a240794dd08e92f8"
+    },
+    {
+      "file": "generation-overlap.jsonl",
+      "path": "vectors/gen-journal/generation-overlap.jsonl",
+      "sha256": "0a178a8aa1d30660bc0fc85c59d18fc5a03dd8641264e8b71f5ce9600d59f02b"
+    },
+    {
+      "file": "generation-reuse.jsonl",
+      "path": "vectors/gen-journal/generation-reuse.jsonl",
+      "sha256": "58f069c7d52cfad06f98d73c7c6d9b4728a16a862ec0d1f6098ae15f56e9bf19"
+    },
+    {
+      "file": "initial-active.jsonl",
+      "path": "vectors/gen-journal/initial-active.jsonl",
+      "sha256": "d26a6a1f54747293cadedfd97b6bbaae2be00011e2264d5334bf3766df73690b"
+    },
+    {
+      "file": "late-broken-chain.jsonl",
+      "path": "vectors/gen-journal/late-broken-chain.jsonl",
+      "sha256": "3d989163706938affb47f2f5a4a5f9d98cc54f5039796790506424388650f75a"
+    },
+    {
+      "file": "manifest.json",
+      "path": "vectors/gen-journal/manifest.json",
+      "sha256": "31d1ece06844337cfd8647c5226a920b56bbf61becf069281055447b32cce3c0"
+    },
+    {
+      "file": "missing-field.jsonl",
+      "path": "vectors/gen-journal/missing-field.jsonl",
+      "sha256": "182ff37fd7f1d29242ebc59a359f12e87ffb1685cebe2e86444fe1d0c037dbfc"
+    },
+    {
+      "file": "noncanonical.jsonl",
+      "path": "vectors/gen-journal/noncanonical.jsonl",
+      "sha256": "807bf31ed12d30e7a89222d06e8879588681164f2ff9285009609c362ef9b493"
+    },
+    {
+      "file": "oversized-line.jsonl",
+      "path": "vectors/gen-journal/oversized-line.jsonl",
+      "sha256": "85dc4c1558bdc08db74a26b13c9623998d90bb145d81238da46d632937f76800"
+    },
+    {
+      "file": "partial-last-line.jsonl",
+      "path": "vectors/gen-journal/partial-last-line.jsonl",
+      "sha256": "0eb9326074a809d06365c35c9ec3274606929887360429d88854825acb41320c"
+    },
+    {
+      "file": "recycle.jsonl",
+      "path": "vectors/gen-journal/recycle.jsonl",
+      "sha256": "8d1b5b21c820a4f11fdab793f340ab7c0ca2d6295d0c43305c14838aef389d53"
+    },
+    {
+      "file": "removed-active.jsonl",
+      "path": "vectors/gen-journal/removed-active.jsonl",
+      "sha256": "ae274e5445bf6b6f962a300f0d9a1239fff43a79415970c324ee980f471fc231"
+    },
+    {
+      "file": "removed.jsonl",
+      "path": "vectors/gen-journal/removed.jsonl",
+      "sha256": "d07339d8161af60f9ec7b98ceb995ec6c70f33d566e8aef46541df00abd42cff"
+    },
+    {
+      "file": "repeated-active.jsonl",
+      "path": "vectors/gen-journal/repeated-active.jsonl",
+      "sha256": "6d4cc81d250b10a2d1199990639e37c602ebda51169d13674e20ed3098b8fafd"
+    },
+    {
+      "file": "retiring-active.jsonl",
+      "path": "vectors/gen-journal/retiring-active.jsonl",
+      "sha256": "7693b6fae94a7b74530f8b5c48cd4433d61f3740dd2ecea3b06850238e4dac0b"
+    },
+    {
+      "file": "retiring.jsonl",
+      "path": "vectors/gen-journal/retiring.jsonl",
+      "sha256": "6c22b76b3f8420aec99bf493a2208c40350d4311f9e4c847398a76009ea4d5cd"
+    },
+    {
+      "file": "rollback-creation.jsonl",
+      "path": "vectors/gen-journal/rollback-creation.jsonl",
+      "sha256": "1db88dc75fce2dfcd843f4d61fe89a6a8b7d3bf7884f1aa0d290d60f6be7653b"
+    },
+    {
+      "file": "rollback-floor.jsonl",
+      "path": "vectors/gen-journal/rollback-floor.jsonl",
+      "sha256": "bc3192646b921aae14ab1c4a0a636313dacd3bd215d7dde53917562323071398"
+    },
+    {
+      "file": "seq-duplicate.jsonl",
+      "path": "vectors/gen-journal/seq-duplicate.jsonl",
+      "sha256": "34201bb8d88e5a43bff4dafc63fbe01890c41a2fdccb8f408b9b914bbab31f6c"
+    },
+    {
+      "file": "seq-gap.jsonl",
+      "path": "vectors/gen-journal/seq-gap.jsonl",
+      "sha256": "f42f7218628863d905b75e76e1cac659928fac100f63b7fe018305f5bd6237d4"
+    },
+    {
+      "file": "string-seq.jsonl",
+      "path": "vectors/gen-journal/string-seq.jsonl",
+      "sha256": "4a37704693f81543e6dfcf0ca5f0ac9d59daabba5984b2675331dbccbcfd9688"
+    },
+    {
+      "file": "token-long.jsonl",
+      "path": "vectors/gen-journal/token-long.jsonl",
+      "sha256": "8b0bf28e1ffc576543b4e96fa14e8f5fa85f350a29f6df234cfbb38673428e2a"
+    },
+    {
+      "file": "token-nonhex.jsonl",
+      "path": "vectors/gen-journal/token-nonhex.jsonl",
+      "sha256": "8cca409916b9a011f35cd71b420d05c4e2e4320ea68d1d6c60871d15215a7d49"
+    },
+    {
+      "file": "token-short.jsonl",
+      "path": "vectors/gen-journal/token-short.jsonl",
+      "sha256": "5bb42edd7e7b7054a118f27ee38ac0e4dee61548e521e695b27935059b09bb80"
+    },
+    {
+      "file": "token-uppercase.jsonl",
+      "path": "vectors/gen-journal/token-uppercase.jsonl",
+      "sha256": "ab87fab72f28ae2d8efcbcc20c7178c9d026a1f82722031111bd8c5ffb49681a"
+    },
+    {
+      "file": "token-zero.jsonl",
+      "path": "vectors/gen-journal/token-zero.jsonl",
+      "sha256": "98fd3794656117dccf2699c89e272b2bb086ad6ac89f7875dd9a07c47e798989"
+    },
+    {
+      "file": "two-uids.jsonl",
+      "path": "vectors/gen-journal/two-uids.jsonl",
+      "sha256": "6b9f04c73ef8220bc70116e62223082d445a48cd2e82e31f673bc28827f01c0a"
+    },
+    {
+      "file": "unknown-field.jsonl",
+      "path": "vectors/gen-journal/unknown-field.jsonl",
+      "sha256": "fe1c1f6af88b282d6dcfa0bcec9b4e233db602353a46818c3ed3f71bab0605d1"
+    },
+    {
+      "file": "unknown-state.jsonl",
+      "path": "vectors/gen-journal/unknown-state.jsonl",
+      "sha256": "fd107a462668e60efada3cca92bcd6c82314b4636cf2fd209bca8ee47e5226dd"
+    },
+    {
+      "file": "unknown-writer.jsonl",
+      "path": "vectors/gen-journal/unknown-writer.jsonl",
+      "sha256": "111060493f13323585211ed4e0c2e40fd3ec4771a2945e53e1f2f65671cc00ca"
+    },
+    {
+      "file": "wrong-format.jsonl",
+      "path": "vectors/gen-journal/wrong-format.jsonl",
+      "sha256": "bf38884483633fcbbb1e34037b0387a3153323cf3a88ce2fa7318470179772da"
+    },
+    {
+      "file": "wrong-genesis.jsonl",
+      "path": "vectors/gen-journal/wrong-genesis.jsonl",
+      "sha256": "8226a23b78e095ef74dabdc788d09b5e7dee558b35576a42f3f8c6f8021c0281"
+    },
+    {
+      "file": "zero-uid.jsonl",
+      "path": "vectors/gen-journal/zero-uid.jsonl",
+      "sha256": "67938602760103f4df5a7df25100530b1b5a76a750580b04e8f530013147572c"
+    }
+  ]
+}

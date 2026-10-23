@@ -1,0 +1,485 @@
+{
+  "format": "gen-journal-vectors/1",
+  "cases": [
+    {
+      "name": "creating",
+      "expect": "ok",
+      "file": "creating.jsonl"
+    },
+    {
+      "name": "active",
+      "expect": "ok",
+      "file": "active.jsonl"
+    },
+    {
+      "name": "retiring",
+      "expect": "ok",
+      "file": "retiring.jsonl"
+    },
+    {
+      "name": "removed",
+      "expect": "ok",
+      "file": "removed.jsonl"
+    },
+    {
+      "name": "recycle",
+      "expect": "ok",
+      "file": "recycle.jsonl"
+    },
+    {
+      "name": "rollback-creation",
+      "expect": "ok",
+      "file": "rollback-creation.jsonl"
+    },
+    {
+      "name": "two-uids",
+      "expect": "ok",
+      "file": "two-uids.jsonl"
+    },
+    {
+      "name": "broken-chain",
+      "expect": "journal_chain",
+      "file": "broken-chain.jsonl",
+      "control": "active"
+    },
+    {
+      "name": "wrong-genesis",
+      "expect": "journal_genesis",
+      "file": "wrong-genesis.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "seq-gap",
+      "expect": "journal_seq",
+      "file": "seq-gap.jsonl",
+      "control": "active"
+    },
+    {
+      "name": "seq-duplicate",
+      "expect": "journal_seq",
+      "file": "seq-duplicate.jsonl",
+      "control": "active"
+    },
+    {
+      "name": "generation-overlap",
+      "expect": "journal_overlap",
+      "file": "generation-overlap.jsonl",
+      "control": "recycle"
+    },
+    {
+      "name": "generation-reuse",
+      "expect": "journal_generation_reuse",
+      "file": "generation-reuse.jsonl",
+      "control": "two-uids"
+    },
+    {
+      "name": "retiring-active",
+      "expect": "journal_transition",
+      "file": "retiring-active.jsonl",
+      "control": "removed"
+    },
+    {
+      "name": "removed-active",
+      "expect": "journal_transition",
+      "file": "removed-active.jsonl",
+      "control": "rollback-creation"
+    },
+    {
+      "name": "initial-active",
+      "expect": "journal_transition",
+      "file": "initial-active.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "active-removed",
+      "expect": "journal_transition",
+      "file": "active-removed.jsonl",
+      "control": "retiring"
+    },
+    {
+      "name": "repeated-active",
+      "expect": "journal_transition",
+      "file": "repeated-active.jsonl",
+      "control": "retiring"
+    },
+    {
+      "name": "token-short",
+      "expect": "journal_generation",
+      "file": "token-short.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "token-long",
+      "expect": "journal_generation",
+      "file": "token-long.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "token-uppercase",
+      "expect": "journal_generation",
+      "file": "token-uppercase.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "token-zero",
+      "expect": "journal_generation",
+      "file": "token-zero.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "token-nonhex",
+      "expect": "journal_generation",
+      "file": "token-nonhex.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "unknown-state",
+      "expect": "journal_state",
+      "file": "unknown-state.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "unknown-writer",
+      "expect": "journal_writer",
+      "file": "unknown-writer.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "wrong-format",
+      "expect": "journal_format",
+      "file": "wrong-format.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "bad-time",
+      "expect": "journal_time",
+      "file": "bad-time.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "zero-uid",
+      "expect": "journal_uid",
+      "file": "zero-uid.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "fraction-uid",
+      "expect": "journal_json",
+      "file": "fraction-uid.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "string-seq",
+      "expect": "journal_seq",
+      "file": "string-seq.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "unknown-field",
+      "expect": "journal_fields",
+      "file": "unknown-field.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "missing-field",
+      "expect": "journal_fields",
+      "file": "missing-field.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "duplicate-field",
+      "expect": "journal_json",
+      "file": "duplicate-field.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "noncanonical",
+      "expect": "journal_noncanonical",
+      "file": "noncanonical.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "crlf",
+      "expect": "journal_noncanonical",
+      "file": "crlf.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "oversized-line",
+      "expect": "journal_line_size",
+      "file": "oversized-line.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "partial-last-line",
+      "expect": "journal_partial",
+      "file": "partial-last-line.jsonl",
+      "control": "active"
+    },
+    {
+      "name": "blank-line",
+      "expect": "journal_json",
+      "file": "blank-line.jsonl",
+      "control": "creating"
+    },
+    {
+      "name": "floor-ancestor",
+      "expect": "ok",
+      "file": "floor-ancestor.jsonl",
+      "floor": {
+        "seq": 2,
+        "hash": "0b3ab6de530d4c16318971861d15a3c022895c448600c48ee2469a17197dbf50"
+      }
+    },
+    {
+      "name": "rollback-floor",
+      "expect": "journal_rollback",
+      "file": "rollback-floor.jsonl",
+      "control": "floor-ancestor",
+      "floor": {
+        "seq": 2,
+        "hash": "0b3ab6de530d4c16318971861d15a3c022895c448600c48ee2469a17197dbf50"
+      }
+    },
+    {
+      "name": "equal-seq-fork",
+      "expect": "journal_fork",
+      "file": "equal-seq-fork.jsonl",
+      "control": "floor-ancestor",
+      "floor": {
+        "seq": 2,
+        "hash": "0b3ab6de530d4c16318971861d15a3c022895c448600c48ee2469a17197dbf50"
+      }
+    },
+    {
+      "name": "journal-owner",
+      "expect": "journal_owner",
+      "control": "active",
+      "fixture": {
+        "target": "journal",
+        "violation": "owner"
+      }
+    },
+    {
+      "name": "journal-mode",
+      "expect": "journal_mode",
+      "control": "active",
+      "fixture": {
+        "target": "journal",
+        "violation": "mode"
+      }
+    },
+    {
+      "name": "journal-symlink",
+      "expect": "journal_path_io",
+      "control": "active",
+      "fixture": {
+        "target": "journal",
+        "violation": "symlink"
+      }
+    },
+    {
+      "name": "directory-owner",
+      "expect": "journal_owner",
+      "control": "active",
+      "fixture": {
+        "target": "directory",
+        "violation": "owner"
+      }
+    },
+    {
+      "name": "directory-mode",
+      "expect": "journal_mode",
+      "control": "active",
+      "fixture": {
+        "target": "directory",
+        "violation": "mode"
+      }
+    },
+    {
+      "name": "directory-symlink",
+      "expect": "journal_path_io",
+      "control": "active",
+      "fixture": {
+        "target": "directory",
+        "violation": "symlink"
+      }
+    },
+    {
+      "name": "ancestor-mode",
+      "expect": "journal_mode",
+      "control": "active",
+      "fixture": {
+        "target": "ancestor",
+        "violation": "mode"
+      }
+    },
+    {
+      "name": "ancestor-symlink",
+      "expect": "journal_path_io",
+      "control": "active",
+      "fixture": {
+        "target": "ancestor",
+        "violation": "symlink"
+      }
+    },
+    {
+      "name": "gate.lock-missing",
+      "expect": "journal_missing",
+      "control": "active",
+      "fixture": {
+        "target": "gate.lock",
+        "violation": "missing"
+      }
+    },
+    {
+      "name": "data.lock-missing",
+      "expect": "journal_missing",
+      "control": "active",
+      "fixture": {
+        "target": "data.lock",
+        "violation": "missing"
+      }
+    },
+    {
+      "name": "journal-hardlink",
+      "expect": "journal_path_type",
+      "control": "active",
+      "fixture": {
+        "target": "journal",
+        "violation": "hardlink"
+      }
+    },
+    {
+      "name": "writer.pending-present",
+      "expect": "journal_writer_pending",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "present"
+      }
+    },
+    {
+      "name": "journal-file-size",
+      "expect": "journal_file_size",
+      "control": "active",
+      "fixture": {
+        "target": "journal",
+        "violation": "file-size"
+      }
+    },
+    {
+      "name": "late-broken-chain",
+      "file": "late-broken-chain.jsonl",
+      "expect": "journal_chain",
+      "control": "retiring"
+    },
+    {
+      "name": "writer.pending-empty",
+      "expect": "journal_pending_malformed",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "empty"
+      }
+    },
+    {
+      "name": "writer.pending-malformed",
+      "expect": "journal_pending_malformed",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "malformed"
+      }
+    },
+    {
+      "name": "writer.pending-noncanonical",
+      "expect": "journal_pending_malformed",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "noncanonical"
+      }
+    },
+    {
+      "name": "writer.pending-bad-budget",
+      "expect": "journal_pending_malformed",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "bad-budget"
+      }
+    },
+    {
+      "name": "writer.pending-duplicate-field",
+      "expect": "journal_pending_malformed",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "duplicate-field"
+      }
+    },
+    {
+      "name": "writer.pending-oversized",
+      "expect": "journal_pending_malformed",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "oversized"
+      }
+    },
+    {
+      "name": "writer.pending-stale",
+      "expect": "journal_writer_stale",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "stale"
+      }
+    },
+    {
+      "name": "writer.pending-other-boot",
+      "expect": "journal_writer_stale",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "other-boot"
+      }
+    },
+    {
+      "name": "writer.pending-future-start",
+      "expect": "journal_writer_stale",
+      "control": "active",
+      "fixture": {
+        "target": "writer.pending",
+        "violation": "future-start"
+      }
+    },
+    {
+      "name": "capacity-reserve-valid",
+      "expect": "ok",
+      "fixture": {
+        "target": "capacity",
+        "violation": "valid"
+      }
+    },
+    {
+      "name": "capacity-reserve-deficit",
+      "expect": "journal_capacity_reserve",
+      "control": "capacity-reserve-valid",
+      "fixture": {
+        "target": "capacity",
+        "violation": "deficit"
+      }
+    },
+    {
+      "name": "capacity-exact-ceiling",
+      "expect": "journal_capacity_reserve",
+      "control": "capacity-reserve-valid",
+      "fixture": {
+        "target": "capacity",
+        "violation": "full"
+      }
+    }
+  ]
+}

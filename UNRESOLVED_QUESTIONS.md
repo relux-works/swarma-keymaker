@@ -82,9 +82,11 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
 - The published enrollment-1 suite (114 negative/25 positive) runs through the
   local adapter's conformance test. All published rows are supported. Later
   unpublished rows need an explicit dependency bump and are not claimed.
-- Binding enforcement and native helper wiring remain integration obligations.
-  The pure [registration builder](internal/registration/README.md) constructs and
-  self-verifies proofs, but enrollment authority alone cannot release one.
+- Native helper integration now enforces binding, generation and current
+  enrollment through actual response release. The
+  [registration builder](internal/registration/README.md) constructs and checks
+  proofs; enrollment alone still grants no binding or release authority.
+  Production generation evidence and live multi-UID qualification remain gates.
 - Proposed `custody_unavailable` (`retryable=false`) covers closed, unloaded or
   protection-failed local signing custody on both surfaces. This proposal awaits
   curator content approval. Other existing refusal meanings are unchanged.

@@ -13,8 +13,9 @@ Unix sockets and OpenSSH/Git with fixture authority. Production `keymaker serve`
 still refuses `generation_source_unavailable` until the authoritative generation
 journal and ordering adapter exist. No fixture authority is compiled into it.
 Persistent operator revocation remains closed without a signed-act verifier;
-`sign_registration` is unsupported. Registration-helper wiring is separate work.
-The pure registration proof builder has local fixture-backed checks. There is no
+`sign_registration` builds registrar proofs with a separate purpose-2 key,
+current binding/enrollment authority and durable same-ID recovery. The proposed
+`custody_unavailable` refusal awaits curator content approval. There is no
 deployed security boundary or installer here.
 
 `internal/control` provides bounded CCJ-1 framing and dispatch.
@@ -41,7 +42,7 @@ Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 | `internal/keymaker/` | Linux custody, derivation, bindings/results, audit and both socket servers |
 | `cmd/keymaker-window/`, `internal/testwindow/` | Nonroot integration-window harness; separate from the daemon |
 | `docs/k1a-coverage.md` | Surface A coverage and retained recovery controls |
-| `docs/k1b-coverage.md` | Native daemon coverage, recovery limits and deferred helper rows |
+| `docs/k1b-coverage.md` | Native/helper daemon coverage, recovery limits and pending deployment gates |
 | `docs/linux-testing.md` | Test isolation, window configuration and remaining qualification gates |
 | `tools/mutations/` | Bounded authorization, recovery and refusal control plants using Go overlays |
 | `tools/vectors/` | Reproducible derivation generator and fixture checks |
@@ -190,3 +191,44 @@ pin-bump commit here: run `go get github.com/relux-works/swarma-registrar@<full-
 review and commit both `go.mod` and `go.sum`, update this pin, and run the affected
 enrollment tests against that exact revision. A branch name or an API inventory
 check is not behavior approval.
+
+## Registration helper configuration and validation
+
+An optional `registration_helper` object in the protected daemon configuration
+contains exactly:
+
+```json
+{
+  "names": {"purpose":"host-registration","product":"sample","project":"core","agent":"station-a"},
+  "enrollment_config": "/etc/swarma-keymaker/enrollment-pins.json",
+  "approval_file": "/etc/swarma-keymaker/enrollment-approval.json"
+}
+```
+
+Names resolve once through the configured registry to purpose 2. No request can
+select a path or key. Omitting this object leaves the helper unavailable while
+surface A and other control methods retain their authority rules. The existing
+`OperatorReconciler` supplies a public startup challenge; status output reports
+it. After independent freshness reconciliation and protected approval publication,
+SIGHUP retries enrollment loading with that same challenge. A failed reload fences
+only helper authority. This uses the existing startup reconciliation interface;
+it provides no service bootstrap or enrollment reconcile command.
+
+The Linux helper clock trusts UTC only when read-only `adjtimex` reports no
+unsynchronized/error state; unavailable health refuses. The shared proof builder
+also detects backwards UTC steps and permanently fences its clock owner. Restart
+still requires independently reconciled enrollment; production generation and
+operator-act adapters remain activation gates.
+
+| Tool | Purpose / exact command | Artifacts |
+| --- | --- | --- |
+| Go tests | `GOPROXY=off go test -race ./internal/keymaker -run 'Test(Helper|DaemonHelper|Native|CustodyUnavailable|Master|PublishedDerivation|Registry|Production|RefusalVectors)' -count=1 -p=1` | Task scratch logs; generated fixture keys only |
+| Go tests | `GOPROXY=off go test -race ./internal/registration -count=1 -p=1` and `GOPROXY=off go test -race ./internal/enrollment -run 'Test(WithAuthorized|HelperVectors|AuthorityCheckOrder)' -count=1 -p=1` | Task scratch logs |
+| Mutation tool | `GOPROXY=off go run ./tools/mutations/main.go -group helper -scratch "$SCRATCH"` | Scratch Go overlays, exact test exits and child PIDs |
+| Go vet / gofmt | `go vet ./internal/keymaker ./internal/control ./internal/enrollment ./internal/registration ./cmd/keymaker ./cmd/keymaker-window ./tools/mutations`; `gofmt -l internal/keymaker/*.go internal/enrollment/*.go internal/registration/*.go internal/control/*.go tools/mutations/main.go` | Diagnostics to task scratch |
+| Multi-UID compiler | `go test -c -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Test binary only; reviewer runs live window |
+
+The existing compiled window runner selects `^TestMultiUID`, including helper
+cases. Without configured provisioning it still returns exact PENDING/status 3;
+compilation does not qualify real foreign-UID execution. Follow the existing
+fixture HOME/no SSH_AUTH_SOCK isolation and keep artifacts in task scratch.

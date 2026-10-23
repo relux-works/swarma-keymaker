@@ -203,3 +203,57 @@ func registrarCode(err error) Code {
 	// no document and never turns an implementation diagnostic into a wire code.
 	return Code(format.RegistrationMalformed)
 }
+
+// Time samples the same trusted rollback-detecting clock used by Build/Recheck.
+// It grants no enrollment or release authority.
+func (b *Builder) Time(ctx context.Context) (time.Time, Code) { return b.now(ctx) }
+
+// Restore revalidates a durably retained envelope without signing or consuming
+// entropy. Current enrollment and binding authority remain the caller's duty.
+func (b *Builder) Restore(ctx context.Context, raw []byte, in Input) (*Proof, Code) {
+	body, err := format.Verify(raw)
+	if err != nil {
+		return nil, registrarCode(err)
+	}
+	if body.Key != in.Enrolled.Key {
+		return nil, Code("key_not_enrolled")
+	}
+	if body.Name != in.Name {
+		return nil, Code("name_not_permitted")
+	}
+	if body.Audience != in.Audience || in.Audience != in.Enrolled.Audience {
+		return nil, AudienceMismatch
+	}
+	canonical, _, err := format.Build(*body, in.Enrolled.Audience)
+	if err != nil {
+		return nil, registrarCode(err)
+	}
+	if err := format.Check(canonical, in.Enrolled.Audience); err != nil {
+		return nil, registrarCode(err)
+	}
+	issued, err := time.Parse(time.RFC3339, body.IssuedAt)
+	if err != nil {
+		return nil, RequestExpired
+	}
+	expires, err := time.Parse(time.RFC3339, body.ExpiresAt)
+	if err != nil || !expires.Equal(issued.Add(120*time.Second)) {
+		return nil, RequestExpired
+	}
+	proof := &Proof{raw: append([]byte(nil), raw...), issued: issued, expires: expires, window: windows.Window{Key: in.Enrolled.Key, NotBefore: in.Enrolled.NotBefore, NotAfter: in.Enrolled.NotAfter}, builder: b}
+	now, code := b.now(ctx)
+	if code != OK {
+		return nil, code
+	}
+	if now.Before(issued) {
+		// A verified retained proof carries the earlier owner's trusted issue time.
+		// This rollback evidence must fence fresh builds too, even after restart.
+		b.clockMu.Lock()
+		b.fenced = true
+		b.clockMu.Unlock()
+		return nil, ClockUntrusted
+	}
+	if code := proof.validAt(now); code != OK {
+		return nil, code
+	}
+	return proof, OK
+}

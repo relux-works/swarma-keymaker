@@ -13,7 +13,7 @@ import (
 )
 
 // NewDaemonServer owns both listeners and one set of admission/work limits.
-// The unsupported helper method remains fail closed independently of surface A.
+// Missing helper authority refuses independently of surface A.
 func NewDaemonServer(socketDir string, e *Engine, cfg NativeConfig, gid uint32, verifier OperatorActVerifier) (*Server, error) {
 	s, err := NewServer(socketDir, e, LinuxPeer{})
 	if err != nil {

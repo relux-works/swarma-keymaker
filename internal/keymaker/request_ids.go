@@ -36,7 +36,7 @@ func (s *Store) validateRequests() error {
 		return failure("retained request budget exceeded")
 	}
 	for i, r := range s.requests {
-		if !validGeneration(r.Caller.Generation) || len(r.ID) != 32 || (r.Method != "hello" && r.Method != "pubkey" && !mutation(r.Method)) {
+		if !validGeneration(r.Caller.Generation) || len(r.ID) != 32 || (r.Method != "hello" && r.Method != "pubkey" && !mutation(r.Method) && r.Method != "sign_registration") {
 			return failure("invalid retained request")
 		}
 		for _, c := range r.ID {

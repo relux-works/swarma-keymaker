@@ -2,7 +2,7 @@
 
 This pure package builds Ed25519 registration/1 proofs from the public result of
 `enrollment.Authorize`. It imports neither `internal/keymaker` nor
-`internal/control`. The daemon does not call it yet.
+`internal/control`. The daemon calls it under its generation, binding and enrollment barriers.
 
 ```go
 type Input struct {
@@ -51,8 +51,7 @@ not turn into clock failure.
 revalidate binding, generation and enrollment and call `Recheck` **inside the
 final authority barrier after durable audit and immediately before writing**.
 This package cannot make a later write atomic, enforce current registry state,
-retain same-ID results or reserve registrar replay state. Those remain daemon
-integration obligations. Same-ID retry must retain the original proof rather
+retain same-ID results or reserve registrar replay state. Those belong to the daemon integration in `internal/keymaker/registration.go`. Same-ID retry must retain the original proof rather
 than call Build again; each fresh Build deliberately consumes independent entropy.
 
 ## Refusals and remaining integration decision
@@ -164,3 +163,9 @@ against one standard SSHSIG-v1 git preimage, with positive controls; it does not
 qualify the live SSH-agent transport. Entropy short/error reads, clock rollback
 and health loss, signer errors, failed self-checks, cancellation, delayed-sign
 expiry and concurrent use have direct negative/positive tests.
+
+Durable helper retry uses `Builder.Restore` to verify retained bytes and current
+key/name/audience/window/expiry without entropy or signing. `Builder.Time` supplies
+the same rollback-detecting time source to the enrollment authorization barrier.
+`TestRestoreRetained` covers refusal/control boundaries and a fresh clock owner
+that observes a retained proof issued in the future.

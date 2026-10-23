@@ -403,7 +403,7 @@ func (s *nativeCountSigner) Sign(path string, data []byte) ([]byte, Code) {
 	return s.Signer.Sign(path, data)
 }
 
-// Unsupported helper intake cannot reach a signer. Nearby self pubkey succeeds
+// Unconfigured helper intake cannot reach a signer. Nearby self pubkey succeeds
 // over the same daemon connection and contains only public metadata.
 func TestNativeHelperUnsupported(t *testing.T) {
 	b := nativeOwnBinding()
@@ -415,7 +415,7 @@ func TestNativeHelperUnsupported(t *testing.T) {
 	nativeNegotiate(t, c, 1)
 	before := nativeSnapshot(t, f)
 	nativeSend(t, c, nativeRequest(2, "sign_registration", control.Object{"name": "station-a", "aud": "fixture"}))
-	nativeResponse(t, nativeReceive(t, c), nativeID(2), "operation_unsupported")
+	nativeResponse(t, nativeReceive(t, c), nativeID(2), "enrollment_unavailable")
 	if !bytes.Equal(before, nativeSnapshot(t, f)) {
 		t.Fatal("unsupported helper mutated state")
 	}

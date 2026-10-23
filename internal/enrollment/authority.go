@@ -188,6 +188,26 @@ func (a *Authority) Reload(ctx context.Context) Code {
 func (a *Authority) Authorize(ctx context.Context, peerUID uint32, generation, key, name, aud string, issuedAt, now time.Time) (EnrolledKey, Code) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
+	return a.authorizeLocked(ctx, peerUID, generation, key, name, aud, issuedAt, now)
+}
+
+// WithAuthorized keeps current enrollment authority stable through the bounded
+// callback, including an actual response write. The callback must not reenter
+// Authority. Reload waits until it returns; failure never calls the callback.
+func (a *Authority) WithAuthorized(ctx context.Context, peerUID uint32, generation, key, name, aud string, issuedAt, now time.Time, fn func(EnrolledKey) Code) Code {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	enrolled, code := a.authorizeLocked(ctx, peerUID, generation, key, name, aud, issuedAt, now)
+	if code != OK {
+		return code
+	}
+	if fn == nil {
+		return EnrollmentUnavailable
+	}
+	return fn(enrolled)
+}
+
+func (a *Authority) authorizeLocked(ctx context.Context, peerUID uint32, generation, key, name, aud string, issuedAt, now time.Time) (EnrolledKey, Code) {
 	deny := func(code Code) (EnrolledKey, Code) { return EnrolledKey{}, code }
 	if ctx.Err() != nil {
 		return deny(EnrollmentUnavailable)

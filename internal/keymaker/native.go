@@ -21,6 +21,7 @@ type OperatorActVerifier interface {
 	Verify(context.Context, Principal, Binding, []byte) Code
 }
 type NativeConfig struct {
+	Helper                  *RegistrationHelper
 	Operator                Principal
 	Registry                Registry
 	Epoch, RegistryRevision string
@@ -32,6 +33,8 @@ type Native struct {
 	slots     chan struct{}
 	rateMu    sync.Mutex
 	mutations map[Principal]*bucket
+	helperMu  sync.Mutex
+	helpers   map[string]*bucket
 }
 
 // Connection state is private to one sequential control loop. It is never wire
@@ -95,7 +98,7 @@ func NewNative(e *Engine, cfg NativeConfig, v OperatorActVerifier, slots chan st
 	if !paired || e.Store == nil || e.Store.dir == nil || e.Store.journal == nil || audit != e.Store.journal || e.Generations == nil || e.Signer == nil || !validGeneration(cfg.Operator.Generation) || cfg.Epoch == "" || cfg.RegistryRevision == "" || cfg.Registry.Validate() != "" || slots == nil {
 		return nil, failure("native dependencies unavailable")
 	}
-	return &Native{Engine: e, Config: cfg, verifier: v, slots: slots, mutations: map[Principal]*bucket{}}, nil
+	return &Native{Engine: e, Config: cfg, verifier: v, slots: slots, mutations: map[Principal]*bucket{}, helpers: map[string]*bucket{}}, nil
 }
 func nativePrincipal(p control.Peer) Principal { return Principal{p.UID, p.Generation} }
 func generationCode(g Generation, uid uint32) Code {
@@ -150,6 +153,9 @@ func (n *Native) Enter(ctx context.Context, conn net.Conn) (func(), control.Code
 }
 func (n *Native) record(p *control.Peer, r control.Request, body []byte, c Code) AuditRecord {
 	domain := "control"
+	if r.Method == "sign_registration" {
+		domain = "registration/1"
+	}
 	out := AuditRecord{Surface: "control", Operation: r.Method, Domain: &domain, Result: "success"}
 	switch out.Operation {
 	case "hello", "pubkey", "register", "revoke", "sign_registration", "sign", "decrypt", "overload":
@@ -242,7 +248,7 @@ func (n *Native) Admit(ctx context.Context, p control.Peer, r control.Request) c
 	if c != "" {
 		return control.Code(c)
 	}
-	if prior != nil && !mutation(r.Method) {
+	if prior != nil && !mutation(r.Method) && r.Method != "sign_registration" {
 		return control.RequestConflict
 	}
 	return ""
@@ -267,7 +273,7 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		return nil, "peer_identity_unavailable"
 	}
 	if r.Method == "sign_registration" {
-		return nil, control.OperationUnsupported
+		return n.signRegistration(ctx, peer, r)
 	}
 	if r.Method == "pubkey" {
 		if len(r.Params) != 0 {
@@ -617,6 +623,9 @@ func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Re
 			if result["path"] != b.Path || result["master_epoch"] != b.Epoch || result["registration_number"] != int64(b.Number) {
 				return "binding_conflict"
 			}
+		}
+		if r.Method == "sign_registration" {
+			return n.releaseRegistration(ctx, peer, r, result, release)
 		}
 		prior, c := s.retained(p, r)
 		if c != "" {

@@ -1,11 +1,11 @@
 # K1b native daemon coverage
 
-The integration task covers surface B and explicitly excludes the registration
-helper. All 70 refusal rows are accounted for: 31 existing surface-A pairs in
-[k1a-coverage.md](k1a-coverage.md), 23 native pairs below, and 16 deferred helper
-rows below. No native row in this assignment is unexecuted. The brief names
-vector rows but supplies no separate attack-surface catalog table; the map does
-not claim a killed mutant for every line or every vector.
+All original 70 refusal rows are covered: 31 surface-A pairs in
+[k1a-coverage.md](k1a-coverage.md), 23 native pairs below and 16 helper pairs.
+The proposed custody code adds one pair covering both sockets (71 total).
+No helper row remains deferred. The brief supplies vector rows but no separate
+attack-surface catalog table (brief gap); this map does not claim an independent
+narrowing mutant for every vector or implementation line.
 
 ## Executed native pairs
 
@@ -95,38 +95,76 @@ exited 1 with the intended witness.
 No surviving mutant is claimed killed. These controls do not constitute
 exhaustive mutation coverage. All existing reviewer test names remain present.
 
-## Out of integration contract
+## Executed helper pairs
 
-The request states: “The registration helper is not part of this task” and
-requires helper rows to remain deferred. These rows and enrollment loading are
-owned by the separate helper task; `sign_registration` stays unsupported here.
-None is claimed passing by compilation, fixture validation or a generic refusal.
+Each row runs `TestDaemonHelperVectors/<id>/negative` followed by `/control`
+through the same real daemon control socket. Linux supplies UID, the connection
+pins generation, the core checks the station binding and the real enrollment
+Authority loads independently signed enrollment from a fixture-key-signed Git
+commit. UID-role equality is projected to the test process; actual foreign UID
+execution is separately PENDING. An absent/revoked binding is never replaced by
+uid_map permission. Executable snapshots are deliberately not attestation.
 
-| Row | Deferred evaluation and acceptance reason |
+| Row | Negative test (paired control replaces `/negative` with `/control`) |
 | --- | --- |
-| `helper-uid-absent` | `registration_helper`; explicit helper exclusion |
-| `helper-name-not-mapped` | `registration_helper`; explicit helper exclusion |
-| `helper-wrong-audience` | `registration_helper`; explicit helper exclusion |
-| `helper-enrollment-missing` | `registration_helper`; explicit helper exclusion |
-| `helper-enrollment-unverified` | `registration_helper`; explicit helper exclusion |
-| `helper-enrollment-revoked` | `registration_helper`; explicit helper exclusion |
-| `helper-map-required` | `registration_helper`; explicit helper exclusion |
-| `helper-key-unenrolled` | `registration_helper`; explicit helper exclusion |
-| `helper-reused-uid` | `registration_helper`; explicit helper exclusion |
-| `helper-revoked-binding-fresh-connection` | `registration_helper`; explicit helper exclusion |
-| `helper-missing-binding` | `registration_helper`; explicit helper exclusion |
-| `helper-wrong-executable` | `registration_helper`; explicit helper exclusion |
-| `helper-undeterminable-executable` | `registration_helper`; explicit helper exclusion |
-| `helper-matching-executable` | `registration_helper`; explicit helper exclusion |
-| `helper-name-slash` | `registration_helper`; explicit helper exclusion |
-| `helper-mxid-length` | `registration_helper`; explicit helper exclusion |
+| `helper-uid-absent` | `TestDaemonHelperVectors/helper-uid-absent/negative` |
+| `helper-name-not-mapped` | `TestDaemonHelperVectors/helper-name-not-mapped/negative` |
+| `helper-wrong-audience` | `TestDaemonHelperVectors/helper-wrong-audience/negative` |
+| `helper-enrollment-missing` | `TestDaemonHelperVectors/helper-enrollment-missing/negative` |
+| `helper-enrollment-unverified` | `TestDaemonHelperVectors/helper-enrollment-unverified/negative` |
+| `helper-enrollment-revoked` | `TestDaemonHelperVectors/helper-enrollment-revoked/negative` |
+| `helper-map-required` | `TestDaemonHelperVectors/helper-map-required/negative` |
+| `helper-key-unenrolled` | `TestDaemonHelperVectors/helper-key-unenrolled/negative` |
+| `helper-reused-uid` | `TestDaemonHelperVectors/helper-reused-uid/negative` |
+| `helper-revoked-binding-fresh-connection` | `TestDaemonHelperVectors/helper-revoked-binding-fresh-connection/negative` |
+| `helper-missing-binding` | `TestDaemonHelperVectors/helper-missing-binding/negative` |
+| `helper-wrong-executable` | `TestDaemonHelperVectors/helper-wrong-executable/negative` |
+| `helper-undeterminable-executable` | `TestDaemonHelperVectors/helper-undeterminable-executable/negative` |
+| `helper-matching-executable` | `TestDaemonHelperVectors/helper-matching-executable/negative` |
+| `helper-name-slash` | `TestDaemonHelperVectors/helper-name-slash/negative` |
+| `helper-mxid-length` | `TestDaemonHelperVectors/helper-mxid-length/negative` |
+
+Controls verify the registrar envelope with `registration.Verify` under the
+actual enrolled purpose-2 public key. Refusals assert exact codes, logical audit
+domain `registration/1`, no retained result change and continuing hello admission.
+
+| Additional contract | Named test | Bound |
+| --- | --- | --- |
+| Durable exact-ID result, changed args, concurrency, restart, expiry | `TestHelperDurableRetry`, `TestHelperLostResponse` | Same retained bytes/nonce; fresh ID required after expiry |
+| Current authority on retry | `TestHelperRetryAuthority` | Fresh connections after revoke, failed reload, window end or replacement generation cannot recover the old proof |
+| Distinct keys/preimages on actual sockets | `TestHelperDomainSeparation` | Helper proof cannot verify as SSHSIG; A signature cannot verify as registration/1; A rejects host public-key selector |
+| Actual-write ordering | `TestHelperReleaseOrdering` | Retirement/revocation before release suppresses proof; release-first proof stands |
+| Expiry after durable audit | `TestHelperExpiryAfterAudit` | Exact expiry refuses; one nanosecond before expiry passes |
+| Enrollment barrier | `TestHelperReloadBeforeRelease`, enrollment `TestWithAuthorizedReleaseBarrier` | Failed reload before barrier refuses; reload cannot overtake a held release |
+| Fenced/unreconciled enrollment, custody, clock, entropy, window | `TestHelperAvailability` | Helper refuses without closing healthy A/control admission |
+| Exact helper schema | `TestHelperSchema` | Body/key/nonce/time/TTL/path/exe selectors refuse; valid request then succeeds |
+| Audit failure | `TestHelperAuditFailure` | Sync failure suppresses envelope; healthy control verifies |
+| Configuration and key purpose | `TestHelperConfiguration` | Optional absence disables helper; incomplete/unknown/null config and purpose-1/unknown paths reject |
+| Key/name budget | `TestHelperRateBudget` | Four operations admitted, fifth refuses, credit recovery admits |
+| Multi-UID helper | `TestMultiUIDHelper/{uid-not-mapped,foreign-binding,retired}/{negative,control}` | Compiled; live reviewer window PENDING |
+
+Helper narrowing controls run with `go run ./tools/mutations/main.go -group helper
+-scratch "$SCRATCH"`. The four selected plants fail a named behavioral assertion;
+setup/compilation errors do not count. The other mutation groups are unchanged.
+
+| Mutant | Property narrowed to | Named failing test | Outcome |
+| --- | --- | --- | --- |
+| helper-binding | Binding before construction and at release | `TestDaemonHelperVectors/helper-missing-binding/negative` | Killed, child exit 1: forbidden envelope escaped |
+| helper-release-recheck | Fresh expiry sample after audit | `TestHelperExpiryAfterAudit/expired` | Killed, child exit 1: expired envelope escaped |
+| helper-surface-a-key | Sign with admitted purpose-2 key | `TestHelperDomainSeparation` | Killed, child exit 1: purpose-1 signature fails envelope self-verification |
+| helper-retry-nonce | Exact-ID retry returns retained proof | `TestHelperDurableRetry` | Killed, child exit 1: new nonce changes response |
+
+No surviving mutant is claimed killed. No requested vector is treated as out of
+contract. No previously committed test name is removed. The existing
+`TestNativeHelperUnsupported` name now checks the unconfigured helper's
+`enrollment_unavailable` refusal and independent pubkey control.
 
 ## Pending gates and interpretations
 
 Production generation-journal ordering and signed operator-act verification
 remain unavailable. Live multi-UID execution, root provisioning, service sandbox,
-deployment and macOS are unqualified. The helper/enrollment package is untouched.
-No specification disagreement was found. Public result names use `master_epoch`
+deployment and macOS are unqualified. The proposed custody code awaits curator content approval.
+Public result names use `master_epoch`
 and raw-32-byte base64 `public_key`; these spell the spec's epoch/public-key
 results without adding signing authority. Multi-principal generation evidence,
 complete Request delivery to Handler and mandatory workload/refusal Observer

@@ -388,3 +388,9 @@ conformance, not HTTP, nonce, limiter, audit or binding qualification.
 The runner discovers later published rows automatically after an explicit pin
 bump. New external fixture inputs or event modes fail explicitly until supported;
 no unrecognized row can silently pass. Unpublished rows are not claimed as run.
+
+`Authority.WithAuthorized` checks the same rules as `Authorize` while retaining
+the read barrier through a bounded callback. The daemon uses this to hold current
+enrollment authority through actual helper response release. Callbacks must not
+reenter Authority. `TestWithAuthorizedReleaseBarrier` proves rejection never
+invokes release and a live reload waits for an admitted release before fencing.

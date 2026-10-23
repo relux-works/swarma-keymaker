@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native or registration controls")
+	group := flag.String("group", "core", "core (including native), native, registration or helper controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -96,6 +96,16 @@ func main() {
 			{"registration-wrong-preimage", "registration.go", "signature, code := b.signer.Sign(ctx, preimage)", "_ = preimage\n\tsignature, code := b.signer.Sign(ctx, canonical)", "^TestSigningInput$", "--- FAIL: TestSigningInput", "signer received non-registrar signing input"},
 		}
 	}
+	if *group == "helper" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"helper-binding", "registration.go", `b, c := s.lookup(peer.UID, peer.Generation)`, `b, c := Binding{}, Code("")`, "^TestDaemonHelperVectors$/^helper-missing-binding$/^negative$", "--- FAIL: TestDaemonHelperVectors/helper-missing-binding/negative", "native response exposed forbidden field envelope"},
+			{"helper-release-recheck", "registration.go", `if pc := retained.Recheck(ctx); pc != "" {`, `if pc := proof.Code(""); retained == nil && pc != "" {`, "^TestHelperExpiryAfterAudit$/^expired$", "--- FAIL: TestHelperExpiryAfterAudit/expired", "native response exposed forbidden field envelope"},
+			{"helper-surface-a-key", "registration.go", `s.master.withPurpose(s.path, "host-registration",`, `s.master.withPurpose("m/1'"+s.path[len("m/2'"):], "agent-identity",`, "^TestHelperDomainSeparation$", "--- FAIL: TestHelperDomainSeparation", "helper refused positive control"},
+			{"helper-retry-nonce", "registration.go", `if old != nil {
+				_, pc := h.builder.Restore(ctx, raw, in)`, `if false {
+				_, pc := h.builder.Restore(ctx, raw, in)`, "^TestHelperDurableRetry$", "--- FAIL: TestHelperDurableRetry", "same-ID retry minted a new nonce"},
+		}
+	}
 	good := true
 	for _, c := range controls {
 		source := filepath.Join(root, pkg, c.file)
@@ -156,6 +166,14 @@ func plant(name, source, old, replacement string) string {
 			os.Exit(2)
 		}
 		mutant = strings.Replace(mutant, timestamp, timestamp+"\n\tif !in.IssuedAt.IsZero() { issued = in.IssuedAt.UTC().Truncate(time.Second) }", 1)
+	}
+	if name == "helper-binding" {
+		old := `if _, c := s.lookup(peer.UID, peer.Generation); c != "" {`
+		if strings.Count(mutant, old) != 1 {
+			fmt.Fprintln(os.Stderr, "helper release binding plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, old, `if _, c := s.lookup(peer.UID, peer.Generation); false && c != "" {`, 1)
 	}
 	return mutant
 }

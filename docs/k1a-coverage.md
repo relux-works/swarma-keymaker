@@ -2,8 +2,8 @@
 
 The original K1a implementation follows the normative reference at `25ea2ad`.
 Its 31 executed pairs remain below. [K1b coverage](k1b-coverage.md) maps the
-additional 23 native daemon pairs and the 16 explicitly deferred helper rows;
-together the documents account for all 70 vector IDs.
+additional 23 native daemon pairs and 16 helper pairs; together the documents
+cover the original 70 vector IDs plus the proposed custody refusal pair.
 
 Each executed row runs `TestRefusalVectors/<id>/negative` first, then
 `TestRefusalVectors/<id>/control`. Tests assert the exact code, no released
@@ -60,9 +60,8 @@ invalidation tests; static inputs alone do not prove a race fence.
 
 The original assignment excluded native control, helper and enrollment work.
 Native control's 23 pairs are now exercised by K1b integration; the 16
-`helper-*` rows remain outside integration because the task explicitly excludes
-the registration helper. Their complete row table and acceptance-clause reason
-are in [K1b coverage](k1b-coverage.md). They are not claimed passing.
+`helper-*` rows now run through the daemon control socket. Their complete row
+table is in [K1b coverage](k1b-coverage.md).
 
 ## Additional evidence and limits
 
@@ -90,7 +89,7 @@ are in [K1b coverage](k1b-coverage.md). They are not claimed passing.
 
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` plants only Go overlay
 files and requires the intended assertion failure; compilation/setup errors do
-not count. Its own exit is 0 only when all fourteen mutant subprocesses (the ten original K1a controls below and four native controls in the K1b map) exit 1 for the
+not count. Its own exit is 0 only when all eighteen mutant subprocesses (the ten original K1a controls below and eight native controls in the K1b map) exit 1 for the
 named assertion. No source file is overwritten.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
@@ -107,7 +106,7 @@ named assertion. No source file is overwritten.
 | Make records optional, retain other schema checks | The decoder must require explicit records independently of the journal veto | `TestSnapshotSchemaRequired/revoked/missing-records` | Killed (mutant test exit 1); isolates omitted-member admission, with paired tombstone preservation checked separately |
 
 No surviving mutant is claimed killed. These ten K1a narrowing
-mutants remain in the wrapper alongside the four native controls. No separate implementation attack-surface
+mutants remain in the wrapper alongside the eight native controls. No separate implementation attack-surface
 table was provided in the brief; this vector map is not a claim of mutation coverage for
-every implementation line or deferred surface. See [Linux testing](linux-testing.md)
+every implementation line. See [Linux testing](linux-testing.md)
 for recovery rules, actual limits and remaining deployment/generation gates.

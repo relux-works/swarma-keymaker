@@ -93,7 +93,11 @@ type Master struct {
 
 func (m *Master) Locked() bool { return m.locked }
 func (m *Master) withKey(path string, f func(ed25519.PrivateKey) []byte) ([]byte, Code) {
-	if c := ValidatePath(path, "agent-identity"); c != "" {
+	return m.withPurpose(path, "agent-identity", f)
+}
+
+func (m *Master) withPurpose(path, purpose string, f func(ed25519.PrivateKey) []byte) ([]byte, Code) {
+	if c := ValidatePath(path, purpose); c != "" {
 		return nil, c
 	}
 	if m == nil {

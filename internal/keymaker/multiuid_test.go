@@ -17,12 +17,14 @@ import (
 	"os/exec"
 	"reflect"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/relux-works/swarma-keymaker/internal/control"
 	"github.com/relux-works/swarma-keymaker/internal/testwindow"
+	format "github.com/relux-works/swarma-registrar/registration"
 )
 
 var windowToken = flag.String("keymaker-window-token", "", "non-secret test-run provenance")
@@ -249,7 +251,12 @@ func windowNativeClient(conn net.Conn, public []byte) int {
 	if !ok || len(hello) != 1 || hello["version"] != int64(1) {
 		return 1
 	}
-	response, err = exchange(nativeRequest(2, "pubkey", control.Object{}))
+	request := nativeRequest(2, "pubkey", control.Object{})
+	helper := os.Getenv("KEYMAKER_CLIENT_METHOD") == "sign_registration"
+	if helper {
+		request = helperRequest(2)
+	}
+	response, err = exchange(request)
 	if err != nil {
 		return 1
 	}
@@ -258,6 +265,24 @@ func windowNativeClient(conn net.Conn, public []byte) int {
 			return 0
 		}
 		return 1
+	}
+	if helper {
+		if len(response) != 2 || response["request_id"] != nativeID(2) {
+			return 1
+		}
+		result, ok := response["result"].(control.Object)
+		if !ok {
+			return 1
+		}
+		raw, code := helperEnvelope(result)
+		if code != "" {
+			return 1
+		}
+		body, err := format.Verify(raw)
+		if err != nil || body.Key != "ed25519:"+base64.RawURLEncoding.EncodeToString(public) || body.Name != helperName || body.Audience != helperAudience {
+			return 1
+		}
+		return 0
 	}
 	result, ok := response["result"].(control.Object)
 	if !ok || len(response) != 2 || response["request_id"] != nativeID(2) || !exactMembers(result, "public_key", "path", "registration_number", "master_epoch") {
@@ -274,13 +299,16 @@ func windowNativeError(response control.Object, id, code string) bool {
 	e, ok := response["error"].(control.Object)
 	return ok && len(response) == 2 && response["request_id"] == id && len(e) == 2 && e["code"] == code && e["retryable"] == false
 }
-func runNativeWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *nativeFixture, public []byte, code string, deny bool) {
+func runNativeWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *nativeFixture, public []byte, code string, deny bool, helper ...bool) {
 	t.Helper()
 	denied := "0"
 	if deny {
 		denied = "1"
 	}
 	args := []string{"-n", "-u", user, "--", "/usr/bin/env", "KEYMAKER_TEST_CLIENT=1", "KEYMAKER_CLIENT_SURFACE=control", "KEYMAKER_CLIENT_UID=" + strconv.FormatUint(uint64(uid), 10), "KEYMAKER_CLIENT_SOCKET=" + f.server.ControlPath, "KEYMAKER_CLIENT_PUBLIC=" + base64.StdEncoding.EncodeToString(public), "KEYMAKER_CLIENT_CODE=" + code, "KEYMAKER_CLIENT_CONNECT_DENIED=" + denied, os.Args[0], "-keymaker-window-token=" + *windowToken}
+	if len(helper) > 0 && helper[0] {
+		args = append(args[:len(args)-2], append([]string{"KEYMAKER_CLIENT_METHOD=sign_registration"}, args[len(args)-2:]...)...)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sudo", args...)
@@ -381,6 +409,86 @@ func TestMultiUIDControl(t *testing.T) {
 					runNativeWindowClient(t, w, w.B, w.BID, f, public, "", true)
 					if after := nativeAudit(t, f.store.journal); len(after) != len(records) {
 						t.Fatal("group-denied client reached daemon")
+					}
+				})
+			}
+		})
+	}
+}
+
+// Real UID A cannot borrow B's binding or uid_map row or use retired authority.
+// Every negative has an independently active, mapped binding control. Only the
+// reviewer runs this owner-provisioned window; missing configuration is PENDING.
+func TestMultiUIDHelper(t *testing.T) {
+	cfg, status, err := testwindow.Load(os.Getenv("KEYMAKER_WINDOW_CONFIG"))
+	if err != nil {
+		t.Fatalf("PENDING: test window not provisioned (runner status %d): %v", status, err)
+	}
+	w, status, err := testwindow.Verify(cfg, uint32(os.Getuid()), testwindow.CommandOutput)
+	if err != nil {
+		t.Fatalf("window status %d: %v", status, err)
+	}
+	if uint32(os.Getgid()) != w.GroupID {
+		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+		defer cancel()
+		args := []string{"-n", "-u", w.Runner, "-g", w.Group, "--", "/usr/bin/env", "KEYMAKER_WINDOW_CONFIG=" + os.Getenv("KEYMAKER_WINDOW_CONFIG"), "KEYMAKER_WINDOW_SCRATCH=" + os.Getenv("KEYMAKER_WINDOW_SCRATCH"), "TMPDIR=" + os.Getenv("TMPDIR"), os.Args[0], "-test.run=^TestMultiUIDHelper$", "-test.timeout=40s", "-test.v", "-keymaker-window-token=" + *windowToken}
+		cmd := exec.CommandContext(ctx, "sudo", args...)
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
+		var output bytes.Buffer
+		cmd.Stdout = &output
+		cmd.Stderr = &output
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("helper group test child PID=%d", cmd.Process.Pid)
+		if err := cmd.Wait(); err != nil {
+			t.Fatalf("helper group child failed: %v %s", err, output.Bytes())
+		}
+		t.Log(output.String())
+		return
+	}
+	for _, scenario := range []struct{ name, code string }{{"uid-not-mapped", "uid_not_permitted"}, {"foreign-binding", "binding_not_found"}, {"retired", "generation_inactive"}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			for _, negative := range []bool{true, false} {
+				name := "control"
+				if negative {
+					name = "negative"
+				}
+				t.Run(name, func(t *testing.T) {
+					b := fixtureBinding(w.AID)
+					b.Generation = nativeToken
+					if negative && scenario.name == "foreign-binding" {
+						b.UID = w.BID
+					}
+					f := nativeBase(t, Principal{uint32(os.Getuid()), nativeToken}, nil, &b)
+					f.generation.entries[w.AID] = Generation{UID: w.AID, Generation: nativeToken, State: "active", Verified: true, Revision: "fixture-order", Provenance: "verified-fixture"}
+					body := helperBody(t, f, w.AID)
+					if negative && scenario.name == "uid-not-mapped" {
+						body["uid_map"].([]any)[0].(map[string]any)["uid"] = int64(w.BID)
+					}
+					trust := newHelperTrust(t, f, body, map[string]string{strconv.FormatUint(uint64(w.AID), 10): nativeToken, strconv.FormatUint(uint64(w.BID), 10): nativeToken}, true)
+					f.native.Config.Helper = trust.helper
+					if negative && scenario.name == "retired" {
+						g := f.generation.entries[w.AID]
+						g.State = "retiring"
+						f.generation.entries[w.AID] = g
+					}
+					public, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(trust.helper.key, "ed25519:"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					f.start()
+					before := f.store.Snapshot()
+					code := ""
+					if negative {
+						code = scenario.code
+					}
+					runNativeWindowClient(t, w, w.A, w.AID, f, public, code, false, true)
+					if !reflect.DeepEqual(before, f.store.Snapshot()) {
+						t.Fatal("helper changed bindings")
+					}
+					if got := lastJournalCode(t, f.store.journal); got != Code(code) {
+						t.Fatalf("helper audit %s want %s", got, code)
 					}
 				})
 			}

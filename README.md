@@ -11,7 +11,8 @@ store and audit journal have fixture-backed tests, including real Unix/OpenSSH/
 Git integration. Production `keymaker serve` refuses
 `generation_source_unavailable` until the authoritative journal format and
 ordering adapter exist. No fixture authority is compiled into that command.
-Native method integration and the registration helper are separate work.
+Native method integration and registration-helper wiring are separate work.
+The pure registration proof builder has local fixture-backed checks.
 There is no deployed security boundary or installer in this repository.
 
 `internal/control` implements bounded CCJ-1 framing, version negotiation and
@@ -31,6 +32,7 @@ Linux v0 and publication gates are in [`spec/keymaker.md`](spec/keymaker.md).
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
+| `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |
 | `go.mod`, `go.sum` | Go version and exact registrar dependency pin |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
 | `cmd/keymaker/` | Production `serve` and `version` entry points |
@@ -60,6 +62,10 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Test pure proof construction: `go test ./internal/registration -count=1` | Local pinned registration vectors and generated in-memory fixture keys; no host SSH access |
+| Go | Race-check proof construction: `GOMAXPROCS=2 go test -race ./internal/registration -count=1 -p=1` | Race diagnostics and verdicts |
+| Go | Vet proof construction: `go vet ./internal/registration ./tools/mutations` | Diagnostics |
+| gofmt | Check proof formatting: `gofmt -l internal/registration/*.go tools/mutations/main.go` | Empty output expected |
 | Go | Test enrollment authority: `go test ./internal/enrollment` | Named verdicts; isolated fixture registries/keys under the Go temporary directory, cleaned by tests |
 | Go | Targeted race check: `GOMAXPROCS=2 go test -race ./internal/enrollment -run 'TestConcurrentReloadAuthorize\|TestStoreCompareAndSwap\|TestInterruptedWriteFencesUntilRestart' -count=1 -p=1` | Race diagnostics and verdicts |
 | Go | Run the published enrollment fixture integration: `GOPROXY=off go test -v ./internal/enrollment -run '^TestRegistrarEnrollmentConformance$' -count=1` | 114 negative/25 positive local pinned-module rows; no test-time fetch |
@@ -79,6 +85,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |
 | Go | Compile pending suite: `go test -c -buildvcs=false -tags multiuid -o "$SCRATCH/multiuid.test" ./internal/keymaker` | Tagged binary; compilation is not qualification |
 | Go | Run narrowing controls: `go run ./tools/mutations/main.go -scratch "$SCRATCH"` | Overlay files/logs in scratch; each mutant test must fail with exit 1; wrapper exits 0 only when all ten are killed |
+| Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |

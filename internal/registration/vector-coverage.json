@@ -1,0 +1,832 @@
+[
+  {
+    "row": "R01",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R02",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R03",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R04",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R05",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R06",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R07",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R08",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R09",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R10",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R100",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R101",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R102",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R103",
+    "stage": "window",
+    "reason": "Release guard projection with original verified issue time and registrar-parsed signed key window; no host-state or membership authority claimed."
+  },
+  {
+    "row": "R104",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R105",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R106",
+    "stage": "excluded",
+    "reason": "Receiver JWT signer generation or audit availability/precedence; helper signer failures and release checks are tested separately."
+  },
+  {
+    "row": "R107",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R108",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R109",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R11",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R110",
+    "stage": "window",
+    "reason": "Release guard projection with original verified issue time and registrar-parsed signed key window; no host-state or membership authority claimed."
+  },
+  {
+    "row": "R111",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R112",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R114",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R115",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R116",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R117",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R118",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R119",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R12",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R120",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R121",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R122",
+    "stage": "expiry",
+    "reason": "Exact helper release guard rejects at the published late time, with a one-nanosecond-before-expiry control. Receiver positive skew is intentionally not reused."
+  },
+  {
+    "row": "R123",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R124",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R125",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R126",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R127",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R128",
+    "stage": "excluded",
+    "reason": "Receiver JWT signer generation or audit availability/precedence; helper signer failures and release checks are tested separately."
+  },
+  {
+    "row": "R129",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R13",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R130",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R131",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R132",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R133",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R134",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R135",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R136",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R137",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R14",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R15",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R16",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R17",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R18",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R19",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R20",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R21",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R22",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R23",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R24",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R25",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R26",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R27",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R28",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R29",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R30",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R31",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R32",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R33",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R34",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R35",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R36",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R37",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R38",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R39",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R40",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R41",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R42",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R43",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R44",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R45",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R46",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R47",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R48",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R49",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R50",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R51",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R52",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R53",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R54",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R55",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R56",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R57",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R58",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R59",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R60",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R61",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R62",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R63",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R64",
+    "stage": "window",
+    "reason": "Release guard projection with original verified issue time and registrar-parsed signed key window; no host-state or membership authority claimed."
+  },
+  {
+    "row": "R65",
+    "stage": "window",
+    "reason": "Release guard projection with original verified issue time and registrar-parsed signed key window; no host-state or membership authority claimed."
+  },
+  {
+    "row": "R66",
+    "stage": "window",
+    "reason": "Release guard projection with original verified issue time and registrar-parsed signed key window; no host-state or membership authority claimed."
+  },
+  {
+    "row": "R67",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R68",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R69",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R70",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R71",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R72",
+    "stage": "name",
+    "reason": "Registrar Verify then Check with trusted configured audience; builder pairs the same requested name/audience with an independently generated fixture key."
+  },
+  {
+    "row": "R73",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R74",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R75",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R76",
+    "stage": "audience",
+    "reason": "Builder defense-in-depth audience equality after registrar name validation, using the fixture name and configured audience."
+  },
+  {
+    "row": "R77",
+    "stage": "audience",
+    "reason": "Builder defense-in-depth audience equality after registrar name validation, using the fixture name and configured audience."
+  },
+  {
+    "row": "R78",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R79",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R80",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R81",
+    "stage": "excluded",
+    "reason": "Receiver startup barrier, skew allowance or process clock-health policy; builder clock_untrusted and exact expiry are separate narrower local contracts."
+  },
+  {
+    "row": "R82",
+    "stage": "expiry",
+    "reason": "Exact helper release guard rejects at the published late time, with a one-nanosecond-before-expiry control. Receiver positive skew is intentionally not reused."
+  },
+  {
+    "row": "R83",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R84",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R85",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R86",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R87",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R88",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "R89",
+    "stage": "verify",
+    "reason": "Exact stateless registrar self-verification verdict on unchanged fixture bytes; P-256 cases are dependency validation, not builder algorithm authority."
+  },
+  {
+    "row": "R90",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R91",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R92",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R93",
+    "stage": "excluded",
+    "reason": "HTTP routing, media type or content encoding is outside proof construction/self-verification."
+  },
+  {
+    "row": "R94",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R95",
+    "stage": "excluded",
+    "reason": "Receiver JWT signer generation or audit availability/precedence; helper signer failures and release checks are tested separately."
+  },
+  {
+    "row": "R96",
+    "stage": "excluded",
+    "reason": "Receiver JWT signer generation or audit availability/precedence; helper signer failures and release checks are tested separately."
+  },
+  {
+    "row": "R97",
+    "stage": "excluded",
+    "reason": "Receiver JWT signer generation or audit availability/precedence; helper signer failures and release checks are tested separately."
+  },
+  {
+    "row": "R98",
+    "stage": "excluded",
+    "reason": "Registry/key membership, host state or name membership needs current enrollment authority; pure builder receives an already-authorized key."
+  },
+  {
+    "row": "R99",
+    "stage": "excluded",
+    "reason": "Receiver nonce consumption/reservation or rate accounting; no receiver state or native request-ID store in this pure layer."
+  },
+  {
+    "row": "PR1",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR10",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR11",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR12",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR13",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR14",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR15",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR16",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR17",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR18",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR19",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR2",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR20",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR21",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR22",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR23",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR24",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR25",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR26",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR27",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR28",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR29",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR3",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR30",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR4",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR5",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR6",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR7",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR8",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "PR9",
+    "stage": "roundtrip",
+    "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  }
+]

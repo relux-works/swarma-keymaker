@@ -60,5 +60,11 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
 - The published enrollment-1 suite (114 negative/25 positive) runs through the
   local adapter's conformance test. All published rows are supported. Later
   unpublished rows need an explicit dependency bump and are not claimed.
-- Binding enforcement, native helper wiring and body construction/signing remain
-  integration obligations; local enrollment authority alone cannot issue a proof.
+- Binding enforcement and native helper wiring remain integration obligations.
+  The pure [registration builder](internal/registration/README.md) constructs and
+  self-verifies proofs, but enrollment authority alone cannot release one.
+- The trusted registration Signer propagates an existing section-15 Code. A
+  generic custody failure with no fitting code needs specification review before
+  daemon integration; no generic signer code or audit-failure substitution is
+  introduced. Registrar self-check failures keep their typed spellings and
+  return no proof, as internal-consistency failures.

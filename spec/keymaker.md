@@ -578,7 +578,7 @@ restoring protected custody before a new admission attempt.
 | Native control methods on B | No signing key operation | Binding mutations and public metadata only |
 | Native registration helper on B | Configured purpose 2 | Registrar-built `registration/1` preimage only |
 | Internal state witness (separate proposal) | Reserved purpose 3 | `keymaker-witness-record/1` + NUL + service-built CCJ-1 body only |
-| Native `sign_message` on B (proposal) | Proposed purpose 4, active peer's author message sibling | Accepted Seraph `MSG_LABEL` + LF + caller-supplied canonical CCJ-1 object only |
+| Native `sign_message` on B (proposal) | Proposed purpose 4, active peer's author message sibling | Accepted waggle `MSG_LABEL` + LF + caller-supplied canonical CCJ-1 object only |
 | Internal message-key certification (recommendation) | Proposed purpose 5, externally pinned certification root | `keymaker-msg-key/1` + NUL + service-built attestation body only |
 
 The last three rows summarize unactivated proposals, not current signing

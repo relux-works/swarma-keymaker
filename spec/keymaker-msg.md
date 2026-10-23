@@ -7,18 +7,18 @@ MUST and MUST NOT below describe the proposed contract after approval, not a
 claim that the daemon supports it. There is no new socket or deployment step.
 
 The owner of `swarm-envelope/2` is
-[Seraph in waggle](https://github.com/relux-works/waggle). Its S0 draft branch
+[waggle in waggle](https://github.com/relux-works/waggle). Its S0 draft branch
 `spec/s0-envelope-grants` was not published when this proposal was prepared.
 The supplied shape is `domain label || LF || CCJ-1(body)`, with
 `id = sha256(preimage)` and signatures outside the body. **`MSG_LABEL` is a
-named parameter pending Seraph's accepted S0 definition, not literal bytes
+named parameter pending waggle's accepted S0 definition, not literal bytes
 and not an invented `swarma-msg` prefix.** Publication and review of a pinned,
 independently accepted S0 head remain an activation gate (MSG1). An unreviewed
 local draft is not an alignment authority. Keymaker MUST NOT silently adapt
 to another label or invent an envelope dialect. Operator device keys remain
 P-256; these agent keys are Ed25519. Neither substitutes for the other's
 authority. Agent message keys sign only the **author** role: human approver
-and delegate-session signatures have separate Seraph authority contracts.
+and delegate-session signatures have separate waggle authority contracts.
 
 ## 1. Purpose registry and domain separation
 
@@ -45,7 +45,7 @@ NOT sign messages, and purpose 4 MUST NOT certify keys. Verifiers MUST pin
 the expected purpose and its authorized key, not trust a claimed purpose
 number. A shared master is still one compromise domain.
 
-Seraph owns the closed list of platform labels and the allowed algorithm,
+waggle owns the closed list of platform labels and the allowed algorithm,
 role and envelope-type combinations. Each label MUST be an exact ASCII
 string without LF or any control byte (including DEL); all labels MUST be
 pairwise distinct. Compare all bytes up to the first LF, without normalization,
@@ -93,7 +93,7 @@ Stable-key verification proves the persistent key signed the bytes. It does
 **not** prove when, or in which generation, the signature was created. A new
 generation's attestation MUST NOT be presented as proof that an older signature
 was made by that generation. Generation attribution needs a registration or
-attestation reference covered by Seraph's signed body and checked against the
+attestation reference covered by waggle's signed body and checked against the
 attestation. Keymaker does not insert or interpret that reference (MSG1).
 Without it, a verifier can claim persistent-key authenticity only.
 
@@ -165,7 +165,7 @@ is `sha256:` followed by the lowercase SHA-256 hex of the raw message public
 key and `signature` is strict unpadded base64url of its 64-byte Ed25519
 signature over the **exact complete decoded preimage**. No prehash, outer
 frame, request ID, newline suffix or extra envelope is signed. The caller
-computes Seraph's envelope `id = sha256(preimage)` and places the returned
+computes waggle's envelope `id = sha256(preimage)` and places the returned
 signature outside the body per S0. That content digest is distinct from the
 native request ID and the public-key identifier.
 
@@ -183,7 +183,7 @@ extra LF, trailing bytes, another JSON document, duplicate members, scalar
 top level, or noncanonical JSON refuses. Empty object is permitted at this
 layer. Body members are opaque: the native wrapper has an exact schema, but
 Keymaker MUST NOT apply envelope-member allowlists or interpret roles, grants,
-content, recipients, timestamps or operator intent. Seraph checks those.
+content, recipients, timestamps or operator intent. waggle checks those.
 
 Propose **`MAX_MSG_PREIMAGE_BYTES = 48000`**, counting the full decoded label,
 LF and canonical body, not just the body. Its unpadded base64url is at most
@@ -313,11 +313,11 @@ verify the attestation's purpose-5 signature over the exact certified body,
 strict encodings, validity window, expected owner, registry lineage, exact
 purpose/path relationship, public-key digest and expected registration. Then
 check independently fresh binding status and root/epoch revocation evidence.
-It MUST require purpose 4 and Ed25519, reconstruct the exact Seraph preimage,
+It MUST require purpose 4 and Ed25519, reconstruct the exact waggle preimage,
 check the envelope content ID, and verify the message signature using that
 certified public key. Require the certified `author` role and S0's exact
 algorithm/role/type/label combination; another role or type must not verify
-by reusing these bytes. Seraph's verifier additionally checks the envelope
+by reusing these bytes. waggle's verifier additionally checks the envelope
 schema, semantic authority and any signed generation/registration reference;
 a valid Keymaker signature supplies none of those decisions.
 If certified key bytes, key-ID derivation, message purpose, validity,
@@ -447,7 +447,7 @@ message tests are claimed by this text-only slice.
 ## 8. Open dependencies and scope bounds
 
 [MSG1–MSG3](../UNRESOLVED_QUESTIONS.md#swarm-signer-message-specification-gates)
-track Seraph's exact label/role/type/limit and generation-reference semantics,
+track waggle's exact label/role/type/limit and generation-reference semantics,
 continuity choice, and attestation purpose/publication/status proof.
 Base Q6, Q7, Q9 and Q10 continue to gate generation ordering, persistent
 revocation, socket access

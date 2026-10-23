@@ -38,7 +38,7 @@ freshness, exclusion and lifecycle qualification remain open activation gates.
 
 The [Swarm Signer message proposal](spec/keymaker-msg.md) defines a purpose-4
 message key, constrained native signing, certification and paired text vectors.
-It is spec only: Seraph format alignment, generation/key continuity and the
+It is spec only: waggle format alignment, generation/key continuity and the
 attestation issuer/publication model remain open. No new method is enabled.
 
 | Path | Contents |

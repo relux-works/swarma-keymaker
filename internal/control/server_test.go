@@ -895,3 +895,58 @@ func (testObserver) Enter(context.Context, net.Conn) (func(), Code) { return fun
 func (testObserver) Refuse(_ context.Context, _ net.Conn, _ *Peer, _ Request, _ []byte, c Code) Code {
 	return c
 }
+
+// A socket owner's accepted tuple applies to the first hello, before ID
+// admission or release. Both UID and generation replacements refuse and close;
+// unchanged authority negotiates and still enters the mandatory write fence.
+func TestAcceptedTupleBeforeHello(t *testing.T) {
+	accepted := Peer{UID: 1001, Generation: "generation-a"}
+	for _, which := range []string{"intact", "uid", "generation", "missing"} {
+		t.Run(which, func(t *testing.T) {
+			current, pin := accepted, accepted
+			switch which {
+			case "uid":
+				current.UID++
+			case "generation":
+				current.Generation = "generation-b"
+			case "missing":
+				pin.Generation = ""
+			}
+			var admitted, released atomic.Int32
+			s := testServer(t, nil, peerFunc(func(context.Context, net.Conn) (Peer, Code) { return current, "" }), idsFunc(func(context.Context, Peer, Request) Code { admitted.Add(1); return "" }), fenceFunc(func(_ context.Context, _ Peer, _ Request, _ Object, write func() Code) Code {
+				released.Add(1)
+				return write()
+			}))
+			server, client := net.Pipe()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			defer client.Close()
+			done := make(chan struct{})
+			go func() { defer close(done); s.ServeConnAccepted(ctx, server, pin) }()
+			if which == "missing" {
+				closed(t, client)
+			} else {
+				send(t, client, hello(1, 1))
+				if which == "intact" {
+					wantSuccess(t, receive(t, client), requestID(1))
+					client.Close()
+				} else {
+					wantError(t, receive(t, client), requestID(1), "generation_mismatch")
+					closed(t, client)
+				}
+			}
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("accepted connection did not close")
+			}
+			want := int32(0)
+			if which == "intact" {
+				want = 1
+			}
+			if admitted.Load() != want || released.Load() != want {
+				t.Fatal("changed accepted tuple entered admission or release")
+			}
+		})
+	}
+}

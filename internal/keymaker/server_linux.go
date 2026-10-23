@@ -290,31 +290,36 @@ func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peer
 // The watcher closes idle control connections too. It only revokes access;
 // Identify and the final WithActive still establish request/release authority.
 func (s *Server) handleControl(ctx context.Context, c *net.UnixConn, p Peer, code Code) {
-	done := make(chan struct{})
-	defer close(done)
-	if code == "" {
-		admitCtx, cancelAdmission := context.WithTimeout(ctx, 2*time.Second)
-		g, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
-		if refusal == "" && generationCode(g, p.UID) == "" {
-			change, cancel := s.Engine.Generations.Watch(p.UID, g.Generation)
-			defer cancel()
-			current, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
-			if refusal != "" || generationCode(current, p.UID) != "" || current.Generation != g.Generation {
-				cancelAdmission()
-				c.Close()
-				return
-			}
-			go func() {
-				select {
-				case <-change:
-					c.Close()
-				case <-ctx.Done():
-					c.Close()
-				case <-done:
-				}
-			}()
-		}
-		cancelAdmission()
+	if code != "" {
+		c.Close()
+		return
 	}
-	s.controlWire.ServeConn(ctx, c)
+	admitCtx, cancelAdmission := context.WithTimeout(ctx, 2*time.Second)
+	defer cancelAdmission()
+	g, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
+	if refusal != "" || generationCode(g, p.UID) != "" {
+		c.Close()
+		return
+	}
+	change, cancel := s.Engine.Generations.Watch(p.UID, g.Generation)
+	defer cancel()
+	current, refusal := s.Engine.Generations.Lookup(admitCtx, p.UID)
+	if refusal != "" || generationCode(current, p.UID) != "" || current.Generation != g.Generation {
+		c.Close()
+		return
+	}
+	cancelAdmission()
+	connectionCtx, cancelConnection := context.WithCancel(ctx)
+	defer cancelConnection()
+	state := &nativeConnection{conn: c, done: connectionCtx.Done()}
+	defer state.close()
+	go func() {
+		select {
+		case <-change:
+			c.Close()
+		case <-connectionCtx.Done():
+		}
+	}()
+	nativeCtx := context.WithValue(connectionCtx, nativeConnectionKey{}, state)
+	s.controlWire.ServeConnAccepted(nativeCtx, c, control.Peer{UID: p.UID, Generation: g.Generation})
 }

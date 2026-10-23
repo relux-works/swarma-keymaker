@@ -34,6 +34,59 @@ type Native struct {
 	mutations map[Principal]*bucket
 }
 
+// Connection state is private to one sequential control loop. It is never wire
+// data or shared across connections. Mutations pin no station identity; pubkey
+// pins the first self binding and subscribes while the Store lock is held.
+type nativeConnectionKey struct{}
+type nativeConnection struct {
+	conn          net.Conn
+	done          <-chan struct{}
+	binding       uint64
+	cancelBinding func()
+	requestID     string
+	conditions    []GenerationCondition
+	prepared      bool
+}
+
+func (c *nativeConnection) close() {
+	if c.cancelBinding != nil {
+		c.cancelBinding()
+	}
+}
+func connectionFrom(ctx context.Context) *nativeConnection {
+	c, _ := ctx.Value(nativeConnectionKey{}).(*nativeConnection)
+	return c
+}
+func (c *nativeConnection) pin(s *Store, b Binding) Code {
+	if c.binding != 0 && c.binding != b.Number {
+		return "identity_revoked"
+	}
+	if c.binding == 0 {
+		c.binding = b.Number
+		change, cancel := s.watchLocked(b.Number)
+		c.cancelBinding = cancel
+		go func() {
+			select {
+			case <-change:
+				c.conn.Close()
+			case <-c.done:
+			}
+		}()
+	}
+	return ""
+}
+func (c *nativeConnection) bindingActive(s *Store) Code {
+	if c.binding == 0 {
+		return ""
+	}
+	for _, b := range s.records {
+		if b.Number == c.binding && b.Status == "active" {
+			return ""
+		}
+	}
+	return "identity_revoked"
+}
+
 func NewNative(e *Engine, cfg NativeConfig, v OperatorActVerifier, slots chan struct{}) (*Native, error) {
 	if e == nil {
 		return nil, failure("native dependencies unavailable")
@@ -166,6 +219,12 @@ func (n *Native) Admit(ctx context.Context, p control.Peer, r control.Request) c
 		return control.DeadlineExceeded
 	}
 	principal := nativePrincipal(p)
+	connection := connectionFrom(ctx)
+	if connection == nil {
+		return "peer_identity_unavailable"
+	}
+	connection.requestID, connection.prepared = r.ID, false
+	connection.conditions = []GenerationCondition{{Principal: principal}}
 	if mutation(r.Method) {
 		if c := n.operator(principal); c != "" {
 			return control.Code(c)
@@ -176,6 +235,9 @@ func (n *Native) Admit(ctx context.Context, p control.Peer, r control.Request) c
 	}
 	n.Engine.Store.mu.Lock()
 	defer n.Engine.Store.mu.Unlock()
+	if c := connection.bindingActive(n.Engine.Store); c != "" {
+		return control.Code(c)
+	}
 	prior, c := n.Engine.Store.retained(principal, r)
 	if c != "" {
 		return control.Code(c)
@@ -200,6 +262,10 @@ func resultFor(public []byte, b Binding) control.Object {
 	return control.Object{"public_key": base64.StdEncoding.EncodeToString(public), "path": b.Path, "registration_number": int64(b.Number), "master_epoch": b.Epoch}
 }
 func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Request) (control.Object, control.Code) {
+	connection := connectionFrom(ctx)
+	if connection == nil || connection.requestID != r.ID {
+		return nil, "peer_identity_unavailable"
+	}
 	if r.Method == "sign_registration" {
 		return nil, control.OperationUnsupported
 	}
@@ -211,6 +277,9 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		defer n.Engine.Store.mu.Unlock()
 		b, c := n.Engine.Store.lookup(peer.UID, peer.Generation)
 		if c != "" {
+			return nil, control.Code(c)
+		}
+		if c := connection.pin(n.Engine.Store, b); c != "" {
 			return nil, control.Code(c)
 		}
 		public, c := n.Engine.Signer.Public(b.Path)
@@ -236,6 +305,9 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		s := n.Engine.Store
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if c := connection.bindingActive(s); c != "" {
+			return c
+		}
 		old, c := s.retained(p, r)
 		if c != "" {
 			return c
@@ -247,6 +319,7 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		return ""
 	})
 	if c != "" || replay != nil {
+		connection.prepared = c == "" && replay != nil
 		return replay, control.Code(c)
 	}
 	plan, c := n.plan(ctx, p, r)
@@ -262,12 +335,16 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		s := n.Engine.Store
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if c := connection.bindingActive(s); c != "" {
+			return c
+		}
 		old, c := s.retained(p, r)
 		if c != "" {
 			return c
 		}
 		if old != nil {
 			result, c = s.resultObject(old)
+			connection.prepared = c == ""
 			return c
 		}
 		if ctx.Err() != nil {
@@ -363,6 +440,10 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		if r.Method == "revoke" {
 			s.notify(b.Number)
 		}
+		// Only this fresh effect carries target evidence to its first release.
+		// An exact historical replay retains caller-only authority conditions.
+		connection.conditions = conditions
+		connection.prepared = true
 		return ""
 	})
 	return result, control.Code(c)
@@ -481,11 +562,22 @@ func (n *Native) plan(ctx context.Context, p Principal, r control.Request) (nati
 	return nativePlan{binding: b}, ""
 }
 
-// The actual write remains inside WithActive and the Store lock. No lookup
+// The actual write remains inside one authority barrier and the Store lock. No lookup
 // outside that barrier authorizes release; hello deliberately needs no binding.
 func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func() control.Code) control.Code {
 	p := nativePrincipal(peer)
-	c := n.releaseFence(ctx, p, func() Code {
+	connection := connectionFrom(ctx)
+	if connection == nil || connection.requestID != r.ID {
+		return "peer_identity_unavailable"
+	}
+	var conditions []GenerationCondition
+	if mutation(r.Method) {
+		if !connection.prepared {
+			return "audit_unavailable"
+		}
+		conditions = connection.conditions
+	}
+	c := n.releaseFence(ctx, p, conditions, func() Code {
 		s := n.Engine.Store
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -494,6 +586,9 @@ func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Re
 		}
 		if ctx.Err() != nil {
 			return "request_deadline_exceeded"
+		}
+		if c := connection.bindingActive(s); c != "" {
+			return c
 		}
 		if mutation(r.Method) {
 			if c := n.operator(p); c != "" {
@@ -560,6 +655,9 @@ func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Re
 	return control.Code(c)
 }
 
-func (n *Native) releaseFence(ctx context.Context, p Principal, release func() Code) Code {
+func (n *Native) releaseFence(ctx context.Context, p Principal, conditions []GenerationCondition, release func() Code) Code {
+	if conditions != nil {
+		return n.Engine.Generations.WithEvidence(ctx, conditions, release)
+	}
 	return n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, release)
 }

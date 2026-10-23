@@ -340,6 +340,11 @@ func (s *Store) notify(n uint64) {
 func (s *Store) Watch(n uint64) (<-chan struct{}, func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.watchLocked(n)
+}
+
+// watchLocked lets admission subscribe atomically with its binding check.
+func (s *Store) watchLocked(n uint64) (<-chan struct{}, func()) {
 	c := make(chan struct{})
 	s.watchers[n] = append(s.watchers[n], c)
 	return c, func() {

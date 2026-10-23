@@ -108,16 +108,32 @@ func (s *Server) Serve(ctx context.Context, listener net.Listener) error {
 // clients must await each response before sending the next request. There is no
 // read-ahead, parallel dispatch or unbounded request queue on a connection.
 func (s *Server) ServeConn(ctx context.Context, conn net.Conn) {
+	s.serveConn(ctx, conn, connectionState{})
+}
+
+// ServeConnAccepted pins the authority tuple already validated by the socket
+// owner before any frame, including hello. Every Identify result must match it.
+// It preserves ServeConn's sequential execution and actual-write release fence.
+func (s *Server) ServeConnAccepted(ctx context.Context, conn net.Conn, accepted Peer) {
+	if accepted.Generation == "" {
+		conn.Close()
+		return
+	}
+	s.serveConn(ctx, conn, connectionState{accepted: accepted, pinned: true})
+}
+
+func (s *Server) serveConn(ctx context.Context, conn net.Conn, state connectionState) {
 	defer conn.Close()
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
-	state := connectionState{helloDeadline: time.Now().Add(frameBudget)}
+	state.helloDeadline = time.Now().Add(frameBudget)
 	for s.serveOne(ctx, conn, &state) {
 	}
 }
 
 type connectionState struct {
 	negotiated    bool
+	pinned        bool
 	accepted      Peer
 	helloDeadline time.Time
 }
@@ -199,7 +215,7 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 		if code == "" && peer.Generation == "" {
 			code = "generation_source_unavailable"
 		}
-		if code == "" && state.negotiated && peer != state.accepted {
+		if code == "" && state.pinned && peer != state.accepted {
 			code = "generation_mismatch"
 		}
 		if code == "" {
@@ -242,6 +258,7 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 		if code == "" {
 			if req.Method == "hello" {
 				state.accepted = peer
+				state.pinned = true
 				state.negotiated = true
 			}
 			return true
@@ -268,7 +285,7 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 
 func generationFailure(code Code) bool {
 	switch code {
-	case "generation_inactive", "generation_mismatch", "generation_source_unavailable", "peer_identity_unavailable":
+	case "generation_inactive", "generation_mismatch", "generation_source_unavailable", "peer_identity_unavailable", "identity_revoked":
 		return true
 	}
 	return false

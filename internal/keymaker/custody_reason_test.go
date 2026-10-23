@@ -180,7 +180,8 @@ func TestCustodyAuditCauses(t *testing.T) {
 
 // The closed enum is required on new custody refusals and forbidden on other
 // records. Invalid records append no bytes; each case has a valid closed control.
-// Legacy records without this optional extension retain their exact hash/schema.
+// Cause-less custody records now refuse recovery; ordinary old records retain
+// their unchanged schema/hash (covered by the matrix and existing audit tests).
 func TestCustodyAuditSchema(t *testing.T) {
 	for _, kind := range []string{"missing", "unknown", "success", "other-refusal", "closed", "unloaded", "protection_failed", "legacy"} {
 		t.Run(kind, func(t *testing.T) {
@@ -265,7 +266,7 @@ func TestCustodyAuditSchema(t *testing.T) {
 				}
 			}
 			opened, err := OpenJournal(dir, uint32(os.Getuid()))
-			if kind == "unknown" || kind == "other-refusal" {
+			if kind == "unknown" || kind == "other-refusal" || kind == "legacy" {
 				if opened != nil || err == nil || !strings.Contains(err.Error(), "invalid audit record") {
 					t.Fatal("invalid stored custody cause recovered", err)
 				}

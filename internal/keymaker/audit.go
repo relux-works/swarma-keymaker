@@ -269,7 +269,7 @@ func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.R
 				return nil, failure("audit record too large")
 			}
 			var r AuditRecord
-			if StrictJSON(bytes.NewReader(line), &r) != nil || !validAuditCustody(r, false) {
+			if StrictJSON(bytes.NewReader(line), &r) != nil || !validAuditCustody(r) {
 				return nil, failure("invalid audit record")
 			}
 			b, e := canonical(r)
@@ -386,7 +386,7 @@ func (j *Journal) appendLocked(r AuditRecord) Code {
 	return j.appendContextLocked(context.Background(), r)
 }
 func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
-	if j.failed || !validAuditCustody(r, true) {
+	if j.failed || !validAuditCustody(r) {
 		return "audit_unavailable"
 	}
 	r.Seq = j.seq + 1
@@ -403,6 +403,12 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 	digest, e := auditDigest(r)
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
+	}
+	// Time qualification can replace the supplied result with unknown. Validate
+	// the final record too, before any write, so custody metadata never lands
+	// on a non-refusal result. Keep the context deadline check above this gate.
+	if !validAuditCustody(r) {
+		return "audit_unavailable"
 	}
 	if e != nil {
 		j.failed = true

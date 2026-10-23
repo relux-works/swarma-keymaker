@@ -24,12 +24,12 @@ func auditCustodyCause(code Code, cause custodyCause) *custodyCause {
 	return &cause
 }
 
-func validAuditCustody(r AuditRecord, require bool) bool {
+func validAuditCustody(r AuditRecord) bool {
 	isCustody := r.RefusalCode != nil && *r.RefusalCode == "custody_unavailable"
 	if r.CustodyCause == nil {
-		return !require || !isCustody
+		return !isCustody
 	}
-	return isCustody && r.CustodyCause.valid()
+	return isCustody && r.Result == "refused" && r.CustodyCause.valid()
 }
 
 // Production Masters supply detailed results internally without changing the

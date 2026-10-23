@@ -56,6 +56,7 @@ func main() {
 		}
 		old, c := outside, outsideCode`
 	controls := []struct{ name, file, old, new, test, needle, witness string }{
+		{"custody-result-linkage", "custody_reason.go", `isCustody && r.Result == "refused" && r.CustodyCause.valid()`, `isCustody && r.CustodyCause.valid()`, "^TestCustodyResultLinkage$", "--- FAIL: TestCustodyResultLinkage/Append/success", "invalid custody result admitted or changed journal"},
 		{"custody-wrong-cause", "derive.go", `return nil, "custody_unavailable", custodyClosed`, `return nil, "custody_unavailable", custodyUnloaded`, "^TestCustodyAuditCauses$/^(agent-sign|control-pubkey|helper)$/^closed$", "--- FAIL: TestCustodyAuditCauses/agent-sign/closed", "custody audit cause mismatch"},
 		{"custody-native-response-cause", "native.go", "return refusal\n}\n\n// Admit", "if record.CustodyCause != nil { return control.Code(*record.CustodyCause) }; return refusal\n}\n\n// Admit", "^TestCustodyAuditCauses$/^control-pubkey$/^closed$", "--- FAIL: TestCustodyAuditCauses/control-pubkey/closed", "custody response bytes changed"},
 		{"custody-agent-response-cause", "server_linux.go", "if writeResponse(c, AgentFailure) != nil ||", "if writeResponse(c, Packet(append([]byte{5}, []byte(\"closed\")...))) != nil ||", "^TestCustodyAuditCauses$/^agent-sign$/^closed$", "--- FAIL: TestCustodyAuditCauses/agent-sign/closed", "custody response bytes changed"},

@@ -641,17 +641,22 @@ not omitted. `domain` is the SSHSIG namespace (`git`), registrar domain, or
 `control`; result is `success`, `refused` or `unknown`. Time is whole-second UTC
 or null with result `unknown` when trustworthy time cannot be established.
 
-New `custody_unavailable` refusal records MUST include `custody_cause`, exactly
-one of `closed`, `unloaded`, or `protection_failed`. A nil Master or empty seed
+`custody_unavailable` records MUST have result `refused` and include
+`custody_cause`, exactly one of `closed`, `unloaded`, or `protection_failed`. A nil Master or empty seed
 maps to `unloaded`; an explicitly closed Master maps to `closed` even after its
 seed is erased; any other non-32-byte seed maps to `protection_failed`. Capture
 the cause during the failing custody operation. This member MUST be omitted on
 other records, including successful operations, and MUST NOT appear in responses
 on either surface, including helper responses. All three causes produce identical
 response bytes for the same request. The member carries no key material or
-free-form diagnostics. Historical records predating this extension may omit it;
-their canonical bytes and hash chain remain unchanged. New appends without the
-required cause, or with an unknown or misapplied cause, MUST refuse.
+free-form diagnostics. Historical custody records without the required cause now
+refuse recovery; ordinary historical records without custody metadata retain their canonical bytes
+and hash chain. Both append APIs and recovery MUST reject a custody refusal code
+without a cause, a cause with another or absent code, and a cause on `success`,
+`unknown` or any result other than `refused`. This also applies after time
+qualification: if uncertain time changes the result to `unknown`, the custody
+record MUST refuse before any append; ordinary cause-free unknown-time records
+retain their existing behavior. No automatic journal migration is provided.
 
 Audit is an append-only sequence of CCJ-1 JSON lines owned by the service,
 mode 0600, in a 0700 directory. Each operation, including hello, lookup and

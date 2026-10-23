@@ -224,7 +224,8 @@ of fixture seed encodings. Independent open controls verify signatures or keys.
 `TestCustodySignCauses` separately covers the signing operation's captured cause.
 `TestCustodyAuditSchema` rejects missing/unknown/misapplied new causes before any
 append and rejects correctly rehashed invalid stored metadata. It recovers valid
-causes and historical records without this optional extension, preserving hashes.
+causes. Historical custody records without a cause now refuse recovery; ordinary
+records without custody metadata retain their canonical bytes and hashes.
 These fixture tests do not qualify live multi-UID use or memory non-extraction.
 
 | Mutant | Gate | Named failing test |
@@ -232,3 +233,36 @@ These fixture tests do not qualify live multi-UID use or memory non-extraction.
 | `custody-wrong-cause` | Closed custody is not reported as unloaded | `TestCustodyAuditCauses/agent-sign/closed` (also B pubkey/helper) |
 | `custody-native-response-cause` | B does not expose local cause | `TestCustodyAuditCauses/control-pubkey/closed` |
 | `custody-agent-response-cause` | A response contains only its failure byte | `TestCustodyAuditCauses/agent-sign/closed` |
+
+### Custody result linkage rework
+
+`TestCustodyResultLinkage` rejects success, unknown, arbitrary and empty results
+carrying a custody cause on `Append`, `AppendContext` and correctly rehashed
+recovery. Each negative has a valid refusal-with-cause control. The retained
+reviewer tests `TestReviewCustodySuccessMetadata` and
+`TestReviewCustodyRequestReset` exercise the original finding and request reset.
+`TestCustodyResultClock` rejects custody records when clock qualification changes
+the result to unknown, without writing or poisoning the journal; ordinary
+unknown-time records still append. The shared append implementation retains the
+context gate, cancellation boundaries and post-durable-action completion rule.
+
+`TestCustodyResultMatrix` executes all 45 combinations below through each append
+API and recovery (135 cases). This is the custody-linkage verdict; it does not
+add unrelated generic audit-schema validation. Absence of code/cause is `none`.
+
+| Result | RefusalCode | none | closed | unloaded | protection_failed | invalid cause |
+| --- | --- | --- | --- | --- | --- | --- |
+| refused | none | accept | reject | reject | reject | reject |
+| refused | custody_unavailable | reject | accept | accept | accept | reject |
+| refused | other | accept | reject | reject | reject | reject |
+| success | none | accept | reject | reject | reject | reject |
+| success | custody_unavailable | reject | reject | reject | reject | reject |
+| success | other | accept | reject | reject | reject | reject |
+| unknown | none | accept | reject | reject | reject | reject |
+| unknown | custody_unavailable | reject | reject | reject | reject | reject |
+| unknown | other | accept | reject | reject | reject | reject |
+
+The `custody-result-linkage` mutant removes only the Result predicate and is
+killed by `TestCustodyResultLinkage/Append/success`; it also exercises the matching
+AppendContext and recovery assertions. The existing cause-code validation stays
+in place. These are isolated local journal fixtures, not live journal edits.

@@ -56,6 +56,9 @@ func TestReconcileCommandDispatch(t *testing.T) {
 		{[]string{"enrollment", "reconcile", "--unknown"}, 2},
 		{[]string{"enrollment", "reconcile", "--config", filepath.Join(t.TempDir(), "pins.json"), "extra"}, 2},
 		{[]string{"enrollment", "reconcile", "--config", filepath.Join(t.TempDir(), "pins.json")}, 1},
+		{[]string{"enrollment", "reconcile", "--bootstrap"}, 2},
+		{[]string{"enrollment", "reconcile", "--bootstrap=invalid", "--config", filepath.Join(t.TempDir(), "pins.json")}, 2},
+		{[]string{"enrollment", "reconcile", "--bootstrap", "--config", filepath.Join(t.TempDir(), "pins.json")}, 1},
 		{[]string{"version"}, 0},
 	} {
 		var out bytes.Buffer

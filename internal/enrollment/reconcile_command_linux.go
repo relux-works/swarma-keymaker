@@ -50,6 +50,7 @@ func openedMetadata(files Files, f *os.File) (Metadata, error) {
 // stderr. Digest covers all history and permanent ownership, not just Hosts.
 type ReconciliationReport struct {
 	Version              int                  `json:"version"`
+	Bootstrap            bool                 `json:"bootstrap"`
 	PinRevision          string               `json:"pin_revision"`
 	PinSHA256            string               `json:"pin_sha256"`
 	PublisherFingerprint string               `json:"publisher_fingerprint"`
@@ -139,9 +140,7 @@ func (s *previewStore) Commit(previous *registry.HighWater, next registry.HighWa
 // inspectReconciliation only reads real state. Registrar Commit is captured in
 // memory so the exact production loader can compute its proposed full state.
 func inspectReconciliation(ctx context.Context, configPath string, c PinConfig, files Files) (ReconciliationReport, *registry.HighWater, error) {
-	r := ReconciliationReport{Version: 1, PinRevision: c.Revision, PinSHA256: pinDigest(c), Audience: c.Audience, Hosts: []ReconciliationHost{}, Evidence: []string{}}
-	publisher, _ := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(c.Publisher, "ed25519:"))
-	r.PublisherFingerprint = "SHA256:" + digestBytes(publisher)
+	r := newReconciliationReport(c, false)
 	entries, err := os.ReadDir(c.StateDir)
 	if err != nil {
 		r.Reason = "state_unavailable"
@@ -257,7 +256,7 @@ func stateDifference(local, next *registry.HighWater) string {
 	return "history_or_ownership_differs"
 }
 
-// Reconcile is the root operator command, never a bootstrap or repair operation.
+// Reconcile confirms existing state for one startup; it never repairs state.
 // The only writes are a one-use approval and its fail-closed publication marker.
 func Reconcile(ctx context.Context, configPath, confirm string, input io.Reader, out, summary io.Writer) error {
 	if os.Geteuid() != 0 {
@@ -265,7 +264,19 @@ func Reconcile(ctx context.Context, configPath, confirm string, input io.Reader,
 	}
 	return reconcileCommand(ctx, configPath, confirm, input, out, summary, LinuxFiles{}, diskOps{})
 }
+
+// Bootstrap is an explicit root-operator action for a never-used state directory.
+// Like Reconcile, inspection and confirmation do not write local state.
+func Bootstrap(ctx context.Context, configPath, confirm string, input io.Reader, out, summary io.Writer) error {
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("operator_root_required")
+	}
+	return reconcileCommandMode(ctx, configPath, confirm, input, out, summary, LinuxFiles{}, diskOps{}, true)
+}
 func reconcileCommand(ctx context.Context, configPath, confirm string, input io.Reader, out, summary io.Writer, files Files, ops durableOps) error {
+	return reconcileCommandMode(ctx, configPath, confirm, input, out, summary, files, ops, false)
+}
+func reconcileCommandMode(ctx context.Context, configPath, confirm string, input io.Reader, out, summary io.Writer, files Files, ops durableOps, bootstrap bool) error {
 	c, _, err := loadConfig(configPath, files)
 	if err != nil {
 		return fmt.Errorf("pin_unavailable: %w", err)
@@ -278,26 +289,31 @@ func reconcileCommand(ctx context.Context, configPath, confirm string, input io.
 		return err
 	}
 	defer unlock(lease)
-	// Lock an existing Store inode read-only; unlike Store.read this cannot create
-	// high-water.lock and cannot turn a missing directory into bootstrap evidence.
-	lockPath := filepath.Join(c.StateDir, "high-water.lock")
-	fd, err := syscall.Open(lockPath, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return fmt.Errorf("existing_store_lock_required: %w", err)
-	}
-	lock := os.NewFile(uintptr(fd), lockPath)
-	defer unlock(lock)
-	info, err := lock.Stat()
-	m, metaErr := openedMetadata(files, lock)
-	if err != nil || metaErr != nil || !info.Mode().IsRegular() || !safeMeta(m, false, *c.ServiceUID) {
-		return errTrust
-	}
-	if err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return fmt.Errorf("store_writer_live: %w", err)
+	if !bootstrap {
+		// Lock the existing Store inode read-only. Inspection never creates a lock
+		// or turns a missing directory into attempted-bootstrap evidence.
+		lockPath := filepath.Join(c.StateDir, "high-water.lock")
+		fd, err := syscall.Open(lockPath, syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
+		if err != nil {
+			return fmt.Errorf("existing_store_lock_required: %w", err)
+		}
+		lock := os.NewFile(uintptr(fd), lockPath)
+		defer unlock(lock)
+		info, err := lock.Stat()
+		m, metaErr := openedMetadata(files, lock)
+		if err != nil || metaErr != nil || !info.Mode().IsRegular() || !safeMeta(m, false, *c.ServiceUID) {
+			return errTrust
+		}
+		if err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+			return fmt.Errorf("store_writer_live: %w", err)
+		}
 	}
 	inspect := func(c PinConfig) (ReconciliationReport, *registry.HighWater, error) {
 		bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
+		if bootstrap {
+			return inspectBootstrap(bounded, configPath, c, files)
+		}
 		return inspectReconciliation(bounded, configPath, c, files)
 	}
 	report, _, inspectionErr := inspect(c)
@@ -335,20 +351,37 @@ func reconcileCommand(ctx context.Context, configPath, confirm string, input io.
 	if pinDigest(current) != report.PinSHA256 {
 		return fmt.Errorf("pin_changed_during_confirmation")
 	}
-	fresh, _, err := inspect(current)
+	fresh, high, err := inspect(current)
 	if err != nil || fresh.StateSHA256 != confirm || !fresh.Match {
 		return fmt.Errorf("state_changed_during_confirmation")
 	}
 	if _, existingErr := os.Lstat(filepath.Join(c.StateDir, approvalName)); !errors.Is(existingErr, os.ErrNotExist) {
 		return fmt.Errorf("approval_already_present: consume at startup or perform separate operator recovery")
 	}
-	if err = writeCommandApproval(ctx, configPath, c, report.StateSHA256, ops); err != nil {
-		return fmt.Errorf("approval_write_failed_fenced: %w", err)
-	}
-	report.Approved = true
-	// Publication has committed: output errors cannot retract operator consent.
-	if err = json.NewEncoder(out).Encode(report); err != nil {
-		return fmt.Errorf("approval_committed_output_failed: %w", err)
+	if bootstrap {
+		store := newFileStore(ctx, c.StateDir, files)
+		store.owner = *c.ServiceUID
+		store.ops = ops
+		err = (initialPublisher{store}).publish(*high, func() error {
+			// All fallible output precedes clearing the independently durable
+			// root fence. An output failure cannot leave startup consent usable.
+			return publishCommandApproval(ctx, configPath, c, report.StateSHA256, ops, func() error {
+				report.Approved = true
+				return json.NewEncoder(out).Encode(report)
+			})
+		})
+		if err != nil {
+			return fmt.Errorf("bootstrap_write_failed_fenced: %w", err)
+		}
+	} else {
+		if err = writeCommandApproval(ctx, configPath, c, report.StateSHA256, ops); err != nil {
+			return fmt.Errorf("approval_write_failed_fenced: %w", err)
+		}
+		report.Approved = true
+		// Existing-state publication has committed; an output failure cannot retract consent.
+		if err = json.NewEncoder(out).Encode(report); err != nil {
+			return fmt.Errorf("approval_committed_output_failed: %w", err)
+		}
 	}
 	fmt.Fprintln(summary, "Approved one startup. Start the enrollment authority; every later restart requires a new confirmation.")
 	return nil
@@ -381,6 +414,9 @@ func readConfirmation(ctx context.Context, input io.Reader) (string, error) {
 }
 
 func writeCommandApproval(ctx context.Context, configPath string, c PinConfig, digest string, ops durableOps) error {
+	return publishCommandApproval(ctx, configPath, c, digest, ops, nil)
+}
+func publishCommandApproval(ctx context.Context, configPath string, c PinConfig, digest string, ops durableOps, beforeUnfence func() error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -439,6 +475,14 @@ func writeCommandApproval(ctx context.Context, configPath string, c PinConfig, d
 		return err
 	}
 	if err = ops.SyncDir(c.StateDir); err != nil {
+		return err
+	}
+	if beforeUnfence != nil {
+		if err = beforeUnfence(); err != nil {
+			return err
+		}
+	}
+	if err = ctx.Err(); err != nil {
 		return err
 	}
 	// Final fallible action: do not fsync after clearing the fence. If a crash
@@ -552,4 +596,63 @@ func (r *commandReconciler) checkPinned(ctx context.Context, high *registry.High
 		return err
 	}
 	return ctx.Err()
+}
+
+func newReconciliationReport(c PinConfig, bootstrap bool) ReconciliationReport {
+	r := ReconciliationReport{Version: 1, Bootstrap: bootstrap, PinRevision: c.Revision, PinSHA256: pinDigest(c), Audience: c.Audience, Hosts: []ReconciliationHost{}, Evidence: []string{}}
+	publisher, _ := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(c.Publisher, "ed25519:"))
+	r.PublisherFingerprint = "SHA256:" + digestBytes(publisher)
+	return r
+}
+
+// Bootstrap has no retained ancestor: the approved exact pin is the initial
+// history anchor. Subsequent reload/reconcile uses the production ancestry gate.
+// Verifier and Loader below are the production implementations, with memory-only
+// Commit until the independently confirmed digest is rechecked under the lease.
+func inspectBootstrap(ctx context.Context, configPath string, c PinConfig, files Files) (ReconciliationReport, *registry.HighWater, error) {
+	r := newReconciliationReport(c, true)
+	if _, err := os.Lstat(pendingPath(configPath)); !errors.Is(err, os.ErrNotExist) {
+		r.Evidence = append(r.Evidence, "operator_publication_pending")
+	}
+	entries, err := os.ReadDir(c.StateDir)
+	if err != nil {
+		r.Reason = "state_unavailable"
+		return r, nil, err
+	}
+	for _, entry := range entries {
+		r.Evidence = append(r.Evidence, entry.Name())
+	}
+	if len(r.Evidence) != 0 {
+		r.Reason = "bootstrap_requires_empty_state: use normal reconciliation or operator repair"
+		return r, nil, errTrust
+	}
+	policy, err := format.NewPolicy(c.Audience, c.Publisher, c.Stations)
+	if err != nil {
+		r.Reason = "invalid_pin"
+		return r, nil, err
+	}
+	if err = safeRepository(ctx, files, c.Registry); err != nil {
+		r.Reason = "registry_unavailable"
+		return r, nil, err
+	}
+	v := newGitVerifier(ctx, c.Registry, c.Revision, c.Maintainers)
+	snapshotEntries, err := v.entries()
+	if err != nil {
+		r.Reason = "snapshot_unverified"
+		return r, nil, err
+	}
+	_, high, err := (registry.Loader{Policy: policy, Verifier: v, Store: &previewStore{}}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, FirstUse: true})
+	if err != nil {
+		r.Reason = "snapshot_rejected: " + err.Error()
+		return r, nil, errTrust
+	}
+	r.StateSHA256 = StateDigest(high)
+	r.SnapshotSHA256 = r.StateSHA256
+	for host, h := range high.Hosts {
+		r.Hosts = append(r.Hosts, ReconciliationHost{host, h.Seq, h.ID, h.Revoked})
+	}
+	sort.Slice(r.Hosts, func(i, j int) bool { return r.Hosts[i].Host < r.Hosts[j].Host })
+	r.Match = true
+	r.Reason = "bootstrap_ready"
+	return r, high, nil
 }

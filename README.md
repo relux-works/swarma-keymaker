@@ -71,6 +71,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | gofmt | Check proof formatting: `gofmt -l internal/registration/*.go tools/mutations/main.go` | Empty output expected |
 | keymaker | Reconcile before enrollment startup: `keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG"` (root operator, stopped helper; optionally `--confirm "$EXACT_STATE_SHA256"`) | JSON lines on stdout, summary/prompt on stderr; one-use approval in protected enrollment state directory |
 | Go | Test enrollment authority: `go test ./internal/enrollment` | Named verdicts; isolated fixture registries/keys under the Go temporary directory, cleaned by tests |
+| Keymaker | Initial operator acceptance: `keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG" --bootstrap [--confirm "$EXACT_STATE_SHA256"]` | v1 JSON (`bootstrap: true`) on stdout; summary on stderr; confirmed state and one-use receipt in the protected state directory |
 | Go | Targeted race check: `GOMAXPROCS=2 go test -race ./internal/enrollment -run 'TestConcurrentReloadAuthorize\|TestStoreCompareAndSwap\|TestInterruptedWriteFencesUntilRestart' -count=1 -p=1` | Race diagnostics and verdicts |
 | Go | Run the published enrollment fixture integration: `GOPROXY=off go test -v ./internal/enrollment -run '^TestRegistrarEnrollmentConformance$' -count=1` | 114 negative/25 positive local pinned-module rows; no test-time fetch |
 | Go | Vet enrollment authority: `go vet ./internal/enrollment` | Diagnostics on stdout/stderr |

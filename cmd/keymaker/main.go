@@ -24,7 +24,7 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) int {
 		return runReconcile(ctx, args[2:], os.Stdin, out, errOut)
 	}
 	if len(args) == 0 || args[0] != "serve" {
-		fmt.Fprintln(errOut, "usage: keymaker version | serve --config <file> | enrollment reconcile --config <file> [--confirm <sha256>]")
+		fmt.Fprintln(errOut, "usage: keymaker version | serve --config <file> | enrollment reconcile --config <file> [--bootstrap] [--confirm <sha256>]")
 		return 2
 	}
 	flags := flag.NewFlagSet("serve", flag.ContinueOnError)
@@ -50,10 +50,15 @@ func runReconcile(ctx context.Context, args []string, input io.Reader, out, errO
 	flags.SetOutput(errOut)
 	config := flags.String("config", "", "protected enrollment pin configuration")
 	confirm := flags.String("confirm", "", "exact full state SHA256; omit to prompt")
+	bootstrap := flags.Bool("bootstrap", false, "explicitly initialize a state directory without prior evidence")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *config == "" {
 		return 2
 	}
-	if err := enrollment.Reconcile(ctx, *config, *confirm, input, out, errOut); err != nil {
+	action := enrollment.Reconcile
+	if *bootstrap {
+		action = enrollment.Bootstrap
+	}
+	if err := action(ctx, *config, *confirm, input, out, errOut); err != nil {
 		fmt.Fprintln(errOut, err)
 		return 1
 	}

@@ -30,8 +30,17 @@ func emptyState(dir string) error {
 }
 
 func (p initialPublisher) Commit(previous *registry.HighWater, next registry.HighWater) (err error) {
+	if previous != nil {
+		return errTrust
+	}
+	return p.publish(next, nil)
+}
+
+// publish keeps the initial Store lock through the operator receipt's durable
+// publication. The optional finish action must leave a startup fence on error.
+func (p initialPublisher) publish(next registry.HighWater, finish func() error) (err error) {
 	s := p.store
-	if previous != nil || s.failed {
+	if s.failed {
 		return errTrust
 	}
 	defer func() {
@@ -57,7 +66,13 @@ func (p initialPublisher) Commit(previous *registry.HighWater, next registry.Hig
 	if err = p.marker(); err != nil {
 		return err
 	}
-	return s.publish(next)
+	if err = s.publish(next); err != nil {
+		return err
+	}
+	if finish != nil {
+		return finish()
+	}
+	return nil
 }
 
 func (p initialPublisher) marker() error {

@@ -82,8 +82,8 @@ service-owned. State comprises `high-water.json`, a consumed-bootstrap marker
 `accepted`, and `high-water.lock`. High water retains the accepted revision,
 per-host highest sequence/ID/tombstone, complete sequence-ID history, and
 permanent key/name ownership. A locked compare-and-swap publishes a temporary
-file with file fsync, rename and directory fsync. Before any temporary high-water
-file is created or written, the bootstrap marker's directory entry is synced,
+file with file fsync, rename and directory fsync. During explicit initial publication, before any temporary high-water
+file is created or written, the acceptance marker's directory entry is synced,
 then its contents are written, synced and closed, and the directory is synced.
 An empty/partial marker or orphaned temporary file is retained attempt evidence,
 never a new bootstrap. Failed writes are not cleaned up by deleting that marker.
@@ -92,8 +92,8 @@ The service never bootstraps. Empty or missing high water, lock-only leftovers,
 partial markers and orphaned entries always fence admission. The removed
 `first_use` configuration member is unknown and refuses even when false.
 First acceptance is an explicit operator action through
-`keymaker enrollment reconcile --config /etc/keymaker/enrollment.json --bootstrap`
-(the command is supplied by the reconciliation layer). It verifies the pinned
+`keymaker enrollment reconcile --config /etc/keymaker/enrollment.json --bootstrap`.
+It verifies the pinned
 snapshot read-only, presents its full state digest and requires exact confirmation
 before initial publication. Only a directory without any prior evidence is
 eligible; failed attempts require another explicit operator decision or repair.
@@ -134,8 +134,8 @@ Use this procedure **before every enrollment-authority restart**, including a
 restart after a failed commit. Stop the enrollment helper/daemon first. Every
 `Authority` holds a shared `flock` on the state-directory inode from its first
 reload until `Close`; stop serving and call `Close` at shutdown. The command
-requires that inode's exclusive lock and also exclusively locks the existing
-Store lock file. A live or starting helper, another operator command, or an
+requires that inode's exclusive lock and also exclusively locks the
+Store lock file. Initial publication creates that lock only after confirmation. A live or starting helper, another operator command, or an
 active Store writer causes refusal. There are no PID-file or socket guesses.
 The current `serve` entry point still refuses at the unavailable generation
 journal gate; this procedure supplies the enrollment API's startup policy,
@@ -149,23 +149,54 @@ the service from replacing the locked directory inode. Run the following single
 command as the root operator, with the installed binary and protected pin path:
 
 ```sh
+# Initial acceptance: the directory must have no prior state or other entries.
+keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG" --bootstrap
+# An operator interface can supply the independently approved full digest.
+keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG" --bootstrap --confirm "$EXACT_STATE_SHA256"
+# All later startups reconcile existing accepted state.
 keymaker enrollment reconcile --config "$ENROLLMENT_CONFIG"
 ```
+
+Bootstrap inspection is read-only: no lock, marker, state or approval is created
+while displaying the snapshot or awaiting confirmation. The initial pin is the
+first history anchor; there is no retained ancestor before initial acceptance.
+The production verifier and registrar loader validate its signed snapshot with
+an in-memory Store. Normal reconciliation and later service reloads retain the
+production ancestry and monotonic-history checks. Bootstrap reports
+`bootstrap: true`; normal reconciliation reports `bootstrap: false`.
+
+Only a directory containing **no entries at all** qualifies for bootstrap.
+A lock-only leftover is prior evidence, as are complete/partial markers,
+high-water files, receipts, pending/orphan files and a root publication fence.
+Bootstrap refuses all of them and directs the operator to normal reconciliation
+or separate privileged repair. Even a failed attempt that left no evidence
+requires a fresh explicit bootstrap invocation: the service always refuses
+empty state. Stop a fenced helper too; it retains its lifecycle lease until Close.
+
+After the full digest is confirmed and the pin/state are rechecked, bootstrap
+holds both locks through initial state and receipt publication. New state, marker
+and lock inodes are owned by `service_uid` with mode 0600; the receipt remains
+root-owned and service-readable. The same publication code is used by the
+initial-state fault and crash fixtures. A failure cannot supply usable startup
+consent. A visible receipt is guarded by the root publication fence until its
+fsync sequence and command output succeed. Require exit 0 before treating an
+`approved` report as usable. A later crash may conservatively restore the fence.
+
 
 Stdout is newline-delimited JSON, schema `version: 1`. The first object contains
 `pin_revision`, `pin_sha256` (the canonical complete protected configuration),
 `publisher_fingerprint` (`SHA256:` followed by lowercase hex over the decoded
 Ed25519 publisher key), `audience`, `local_revision`, sorted `hosts` (host, seq,
-id, revoked), `state_sha256`, `snapshot_sha256`, `evidence`, `match`, `reason`,
+id, revoked), `bootstrap`, `state_sha256`, `snapshot_sha256`, `evidence`, `match`, `reason`,
 and `approved: false`. `state_sha256` hashes the versioned complete high-water
 record, including sequence history and permanent key/name ownership. A human
 summary and confirmation prompt go to stderr. Bootstrap-marker presence is
 reported as evidence of prior acceptance; a partial marker, missing high water,
-or any orphan/pending/unrecognized file refuses. Never-used state also refuses;
-this command cannot bootstrap.
+or any orphan/pending/unrecognized file refuses in normal reconciliation.
+Never-used state requires the explicit bootstrap mode above.
 
-The command reads state without creating a lock file or calling its persistent
-Commit. It recomputes the pinned registry through the production Git verifier,
+Normal reconciliation reads state without creating a lock file or calling its
+persistent Commit. It recomputes the pinned registry through the production Git verifier,
 ancestry check and registrar loader, capturing proposed Commits only in
 memory. An isolated fresh preview derives state from the pin without trusting
 local history; its registrar `FirstUse` validation mode has only an in-memory
@@ -211,7 +242,7 @@ On a mismatch or interrupted-write fence, **leave the helper stopped** and
 retain the JSON report and error. Investigate against independently trusted
 registry history/backups. Repair or recovery is a separate privileged operator
 action outside this command; it must preserve monotonic history, tombstones and
-permanent ownership. No repair/reset/bootstrap switch is supplied. Do not clear
+permanent ownership. Bootstrap cannot repair/reset prior state. Do not clear
 evidence or edit approval/high-water files to force admission. After authorized
 recovery, rerun this same procedure; no file editing is part of reconciliation.
 

@@ -285,3 +285,46 @@ func TestNativeCanonicalRetainedArguments(t *testing.T) {
 		t.Fatal("canonical evidence replay lost result")
 	}
 }
+
+// Rotating the configured operator does not transfer the original registrar's
+// ephemeral-cleanup authority. Matching current operator/registrar beside the
+// same retired target can create the tombstone; neither case needs an act.
+func TestNativeOriginalRegistrar(t *testing.T) {
+	for _, original := range []bool{false, true} {
+		name := "different-registrar"
+		if original {
+			name = "original-registrar"
+		}
+		t.Run(name, func(t *testing.T) {
+			operator := Principal{uint32(os.Getuid()), nativeToken}
+			registrar := operator
+			if !original {
+				registrar.Generation = "prior-operator-generation"
+			}
+			b := fixtureBinding(30001)
+			b.Generation = nativeToken
+			f := nativeBase(t, registrar, nil, &b)
+			// Trusted config rotation in the fixture changes intake authority,
+			// not the registrar recorded by the earlier durable registration.
+			f.config.Operator = operator
+			f.native.Config.Operator = operator
+			f.generation.set(b.UID, "removed", nativeToken)
+			f.start()
+			c := nativeDial(t, f.server.ControlPath)
+			nativeNegotiate(t, c, 1)
+			before := nativeSnapshot(t, f)
+			nativeSend(t, c, nativeRequest(2, "revoke", control.Object{"registration_number": int64(1), "mode": "ephemeral", "operator_record": nil}))
+			want := Code("")
+			if !original {
+				want = "role_not_permitted"
+			}
+			nativeResponse(t, nativeReceive(t, c), nativeID(2), want)
+			if !original && !bytes.Equal(before, nativeSnapshot(t, f)) {
+				t.Fatal("operator rotation transferred cleanup authority")
+			}
+			if original && f.store.Snapshot()[0].Status != "revoked" {
+				t.Fatal("original registrar cleanup refused")
+			}
+		})
+	}
+}

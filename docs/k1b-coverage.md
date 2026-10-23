@@ -52,7 +52,7 @@ or production signed-act qualification.
 | No helper signing path | `TestNativeHelperUnsupported` | Unsupported response, unchanged state, zero instrumented Sign calls and own-pubkey control |
 | UID and generation operator authority | `TestNativeOperatorGeneration`, assigned wrong-UID vectors | Configured tuple, no wire role switch |
 | Exact self pubkey and register schema | `TestNativePubkeySelectors`, `TestNativeRegisterGuards` | Selector/schema/UID-range/target evidence refusals leave state unchanged; own-key/valid registration controls |
-| Ephemeral retirement | `TestNativeEphemeralRetirement` | Active/replaced targets refuse; exact retiring generation admits cleanup |
+| Ephemeral retirement | `TestNativeEphemeralRetirement`, `TestNativeOriginalRegistrar` | Active/replaced targets and changed registrar refuse; exact retiring/removed target plus original registrar admits cleanup |
 | Actual write barrier | `TestNativeReleaseFence/{hello,pubkey}/{retirement-wins,release-wins}` | Delayed notification isolates final authority barrier; retirement-wins has no success or retained result; release-wins orders write first |
 | Safe socket publication | `TestNativeSocketPermissions` | Invalid group/existing file/symlink/stage refuse; intact exact 0660/UID/GID; existing evidence preserved |
 | Shared work/rate and health | `TestNativeSharedConnectionBudget`, `TestNativeSharedWorkBudget`, `TestNativeSharedRateBudget`, `TestNativeAuditClosesBothSurfaces` | Mixed sockets share the eight-per-UID cap; saturated slots/rate refuse on both listeners; restored credit admits; sync fault closes both without success |

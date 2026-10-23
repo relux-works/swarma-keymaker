@@ -862,15 +862,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -880,7 +885,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "uid_not_permitted",
       "positive_control": "ok-helper-uid-absent",
@@ -899,15 +905,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_other"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_other"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -917,11 +928,12 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "name_not_permitted",
       "positive_control": "ok-helper-name-not-mapped",
-      "mutation_path": "/enrollment/uid_map/30001"
+      "mutation_path": "/enrollment/uid_map"
     },
     {
       "id": "helper-wrong-audience",
@@ -936,15 +948,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -954,7 +971,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "audience_mismatch",
       "positive_control": "ok-helper-wrong-audience",
@@ -973,15 +991,20 @@
           "available": false,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -991,7 +1014,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "enrollment_unavailable",
       "positive_control": "ok-helper-enrollment-missing",
@@ -1010,15 +1034,20 @@
           "available": true,
           "verified": false,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -1028,7 +1057,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "enrollment_unverified",
       "positive_control": "ok-helper-enrollment-unverified",
@@ -1047,15 +1077,20 @@
           "available": true,
           "verified": true,
           "state": "revoked",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -1065,7 +1100,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "host_revoked",
       "positive_control": "ok-helper-enrollment-revoked",
@@ -1085,10 +1121,12 @@
           "verified": true,
           "state": "active",
           "uid_map": null,
-          "names": [
-            "sample_core_worker"
-          ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -1098,7 +1136,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "uid_map_required",
       "positive_control": "ok-helper-map-required",
@@ -1117,15 +1156,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": false
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": false,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -1135,7 +1179,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "key_not_enrolled",
       "positive_control": "ok-helper-key-unenrolled",
@@ -1154,15 +1199,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -1172,7 +1222,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_code": "generation_mismatch",
       "positive_control": "ok-helper-reused-uid",
@@ -1341,6 +1392,322 @@
       "expected_code": "audit_unavailable",
       "positive_control": "ok-audit-sync-failure",
       "mutation_path": "/audit_sync_ok"
+    },
+    {
+      "id": "helper-revoked-binding-fresh-connection",
+      "claim": "A fresh helper connection cannot regain authority from uid_map after identity revocation.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "revoked",
+        "connection": "fresh"
+      },
+      "expected_code": "identity_revoked",
+      "positive_control": "ok-helper-revoked-binding-fresh-connection",
+      "mutation_path": "/binding_status"
+    },
+    {
+      "id": "helper-missing-binding",
+      "claim": "An active generation and mapped UID without a station binding cannot sign.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "absent",
+        "connection": "fresh"
+      },
+      "expected_code": "binding_not_found",
+      "positive_control": "ok-helper-missing-binding",
+      "mutation_path": "/binding_status"
+    },
+    {
+      "id": "helper-wrong-executable",
+      "claim": "v0 refuses executable-qualified rows instead of treating a procfs snapshot or UID alone as proof.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ],
+              "exe": "/usr/bin/client"
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh",
+        "observed_executable": "/usr/bin/other-client"
+      },
+      "expected_code": "enrollment_unsupported",
+      "positive_control": "ok-helper-wrong-executable",
+      "mutation_path": "/enrollment/uid_map"
+    },
+    {
+      "id": "helper-undeterminable-executable",
+      "claim": "v0 refuses executable-qualified rows instead of treating a procfs snapshot or UID alone as proof.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ],
+              "exe": "/usr/bin/client"
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh",
+        "observed_executable": null
+      },
+      "expected_code": "enrollment_unsupported",
+      "positive_control": "ok-helper-undeterminable-executable",
+      "mutation_path": "/enrollment/uid_map"
+    },
+    {
+      "id": "helper-matching-executable",
+      "claim": "v0 refuses executable-qualified rows instead of treating a procfs snapshot or UID alone as proof.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ],
+              "exe": "/usr/bin/client"
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh",
+        "observed_executable": "/usr/bin/client"
+      },
+      "expected_code": "enrollment_unsupported",
+      "positive_control": "ok-helper-matching-executable",
+      "mutation_path": "/enrollment/uid_map"
+    },
+    {
+      "id": "helper-name-slash",
+      "claim": "Registrar-aligned name syntax excludes slash before membership checks.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker/extra",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh"
+      },
+      "expected_code": "name_invalid",
+      "positive_control": "ok-helper-name-slash",
+      "mutation_path": "/request/params/name"
+    },
+    {
+      "id": "helper-mxid-length",
+      "claim": "Name byte bound includes configured audience and Matrix punctuation.",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh"
+      },
+      "expected_code": "name_invalid",
+      "positive_control": "ok-helper-mxid-length",
+      "mutation_path": "/request/params/name"
     }
   ],
   "positive": [
@@ -2099,15 +2466,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2117,7 +2489,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "mapped UID obtains registration envelope"
     },
@@ -2134,15 +2507,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2152,7 +2530,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "name mapped to caller obtains envelope"
     },
@@ -2169,15 +2548,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2187,7 +2571,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "configured audience obtains envelope"
     },
@@ -2204,15 +2589,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2222,7 +2612,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "available pinned enrollment obtains envelope"
     },
@@ -2239,15 +2630,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2257,7 +2653,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "verified pinned enrollment obtains envelope"
     },
@@ -2274,15 +2671,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2292,7 +2694,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "active enrollment obtains envelope"
     },
@@ -2309,15 +2712,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2327,7 +2735,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "required uid_map authorises own name"
     },
@@ -2344,15 +2753,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2362,7 +2776,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "enrolled host key obtains envelope"
     },
@@ -2379,15 +2794,20 @@
           "available": true,
           "verified": true,
           "state": "active",
-          "uid_map": {
-            "30001": [
-              "sample_core_worker"
-            ]
-          },
-          "names": [
-            "sample_core_worker"
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
           ],
-          "key_enrolled": true
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
         },
         "request": {
           "method": "sign_registration",
@@ -2397,7 +2817,8 @@
           },
           "request_id": "00000000000000000000000000000001",
           "timeout_ms": 2000
-        }
+        },
+        "binding_status": "active"
       },
       "expected_result": "explicitly admitted generation obtains envelope"
     },
@@ -2536,6 +2957,305 @@
         "binding_status": "active"
       },
       "expected_result": "synced audit permits signature release"
+    },
+    {
+      "id": "ok-helper-revoked-binding-fresh-connection",
+      "claim": "fresh connection with active binding and mapped name may sign",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh"
+      },
+      "expected_result": "fresh connection with active binding and mapped name may sign"
+    },
+    {
+      "id": "ok-helper-missing-binding",
+      "claim": "active bound station with mapped name may sign",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh"
+      },
+      "expected_result": "active bound station with mapped name may sign"
+    },
+    {
+      "id": "ok-helper-wrong-executable",
+      "claim": "UID-only row permits own binding/name; executable snapshot is not authority",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh",
+        "observed_executable": "/usr/bin/other-client"
+      },
+      "expected_result": "UID-only row permits own binding/name; executable snapshot is not authority"
+    },
+    {
+      "id": "ok-helper-undeterminable-executable",
+      "claim": "UID-only row permits own binding/name; executable snapshot is not authority",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh",
+        "observed_executable": null
+      },
+      "expected_result": "UID-only row permits own binding/name; executable snapshot is not authority"
+    },
+    {
+      "id": "ok-helper-matching-executable",
+      "claim": "UID-only row permits own binding/name; executable snapshot is not authority",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh",
+        "observed_executable": "/usr/bin/client"
+      },
+      "expected_result": "UID-only row permits own binding/name; executable snapshot is not authority"
+    },
+    {
+      "id": "ok-helper-name-slash",
+      "claim": "valid structured name uses registrar name semantics",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "sample_core_worker"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": []
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "sample_core_worker",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh"
+      },
+      "expected_result": "valid structured name uses registrar name semantics"
+    },
+    {
+      "id": "ok-helper-mxid-length",
+      "claim": "exact 255-byte mxid with explicitly mapped legacy name may sign",
+      "input": {
+        "evaluation": "registration_helper",
+        "surface": "control",
+        "peer_uid": 30001,
+        "generation": "00000000000000000000000000000001",
+        "admitted_generation": "00000000000000000000000000000001",
+        "enrollment": {
+          "available": true,
+          "verified": true,
+          "state": "active",
+          "uid_map": [
+            {
+              "uid": 30001,
+              "names": [
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              ]
+            }
+          ],
+          "names": {
+            "prefix": "sample_",
+            "explicit": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          },
+          "key_enrolled": true,
+          "host": "sample"
+        },
+        "request": {
+          "method": "sign_registration",
+          "params": {
+            "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "aud": "carrier.example.invalid"
+          },
+          "request_id": "00000000000000000000000000000001",
+          "timeout_ms": 2000
+        },
+        "binding_status": "active",
+        "connection": "fresh"
+      },
+      "expected_result": "exact 255-byte mxid with explicitly mapped legacy name may sign"
     }
   ]
 }

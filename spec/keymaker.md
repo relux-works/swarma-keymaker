@@ -19,7 +19,7 @@ Public design references (drafts remain drafts):
 - [CIP-0019, Carrier admission (draft)](https://github.com/relux-works/curator-spec/blob/a77686c8112d60841236f2107d7e085e48361f6e/cips/CIP-0019-carrier-admission-by-public-key.md): helper and enrollment constraints.
 - [CIP-0010, Credentials (draft)](https://github.com/relux-works/curator-spec/blob/a77686c8112d60841236f2107d7e085e48361f6e/cips/CIP-0010-credentials-setup-token-and-inherited-auth.md): identity keys and provider credentials have different authorities.
 - [Credential broker specification, section 13.1](https://github.com/relux-works/swarma-credential-broker/blob/ec7fb3d0670449b074521d51f3e03b59f0142a69/spec/broker.md#131-transport): Unix framing, canonical objects and deadlines.
-- [Registrar specification](https://github.com/relux-works/swarma-registrar/blob/main/spec/registrar.md): authority for `registration/1`, `enrollment/1`, signed envelopes and `uid_map` meaning. Its draft format-publication gaps gate integration.
+- [swarma-registrar spec/registrar.md (draft)](https://github.com/relux-works/swarma-registrar/blob/15b2604a9c8827c6f64365c15b45d0d933a08a1b/spec/registrar.md): authority for `registration/1`, `enrollment/1`, signed envelopes and `uid_map` meaning. This candidate aligns to sections 2–5 at that draft revision; changing constants requires a reviewed alignment update, not a silent deployment change.
 - [SLIP-0010](https://github.com/satoshilabs/slips/blob/master/slip-0010.md): Ed25519 hardened derivation and published test vectors 1 and 2.
 - [SSH agent protocol, draft-miller-ssh-agent-17](https://www.ietf.org/archive/id/draft-miller-ssh-agent-17.txt): protocol subset below; a work in progress, not an RFC.
 - [OpenSSH PROTOCOL.sshsig](https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.sshsig), sections 2–3: detached signature format and signed preimage.
@@ -253,7 +253,7 @@ binding mutation; permitted audit/refusal-budget writes are the only effects.
 | `pubkey` | No identity selector | Public key, path, registration number, epoch | Active peer's own bound identity only |
 | `register` | `target_uid`, `target_generation`, `owner`, `names`, `lifetime` | Public key, resolved path, new registration number, epoch | Configured operator UID/generation; target must be active and unbound |
 | `revoke` | `registration_number`, `mode`, `operator_record` | Retained identity tombstone and registration number | Operator; future dispatcher only for its own ephemeral registration |
-| `sign_registration` (native helper method only) | `name`, `aud` | Registrar envelope | Active peer whose kernel UID is explicitly allowed for the name in pinned enrollment |
+| `sign_registration` (native helper method only) | `name`, `aud` | Registrar envelope | Active peer with an active station binding whose kernel UID is explicitly allowed for the name in pinned enrollment |
 | `decrypt` | None accepted | `operation_unsupported` | Nobody in v0 |
 
 `names` has exactly `{purpose,product,project,agent}`; `purpose` must be
@@ -371,13 +371,15 @@ successful truncated-frame test. Zero length refuses `frame_malformed`.
 Payload MUST be one CCJ-1 canonical JSON object. Integers are decimal safe
 integers in `[-9007199254740991,9007199254740991]`; negative zero, fractions,
 exponents, duplicate members, invalid UTF-8/Unicode, extra documents and
-unknown schema members refuse. Object keys are lexicographically sorted by
-UTF-8 bytes, with no insignificant whitespace. Strings use UTF-8 directly,
+unknown schema members refuse. Object keys are sorted by Unicode scalar value
+(equivalent to UTF-8 byte order for valid scalar sequences), with no insignificant whitespace. Strings use UTF-8 directly,
 escape only quote/backslash and control characters (short `\b\t\n\f\r`
 where available, otherwise lowercase `\u00xx`); do not escape slash. No Unicode
-normalization is applied. These local canonical-byte assumptions MUST be
-checked against the platform CCJ-1 owner before activation; a differing CCJ-1
-definition gates both sockets rather than being silently accepted (Q5).
+normalization is applied. This codec matches the registrar draft section 2.1.
+Native socket frames deliberately require canonical bytes; the registrar HTTP
+receiver instead accepts noncanonical wire JSON and canonicalizes its values.
+This is an explicit transport distinction, not a different signed preimage
+codec. The scope of that distinction is recorded in Q5.
 
 First request (canonical bytes shown):
 
@@ -426,58 +428,107 @@ The exact params object is `{name,aud}`. Success is
 `{request_id,result:{envelope}}`, where `envelope` is the registrar-owned
 registration envelope. Typed failures use section 7's error object. Keymaker
 owns these helper method and result wrappers; the registrar owns the bytes
-inside `envelope`. The following body assumptions are **to align with registrar
-spec**, following the public CIP-0019 draft rather than publishing a competing
-signed format:
+inside `envelope`. The signed document is built using **swarma-registrar
+spec/registrar.md (draft)** sections 2–5 at the pinned reference in section 1;
+Keymaker does not own or duplicate that document schema. The alignment choices
+below are **to align with registrar spec** and must be rechecked if its draft
+changes:
 
-- Keymaker constructs the `registration/1` body itself from configured host
-  key, validated name/audience, CSPRNG 128-bit nonce and whole-second UTC
-  `iat`/`exp`, with a 120-second lifetime. It uses the registrar's canonical
-  envelope/preimage rules and returns the complete envelope. The client MUST
-  NOT supply body, nonce, timestamps, key, signature input or TTL overrides.
-- Public draft spelling is `swarma-registrar registration/1` plus newline and
-  canonical body; this is the only helper signing domain. Ed25519 is v0's
-  algorithm; the host key is the configured purpose-2 descendant in the
-  enrollment's valid `keys[]`. No P-256 emulation or agent-key substitution.
-- Pending registrar clarification, `sig` is unpadded base64url of the 64-byte
-  signature, key uses its draft `ed25519:` encoding, and nonce uses unpadded
-  base64url. Name grammar is lowercase `[a-z0-9][a-z0-9._=/-]{0,254}` without
-  `@` or server suffix, maximum 255 ASCII bytes; enrollment membership remains
-  mandatory even when this syntactic check passes. This bound/grammar is a
-  provisional helper restriction, not a change to the carrier standard.
-- Same-ID retry returns the same stored envelope while still valid and
-  authorised; after expiry it returns `request_expired`. A new ID is needed
-  for a fresh nonce. The nonce is distinct from the transport request ID.
-  Nonce generation failure is `entropy_unavailable`; uncertain time or clock
-  rollback is `clock_untrusted`. Do not mint an already-expired envelope.
+- The helper builds every registrar-defined body member itself: the fixed
+  type, configured purpose-2 public key, permitted name, configured audience,
+  independently generated 16-byte CSPRNG nonce, and whole-second UTC issue and
+  expiry times. It chooses the draft's maximum 120-second proof lifetime.
+  No caller-supplied key/body/nonce/time/TTL or signing bytes are accepted.
+- Use the registrar section 2.2 canonical body preimage, ID and signature
+  envelope, without a trailing newline. Ed25519 is v0's sole host algorithm;
+  its 32-byte public key, 64-byte signature and 16-byte nonce use the draft's
+  canonical unpadded base64url encodings. No P-256 or agent-key substitution.
+  The generated key/signature must satisfy the draft's strict Ed25519 rules.
+- Validate the requested name using the draft section 5 structured-name or
+  exact explicit-legacy rules, including its configured-audience mxid byte
+  bound, before audience comparison. The old permissive slash-containing
+  localpart proposal is withdrawn. Name and audience remain literal,
+  case-sensitive strings, with no normalization. A nonce is unrelated to the
+  native transport request ID.
+- Both issue time and release time must be inside the selected enrolled key's
+  half-open validity window; no skew extends key authority. Clock rollback or
+  unavailable trusted time refuses `clock_untrusted`; failed random generation
+  refuses `entropy_unavailable`. Revalidate expiry after audit and before
+  release, returning `request_expired` instead of an expired proof.
+- A same-ID native retry returns the retained envelope only while all current
+  binding/enrollment checks and proof expiry still permit it; it never mints
+  another nonce for that ID. The registrar may already have consumed that
+  nonce, so retry is not a guarantee of a second HTTP admission. A fresh
+  admission attempt needs a new native ID. This receiver distinction remains
+  an explicit Q5 integration test, not an exemption from registrar replay rules.
 
-Before every helper signature and release, Keymaker MUST load or revalidate
-a pinned, verified `enrollment/1` revision from a configured local path. It
-MUST NOT fetch the network or follow a mutable branch. Root-managed policy
-pins the registry commit and verification trust anchors; an agent-writable
-worktree or caller-supplied revision is invalid. Persist the greatest accepted
-sequence and revocation tombstones. Missing path/unreadable evidence refuses
-`enrollment_unavailable`; invalid signature/pin, rollback or unverified
-revision refuses `enrollment_unverified`; revoked state refuses `host_revoked`.
-Updates require explicit verified pin installation; removing a tombstone or
-restarting with an older revision cannot reactivate an enrollment.
+Before every helper signature and release, Keymaker MUST have the caller's
+active station identity binding for the current generation. Absence refuses
+`binding_not_found`; revocation refuses `identity_revoked`, including a fresh
+connection from the same still-active UID/generation. Binding revocation
+therefore also withdraws helper authority; uid_map alone never restores it.
+The in-flight/next-request release fence in section 3 applies to the helper.
+An already released proof cannot be recalled and remains subject to registrar
+checks and expiry. Re-registration of an unrelated identity is not implicit
+helper re-admission.
 
-`uid_map` is REQUIRED for station hosts. Absence refuses `uid_map_required`;
-an absent caller UID refuses `uid_not_permitted`; a name not mapped to the
-kernel UID refuses `name_not_permitted`. Group membership never supplies a
-fallback. Name must also be permitted by the enrollment's names policy.
-`aud` MUST byte-equal the configured server name (`audience_mismatch`).
-Unenrolled/wrong-purpose key refuses `key_not_enrolled`; validity-window
-failure is `key_not_valid_now`. An optional executable pin in a future
-uid_map contract MUST NOT be claimed enforceable from a request path string;
-such entries refuse `enrollment_unsupported` until qualified.
+Keymaker MUST revalidate the exact local registry pin and snapshot using the
+registrar draft sections 4.3–4.4. Both services use the same approved full
+commit object ID, audience, maintainer-key verification rule and separately
+pinned offline enrollment-publisher key. The draft's extra publisher pin is
+still a proposal: Q5 records that dependency, not an invented owner-device
+signature. No mutable branch, network fetch or agent-writable working copy
+is authority. Validate the whole historical snapshot, persist accepted
+revision/sequence/ID/tombstones atomically before use, and never continue
+signing from an old cache after a failed reload. Lost rollback evidence
+fences helper admission until external reconciliation.
+
+The local helper maps missing/unreadable registry evidence to
+`enrollment_unavailable`, unverifiable/invalid/rollback evidence to
+`enrollment_unverified`, and a verified host tombstone to `host_revoked`.
+Registrar loader diagnostics retain their registrar meanings; these mappings
+are helper response codes, not renamed document formats. A missing station
+uid_map refuses `uid_map_required`; no group fallback is available.
+
+Consume uid_map as the draft section 4.2 **array of objects**, not an object
+keyed by decimal UID strings. Resolve exactly one integer-UID row, then its
+explicit names list; an absent row refuses `uid_not_permitted`, a different
+name refuses `name_not_permitted`. Duplicate rows, cross-UID name ambiguity,
+invalid types or other schema violations refuse `enrollment_unverified`.
+The registrar owns the array/member bounds, optional `exe` syntax and name
+membership rules; Keymaker MUST validate those exact rules before enforcing
+peer authority. `aud` must match the configured server (`audience_mismatch`),
+and the purpose-2 key must be enrolled/current (`key_not_enrolled` or
+`key_not_valid_now`).
+
+**Executable-qualified entries: unsupported in v0.** A path supplied in the
+request is never executable evidence. On Linux, SO_PEERCRED's PID and a read
+of `/proc/<pid>/exe` would at most give a process/path snapshot. The opener
+may exit and its PID be reused; it may exec, fork or pass the connected file
+descriptor before an operation. A pidfd can narrow PID-reuse ambiguity but
+does not bind every later socket operation to an unchanged executable. A
+readlink comparison has no atomic coupling to request release and does not
+attest interpreter inputs or request proxies. No such race-safe attestation
+contract is implemented or qualified here.
+
+Consequently, if the matched UID row has `exe`, Keymaker MUST refuse
+`enrollment_unsupported` before any signature, even when an observed path
+matches. Wrong, undeterminable, inaccessible/deleted executable evidence and
+matching snapshots all refuse; Keymaker MUST NOT silently drop `exe` or fall
+back to UID-only authority. An unmatched row's optional exe does not grant
+or change the caller's authority. The enrollment can be valid registrar data
+while this local enforcement capability is unavailable. macOS executable
+attestation is likewise unqualified and refuses; its peer-credential support
+alone would not close this gap. Enabling executable-qualified rows requires
+a separately reviewed per-operation attestation and delegation model (Q12).
 
 The helper enforces account generations even though enrollment maps numeric
 UIDs. Reusing a UID MUST NOT reactivate old helper permission implicitly: the
 protected local enrollment-pin policy includes the admitted generation for
 each UID. A new generation requires explicit reviewed re-admission alongside
 its identity binding (`generation_mismatch` otherwise). This local guard is
-not an added enrollment/1 wire member. Publication with the registrar is Q5.
+not an added enrollment/1 wire member. This is a local narrowing rule to align with registrar spec; its shared
+qualification is tracked in Q5, without changing the registrar uid_map schema.
 Keymaker signs admission evidence; it never calls the homeserver, issues a
 JWT, logs a token, or promises that already-issued carrier sessions are ended
 by local revocation.
@@ -594,44 +645,82 @@ Missing/corrupt evidence or uncertain restore fences service admission.
 
 ## 12. Privileged Linux step: operator handoff
 
-This section is a proposed runbook for the infrastructure owner to execute
-as root after a reviewed v0 binary, fixtures and config are delivered. It is
-the privileged step handed to the keeper; **none of it was executed for this
-specification**. Commands and CLI entry points below are candidate installation
-requirements, not tools present today. Do not run them against an existing
-installation or reuse a production master for the integration fixture.
+These are proposed owner-run commands for reviewed v0 artifacts, not commands
+executed for this specification. The infrastructure owner provisions the
+service and a reusable test window once. Later integration runs are entirely
+unprivileged and never create/delete OS accounts. The host must have working
+local NSS, Bash, Python 3, sudo/visudo and the usual account-management tools.
+No daemon or integration runner is supplied by this spec-only repository.
 
-The reserved IDs below are examples for a fresh isolated test host. The
-guards MUST pass; collisions require selecting approved free service IDs,
-not renumbering existing users. The reviewed files must first be staged under
-`/var/tmp/keymaker-release`, owned by root, without station write access.
+### 12.1 Explicit preflight and dynamic service IDs
+
+Use a root Bash shell. Stage reviewed release files under
+`/var/tmp/keymaker-release`, root-owned and not writable by stations. Every
+name/path guard precedes the first mutation. Never renumber an existing entry.
+The allocator selects system IDs; no fixed numeric service UID/GID is assumed.
 
 ```sh
-set -eu
+set -euo pipefail
 test "$(id -u)" = 0
-! getent passwd swarma-keymaker
-! getent group swarma-keymaker
-! getent group swarma-registration
-! getent passwd 990
-! getent group 990
-! getent group 991
-groupadd --system --gid 990 swarma-keymaker
-groupadd --system --gid 991 swarma-registration
-useradd --system --uid 990 --gid swarma-keymaker --no-create-home \
+# runbook-check:begin guards
+require_absent() {
+  local lookup_status
+  if getent "$1" "$2" > /dev/null; then
+    printf 'collision: %s %s\n' "$1" "$2" >&2
+    exit 1
+  else
+    lookup_status=$?
+    if [ "$lookup_status" -ne 2 ]; then
+      printf 'lookup failed: %s %s (exit %s)\n' "$1" "$2" "$lookup_status" >&2
+      exit 1
+    fi
+  fi
+}
+# runbook-check:end guards
+# runbook-check:begin service-preflight
+require_absent passwd swarma-keymaker
+require_absent group swarma-keymaker
+require_absent group swarma-registration
+# runbook-check:end service-preflight
+for service_path in /etc/swarma-keymaker /var/lib/swarma-keymaker \
+  /var/log/swarma-keymaker /run/swarma-keymaker /usr/local/bin/keymaker \
+  /etc/systemd/system/swarma-keymaker.service; do
+  if [ -e "$service_path" ] || [ -L "$service_path" ]; then
+    printf 'existing installation path: %s\n' "$service_path" >&2
+    exit 1
+  fi
+done
+# runbook-check:begin service-allocation
+groupadd --system swarma-keymaker
+groupadd --system swarma-registration
+useradd --system --gid swarma-keymaker --no-create-home \
   --home-dir /var/lib/swarma-keymaker --shell /usr/sbin/nologin swarma-keymaker
+# runbook-check:end service-allocation
+SERVICE_UID=$(id -u swarma-keymaker)
+SERVICE_GID=$(getent group swarma-keymaker | cut -d: -f3)
+CONTROL_GID=$(getent group swarma-registration | cut -d: -f3)
 install -d -o root -g swarma-keymaker -m 0750 /etc/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/log/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0755 /run/swarma-keymaker
-test ! -e /var/lib/swarma-keymaker/master.seed
-test ! -L /var/lib/swarma-keymaker/master.seed
 umask 077
-head -c 32 /dev/urandom > /var/lib/swarma-keymaker/master.seed
+( set -o noclobber; head -c 32 /dev/urandom > /var/lib/swarma-keymaker/master.seed )
 chown swarma-keymaker:swarma-keymaker /var/lib/swarma-keymaker/master.seed
 chmod 0600 /var/lib/swarma-keymaker/master.seed
 install -o root -g root -m 0755 /var/tmp/keymaker-release/keymaker /usr/local/bin/keymaker
 install -o root -g swarma-keymaker -m 0640 \
   /var/tmp/keymaker-release/config.json /etc/swarma-keymaker/config.json
+python3 - "$SERVICE_UID" "$SERVICE_GID" "$CONTROL_GID" <<'PY'
+import json, sys
+path = '/etc/swarma-keymaker/config.json'
+with open(path) as f:
+    config = json.load(f)
+config.update(service_uid=int(sys.argv[1]), service_gid=int(sys.argv[2]),
+              control_gid=int(sys.argv[3]))
+with open(path, 'w') as f:
+    json.dump(config, f, sort_keys=True)
+    f.write('\n')
+PY
 install -o root -g swarma-keymaker -m 0640 \
   /var/tmp/keymaker-release/name-indices.json /etc/swarma-keymaker/name-indices.json
 install -o root -g swarma-keymaker -m 0640 \
@@ -641,8 +730,17 @@ install -o root -g root -m 0644 \
 systemctl daemon-reload
 ```
 
-The staged unit MUST have at least the following settings; the binary owns
-creation/modes of both sockets, including helper group lookup:
+`getent` exit 2 is the sole permitted absence result; success is a collision,
+and all other nonzero exits abort. The function accepts names or numeric keys;
+numeric collision cases are checked offline even though installation leaves
+ID selection to the system allocator. A partial provisioning failure requires
+owner inspection of its exact resources before retry, not bypassing guards.
+The config's `service_uid`, `service_gid` and `control_gid` are protected numeric
+pins; the daemon MUST verify them against the configured account/groups before
+readiness. Offline checker markers delimit actual runbook excerpts, not alternate
+implementations of these guards.
+
+The staged unit MUST contain these settings; the daemon owns socket creation:
 
 ```ini
 [Unit]
@@ -676,40 +774,197 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-Linux permits a socket's group to be changed only to an eligible group. The
-service account therefore needs the helper group as well as callers. The
-staged unit MUST add `SupplementaryGroups=swarma-registration`; root owns that
-membership. It conveys no extra file read authority. Without that setting,
-socket group setup MUST fail startup rather than fall back to 0666.
+The service needs the control socket group to assign that group without root.
+If group setup fails, startup MUST fail instead of making the socket 0666.
+Production `systemctl enable --now swarma-keymaker` remains gated on the real
+generation adapter, enrollment and operator-verifier qualifications.
 
-For the isolated multi-UID window, the future integration runner MUST accept
-these fixed CLI options. It creates an isolated daemon/config/journal fixture,
-uses a **public test seed** separate from the installation master, and drops
-privileges for all client calls. It MUST NOT mutate live generation records.
+### 12.2 Provision the reusable test window once
+
+The owner chooses an existing unprivileged runner account. The following are
+example test-account/group names, not constants in the integration runner.
+Use the same root Bash shell and `require_absent` function from section 12.1.
+Both test users are empty system accounts: no home creation, login shell or
+password. Their shared primary group is an existing unprivileged base group;
+only account A joins the new registration test group. The runner is not a
+member of that group and may assume it only through the constrained sudo rule.
+This test group is separate from the production service's control group.
 
 ```sh
-! getent passwd keymaker-test-a
-! getent passwd keymaker-test-b
-useradd --create-home --shell /usr/sbin/nologin keymaker-test-a
-useradd --create-home --shell /usr/sbin/nologin keymaker-test-b
-usermod -a -G swarma-registration keymaker-test-a
-usermod -a -G swarma-registration keymaker-test-b
-install -d -o root -g root -m 0700 /var/tmp/keymaker-integration
-/var/tmp/keymaker-release/keymaker-integration \
-  --client-a-uid "$(id -u keymaker-test-a)" \
-  --client-b-uid "$(id -u keymaker-test-b)" \
-  --service-user swarma-keymaker \
-  --work-dir /var/tmp/keymaker-integration \
-  --report /var/tmp/keymaker-integration/report.json
+set -euo pipefail
+test "$(id -u)" = 0
+: "${RUNNER_USER:?set an existing unprivileged test-runner account}"
+BASE_GROUP=nogroup
+WINDOW_STATE=/var/lib/swarma-keymaker-test-window
+WINDOW_SUDOERS=/etc/sudoers.d/swarma-keymaker-test-window
+RUNNER_CONFIG=/etc/swarma-keymaker-test-window.json
+# runbook-check:begin window-preflight
+TEST_A=platform-test-a
+TEST_B=platform-test-b
+TEST_GROUP=platform-test-reg
+require_absent passwd "$TEST_A"
+require_absent group "$TEST_A"
+require_absent passwd "$TEST_B"
+require_absent group "$TEST_B"
+require_absent group "$TEST_GROUP"
+# runbook-check:end window-preflight
+case "$RUNNER_USER" in ''|*[!a-z0-9_-]*) exit 1 ;; esac
+RUNNER_UID=$(id -u "$RUNNER_USER")
+test "$RUNNER_UID" -ne 0
+getent group "$BASE_GROUP" > /dev/null
+BASE_GID=$(getent group "$BASE_GROUP" | cut -d: -f3)
+test "$BASE_GID" -ne 0
+for window_path in "$WINDOW_STATE" "$WINDOW_SUDOERS" "$RUNNER_CONFIG"; do
+  if [ -e "$window_path" ] || [ -L "$window_path" ]; then
+    printf 'existing window path: %s\n' "$window_path" >&2
+    exit 1
+  fi
+done
+install -d -o root -g root -m 0700 "$WINDOW_STATE"
+# runbook-check:begin window-allocation
+groupadd --system "$TEST_GROUP"
+useradd --system --no-create-home --no-user-group --gid "$BASE_GROUP" \
+  --home-dir /nonexistent --shell /usr/sbin/nologin "$TEST_A"
+useradd --system --no-create-home --no-user-group --gid "$BASE_GROUP" \
+  --home-dir /nonexistent --shell /usr/sbin/nologin "$TEST_B"
+# runbook-check:end window-allocation
+usermod -a -G "$TEST_GROUP" "$TEST_A"
+# useradd without a password creates a locked account; verify, never print hashes.
+for test_account in "$TEST_A" "$TEST_B"; do
+  account_status=$(passwd -S "$test_account")
+  case "$account_status" in "$test_account L "*) ;; *) exit 1 ;; esac
+done
+TEST_A_UID=$(id -u "$TEST_A")
+TEST_B_UID=$(id -u "$TEST_B")
+TEST_GROUP_GID=$(getent group "$TEST_GROUP" | cut -d: -f3)
+TEST_A_ENTRY=$(getent passwd "$TEST_A" | cut -d: -f1,3-7)
+TEST_B_ENTRY=$(getent passwd "$TEST_B" | cut -d: -f1,3-7)
+TEST_GROUP_ENTRY=$(getent group "$TEST_GROUP" | cut -d: -f1,3,4)
+test "$(printf '%s\n' "$TEST_GROUP_ENTRY" | cut -d: -f3)" = "$TEST_A"
+printf '%s ALL=(%s,%s) NOPASSWD: ALL\n%s ALL=(%s:%s) NOPASSWD: ALL\n' \
+  "$RUNNER_USER" "$TEST_A" "$TEST_B" \
+  "$RUNNER_USER" "$RUNNER_USER" "$TEST_GROUP" > "$WINDOW_STATE/sudoers.candidate"
+visudo -cf "$WINDOW_STATE/sudoers.candidate"
+install -o root -g root -m 0440 "$WINDOW_STATE/sudoers.candidate" "$WINDOW_SUDOERS"
+python3 - "$RUNNER_USER" "$RUNNER_UID" "$TEST_A" "$TEST_A_UID" \
+  "$TEST_B" "$TEST_B_UID" "$TEST_GROUP" "$TEST_GROUP_GID" "$RUNNER_CONFIG" <<'PY'
+import json, sys
+r, ru, a, au, b, bu, g, gi, path = sys.argv[1:]
+with open(path, 'x') as f:
+    json.dump(dict(runner_user=r, runner_uid=int(ru), client_a=a, client_a_uid=int(au),
+                   client_b=b, client_b_uid=int(bu), registration_group=g,
+                   registration_gid=int(gi)), f, sort_keys=True)
+    f.write('\n')
+PY
+chown root:root "$RUNNER_CONFIG"
+chmod 0644 "$RUNNER_CONFIG"
+SUDOERS_DIGEST=$(sha256sum "$WINDOW_SUDOERS" | cut -d' ' -f1)
+CONFIG_DIGEST=$(sha256sum "$RUNNER_CONFIG" | cut -d' ' -f1)
+# Root-only provenance excludes password fields; %q is Bash shell quoting.
+for variable in RUNNER_USER RUNNER_UID TEST_A TEST_B TEST_GROUP TEST_A_UID \
+  TEST_B_UID TEST_GROUP_GID TEST_A_ENTRY TEST_B_ENTRY TEST_GROUP_ENTRY \
+  WINDOW_SUDOERS RUNNER_CONFIG SUDOERS_DIGEST CONFIG_DIGEST; do
+  printf '%s=%q\n' "$variable" "${!variable}"
+done > "$WINDOW_STATE/window.env"
+chmod 0600 "$WINDOW_STATE/window.env"
 ```
 
-The runner must emit each test's name, candidate/toolchain identity, actual
-verdict and exit code. Owner cleanup is a separate explicit action after all
-recorded daemon/client PIDs are stopped and the report is retained. No cleanup
-command in this spec authorises deletion of an existing user or live data.
-Production `systemctl enable --now swarma-keymaker` is permitted only after
-the generation adapter, enrollment verification and signed-act gates are
-qualified; synthetic test-source success cannot open that gate.
+The sudoers rules have no root Runas target. They permit commands only as the
+two test accounts, or as the runner with the test registration group; this is
+an intentional capability to execute arbitrary fixture clients under those
+unprivileged identities. Do not add the runner to a root/sudo group, use a
+wildcard Runas identity or grant a root helper. Account A alone has standing
+test-group membership. No production identity, enrollment or secret is used.
+If allocation fails partway, the owner must reconcile that partial window
+before rerunning; a missing provenance record never authorizes deletion.
+
+### 12.3 Verify and run as the unprivileged runner
+
+Read the test names and numeric pins from the root-owned runner configuration;
+the runner MUST refuse changed ownership/IDs or an unexpected current UID.
+For the example names the owner's runner-account verification is:
+
+```sh
+sudo -n -u platform-test-a -- /usr/bin/id -u
+sudo -n -u platform-test-b -- /usr/bin/id -u
+sudo -n -u "$(id -un)" -g platform-test-reg -- /usr/bin/id -g
+```
+
+The first two results MUST equal `client_a_uid` and `client_b_uid` in config,
+and the third MUST equal `registration_gid`. Tests also check A's group list
+contains that GID and B's does not. Missing sudo permission is PENDING, not a
+skipped or passing multi-UID qualification.
+
+The future runner starts its own daemon fixture as itself, using
+`sudo -n -u <configured-runner> -g <configured-test-group>` where needed for
+socket group setup. Clients use `sudo -n -u <configured-account> -- <client>`.
+The fixture uses only a public test seed and runner-owned state; it MUST NOT
+read production service paths or run under the production service account.
+Its test generation journal is synthetic and proves no production adapter.
+Configuration, not code, supplies all account/group names. The planned CLI is:
+
+```sh
+: "${RUNNER_SCRATCH:?set a private scratch parent owned by the runner}"
+: "${REPORT_PATH:?set a report path outside the fixture work directory}"
+WORK_DIR=$(mktemp -d "${RUNNER_SCRATCH%/}/keymaker-it.XXXXXXXX")
+keymaker-integration run --config /etc/swarma-keymaker-test-window.json \
+  --work-dir "$WORK_DIR" --report "$REPORT_PATH"
+keymaker-integration cleanup --config /etc/swarma-keymaker-test-window.json \
+  --work-dir "$WORK_DIR" --retained-report "$REPORT_PATH"
+```
+
+The runner exposes only its socket subdirectory for traversal by the two
+clients; secret/state directories stay 0700. Cleanup MUST validate a
+runner-owned creation manifest containing the work directory's canonical path,
+UID, device/inode and per-run random token. It MUST stop only recorded child
+PIDs whose UID, process-start identity and run token still match, and await
+termination. A reused/mismatched PID or directory identity refuses cleanup;
+never kill by name or assume the current occupant is the original child.
+The retained report must be durable and outside the work directory before
+removing only that manifest-owned tree. Cleanup MUST NOT delete OS accounts,
+groups, global sockets or other runs' files. These runner operations are
+future v0 requirements, not an existing executable or proof of safe deletion.
+
+### 12.4 Owner rollback of the one-time window
+
+First finish fixture cleanup as the runner. The owner then uses root Bash:
+
+```sh
+set -euo pipefail
+test "$(id -u)" = 0
+WINDOW_STATE=/var/lib/swarma-keymaker-test-window
+test ! -L "$WINDOW_STATE"
+test "$(stat -c '%u:%a' "$WINDOW_STATE")" = 0:700
+test ! -L "$WINDOW_STATE/window.env"
+test "$(stat -c '%u:%a' "$WINDOW_STATE/window.env")" = 0:600
+. "$WINDOW_STATE/window.env"
+# Exact recorded directory/account/group identities must still belong to this window.
+CURRENT_A=$(getent passwd "$TEST_A" | cut -d: -f1,3-7)
+CURRENT_B=$(getent passwd "$TEST_B" | cut -d: -f1,3-7)
+CURRENT_GROUP=$(getent group "$TEST_GROUP" | cut -d: -f1,3,4)
+test "$CURRENT_A" = "$TEST_A_ENTRY"
+test "$CURRENT_B" = "$TEST_B_ENTRY"
+test "$CURRENT_GROUP" = "$TEST_GROUP_ENTRY"
+test ! -L "$WINDOW_SUDOERS"
+test ! -L "$RUNNER_CONFIG"
+CURRENT_SUDOERS_DIGEST=$(sha256sum "$WINDOW_SUDOERS" | cut -d' ' -f1)
+CURRENT_CONFIG_DIGEST=$(sha256sum "$RUNNER_CONFIG" | cut -d' ' -f1)
+test "$CURRENT_SUDOERS_DIGEST" = "$SUDOERS_DIGEST"
+test "$CURRENT_CONFIG_DIGEST" = "$CONFIG_DIGEST"
+rm -- "$WINDOW_SUDOERS"
+visudo -c
+# No --remove: the accounts had no homes; userdel refuses a still-used account.
+userdel -- "$TEST_A"
+userdel -- "$TEST_B"
+groupdel -- "$TEST_GROUP"
+rm -- "$RUNNER_CONFIG" "$WINDOW_STATE/sudoers.candidate" "$WINDOW_STATE/window.env"
+rmdir -- "$WINDOW_STATE"
+```
+
+Changed records, absent provenance, active processes or unexpected leftover
+files stop rollback and require owner inspection. No recursive deletion,
+pattern kill, existing unrelated account deletion or UID renumbering is
+permitted by this procedure. The external retained test report is preserved.
 
 ## 13. Tests and vector evidence
 
@@ -738,7 +993,10 @@ first and controls second; a reject-all implementation MUST fail controls.
 | `TestSSHSIGSubset` | Reject raw/userauth/other namespace/trailing/flags/host key; valid Git preimage signs | Planned; concrete packets present |
 | `TestNativeFramingAndCanonicalBytes` | Oversize refused from header; EOF detected; noncanonical/unknown-version rejected | Planned; concrete packets present |
 | `TestRegisterRevokeAuthority` | Wrong caller and persistent ephemeral-style revoke cannot mutate state; signed operator control succeeds | Planned; verifier is a publication gate |
-| `TestHelperEnrollmentAndUIDMap` | Absent/unverified/revoked enrollment, missing map/UID, wrong name/aud cannot sign | Planned; fixture present |
+| `TestHelperEnrollmentAndUIDMap` | Absent/unverified/revoked enrollment, missing map/UID, wrong name/aud cannot sign | Planned; registrar-array fixtures present |
+| `TestHelperRevokedBindingFreshConnection` | A fresh helper connection cannot reuse uid_map after its identity is revoked | Planned; paired fixture present |
+| `TestHelperExecutableQualifiedRefusal` | Wrong, unavailable and matching executable snapshots never activate an exe-qualified row in v0 | Planned; UID-only positive controls paired with three qualified-row refusals |
+| `TestRunbookCollisionBeforeMutation` | Actual shell preflight stops name/ID collisions and lookup errors before stub mutations; absent lookups proceed | Offline checker available; no root or account writes |
 | `TestDomainSeparation` | Registration bytes rejected on A and no B arbitrary-sign path | Planned; fixture present |
 | `TestAuditFailureAndRecovery` | Failed append/sync returns no signature, mutation intent replays without duplicates | Planned; fixture plus fault injection required |
 | `TestPeerCredentialsCurrentUID` | Real SO_PEERCRED reports current test UID and valid binding succeeds | PENDING v0 binary; needs no root, no cross-UID claim |
@@ -775,10 +1033,10 @@ tests in this initial repository. Future rework MUST retain them by name.
    additionally needs a verified signed operator act; missing verifier refuses.
 4. **Q4 — decided:** repository/module is `swarma-keymaker`,
    role is per-station key custody, lore name Keymaker; no module rename.
-5. **Q5 — registrar/CCJ-1 publication gate:** agree exact signed body bytes,
-   signature representation, name grammar/length, helper result nesting,
-   retry/expiry, pin update/freshness and UID-generation re-admission guard.
-   Local assumptions in sections 7–8 MUST be resolved against the owner.
+5. **Q5 — registrar draft alignment gate:** sections 2–5 of the cited draft
+   now define the body/envelope, CCJ-1, names, uid_map arrays and snapshot pins.
+   Remaining differences/proposals are enumerated in UNRESOLVED_QUESTIONS.md;
+   revised draft constants require explicit consumer re-qualification.
 6. **Q6 — generation-source gate:** publish authoritative journal adapter,
    operator-principal generations and retirement/release ordering. Production
    stub denies all dependent operations. An isolated fixture proves no live
@@ -794,9 +1052,13 @@ tests in this initial repository. Future rework MUST retain them by name.
 10. **Q10 — later-format gate:** external owner root attestation, planned
     rotation and compromise/reissue records need publication and qualification;
     they are hooks only in v0. macOS/TPM are separate qualification work.
-11. **Q11 — privileged evidence gate:** owner supplies section 12's isolated
-    multi-UID window and reviewed v0 artifacts; no root action or service
-    deployment is part of this spec-only slice.
+11. **Q11 — privileged evidence gate:** owner pre-provisions section 12's
+    reusable two-UID window and constrained non-root sudo; no privileged action
+    or service deployment is part of this spec-only slice.
+12. **Q12 — executable-qualified capability:** registrar-valid exe rows are
+    refused locally in v0, including matching snapshots. A future design must
+    qualify per-operation executable identity and descriptor delegation, not
+    rely on a racy procfs path comparison.
 
 No surface table was supplied with this specification assignment; a later
 implementation brief must enumerate its acceptance surfaces and coverage map.

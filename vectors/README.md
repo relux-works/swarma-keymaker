@@ -4,7 +4,7 @@ All seeds, names, UIDs and keys here are invented or published test data.
 Never use these seeds or their descendants for an installation.
 
 Run negatives first, then the positive controls. `refusals.json` contains
-63 stable refusal IDs and 63 explicitly paired controls. Each pair differs
+70 stable refusal IDs and 70 explicitly paired controls. Each pair differs
 at exactly one input field (`mutation_path`, a JSON pointer). Frame tests
 change a single `frame_hex` field containing complete wire bytes; they do not
 pretend a protocol packet is one semantic member. Array-valued fields count
@@ -13,7 +13,7 @@ no binding/enrollment mutations, apart from permitted bounded audit writes.
 
 | File | Coverage |
 | --- | --- |
-| `refusals.json` | Foreign peer, inactive/reused generations, unavailable source, open-connection revoke/retire races at release and next request, hardened paths and purposes, SSHSIG restrictions and rejected agent mutations, concrete native malformed frames, operator register/revoke authority, mandatory uid_map and pinned enrollment, domain separation, private-material request rejection and audit failure |
+| `refusals.json` | Foreign peer, inactive/reused generations, unavailable source, open-connection revoke/retire races at release and next request, hardened paths and purposes, SSHSIG restrictions and rejected agent mutations, concrete native malformed frames, operator register/revoke authority, mandatory registrar-array uid_map and pinned enrollment, revoked/missing helper binding, executable-qualified refusal, registrar name bounds, domain separation, private-material request rejection and audit failure |
 | `slip0010-ed25519.json` | Public SLIP-0010 Ed25519 test vectors 1 and 2: all six nodes each, expected chain code and SLIP-encoded public key; source URL and source SHA-256 retained |
 | `keymaker-paths.json` | Fixed public 32-byte seed, explicit scoped registry and five name → path → Ed25519/SSH public-key examples; purpose and ancestor separation |
 
@@ -24,6 +24,15 @@ connection phase and operator-verifier verdicts are trusted **harness inputs**,
 never native request members. These fixtures are candidate policy expectations,
 not a service implementation. The `operator_record` fixture is an interface
 stand-in, not a published signed-act format.
+
+Helper `enrollment` inputs are harness views of a validated snapshot, with
+availability/verifier facts alongside the registrar-shaped `uid_map` array and
+names policy. They are not enrollment envelopes. Binding status is a separate
+local fact. Wrong, undeterminable and matching executable snapshots each pair
+an exe-qualified row (refused `enrollment_unsupported`) with a UID-only row
+that can sign. The single changed field is the array, treated as one input
+field; executable evidence is unchanged within each pair. No positive control
+claims that a procfs path comparison qualifies executable enforcement.
 
 `before_release` means revoke/retire is committed before the request's final
 release fence. `next_request` means the same accepted connection sends again

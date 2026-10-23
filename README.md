@@ -16,17 +16,21 @@ The proposed Linux v0 and publication gates are in
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
 | `tools/vectors/` | Reproducible Go derivation generator and fixture checks |
+| `tools/runbook-check/` | Offline regression of the specification's shell guards, using stubs |
 | `UNRESOLVED_QUESTIONS.md` | Index of decisions and activation gates |
 
 ## Tools
 
-Run commands from the repository root. The tool uses only the Go standard
-library (Go 1.26); no network or service credentials are needed.
+Run commands from the repository root. Both tools use only the Go standard
+library (Go 1.26); the runbook check also needs Bash. No network, root,
+account-management commands or service credentials are used by these checks.
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
 | Go | Check published SLIP-0010 controls, regenerate in memory and compare: `go run ./tools/vectors/main.go -check` | Summary on stdout; refuses mismatched fixtures |
 | Go | Regenerate Keymaker derivation examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
+| Go + Bash | Check actual marked shell preflights with stubbed NSS and mutations: `go run ./tools/runbook-check/main.go -check` | Named regression verdicts on stdout; no host writes |
+| Go + Bash | Plant the inverted-getent regression in memory: `go run ./tools/runbook-check/main.go -plant` | Expected nonzero exit 1 naming `TestRunbookCollisionBeforeMutation`; production files unchanged |
 | Python 3 | Check all JSON: `python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("vectors").glob("*.json")]'` | Exit status; no files |
 | Git | Inspect scope: `git diff --check`; verify signed commits: `git log --format="%h %G?"` | Diagnostics on stdout |
 

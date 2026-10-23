@@ -1,0 +1,29 @@
+[Unit]
+Description=Local identity key custody
+After=local-fs.target
+[Service]
+Type=simple
+User=swarma-keymaker
+Group=swarma-keymaker
+SupplementaryGroups=swarma-registration
+ExecStart=/usr/local/bin/keymaker serve --config /etc/swarma-keymaker/config.json
+RuntimeDirectory=swarma-keymaker
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/swarma-keymaker /var/log/swarma-keymaker /run/swarma-keymaker
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+LimitNOFILE=512
+MemoryMax=256M
+TasksMax=64
+CPUQuota=100%
+Restart=on-failure
+[Install]
+WantedBy=multi-user.target

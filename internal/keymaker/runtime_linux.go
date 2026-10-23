@@ -3,7 +3,6 @@
 package keymaker
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -31,42 +30,7 @@ func ServeProduction(ctx context.Context, config string, status io.Writer) error
 	return serveConfigured(ctx, config, status, generation)
 }
 
-type productionConfig struct {
-	Registration     *registrationConfig `json:"registration_helper,omitempty"`
-	SocketDir        string              `json:"socket_dir"`
-	StateDir         string              `json:"state_dir"`
-	MasterFile       string              `json:"master_file"`
-	RegistryFile     string              `json:"registry_file"`
-	ServiceUID       uint32              `json:"service_uid"`
-	ServiceGID       uint32              `json:"service_gid"`
-	ControlGID       uint32              `json:"control_gid"`
-	Operator         Principal           `json:"operator_principal"`
-	Epoch            string              `json:"master_epoch"`
-	RegistryRevision string              `json:"registry_revision"`
-}
-
-// Zero is a possible numeric principal/group, never evidence that a member was
-// configured. Reject omitted authority fields before typed decoding defaults.
-func (cfg *productionConfig) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper")
-	if err != nil {
-		return err
-	}
-	if _, err := objectMembers(fields["operator_principal"], []string{"uid", "generation"}); err != nil {
-		return err
-	}
-	if raw, ok := fields["registration_helper"]; ok {
-		helper, err := objectMembers(raw, []string{"names", "enrollment_config", "approval_file"})
-		if err != nil {
-			return err
-		}
-		if _, err := objectMembers(helper["names"], []string{"purpose", "product", "project", "agent"}); err != nil {
-			return err
-		}
-	}
-	type plain productionConfig
-	return StrictJSON(bytes.NewReader(raw), (*plain)(cfg))
-}
+type productionConfig = Config
 
 func serveConfigured(ctx context.Context, path string, status io.Writer, generation GenerationSource) error {
 	var cfg productionConfig

@@ -1,0 +1,15 @@
+{
+  "socket_dir": "/run/swarma-keymaker",
+  "state_dir": "/var/lib/swarma-keymaker/state",
+  "master_file": "/var/lib/swarma-keymaker/master.seed",
+  "registry_file": "/etc/swarma-keymaker/name-indices.json",
+  "service_uid": 0,
+  "service_gid": 0,
+  "control_gid": 0,
+  "master_epoch": "REPLACE_WITH_PINNED_MASTER_EPOCH",
+  "registry_revision": "REPLACE_WITH_PINNED_REGISTRY_REVISION",
+  "operator_principal": {
+    "uid": 0,
+    "generation": "REPLACE_WITH_OPERATOR_GENERATION"
+  }
+}

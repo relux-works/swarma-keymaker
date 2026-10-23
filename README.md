@@ -51,6 +51,8 @@ freshness, exclusion and lifecycle qualification remain open activation gates.
 | `docs/k1b-coverage.md` | Native/helper daemon coverage, recovery limits and pending deployment gates |
 | `docs/linux-testing.md` | Test isolation, window configuration and remaining qualification gates |
 | `tools/mutations/` | Bounded authorization, recovery and refusal control plants using Go overlays |
+| `packaging/` | Exact specification unit and real daemon example config; [fields, bundle contract and dependency gates](packaging/README.md) |
+| `tools/release-bundle/` | Offline clean-commit binary, validated inputs and SHA256SUMS assembly; no installation |
 | `tools/vectors/` | Reproducible derivation generator and fixture checks |
 | `tools/runbook-check/` | Offline specification shell-guard checks using stubs |
 | `UNRESOLVED_QUESTIONS.md` | Specification decisions and activation gates |
@@ -84,6 +86,11 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Vet enrollment authority: `go vet ./internal/enrollment` | Diagnostics on stdout/stderr |
 | gofmt | Check enrollment formatting: `gofmt -l internal/enrollment/*.go` | Empty output expected |
 | Git + OpenSSH | Production uses `/usr/bin/git cat-file` and `merge-base --is-ancestor`; fixture tests invoke `/usr/bin/ssh-keygen -t ed25519` and Git `commit-tree -S` | Local objects and temporary test-only keys; no network or inherited SSH agent |
+| Go | Packaging parser and unit checks: `go test ./internal/keymaker -run '^TestPackagingConfig' -count=1`; `go test ./tools/release-bundle -count=1` | Paired refusals, clean-clone fixtures and one offline real build under TMPDIR |
+| Go | Packaging static checks: `go vet ./tools/release-bundle ./internal/keymaker`; `gofmt -l tools/release-bundle/*.go internal/keymaker/config_linux*.go internal/keymaker/runtime_linux.go` | Diagnostics; empty formatting output expected |
+| Go | Build offline assembler: `go build -trimpath -o "$SCRATCH/release-bundle" ./tools/release-bundle` | Tool binary under scratch |
+| release-bundle | Assemble: `"$SCRATCH/release-bundle" -repo "$SOURCE" -commit "$COMMIT" -version "$VERSION" -target "$BUNDLE" -config "$CONFIG" -name-indices "$REGISTRY"` | New offline bundle directory; all temporary build work remains inside it |
+| sha256sum | Verify before the root step: `(cd "$BUNDLE" && sha256sum -c SHA256SUMS)` | Every listed file must report OK; exit 0 required |
 | Go | Test the native wire layer: `go test ./internal/control/...` | Test verdicts; temporary sockets cleaned by tests |
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |
@@ -245,3 +252,19 @@ The existing compiled window runner selects `^TestMultiUID`, including helper
 cases. Without configured provisioning it still returns exact PENDING/status 3;
 compilation does not qualify real foreign-UID execution. Follow the existing
 fixture HOME/no SSH_AUTH_SOCK isolation and keep artifacts in task scratch.
+
+## Offline release handoff
+
+Set SOURCE to a clean checkout at the full reviewed COMMIT and VERSION to its
+`keymaker version` string. Set BUNDLE to a new directory under an existing
+operator-controlled scratch parent, outside SOURCE and system paths. CONFIG and
+REGISTRY are regular operator-supplied files; the
+[packaging contract](packaging/README.md) documents every member and refusal.
+
+After assembly, verify SHA256SUMS with the exact command in the Tools table
+before handing files to the owner. Follow only
+[specification section 12.1](spec/keymaker.md#121-explicit-preflight-and-dynamic-service-ids)
+for protected staging and the root step. This baseline omits enrollment.json and
+refuses any supplied enrollment input until PR #5's validator is integrated.
+The control socket and later operator field depend on PR #6. Production activation
+remains gated; this tool does not install or run a service.

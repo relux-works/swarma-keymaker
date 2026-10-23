@@ -171,6 +171,7 @@ type Journal struct {
 	totalLimit   int64
 	reserve      int64
 	clock        AuditClock
+	binding      bindingCommit
 }
 
 func auditDigest(r AuditRecord) (string, error) {
@@ -195,6 +196,11 @@ func OpenJournal(dir *os.File, uid uint32) (*Journal, error) {
 	return openJournal(dir, uid, systemAuditClock{}, rand.Reader)
 }
 func openJournal(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader) (*Journal, error) {
+	return openJournalChecked(dir, uid, clock, entropy, nil)
+}
+
+// The callback runs after read-only replay and before opening/creating a writer.
+func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader, check func(*Journal) error) (*Journal, error) {
 	j := &Journal{dir: dir, uid: uid, segment: 1, first: 1, segmentLimit: 64 << 20, totalLimit: (1 << 30) + (16 << 20), reserve: 16 << 20, clock: clock}
 	var nonce [16]byte
 	if _, e := io.ReadFull(entropy, nonce[:]); e != nil {
@@ -263,6 +269,9 @@ func openJournal(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader) 
 			if e != nil || e2 != nil || !bytes.Equal(b, line) || r.Seq != j.seq+1 || r.Previous != j.previous || r.Digest != digest {
 				return nil, failure("audit continuity failure")
 			}
+			if err := j.observeBinding(r); err != nil {
+				return nil, err
+			}
 			j.seq = r.Seq
 			j.previous = r.Digest
 		}
@@ -295,6 +304,11 @@ func openJournal(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader) 
 	}
 	if len(names) != 0 {
 		return nil, failure("orphan audit seal")
+	}
+	if check != nil {
+		if err := check(j); err != nil {
+			return nil, err
+		}
 	}
 	flags := syscall.O_WRONLY | syscall.O_APPEND
 	if len(segments) == 0 || j.segment > uint64(len(segments)) {
@@ -348,6 +362,9 @@ func (j *Journal) rotate() error {
 func (j *Journal) Append(r AuditRecord) Code {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	return j.appendLocked(r)
+}
+func (j *Journal) appendLocked(r AuditRecord) Code {
 	if j.failed {
 		return "audit_unavailable"
 	}
@@ -394,6 +411,10 @@ func (j *Journal) Append(r AuditRecord) Code {
 		return "audit_unavailable"
 	}
 	if j.writer.Sync() != nil {
+		j.failed = true
+		return "audit_unavailable"
+	}
+	if j.observeBinding(r) != nil {
 		j.failed = true
 		return "audit_unavailable"
 	}

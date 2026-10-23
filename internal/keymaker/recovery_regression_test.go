@@ -2,7 +2,6 @@ package keymaker
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,23 +34,12 @@ func TestMissingSnapshotRecovery(t *testing.T) {
 				t.Fatal(c)
 			}
 			auditPath := filepath.Join(d, "audit")
-			if err = os.Mkdir(auditPath, 0700); err != nil {
-				t.Fatal(err)
-			}
-			adir, err := OpenDirectory(auditPath, uid, 0700)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer adir.Close()
-			j, err := OpenJournal(adir, uid)
-			if err != nil {
-				t.Fatal(err)
-			}
+			j := s.journal
 			code := Code("identity_revoked")
 			if c = j.Append(AuditRecord{Surface: "agent", Operation: "sign", Result: "refused", RefusalCode: &code, PeerUID: &b.UID, Generation: &b.Generation, Path: &b.Path, Epoch: &b.Epoch}); c != "" {
 				t.Fatal(c)
 			}
-			j.Close()
+			s.Close()
 			snapshot := filepath.Join(d, "bindings.json")
 			if damage == "missing" {
 				if err = os.Remove(snapshot); err != nil {
@@ -67,6 +55,14 @@ func TestMissingSnapshotRecovery(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Isolate the primitive missing-file guard as well as the paired
+			// opener; the latter independently refuses mismatched journal state.
+			if damage == "missing" {
+				raw, e := loadStore(dir, uid)
+				if e == nil || raw != nil {
+					t.Fatal("incomplete recovery admitted a store")
+				}
+			}
 			recovered, err := OpenStore(dir, uid)
 			if damage != "intact" {
 				if err == nil || recovered != nil {
@@ -81,6 +77,7 @@ func TestMissingSnapshotRecovery(t *testing.T) {
 				if err != nil {
 					t.Fatal("intact control", err)
 				}
+				defer recovered.Close()
 				if _, c = recovered.Register(fixtureOperator, fixtureOperator, b); c != "identity_revoked" {
 					t.Fatal("tombstone lost", c)
 				}
@@ -91,7 +88,7 @@ func TestMissingSnapshotRecovery(t *testing.T) {
 				}
 			}
 			after, err := os.ReadFile(filepath.Join(auditPath, auditName(1)))
-			if err != nil || string(before) != string(after) {
+			if err != nil || damage != "intact" && string(before) != string(after) {
 				t.Fatal("recovery changed audit evidence", err)
 			}
 		})
@@ -128,13 +125,7 @@ func TestBindingHistoryUniqueness(t *testing.T) {
 			if err := os.Chmod(d, 0700); err != nil {
 				t.Fatal(err)
 			}
-			raw, err := json.Marshal(bindingDisk{Next: 4, Records: rows})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err = os.WriteFile(filepath.Join(d, "bindings.json"), raw, 0600); err != nil {
-				t.Fatal(err)
-			}
+			writeHistoryFixture(t, d, rows, 4)
 			dir, err := OpenDirectory(d, uint32(os.Getuid()), 0700)
 			if err != nil {
 				t.Fatal(err)
@@ -150,6 +141,7 @@ func TestBindingHistoryUniqueness(t *testing.T) {
 			if err != nil {
 				t.Fatal("valid history control", err)
 			}
+			defer s.Close()
 			// The valid recovered owner actually signs; older principals cannot admit.
 			_, _, signer, audit, _ := fixtureEngine(t)
 			g := newGenerations(rows[2].UID, rows[2].Generation)
@@ -195,7 +187,7 @@ func TestCustodyStartupReconciliation(t *testing.T) {
 			} else if damage == "empty-audit-only" {
 				err = os.Mkdir(filepath.Join(d, "audit"), 0700)
 			} else if damage == "interrupted-bootstrap" {
-				_, err = OpenStore(dir, uid)
+				err = os.Mkdir(filepath.Join(d, "audit"), 0700)
 			} else {
 				s, j, adir, e := openCustodyState(dir, uid)
 				if e != nil {
@@ -244,7 +236,7 @@ func TestCustodyStartupReconciliation(t *testing.T) {
 			if err != nil {
 				t.Fatal("intact startup control", err)
 			}
-			if j.seq != 1 {
+			if j.seq != 4 {
 				t.Fatal("audit history lost", j.seq)
 			}
 			if _, code := s.Register(fixtureOperator, fixtureOperator, fixtureBinding(31001)); code != "identity_revoked" {

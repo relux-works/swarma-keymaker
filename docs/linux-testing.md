@@ -38,12 +38,50 @@ Configure `state_dir` as a dedicated binding/journal directory, with
 binding state is new. The production activation workflow must provision this
 layout before the unavailable generation adapter can be enabled.
 The state lock uses the directory inode without creating a file. Under that
-lock, startup durably writes an empty snapshot before creating the audit
-directory and journal. A pre-created audit directory, even empty, is retained
-evidence and cannot authorize first use. Subsequent startup requires both a
-valid snapshot and retained, replayable journal evidence. Missing, unsafe,
-incomplete or corrupt evidence fences admission; initialization interrupted
-between these steps also requires operator recovery.
+lock, first use creates and syncs the protected audit directory, opens its
+journal, commits version 1 for an explicit empty binding array, then writes the
+snapshot. A pre-created audit directory, even empty, is retained evidence and
+cannot authorize first use. Interrupted initialization requires operator
+recovery. `OpenStore` opens this reconciled pair; its `Close` releases the owned
+audit descriptors, while the caller retains the state directory and lock.
+
+Every durable register, revoke and unbind/retirement transition increments the
+snapshot version and commits a SHA-256 digest of canonical CCJ-1
+`{version,next_registration_number,records}`. The trusted audit record uses the
+existing exact schema: `surface=control`, `operation=binding_commit`,
+`domain=control`, `request_id=binding:<version>` and `payload_digest=<digest>`.
+Other actor fields remain explicitly unknown. Replay requires binding versions
+1 through the latest without gaps. The snapshot includes that record's
+`audit_seq` and `audit_hash`; these references are excluded from the body digest
+to avoid a circular hash. All snapshot members, including nested binding and
+registrar fields, are required. An empty `records` array is valid; omission,
+null, unknown members and case aliases refuse. Older unbound snapshot formats
+also fence; there is no automatic upgrade that discards recovery evidence.
+
+Write order is journal append and file sync, then exclusive `bindings.next`
+creation, snapshot write and file sync, rename to `bindings.json`, and state
+directory sync. A failure fences the running store. A crash before any journal
+change leaves the previous complete pair. Rotation or seal failures also fence
+under the journal's replay rules. A crash after journal append
+but before snapshot replacement leaves an unmatched commit (or partial audit
+record); a crash during snapshot writing also leaves an unresolved intent.
+Either fences restart. After rename but before directory sync, restart admits
+only whichever complete matching pair actually survived; a stale, absent or
+partial snapshot refuses. The operation reports success only after both stores
+are durable. A snapshot ahead of its journal also refuses.
+
+Startup replays evidence read-only before opening or creating an audit writer.
+It requires the latest binding commit's version, sequence, chain hash and body
+digest to match the snapshot. This proves the referenced record exists and
+rejects any later unreflected binding commit. Later ordinary audit records are
+allowed. A populated or empty committed snapshot cannot accept a zeroed or
+missing journal, or truncation before its referenced commit. Partial records
+also refuse. Independently valid but mismatched files refuse
+without rewriting evidence. `TestSnapshotJournalDivergence` retains the real
+socket/Master signing reproduction and active signing control;
+`TestBindingCommitRecovery`, `TestBindingCommitCrashWindows` and
+`TestSnapshotSchemaRequired` cover the additional restore, crash and schema
+boundaries.
 
 The snapshot determines bindings, tombstones and issued registration numbers.
 The journal independently vetoes admission when evidence is unavailable; it
@@ -52,7 +90,11 @@ the operator to restore and validate the intact pair from retained evidence
 while the service is stopped. Deleting remaining evidence to obtain an empty
 directory is not recovery. No automatic reconciliation or re-admission occurs.
 These checks cannot detect rollback of a complete, internally valid pair without
-an independent checkpoint. Native lifecycle/audit transactions remain K1b work.
+an independent checkpoint; a test explicitly retains that limitation. Removing
+a complete ordinary-audit suffix after the referenced binding commit likewise
+needs an independent checkpoint for detection. Native
+generation/act verification and durable request-result coordination remain K1b
+work. Local binding commitments do not qualify those native protocols.
 
 `TestBindingHistoryUniqueness` rejects active or revoked predecessors hidden by
 later unbound records. Retained registration numbers must increase in order;

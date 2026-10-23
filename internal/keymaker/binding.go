@@ -46,8 +46,11 @@ type Binding struct {
 	RegistryRevision string    `json:"registry_revision"`
 }
 type bindingDisk struct {
-	Next    uint64    `json:"next_registration_number"`
-	Records []Binding `json:"records"`
+	Next      uint64    `json:"next_registration_number"`
+	Records   []Binding `json:"records"`
+	Version   uint64    `json:"version"`
+	AuditSeq  uint64    `json:"audit_seq"`
+	AuditHash string    `json:"audit_hash"`
 }
 type Store struct {
 	mu          sync.Mutex
@@ -57,13 +60,42 @@ type Store struct {
 	uid         uint32
 	watchers    map[uint64][]chan struct{}
 	failed      bool
-	initialized bool // This call durably bootstrapped a provably empty directory.
+	initialized bool // This call proved the state directory was empty.
+	version     uint64
+	auditSeq    uint64
+	auditHash   string
+	journal     *Journal
+	auditDir    *os.File
 }
 
 // NewStore is an in-process store; durable deployments use OpenStore. No caller
 // credential is accepted on a wire through these trusted lifecycle methods.
-func NewStore() *Store { return &Store{next: 1, watchers: map[uint64][]chan struct{}{}} }
+func NewStore() *Store {
+	return &Store{next: 1, records: []Binding{}, watchers: map[uint64][]chan struct{}{}}
+}
+
+// OpenStore opens the reconciled pair, never a standalone binding authority.
+// The caller holds LockState and owns dir; Close releases the paired audit fds.
 func OpenStore(dir *os.File, uid uint32) (*Store, error) {
+	s, _, _, err := openCustodyState(dir, uid)
+	return s, err
+}
+func (s *Store) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.failed = true
+	if s.journal == nil {
+		return nil
+	}
+	err := s.journal.Close()
+	if closeErr := s.auditDir.Close(); err == nil {
+		err = closeErr
+	}
+	return err
+}
+
+// loadStore validates snapshot syntax/history only; it never grants admission.
+func loadStore(dir *os.File, uid uint32) (*Store, error) {
 	s := NewStore()
 	fd, pending := syscall.Openat(int(dir.Fd()), "bindings.next", syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
 	if pending != syscall.ENOENT {
@@ -99,11 +131,8 @@ func OpenStore(dir *os.File, uid uint32) (*Store, error) {
 		if len(entries) != 0 || err != io.EOF {
 			return nil, failure("missing binding snapshot with retained evidence")
 		}
-		// Persist even the empty snapshot before any journal/lock artifact is
-		// created. A crash from here on requires recovery, never empty admission.
-		if c := s.persist(); c != "" {
-			return nil, c
-		}
+		// The paired opener will commit bootstrap journal-first. Any artifact
+		// left before that completes fences the next attempt.
 		s.initialized = true
 		return s, nil
 	}
@@ -114,6 +143,10 @@ func OpenStore(dir *os.File, uid uint32) (*Store, error) {
 	}
 	s.records = disk.Records
 	s.next = disk.Next
+	s.version, s.auditSeq, s.auditHash = disk.Version, disk.AuditSeq, disk.AuditHash
+	if s.version == 0 || s.version > 9007199254740991 || s.auditSeq == 0 || s.auditSeq > 9007199254740991 || !validDigest(s.auditHash) {
+		return nil, failure("invalid snapshot commitment")
+	}
 	if c := s.validate(); c != "" {
 		return nil, c
 	}
@@ -157,7 +190,21 @@ func (s *Store) persist() Code {
 	if s.dir == nil {
 		return ""
 	}
-	b, e := json.Marshal(bindingDisk{s.next, s.records})
+	if s.journal == nil || s.version >= 9007199254740991 {
+		return "audit_unavailable"
+	}
+	version := s.version + 1
+	digest, e := s.contentDigest(version)
+	if e != nil {
+		return "state_capacity_exceeded"
+	}
+	// The durable journal commit comes first. A later snapshot write failure
+	// leaves an unmatched commit, fencing both this Store and the next startup.
+	commit, c := s.journal.commitBinding(version, digest)
+	if c != "" {
+		return c
+	}
+	b, e := json.Marshal(bindingDisk{Next: s.next, Records: s.records, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash})
 	if e != nil {
 		return "state_capacity_exceeded"
 	}
@@ -184,11 +231,12 @@ func (s *Store) persist() Code {
 		s.failed = true
 		return "audit_unavailable"
 	}
+	s.version, s.auditSeq, s.auditHash = version, commit.Seq, commit.Hash
 	return ""
 }
 
 // Register is a custody transition for a trusted operator coordinator. K1b must
-// combine its generation/act verification and durable audit intent with this
+// combine its generation/act verification and durable result protocol with this
 // transition before exposing native mutations. There is no K1a mutation endpoint.
 func (s *Store) Register(caller, operator Principal, b Binding) (Binding, Code) {
 	if caller != operator || !validGeneration(caller.Generation) {
@@ -291,7 +339,7 @@ func (s *Store) Watch(n uint64) (<-chan struct{}, func()) {
 	}
 }
 func (s *Store) lookup(uid uint32, gen string) (Binding, Code) {
-	if s.failed {
+	if s.failed || s.dir != nil && s.journal == nil {
 		return Binding{}, "audit_unavailable"
 	}
 	for i := len(s.records) - 1; i >= 0; i-- {

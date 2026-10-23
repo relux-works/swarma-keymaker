@@ -3,7 +3,7 @@
 package keymaker
 
 import (
-	"io"
+	"crypto/rand"
 	"os"
 	"syscall"
 )
@@ -12,7 +12,7 @@ import (
 // absence can recreate bindings. Both stores must survive independently; only a
 // snapshot initialized from an empty directory permits creating a new journal.
 func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, error) {
-	s, err := OpenStore(state, uid)
+	s, err := loadStore(state, uid)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -37,18 +37,29 @@ func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, e
 	if syscall.Fstat(fd, &st) != nil || st.Uid != uid || st.Mode&07777 != 0700 {
 		return fail()
 	}
-	if !s.initialized {
-		// Existing snapshots require retained journal evidence, even if empty
-		// state was all that survived a crash during first initialization.
-		entries, e := dir.ReadDir(1)
-		if len(entries) == 0 || e != nil && e != io.EOF {
-			return fail()
+	j, err := openJournalChecked(dir, uid, systemAuditClock{}, rand.Reader, func(j *Journal) error {
+		if s.initialized {
+			if j.seq != 0 {
+				return failure("unexpected bootstrap audit evidence")
+			}
+			return nil
 		}
-	}
-	j, err := OpenJournal(dir, uid)
+		if !s.matchesCommit(j.binding) {
+			return failure("binding journal recovery mismatch")
+		}
+		return nil
+	})
 	if err != nil {
 		dir.Close()
 		return nil, nil, nil, err
+	}
+	s.journal, s.auditDir = j, dir
+	if s.initialized {
+		if c := s.persist(); c != "" {
+			j.Close()
+			dir.Close()
+			return nil, nil, nil, c
+		}
 	}
 	return s, j, dir, nil
 }

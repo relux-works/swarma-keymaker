@@ -115,7 +115,8 @@ syntax checks.
 | Scoped registry and path mapping | `TestRegistryPathVectors`, `TestRegistryRejectsInvalidHistory` | Five path controls, invalid history, duplicate/implicit allocations |
 | Protected master storage | `TestMasterStorageGuards` | Owner/mode/parent/symlink/hardlink/type/length refusals and valid sign/verify |
 | Persistent lifecycle/tombstones | `TestBindingLifecycle`, `TestPersistentRetirement`, `TestBindingRecoveryFences` | Trusted internal lifecycle, no native mutation or signed-act verifier qualification |
-| Snapshot/journal recovery | `TestMissingSnapshotRecovery`, `TestCustodyStartupReconciliation` | Genuine empty bootstrap; retained evidence prevents reset; intact controls preserve tombstones/numbers; no independent rollback checkpoint |
+| Snapshot/journal recovery | `TestMissingSnapshotRecovery`, `TestCustodyStartupReconciliation`, `TestSnapshotJournalDivergence`, `TestBindingCommitRecovery`, `TestBindingCommitCrashWindows` | Journal-first version/digest commitments and snapshot position/hash must agree; missing, stale, substituted, zeroed, truncated and interrupted pairs fence before evidence changes; real socket signing control; complete-pair rollback needs an independent checkpoint |
+| Complete snapshot schema | `TestSnapshotSchemaRequired` | Missing top-level/nested members, null records and unknown/case-alias members refuse; complete empty/revoked controls admit; raw decoder test isolates schema from reconciliation |
 | Whole retained path history | `TestBindingHistoryUniqueness` | Hidden active/revoked predecessors, owner/lifetime/order violations refuse; valid persistent history signs for latest principal |
 | Generation unavailable | `TestProductionGenerationRefuses`, `TestProductionBinaryGenerationGate` | Actual production binary refuses; injected fake-backed positive, no journal adapter |
 | Release and next-request fencing | `TestReleaseFences` | Controlled sign pause; revoke/retire/reuse win before release |
@@ -132,21 +133,23 @@ syntax checks.
 
 `go run ./tools/mutations/main.go -scratch "$SCRATCH"` plants only Go overlay
 files and requires the intended assertion failure; compilation/setup errors do
-not count. Its own exit is 0 only when all eight mutant subprocesses exit 1 for the
+not count. Its own exit is 0 only when all ten mutant subprocesses exit 1 for the
 named assertion. No source file is overwritten.
 
 | Mutant | Property narrowed to | Named failing test | Outcome/bound |
 | --- | --- | --- | --- |
 | Remove binding peer UID equality | The binding authorization primitive must reject a different authenticated UID | `TestRefusalVectors/binding-wrong-uid/negative` | Killed (mutant test exit 1); tests this primitive, not every possible UID-check site |
 | Disable namespace comparison while retaining parsing | Agent dispatch must reject an otherwise valid non-Git SSHSIG preimage | `TestRefusalVectors/ssh-namespace/negative` | Killed (mutant test exit 1); does not qualify future protocols |
-| Ignore retained entries on missing snapshot | A lost snapshot cannot bootstrap over retained audit evidence | `TestMissingSnapshotRecovery/missing` | Killed (mutant test exit 1); does not detect complete-pair rollback |
+| Ignore retained entries on missing snapshot | The snapshot loader cannot bootstrap over retained audit evidence | `TestMissingSnapshotRecovery/missing` | Killed (mutant test exit 1); isolates the primitive guard, with paired startup checked separately |
 | Restore last-record-only active comparison | An intervening unbound record cannot conceal an active predecessor | `TestBindingHistoryUniqueness/hidden-active` | Killed (mutant test exit 1); scoped to retained path transitions |
 | Remove framing work charge | Actual oversize frames must consume work credit before journal writes | `TestFrameRefusalAccounting/oversize` | Killed (mutant test exit 1); bounded flood, not load qualification |
 | Remove busy work charge | Saturated dispatch must consume the same credit | `TestFrameRefusalAccounting/busy` | Killed (mutant test exit 1); actual server dispatch branch |
 | Journal every overload | Exhaustion cannot turn framed refusals into unlimited journal writes | `TestOverloadRefusalBudget` | Killed (mutant test exit 1); fixed clock bounds writes independently of wall time |
-| Permit empty journal for an existing snapshot | Existing state cannot silently bootstrap missing journal evidence | `TestCustodyStartupReconciliation/empty-audit` | Killed (mutant test exit 1); independent checkpoint remains outside scope |
+| Permit absent binding commitment for an existing snapshot | Existing state cannot silently bootstrap missing journal evidence | `TestCustodyStartupReconciliation/empty-audit` | Killed (mutant test exit 1); existing missing-journal plant now targets the strengthened reconciliation guard |
+| Remove cross-binding check, retain missing-file refusal | An older valid snapshot cannot grant revoked signing authority beside the later journal | `TestSnapshotJournalDivergence/snapshot-before-revoke` | Killed (mutant test exit 1); demonstrates the forbidden signature over a real socket with the actual Master |
+| Make records optional, retain other schema checks | The decoder must require explicit records independently of the journal veto | `TestSnapshotSchemaRequired/revoked/missing-records` | Killed (mutant test exit 1); isolates omitted-member admission, with paired tombstone preservation checked separately |
 
-No surviving mutant is claimed killed. Only these eight specified narrowing
+No surviving mutant is claimed killed. Only these ten specified narrowing
 mutants were planted. No separate implementation attack-surface table was
 provided in the brief; this vector map is not a claim of mutation coverage for
 every implementation line or deferred surface. See [Linux testing](linux-testing.md)

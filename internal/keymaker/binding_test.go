@@ -54,10 +54,12 @@ func TestBindingLifecycle(t *testing.T) {
 	if c = s.Revoke(context.Background(), fixtureOperator, fixtureOperator, b.Number, approvedAct{}); c != "" {
 		t.Fatal(c)
 	}
+	s.Close()
 	s, e = OpenStore(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
+	defer s.Close()
 	if _, c = s.Register(fixtureOperator, fixtureOperator, b); c != "identity_revoked" {
 		t.Fatal("revoked path resurrected", c)
 	}

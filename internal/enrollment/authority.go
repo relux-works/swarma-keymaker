@@ -16,18 +16,19 @@ import (
 type Code string
 
 const (
-	OK                    Code = ""
-	EnrollmentUnavailable Code = "enrollment_unavailable"
-	EnrollmentUnverified  Code = "enrollment_unverified"
-	HostRevoked           Code = "host_revoked"
-	UIDNotPermitted       Code = "uid_not_permitted"
-	NameNotPermitted      Code = "name_not_permitted"
-	NameInvalid           Code = "name_invalid"
-	AudienceMismatch      Code = "audience_mismatch"
-	KeyNotEnrolled        Code = "key_not_enrolled"
-	KeyNotValidNow        Code = "key_not_valid_now"
-	EnrollmentUnsupported Code = "enrollment_unsupported"
-	GenerationMismatch    Code = "generation_mismatch"
+	OK                      Code = ""
+	EnrollmentUnavailable   Code = "enrollment_unavailable"
+	EnrollmentUnverified    Code = "enrollment_unverified"
+	HostRevoked             Code = "host_revoked"
+	UIDNotPermitted         Code = "uid_not_permitted"
+	NameNotPermitted        Code = "name_not_permitted"
+	NameInvalid             Code = "name_invalid"
+	AudienceMismatch        Code = "audience_mismatch"
+	KeyNotEnrolled          Code = "key_not_enrolled"
+	KeyNotValidNow          Code = "key_not_valid_now"
+	EnrollmentUnsupported   Code = "enrollment_unsupported"
+	GenerationMismatch      Code = "generation_mismatch"
+	RequestDeadlineExceeded Code = "request_deadline_exceeded"
 )
 
 // Reconciler attests freshness from evidence independent of restored local state.
@@ -47,7 +48,8 @@ type EnrolledKey struct {
 // Authority serializes reloads with admission and never exposes old snapshots.
 // Files=nil selects LinuxFiles. No registry or network I/O occurs in Authorize.
 type Authority struct {
-	mu          sync.RWMutex
+	mu          admissionGate
+	reloadMu    sync.Mutex
 	configPath  string
 	files       Files
 	reconcile   Reconciler
@@ -76,6 +78,8 @@ func New(configPath string, files Files, reconcile Reconciler) *Authority {
 // Close permanently fences this authority and releases its stopped-helper lease.
 // Call only after its serving goroutines have stopped; later Reload refuses.
 func (a *Authority) Close() error {
+	a.reloadMu.Lock()
+	defer a.reloadMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.closed = true
@@ -93,8 +97,29 @@ func (a *Authority) Close() error {
 // evidence, then switches authority. Failure fences; Commit errors require a new
 // Authority and trusted startup reconciliation, not another live reload.
 func (a *Authority) Reload(ctx context.Context) Code {
+	// Serialize lease, rollback and durable-store work without holding the
+	// admission write barrier. Existing readers finish on their old snapshot;
+	// new readers wait cancellably until the entire candidate is installed.
+	a.reloadMu.Lock()
+	defer a.reloadMu.Unlock()
+	a.mu.pause()
+	candidate := &Authority{
+		configPath: a.configPath, files: a.files, reconcile: a.reconcile,
+		retained: a.retained, stateDir: a.stateDir, commitFault: a.commitFault,
+		storeOps: a.storeOps, lease: a.lease, closed: a.closed,
+	}
+	code := candidate.load(ctx)
 	a.mu.Lock()
-	defer a.mu.Unlock()
+	a.config, a.policy, a.snapshot, a.fence = candidate.config, candidate.policy, candidate.snapshot, candidate.fence
+	a.retained, a.stateDir, a.commitFault = candidate.retained, candidate.stateDir, candidate.commitFault
+	a.lease = candidate.lease
+	a.mu.Unlock()
+	return code
+}
+
+// load operates on a private candidate. It performs every file/Git validation
+// and durable rollback update before the single admission-state swap.
+func (a *Authority) load(ctx context.Context) Code {
 	a.snapshot = nil
 	a.policy = nil
 	a.fence = EnrollmentUnverified
@@ -186,7 +211,9 @@ func (a *Authority) Reload(ctx context.Context) Code {
 // Authorize checks a caller-derived purpose-2 public key. The key and issuedAt
 // must come from trusted core state, never untrusted request key selectors.
 func (a *Authority) Authorize(ctx context.Context, peerUID uint32, generation, key, name, aud string, issuedAt, now time.Time) (EnrolledKey, Code) {
-	a.mu.RLock()
+	if err := a.mu.RLock(ctx); err != nil {
+		return EnrolledKey{}, RequestDeadlineExceeded
+	}
 	defer a.mu.RUnlock()
 	return a.authorizeLocked(ctx, peerUID, generation, key, name, aud, issuedAt, now)
 }
@@ -195,7 +222,9 @@ func (a *Authority) Authorize(ctx context.Context, peerUID uint32, generation, k
 // callback, including an actual response write. The callback must not reenter
 // Authority. Reload waits until it returns; failure never calls the callback.
 func (a *Authority) WithAuthorized(ctx context.Context, peerUID uint32, generation, key, name, aud string, issuedAt, now time.Time, fn func(EnrolledKey) Code) Code {
-	a.mu.RLock()
+	if err := a.mu.RLock(ctx); err != nil {
+		return RequestDeadlineExceeded
+	}
 	defer a.mu.RUnlock()
 	enrolled, code := a.authorizeLocked(ctx, peerUID, generation, key, name, aud, issuedAt, now)
 	if code != OK {
@@ -210,7 +239,7 @@ func (a *Authority) WithAuthorized(ctx context.Context, peerUID uint32, generati
 func (a *Authority) authorizeLocked(ctx context.Context, peerUID uint32, generation, key, name, aud string, issuedAt, now time.Time) (EnrolledKey, Code) {
 	deny := func(code Code) (EnrolledKey, Code) { return EnrolledKey{}, code }
 	if ctx.Err() != nil {
-		return deny(EnrollmentUnavailable)
+		return deny(RequestDeadlineExceeded)
 	}
 	if a.snapshot == nil {
 		code := a.fence

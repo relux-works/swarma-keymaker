@@ -135,6 +135,8 @@ domain `registration/1`, no retained result change and continuing hello admissio
 | Distinct keys/preimages on actual sockets | `TestHelperDomainSeparation` | Helper proof cannot verify as SSHSIG; A signature cannot verify as registration/1; A rejects host public-key selector |
 | Actual-write ordering | `TestHelperReleaseOrdering` | Retirement/revocation before release suppresses proof; release-first proof stands |
 | Expiry after durable audit | `TestHelperExpiryAfterAudit` | Exact expiry refuses; one nanosecond before expiry passes |
+| Bounded enrollment wait | `TestReviewHelperReloadDeadline`, enrollment `TestEnrollmentGateDeadline` | 100ms helper deadline releases shared locks; parallel pubkey succeeds before slow pin I/O resumes; no helper nonce/signature/result, exactly one refusal audit |
+| Reload I/O and atomic publication | `TestHelperReloadPreparesOutsideWrite`, enrollment `TestReloadPreparesOutsideReleaseBarrier`, `TestReviewHelperReloadOrders` | Pin I/O proceeds during an actual write; the entire snapshot or failure fence swaps after release; old enrollment is fenced on failure |
 | Enrollment barrier | `TestHelperReloadBeforeRelease`, enrollment `TestWithAuthorizedReleaseBarrier` | Failed reload before barrier refuses; reload cannot overtake a held release |
 | Fenced/unreconciled enrollment, custody, clock, entropy, window | `TestHelperAvailability` | Helper refuses without closing healthy A/control admission |
 | Exact helper schema | `TestHelperSchema` | Body/key/nonce/time/TTL/path/exe selectors refuse; valid request then succeeds |
@@ -144,11 +146,13 @@ domain `registration/1`, no retained result change and continuing hello admissio
 | Multi-UID helper | `TestMultiUIDHelper/{uid-not-mapped,foreign-binding,retired}/{negative,control}` | Compiled; live reviewer window PENDING |
 
 Helper narrowing controls run with `go run ./tools/mutations/main.go -group helper
--scratch "$SCRATCH"`. The four selected plants fail a named behavioral assertion;
+-scratch "$SCRATCH"`. The six selected plants fail a named behavioral assertion;
 setup/compilation errors do not count. The other mutation groups are unchanged.
 
 | Mutant | Property narrowed to | Named failing test | Outcome |
 | --- | --- | --- | --- |
+| helper-uncancellable-enrollment | Expired helper frees generation/Store while reload I/O is pending | `TestReviewHelperReloadDeadline/slow-reload` | Killed, child exit 1: parallel pubkey remains blocked before I/O resumes |
+| helper-reload-io-lock | Preparing a candidate proceeds during an admitted socket write | `TestHelperReloadPreparesOutsideWrite/valid` | Killed, child exit 1: pin I/O waits for the actual write |
 | helper-binding | Binding before construction and at release | `TestDaemonHelperVectors/helper-missing-binding/negative` | Killed, child exit 1: forbidden envelope escaped |
 | helper-release-recheck | Fresh expiry sample after audit | `TestHelperExpiryAfterAudit/expired` | Killed, child exit 1: expired envelope escaped |
 | helper-surface-a-key | Sign with admitted purpose-2 key | `TestHelperDomainSeparation` | Killed, child exit 1: purpose-1 signature fails envelope self-verification |

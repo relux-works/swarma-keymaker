@@ -72,7 +72,10 @@ allowed network protocols. No inherited `GIT_*` or SSH agent state is used.
 Object hashes are checked, and SSHSIG verification happens in Go against the
 allowlist in namespace `git`. Author text and embedded keys never establish trust.
 Commit metadata is bounded to 1 MiB and tree metadata to 8 MiB; envelope aggregate
-caps remain the registrar's 10,000 records/16 MiB. Reload has a ten-second context budget for Git work and lock waits.
+caps remain the registrar's 10,000 records/16 MiB. Reload has a ten-second context
+budget for validation and durable-state lock waits.
+Publishing the result also drains already admitted bounded release callbacks,
+even after context expiry, so a failed reload always installs its fence.
 
 ## Durable state and reconciliation
 
@@ -112,8 +115,12 @@ existing-state restart refuses. Successful in-process commits retain the known-l
 state for subsequent reloads. `StateDigest` can identify that state; calculating
 a digest from the local file does not itself establish freshness.
 
-Any failed reload withdraws the old snapshot immediately. A normal validation
-failure can recover only with a fully valid reload. **Any Commit error poisons
+While reload prepares a private candidate, new admissions wait with their own
+request contexts; existing bounded releases finish on one consistent snapshot.
+All pin, Git, validation and durable-state I/O runs outside the enrollment write
+barrier. Reload takes that barrier only to publish the complete candidate or
+failure fence. After a failed reload returns, no old snapshot is usable. A normal
+validation failure can recover only with a fully valid reload. **Any Commit error poisons
 that Authority instance:** another live reload cannot recover it. Startup with
 independent reconciliation is required. In particular, directory fsync can fail
 after rename: the replacement may already be visible and its durability is
@@ -394,3 +401,9 @@ the read barrier through a bounded callback. The daemon uses this to hold curren
 enrollment authority through actual helper response release. Callbacks must not
 reenter Authority. `TestWithAuthorizedReleaseBarrier` proves rejection never
 invokes release and a live reload waits for an admitted release before fencing.
+
+`TestReloadPreparesOutsideReleaseBarrier` checks that pin I/O proceeds during a
+held release while the swap waits, including failure fencing and valid recovery.
+`TestEnrollmentGateDeadline` checks cancellation without callback effects and a
+valid post-publication control. Admission cancellation maps to the existing
+`request_deadline_exceeded` code. No lock-wait goroutines are left behind.

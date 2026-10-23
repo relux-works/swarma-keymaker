@@ -287,7 +287,7 @@ func TestCanceledAuthorization(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	result, code := a.Authorize(ctx, 30001, testGeneration, public(2), testName, testAudience, testNow, testNow)
-	expectCode(t, EnrollmentUnavailable, code)
+	expectCode(t, RequestDeadlineExceeded, code)
 	if result.Key != "" {
 		t.Fatal("canceled admission returned data")
 	}

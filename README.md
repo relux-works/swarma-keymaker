@@ -82,6 +82,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Vet the native wire layer: `go vet ./internal/control/...` | Diagnostics on stdout/stderr |
 | gofmt | Check formatting: `gofmt -l internal/control/*.go` | Names of unformatted files; empty output expected |
 | Go | Bounded decoder fuzzing: `GOMAXPROCS=2 go test ./internal/control -run '^$' -fuzz '^FuzzCCJRoundTrip$' -fuzztime=20s -parallel=1` | Verdicts and Go fuzz cache; failing corpus under `internal/control/testdata/fuzz/` |
+| Go | Reload deadline and publication regressions: `GOMAXPROCS=2 go test -race ./internal/keymaker -run '^Test(ReviewHelperReloadDeadline\|HelperReloadPreparesOutsideWrite)$' -count=1 -p=1` | Fixture pin I/O, real daemon sockets and authority barriers; allowed pubkey retention plus refusal-only helper audit |
 | Go | Native integration checks: `go test ./internal/keymaker -run '^TestNative' -count=1`; race: `go test -race ./internal/keymaker -run '^TestNative' -count=1` | Verdicts; temporary fixtures under `TMPDIR` |
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
 | gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
@@ -211,8 +212,12 @@ surface A and other control methods retain their authority rules. The existing
 `OperatorReconciler` supplies a public startup challenge; status output reports
 it. After independent freshness reconciliation and protected approval publication,
 SIGHUP retries enrollment loading with that same challenge. A failed reload fences
-only helper authority. This uses the existing startup reconciliation interface;
-it provides no service bootstrap or enrollment reconcile command.
+only helper authority. The operator reconciliation command described above
+provides independent freshness approval; the service never bootstraps enrollment.
+Reload prepares all file/Git validation outside the enrollment write barrier,
+then publishes one complete snapshot or failure fence. New helper admissions
+wait cancellably during reload and return `request_deadline_exceeded` when their
+request budget ends, releasing the shared generation and Store locks.
 
 The Linux helper clock trusts UTC only when read-only `adjtimex` reports no
 unsynchronized/error state; unavailable health refuses. The shared proof builder

@@ -98,6 +98,8 @@ func main() {
 	}
 	if *group == "helper" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"helper-uncancellable-enrollment", "../enrollment/gate.go", "select {\n\t\tcase <-ctx.Done():\n\t\tcase <-changed:\n\t\t}", "<-changed", "^TestReviewHelperReloadDeadline$/^slow-reload$", "--- FAIL: TestReviewHelperReloadDeadline/slow-reload", "parallel pubkey blocked by expired helper before reload I/O resumed"},
+			{"helper-reload-io-lock", "../enrollment/authority.go", "code := candidate.load(ctx)\n\ta.mu.Lock()", "a.mu.Lock()\n\tcode := candidate.load(ctx)", "^TestHelperReloadPreparesOutsideWrite$", "--- FAIL: TestHelperReloadPreparesOutsideWrite/valid", "reload I/O waited for the actual socket write"},
 			{"helper-binding", "registration.go", `b, c := s.lookup(peer.UID, peer.Generation)`, `b, c := Binding{}, Code("")`, "^TestDaemonHelperVectors$/^helper-missing-binding$/^negative$", "--- FAIL: TestDaemonHelperVectors/helper-missing-binding/negative", "native response exposed forbidden field envelope"},
 			{"helper-release-recheck", "registration.go", `if pc := retained.Recheck(ctx); pc != "" {`, `if pc := proof.Code(""); retained == nil && pc != "" {`, "^TestHelperExpiryAfterAudit$/^expired$", "--- FAIL: TestHelperExpiryAfterAudit/expired", "native response exposed forbidden field envelope"},
 			{"helper-surface-a-key", "registration.go", `s.master.withPurpose(s.path, "host-registration",`, `s.master.withPurpose("m/1'"+s.path[len("m/2'"):], "agent-identity",`, "^TestHelperDomainSeparation$", "--- FAIL: TestHelperDomainSeparation", "helper refused positive control"},

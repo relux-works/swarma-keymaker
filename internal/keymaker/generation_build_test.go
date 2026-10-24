@@ -29,6 +29,9 @@ func generationProductionAPI(api string) error {
 	if strings.Contains(api, "func NewTestHandle(") || strings.Contains(api, "func OpenForTest(") {
 		return fmt.Errorf("production API exposes fixture constructor")
 	}
+	if strings.Contains(api, "func WithReaderHold(") {
+		return fmt.Errorf("production API exposes fixture reader duration")
+	}
 	return nil
 }
 
@@ -60,6 +63,9 @@ func TestGenerationProductionBuildBoundary(t *testing.T) {
 	if err = generationProductionAPI(string(api) + "\nfunc NewTestHandle(owner uint32, anchor string) *TestHandle\n"); err == nil || err.Error() != "production API exposes fixture constructor" {
 		t.Fatal("fixture API control was not rejected", err)
 	}
+	if err = generationProductionAPI(string(api) + "\nfunc WithReaderHold(d time.Duration) TestOption\n"); err == nil || err.Error() != "production API exposes fixture reader duration" {
+		t.Fatal("fixture duration API control was not rejected", err)
+	}
 	binary := filepath.Join(t.TempDir(), "keymaker")
 	cmd = exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/keymaker")
 	if out, err = cmd.CombinedOutput(); err != nil {
@@ -86,7 +92,7 @@ func TestGenerationProductionBuildBoundary(t *testing.T) {
 	for _, dep := range info.Deps {
 		if dep.Path == "github.com/relux-works/swarma-user-manager" {
 			foundSource = true
-			if dep.Version != "v0.0.0-20261024181100-2fba23868045" || dep.Replace != nil {
+			if dep.Version != "v0.0.0-20261024191358-505fb9f55a6d" || dep.Replace != nil {
 				t.Fatalf("production source pin or replacement differs: %+v", dep)
 			}
 		}

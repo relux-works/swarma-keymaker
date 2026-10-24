@@ -6,4 +6,4 @@ require github.com/relux-works/swarma-registrar v0.0.0-20261023164451-5f44ebf3f7
 
 require golang.org/x/sys v0.37.0
 
-require github.com/relux-works/swarma-user-manager v0.0.0-20261024181100-2fba23868045
+require github.com/relux-works/swarma-user-manager v0.0.0-20261024191358-505fb9f55a6d

@@ -183,12 +183,17 @@ Its 67-case manifest and exact raw files are copied under
 `internal/keymaker/testdata/gen-journal/`, with per-file source paths and SHA256
 in `provenance.json`. Drift controls check those bytes; they do not establish
 adapter conformance. The adapter now pins the signed landed user-manager
-`2fba23868045b37143ef0156c0e88d1d340d9cc3`. Production delegates directly to
+`505fb9f55a6d4f3f71db49e5037cd863679a3e41`. Production delegates directly to
 its public `WithEvidence`; no private path, marker or lock validator is copied
 and no release uses `Checkpoint`. The tagged `NewTestHandle` and exact-gap hook
 exist only in fixture builds; normal binary metadata and dependencies are
 checked separately. The 67 adapter verdicts and real-flock/no-create contracts
 are executable in `generation_fixture_linux_test.go`.
+Race-tagged fixtures use the source owner's per-handle `WithReaderHold(5s)`
+option for instrumented verification, including all 67 vectors. Ordinary
+fixtures keep the two-argument 250ms window and real-clock deadline tests;
+the normal source API exposes no reader-duration option. Invalid duration and
+nil-option tests require refusal before callbacks or source/local persistence.
 
 - Qualification against a real root-owned journal remains PENDING. Nonroot
   tagged fixtures do not qualify production custody, ACLs, storage latency or

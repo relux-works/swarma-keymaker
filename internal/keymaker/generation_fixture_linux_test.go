@@ -42,8 +42,92 @@ func generationFixture(t *testing.T, raw []byte) (string, string) {
 }
 func generationTestJournal(t *testing.T, anchor string) generationWindow {
 	t.Helper()
-	return gj.NewTestHandle(uint32(os.Getuid()), anchor)
+	return generationFixtureHandle(uint32(os.Getuid()), anchor)
 }
+
+func generationFixtureHandle(owner uint32, anchor string) *gj.TestHandle {
+	// Ordinary fixtures retain the two-argument API and its production 250ms
+	// window. Only race instrumentation gets the owner's per-handle extension.
+	if generationFixtureReaderHold == gj.ReaderHold {
+		return gj.NewTestHandle(owner, anchor)
+	}
+	return gj.NewTestHandle(owner, anchor, gj.WithReaderHold(generationFixtureReaderHold))
+}
+
+// A fixture's callback receives a real deadline with the selected bound. The
+// two-argument neighbor stays at 250ms even beside a race-extended handle;
+// extension is instrument accommodation, not production timing qualification.
+func TestGenerationTaggedReaderHoldWindow(t *testing.T) {
+	if gj.ReaderHold != 250*time.Millisecond {
+		t.Fatal("production reader bound changed", gj.ReaderHold)
+	}
+	dir, anchor := generationFixture(t, generationBytes(t, "active"))
+	for _, tc := range []struct {
+		name string
+		h    *gj.TestHandle
+		hold time.Duration
+	}{
+		{"selected", generationFixtureHandle(uint32(os.Getuid()), anchor), generationFixtureReaderHold},
+		{"default", gj.NewTestHandle(uint32(os.Getuid()), anchor), gj.ReaderHold},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			err := tc.h.WithEvidence(context.Background(), dir, gj.Floor{Hash: gj.ZeroHash}, func(_ gj.View, deadline time.Time) error {
+				called = true
+				left := time.Until(deadline)
+				if left <= 0 || left > tc.hold || (tc.hold > gj.ReaderHold && left <= gj.ReaderHold) {
+					t.Fatalf("reader deadline remaining=%s want bound=%s", left, tc.hold)
+				}
+				return nil
+			})
+			if err != nil || !called {
+				t.Fatal("valid reader control refused", err, called)
+			}
+		})
+	}
+}
+
+// Invalid duration or nil options refuse the actual consumer API and adapter
+// before callbacks or source/local persistence; a later positive option cannot
+// erase invalid input. The same source and pristine store then admit normally.
+func TestGenerationTaggedReaderHoldRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options []gj.TestOption
+	}{
+		{"zero", []gj.TestOption{gj.WithReaderHold(0)}},
+		{"negative", []gj.TestOption{gj.WithReaderHold(-time.Nanosecond)}},
+		{"nil", []gj.TestOption{nil}},
+		{"invalid-then-positive", []gj.TestOption{gj.WithReaderHold(0), gj.WithReaderHold(time.Second)}},
+		{"positive-then-invalid", []gj.TestOption{gj.WithReaderHold(time.Second), gj.WithReaderHold(-time.Second)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir, anchor := generationFixture(t, generationBytes(t, "active"))
+			s, state := generationStore(t)
+			window := gj.NewTestHandle(uint32(os.Getuid()), anchor, tc.options...)
+			g := newJournalGeneration(window, s, dir, gj.Floor{Hash: gj.ZeroHash})
+			sourceBefore, stateBefore := recoveryFiles(t, anchor), recoveryFiles(t, state.Name())
+			called := false
+			err := window.WithEvidence(context.Background(), dir, gj.Floor{Hash: gj.ZeroHash}, func(gj.View, time.Time) error { called = true; return nil })
+			var refusal *gj.Refusal
+			if !errors.As(err, &refusal) || refusal.Code != "journal_reader_hold" || called {
+				t.Fatal("invalid hold source verdict/effect", err, called)
+			}
+			code := g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
+			if code != "generation_source_unavailable" || called {
+				t.Fatal("invalid hold adapter verdict/effect", code, called)
+			}
+			if fmt.Sprint(sourceBefore) != fmt.Sprint(recoveryFiles(t, anchor)) || fmt.Sprint(stateBefore) != fmt.Sprint(recoveryFiles(t, state.Name())) {
+				t.Fatal("invalid hold changed source or local state")
+			}
+			good := newJournalGeneration(generationTestJournal(t, anchor), s, dir, gj.Floor{Hash: gj.ZeroHash})
+			if code = good.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" }); code != "" || !called {
+				t.Fatal("valid reader control refused", code, called)
+			}
+		})
+	}
+}
+
 func generationPending(t *testing.T, mode string) []byte {
 	t.Helper()
 	boot, e := os.ReadFile("/proc/sys/kernel/random/boot_id")
@@ -137,7 +221,7 @@ func materializeGenerationCase(t *testing.T, c generationVectorCase) (string, ge
 	case violation == "owner":
 		// Non-root execution cannot chown individual files. This is an expected-owner
 		// mismatch at the protected boundary, not isolated target-inode qualification.
-		window = gj.NewTestHandle(uint32(os.Getuid())+1, anchor)
+		window = generationFixtureHandle(uint32(os.Getuid())+1, anchor)
 	case violation == "mode":
 		if e := os.Chmod(path, 0777); e != nil {
 			t.Fatal(e)
@@ -454,7 +538,7 @@ func TestGenerationTaggedWriterProgress(t *testing.T) {
 func TestGenerationTaggedPendingGap(t *testing.T) {
 	dir, _ := generationFixture(t, generationBytes(t, "active"))
 	s, _ := generationStore(t)
-	boundary := gj.NewTestHandle(uint32(os.Getuid()), dir)
+	boundary := generationFixtureHandle(uint32(os.Getuid()), dir)
 	for _, pending := range []bool{false, true} {
 		observed := false
 		window := generationWindowFunc(func(ctx context.Context, path string, floor gj.Floor, commit func(gj.View, time.Time) error) error {

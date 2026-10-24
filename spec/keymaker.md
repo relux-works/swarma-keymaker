@@ -322,9 +322,13 @@ There is no extra wrapper or request member. It binds operation `revoke`,
 registration target, protected owner and master epoch, action ID, audience,
 nonce and canonical arguments digest; current P-256 operator-device authority,
 trusted time, revocation and durable replay/effect checks are mandatory.
-The waggle S1 verifier library and durable consumer integration remain pending
-(Q7). Persistent revoke MUST return `operator_record_unavailable` until that
-verifier is available; it MUST NOT accept an unsigned substitute. Invalid or
+The waggle S1 verifier library has landed; durable consumer integration and
+qualified fact sources remain pending (Q7). The
+[operator-record integration proposal](keymaker-operator-record.md) specifies
+the candidate call, source choices, transaction and explicit audit delta;
+it does not activate this path. Persistent revoke MUST return
+`operator_record_unavailable` until that integration is available and qualified;
+it MUST NOT accept an unsigned substitute. Invalid or
 changed evidence refuses `operator_record_invalid`. Positive fixture verdicts
 model the verifier interface and MUST NOT be mistaken for runtime availability.
 
@@ -1200,9 +1204,10 @@ tests in this initial repository. Future rework MUST retain them by name.
    Section 3.1 retains `with_active` ordering and states the manual-writer limit.
 7. **Q7 — signed-act gate:** the operator-act/1 format and exact mapping are
    published in [waggle S0 §4.2](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#42-keymaker-operator_record-exact-mapping).
-   The S1 verifier library, pins, replay/effect integration and qualification
-   remain pending; persistent revoke refuses `operator_record_unavailable`.
-   No unsigned substitute.
+   S1 has landed; the [integration proposal](keymaker-operator-record.md) leaves
+   source selection, pins, time/watermark, replay/effect and audit integration
+   and qualification open. Persistent revoke refuses
+   `operator_record_unavailable`; no unsigned substitute.
 8. **Q8 — decided:** the explicit, append-only, scoped name-to-index registry
    is approved. Field names and path syntax stay as specified in section 4.2;
    a truncated hash cannot supply the required collision-free mapping.

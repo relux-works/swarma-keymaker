@@ -6,21 +6,40 @@ The authoritative decision list and safe defaults are in
 - Q1 and Q4: helper ownership split and module naming — decided.
 - Q2 and Q3: decrypt out of v0 (`operation_unsupported`) and configured
   operator-only register/revoke intake — decided. Persistent revoke refuses
-  until the signed operator-act verifier exists; Q7 remains its activation gate.
+  until the signed-act adapter and its fact sources are qualified; Q7 remains
+  its activation gate.
 - Q6: decided — the authoritative `gen-journal/1` format belongs to
   `swarma-user-manager`. The production read-only adapter uses its protected
   release window. Qualification on a real root-owned journal remains an
   activation gate; retirement recorded late is not fenced (section 3.1).
 - Q7: `operator-act/1` record format and exact Keymaker mapping are published
   in [waggle S0 §4.2](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#42-keymaker-operator_record-exact-mapping).
-  Waggle S1 verifier library and durable integration/qualification remain
-  activation gates; persistent revoke stays `operator_record_unavailable`.
+  [Waggle S1](https://github.com/relux-works/waggle/tree/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/verifier) has landed. The
+  [integration proposal](spec/keymaker-operator-record.md) is spec only; source
+  decisions and durable integration/qualification remain activation gates.
+  Persistent revoke stays `operator_record_unavailable`.
 - Q8: explicit, append-only, scoped name-to-index registry — decided.
 - Q9–Q11: control-group provisioning, external root attestation/rotation and
   the reusable Linux test window — qualification gates.
 - Q12: decided — executable-qualified enrollment is valid data but not an available v0
   enforcement capability. All matched rows with `exe` refuse locally, including
   matching procfs snapshots. No UID-only fallback is allowed.
+
+## Q7: operator-record integration sources
+
+The [Q7 supplement](spec/keymaker-operator-record.md) recommends retaining the
+unavailable gate until these decisions and qualification close. A protected local
+evidence file is a candidate, not an activated source or a freshness exemption.
+
+| Open question | Recommendation / acceptance needed |
+| --- | --- |
+| Operator pins and owner/device currency | Choose owner-scoped protected root/role catalog, exact owner and an independently current device-authorization provider/update boundary. A device signature, valid attestation or nonrevocation alone cannot manufacture SignerFacts.current. D30 distinct present role pins and D31's closed v0 recovery remain mandatory. |
+| Signed snapshot delivery and continuity | Recommend no activation yet. Candidate: protected operator-delivered originals with A<=60s, cumulative last-seen state and independently justified restore continuity; qualify safe replacement/admission serialization. Future registry distribution retains the operator-root signature. No deployed source, grace period or unsigned empty set. |
+| Time and watermark | Use the separately integrated qualified shared provider, never copy its rules. Decide conservative S1 Time/Now mapping and independent durable W bootstrap/advancement: min(Now,W) blocks acts issued after W. Do not substitute a guessed fresh W or bypass provider uncertainty/holds. |
+| Durable action/ID/result transaction | Accept schema/migration/explicit bootstrap for installation-wide used actions, original act-byte ID bindings, watermark/source anchors and recoverable tombstone/result/audit transaction. Current retained native IDs are not this ledger. Keep permanent evidence and qualify capacity under Store and S1 Present bounds. |
+| Critical-effect owner check | Protected consumer policy must classify this effect and, if critical, supply S0's exact-request authority-owner check at the serialized boundary. Decide its real source/exclusion protocol; no RPC under locks or cached-current substitute. |
+| Audit schema | Accept the explicit proposed payload-digest meaning and optional typed operator_action_id/operator_reason metadata, bounded fine S1 reasons, unchanged coarse wire errors and historical journal recovery. No envelope/device-key logging. |
+| Qualification | Execute paired invalidity, unavailable source, exact retry/replay, concurrent reservation, changed evidence, actual effect/release, sync loss and restart/restore tests before runtime activation; text vectors are not execution evidence. |
 
 ## Q5: registrar draft alignment and explicit differences
 

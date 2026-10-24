@@ -17,7 +17,8 @@ floor only before any binding has been issued; damaged established anchors,
 rollback, fork, stale writers and reserve incidents fence without automatic
 recovery. The real root-owned journal remains an activation qualification gate.
 No fixture authority is compiled into normal production builds.
-Persistent operator revocation remains closed without a signed-act verifier;
+Persistent operator revocation remains closed pending signed-act integration
+and qualified fact sources.
 `sign_registration` builds registrar proofs with a separate purpose-2 key,
 current binding/enrollment authority and durable same-ID recovery. The curator-approved
 `custody_unavailable` refusal uses one response for every custody cause; only the
@@ -63,6 +64,7 @@ normal create keeps register-after-active. No new method is enabled.
 
 | Path | Contents |
 | --- | --- |
+| `spec/keymaker-operator-record.md` | Proposed S1 operator-record integration, fact sources, durable replay and audit delta; no runtime activation |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |

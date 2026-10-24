@@ -153,3 +153,20 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
   state_dir expected by the custody loader. The owner must reconcile this
   provisioning gap before activation. Packaging records the dependency without
   adding another root procedure or changing the normative runbook.
+
+## Provision and confirmation gates
+
+The [provision/confirm supplement](spec/keymaker-provision.md) aligns its
+account-side inputs to user-manager `4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1`,
+`spec/stations-v0.md` §6.2, `spec/generation-journal.md` §§4/6.1 and
+`docs/station-core.md`. It is spec only; production bump remains
+`bump_key_admission_unconfirmed` until joint acceptance and qualification.
+Existing create/retire gates are independent. Normal create keeps
+register-after-active; no key-purpose or signed-receipt authority is added.
+
+| Gate | Remaining decision / evidence |
+| --- | --- |
+| PC1: joint interface and observer authentication | Accept the separate operator-only provision and scoped read-only confirm schemas on both sides. Qualify the actual user-manager adapter and protected pending-intent correlation, active observer UID/generation, socket/server authentication and owner/target scope. A root caller is not exempt from Keymaker generation checks. Signed confirmation would need a separate authorized signer/purpose decision; purposes 2/5 are not widened. |
+| PC2: currency through activation | Specify and qualify final ordering between the two confirmation facts, pin withdrawal, revoke/epoch change and user-manager active append, without RPC under either side's state/journal locks. A fresh nonce/2000ms local observation is not a lease and cannot close this race. No shared-lock/lease/commit protocol is claimed implemented. Until this is resolved, bump refuses rather than using a cached receipt. |
+| PC3: creating guard, durability and restore | Qualify metadata-only creating target guard with active caller, published gate→data→commit order and <=250ms local window. Cover exact replay, audit/commit uncertainty, restart/promotion/removal history, protected policy-digest provenance and epoch/journal floor restore. No timer activation or deleting committed evidence; include new state in option C inventory if activated. |
+| PC4: identity allocation and rollout | Operator preallocates a never-used purpose-1 identity for bump: ordinary persistent same-path reuse would reproduce the old key and is not this operation. Confirm this account-to-identity mapping, local generation-pin review/install flow, resource budgets and actual fresh account-token acquisition through its owning service. Keep normal create register-after-active unless separately reviewed. Runtime/root/backend and joint negative-vector qualification remain open. |

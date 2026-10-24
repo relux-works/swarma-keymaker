@@ -44,10 +44,17 @@ decided. Signing also checks the caller's bound identity and key ID. Exact
 waggle label/field alignment, publication and qualification remain open.
 No new method is enabled.
 
+The [pre-active provision/confirm proposal](spec/keymaker-provision.md) reserves
+a binding while a bump successor is `creating`, without key issuance before
+`active`. It recommends a separate operator method and authenticated metadata
+query. Joint confirmation-currency and adapter qualification remain gates;
+normal create keeps register-after-active. No new method is enabled.
+
 | Path | Contents |
 | --- | --- |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
+| `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |
 | `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |

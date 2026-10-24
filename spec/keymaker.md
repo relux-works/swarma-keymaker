@@ -325,6 +325,18 @@ NOT be reported as absent or retried under a new identity. Durable mutation
 results cannot be reclaimed without a rule permanently rejecting expired IDs;
 v0 retains them and refuses admission at its budget.
 
+### 5.1 Proposed pre-active provision and confirmation
+
+The [provision/confirm supplement](keymaker-provision.md) proposes a separate
+operator-only metadata transaction for a target in journal `creating`, plus
+an authenticated scoped observer query. It defines `provisioned` binding
+state, no issuance before active, ordered generation-pin re-admission and
+exact-tuple confirmation. It is **spec only; not implemented or activated**.
+The target-only metadata exception never relaxes active caller or signing
+checks. Ordinary `register` above remains active-target-only. Confirmation
+currency through the user-manager active append remains a joint qualification
+gate; the supplemental query alone does not claim an activation lease.
+
 ## 6. Surface A: SSH agent subset
 
 Endpoint: `/run/swarma-keymaker/agent.sock`. Each packet is `uint32be(length)`
@@ -1175,6 +1187,8 @@ strings. Registrar-owned signed-document verdicts retain registrar spelling.
 | `binding_not_found`, `peer_binding_mismatch`, `binding_conflict` | Missing, foreign or conflicting binding |
 | `generation_inactive`, `generation_mismatch`, `generation_source_unavailable` | Retired, different or unavailable account incarnation |
 | `role_not_permitted` | Authenticated peer has no operation authority |
+| `provision_state_invalid` (unimplemented provision/confirm proposal) | Exact target journal token is active, retiring or removed rather than creating for provision/confirm; `retryable=false` |
+| `binding_provisioned` (unimplemented provision/confirm proposal) | Key use or public-key disclosure reaches a reserved binding without qualified durable active promotion; `retryable=false` |
 | `identity_revoked`, `persistent_revoke_requires_operator` | Terminal identity or forbidden revoke mode |
 | `operator_record_unavailable`, `operator_record_invalid` | Missing verifier/evidence or invalid signed act |
 | `path_not_hardened`, `path_invalid`, `purpose_unknown` | Invalid derivation contract |

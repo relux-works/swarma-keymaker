@@ -828,5 +828,30 @@
     "row": "PR9",
     "stage": "roundtrip",
     "reason": "Unchanged published proof Verify/Check/Build/Assemble round-trip only; receiver admission state and P-256 builder authority are not claimed."
+  },
+  {
+    "row": "R138",
+    "stage": "excluded",
+    "reason": "Registrar HTTP Content-Type charset/OWS admission; Keymaker spec section 9 constructs proofs and has no HTTP receiver. Public proof package trees are unchanged at registrar5f44."
+  },
+  {
+    "row": "R139",
+    "stage": "excluded",
+    "reason": "Registrar HTTP Content-Type charset/OWS admission; Keymaker spec section 9 constructs proofs and has no HTTP receiver. Public proof package trees are unchanged at registrar5f44."
+  },
+  {
+    "row": "PR31",
+    "stage": "excluded",
+    "reason": "Registrar HTTP Content-Type charset/OWS admission; Keymaker spec section 9 constructs proofs and has no HTTP receiver. Public proof package trees are unchanged at registrar5f44."
+  },
+  {
+    "row": "PR32",
+    "stage": "excluded",
+    "reason": "Registrar HTTP Content-Type charset/OWS admission; Keymaker spec section 9 constructs proofs and has no HTTP receiver. Public proof package trees are unchanged at registrar5f44."
+  },
+  {
+    "row": "PR33",
+    "stage": "excluded",
+    "reason": "Registrar HTTP Content-Type charset/OWS admission; Keymaker spec section 9 constructs proofs and has no HTTP receiver. Public proof package trees are unchanged at registrar5f44."
   }
 ]

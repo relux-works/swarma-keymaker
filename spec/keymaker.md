@@ -118,6 +118,26 @@ interim, retirement fencing depends on the operator recording `retiring` or
 `removed` before account removal. A retirement recorded late is not fenced;
 manual writing provides no automatic coordination with OS account removal.
 
+The optional protected configuration member `generation_journal` contains
+`path` (an absolute, clean journal directory path) and `initial_floor`
+(`{seq, hash}` in the journal format). It exposes no owner or fixture policy.
+The configured initial floor MUST be used only for pristine local state: no
+stored generation anchor and no binding ever issued. A durable enrollment
+record MUST distinguish a lost anchor from pristine state even when no binding
+has yet been issued. An absent, corrupt or incompletely committed established
+anchor, or journal rollback/fork relative to it, MUST latch
+`generation_source_fenced`, durably record one incident, and require operator
+reconciliation. Keymaker MUST NOT initialize from the restored journal or
+recover automatically. A verified window alone may advance the durable floor;
+publication MUST be crash-safe and complete before an authorized release.
+Local anchor continuity does not implement external restore authorization:
+WC1 remains PENDING, with no dummy success callback or claim of restore safety.
+
+The final callback MUST carry the journal's bounded deadline through durable
+audit admission and actual transport handoff. A post-callback deadline check
+cannot recall bytes already emitted. An already-started durable write/sync
+completes its commit protocol, but an expired window MUST suppress handoff.
+
 Each accepted connection records `(peer_uid, generation_at_accept)`. Each
 operation and its release MUST revalidate this tuple. A live connection MUST
 NOT change generations, adopt a new binding, or survive retirement by using

@@ -31,9 +31,9 @@ type idsFunc func(context.Context, Peer, Request) Code
 
 func (f idsFunc) Admit(c context.Context, p Peer, r Request) Code { return f(c, p, r) }
 
-type fenceFunc func(context.Context, Peer, Request, Object, func() Code) Code
+type fenceFunc func(context.Context, Peer, Request, Object, func(context.Context) Code) Code
 
-func (f fenceFunc) WithActive(c context.Context, p Peer, r Request, o Object, release func() Code) Code {
+func (f fenceFunc) WithActive(c context.Context, p Peer, r Request, o Object, release func(context.Context) Code) Code {
 	return f(c, p, r, o, release)
 }
 
@@ -60,7 +60,9 @@ func testServer(t *testing.T, handler Handler, peers PeerSource, ids RequestIDs,
 		})
 	}
 	// Fixed-active fixture only; real adapters must serialize with retirement.
-	var fence ReleaseFence = fenceFunc(func(_ context.Context, _ Peer, _ Request, _ Object, release func() Code) Code { return release() })
+	var fence ReleaseFence = fenceFunc(func(ctx context.Context, _ Peer, _ Request, _ Object, release func(context.Context) Code) Code {
+		return release(ctx)
+	})
 	if len(fences) == 1 {
 		fence = fences[0]
 	} else if len(fences) > 1 {
@@ -705,7 +707,9 @@ func TestRequiredDependencies(t *testing.T) {
 	h := handlerFunc(func(context.Context, Peer, string, Object) (Object, Code) { return Object{}, "" })
 	p := peerFunc(func(context.Context, net.Conn) (Peer, Code) { return Peer{1001, "g"}, "" })
 	ids := idsFunc(func(context.Context, Peer, Request) Code { return "" })
-	fence := fenceFunc(func(_ context.Context, _ Peer, _ Request, _ Object, release func() Code) Code { return release() })
+	fence := fenceFunc(func(ctx context.Context, _ Peer, _ Request, _ Object, release func(context.Context) Code) Code {
+		return release(ctx)
+	})
 	for _, deps := range []struct {
 		h Handler
 		p PeerSource
@@ -913,9 +917,9 @@ func TestAcceptedTupleBeforeHello(t *testing.T) {
 				pin.Generation = ""
 			}
 			var admitted, released atomic.Int32
-			s := testServer(t, nil, peerFunc(func(context.Context, net.Conn) (Peer, Code) { return current, "" }), idsFunc(func(context.Context, Peer, Request) Code { admitted.Add(1); return "" }), fenceFunc(func(_ context.Context, _ Peer, _ Request, _ Object, write func() Code) Code {
+			s := testServer(t, nil, peerFunc(func(context.Context, net.Conn) (Peer, Code) { return current, "" }), idsFunc(func(context.Context, Peer, Request) Code { admitted.Add(1); return "" }), fenceFunc(func(ctx context.Context, _ Peer, _ Request, _ Object, write func(context.Context) Code) Code {
 				released.Add(1)
-				return write()
+				return write(ctx)
 			}))
 			server, client := net.Pipe()
 			ctx, cancel := context.WithCancel(context.Background())

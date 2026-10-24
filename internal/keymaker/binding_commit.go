@@ -1,6 +1,9 @@
 package keymaker
 
-import "strconv"
+import (
+	"context"
+	"strconv"
+)
 
 type bindingCommit struct {
 	Version uint64
@@ -27,13 +30,18 @@ func (j *Journal) observeBinding(r AuditRecord) error {
 }
 
 func (j *Journal) commitBinding(version uint64, digest string) (bindingCommit, Code) {
-	j.mu.Lock()
+	return j.commitBindingContext(context.Background(), version, digest)
+}
+func (j *Journal) commitBindingContext(ctx context.Context, version uint64, digest string) (bindingCommit, Code) {
+	if !j.mu.LockContext(ctx) {
+		return bindingCommit{}, "request_deadline_exceeded"
+	}
 	defer j.mu.Unlock()
 	if version != j.binding.Version+1 || !validDigest(digest) {
 		return bindingCommit{}, "audit_unavailable"
 	}
 	id, domain := "binding:"+strconv.FormatUint(version, 10), "control"
-	if c := j.appendLocked(AuditRecord{Surface: "control", Operation: "binding_commit", Domain: &domain, RequestID: &id, PayloadDigest: &digest, Result: "success"}); c != "" {
+	if c := j.appendContextLocked(ctx, AuditRecord{Surface: "control", Operation: "binding_commit", Domain: &domain, RequestID: &id, PayloadDigest: &digest, Result: "success"}); c != "" {
 		return bindingCommit{}, c
 	}
 	return j.binding, ""

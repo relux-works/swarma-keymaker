@@ -109,7 +109,7 @@ func TestOverloadRefusalBudget(t *testing.T) {
 	e.rateNow = func() time.Time { return fixed }
 	e.global = bucket{last: time.Now().Add(time.Hour)}
 	for i := 0; i < 100; i++ {
-		if code := e.Handle(context.Background(), s, []byte{11}, func([]byte) error { t.Fatal("overload released"); return nil }); code != "rate_limited" {
+		if code := e.Handle(context.Background(), s, []byte{11}, func(context.Context, []byte) error { t.Fatal("overload released"); return nil }); code != "rate_limited" {
 			t.Fatal(code)
 		}
 	}
@@ -123,7 +123,7 @@ func TestOverloadRefusalBudget(t *testing.T) {
 		t.Fatal("overload counter lost refusals", e.AggregatedRefusals())
 	}
 	e.global = bucket{}
-	if code := e.Handle(context.Background(), s, []byte{11}, func([]byte) error { return nil }); code != "" {
+	if code := e.Handle(context.Background(), s, []byte{11}, func(context.Context, []byte) error { return nil }); code != "" {
 		t.Fatal("positive control", code)
 	}
 }

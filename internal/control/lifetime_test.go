@@ -69,7 +69,7 @@ func (a *lifetimeAuthority) Identify(context.Context, net.Conn) (Peer, Code) {
 	return a.peer, ""
 }
 
-func (a *lifetimeAuthority) WithActive(ctx context.Context, peer Peer, _ Request, _ Object, release func() Code) Code {
+func (a *lifetimeAuthority) WithActive(ctx context.Context, peer Peer, _ Request, _ Object, release func(context.Context) Code) Code {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if ctx.Err() != nil {
@@ -81,7 +81,7 @@ func (a *lifetimeAuthority) WithActive(ctx context.Context, peer Peer, _ Request
 	if peer != a.peer {
 		return "generation_mismatch"
 	}
-	return release()
+	return release(ctx)
 }
 
 func (a *lifetimeAuthority) retire() {

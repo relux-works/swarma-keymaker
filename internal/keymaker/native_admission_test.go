@@ -73,7 +73,7 @@ func (n *nativeAdmissionCalls) Handle(ctx context.Context, p control.Peer, r con
 	n.handle.Add(1)
 	return n.Native.Handle(ctx, p, r)
 }
-func (n *nativeAdmissionCalls) WithActive(ctx context.Context, p control.Peer, r control.Request, result control.Object, release func() control.Code) control.Code {
+func (n *nativeAdmissionCalls) WithActive(ctx context.Context, p control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) control.Code {
 	n.release.Add(1)
 	return n.Native.WithActive(ctx, p, r, result, release)
 }

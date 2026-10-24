@@ -50,6 +50,14 @@ func decodeFixture(t *testing.T, s string) []byte {
 	}
 	return b
 }
+
+// Registrar263ca7fcfd97 and5f44ebf3f788 have identical public trees:
+// ccj53452b3e84a131d811221834a1d84c1328dcd5d3, registration
+// ed1a0c55fa1da41be6688f5c7c079576b4351df3, enrollment
+// 088a2337ff6abb18399b16710353f34cbf6b3bec, registry
+// c17d73b2d6ffd5dfc042d3e0d8fc63972c95e00a (git rev-parse commit:path).
+// The five added rows R138/R139/PR31-33 concern HTTP Content-Type only;
+// vector-coverage.json explicitly excludes that receiver boundary.
 func localModule(t *testing.T) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -66,7 +74,7 @@ func localModule(t *testing.T) string {
 		t.Fatal("local pinned registrar unavailable; conformance unrun", err)
 	}
 	var m struct{ Dir, Version string }
-	if json.Unmarshal(out, &m) != nil || !filepath.IsAbs(m.Dir) || m.Version != "v0.0.0-20261023150327-263ca7fcfd97" {
+	if json.Unmarshal(out, &m) != nil || !filepath.IsAbs(m.Dir) || m.Version != "v0.0.0-20261023164451-5f44ebf3f788" {
 		t.Fatal("conformance requires exact local registrar pin")
 	}
 	return m.Dir
@@ -91,7 +99,7 @@ func published(t *testing.T) map[string]registrationVector {
 			rows[row.Row] = row
 		}
 	}
-	if len(rows) != 166 {
+	if len(rows) != 171 {
 		t.Fatalf("registrar rows changed: %d; coverage review required", len(rows))
 	}
 	return rows

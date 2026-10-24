@@ -148,7 +148,10 @@ func TestBindingHistoryUniqueness(t *testing.T) {
 			e := NewEngine(s, g, signer, audit)
 			session := e.OpenSession(context.Background(), Peer{UID: rows[2].UID})
 			body := validBody(signer.key[32:], "git")
-			if c := e.Handle(context.Background(), session, body, func(response []byte) error { checkResponse(t, response, signer.key[32:], body); return nil }); c != "" {
+			if c := e.Handle(context.Background(), session, body, func(_ context.Context, response []byte) error {
+				checkResponse(t, response, signer.key[32:], body)
+				return nil
+			}); c != "" {
 				t.Fatal("valid signing control", c)
 			}
 			for _, b := range rows[:2] {

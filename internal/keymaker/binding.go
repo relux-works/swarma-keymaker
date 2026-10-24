@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 )
 
@@ -21,15 +20,16 @@ type Generation struct {
 type GenerationSource interface {
 	Lookup(context.Context, uint32) (Generation, Code)
 	// WithActive must not invoke the callback unless current authoritative evidence
-	// is active; its callback/release is ordered against retirement.
-	WithActive(context.Context, uint32, string, func() Code) Code
+	// is active; its callback/release is ordered against retirement. The
+	// callback context carries the window deadline through audit and handoff.
+	WithActive(context.Context, uint32, string, func(context.Context) Code) Code
 	// WithEvidence validates all named generations under the same retirement
 	// barrier and holds it through the callback. No nested Lookup is permitted.
 	// A condition with Verdict records its current predicate verdict instead of
 	// refusing before the callback. The callback must enforce that verdict before
 	// any effect requiring this condition. This supports atomic retained-result
 	// selection under the Store lock without reacquiring the generation barrier.
-	WithEvidence(context.Context, []GenerationCondition, func() Code) Code
+	WithEvidence(context.Context, []GenerationCondition, func(context.Context) Code) Code
 	Watch(uint32, string) (<-chan struct{}, func())
 }
 
@@ -67,7 +67,7 @@ type bindingDisk struct {
 	AuditHash string            `json:"audit_hash"`
 }
 type Store struct {
-	mu           sync.Mutex
+	mu           auditGate
 	records      []Binding
 	requests     []retainedRequest
 	requestIndex map[requestKey]int
@@ -207,7 +207,11 @@ func validateBindings(records []Binding, next uint64) Code {
 	}
 	return ""
 }
-func (s *Store) persist() Code {
+func (s *Store) persist() Code { return s.persistContext(context.Background()) }
+func (s *Store) persistContext(ctx context.Context) Code {
+	if auditContextExpired(ctx) {
+		return "request_deadline_exceeded"
+	}
 	if s.dir == nil {
 		return ""
 	}
@@ -221,7 +225,7 @@ func (s *Store) persist() Code {
 	}
 	// The durable journal commit comes first. A later snapshot write failure
 	// leaves an unmatched commit, fencing both this Store and the next startup.
-	commit, c := s.journal.commitBinding(version, digest)
+	commit, c := s.journal.commitBindingContext(ctx, version, digest)
 	if c != "" {
 		return c
 	}

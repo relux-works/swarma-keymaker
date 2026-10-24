@@ -28,7 +28,7 @@ type registrationSigner struct {
 }
 
 func (s registrationSigner) Sign(ctx context.Context, preimage []byte) ([]byte, proof.Code) {
-	if ctx.Err() != nil {
+	if auditContextExpired(ctx) {
 		return nil, proof.DeadlineExceeded
 	}
 	// Only Builder can reach this private adapter. Its preimage remains owned by
@@ -37,7 +37,7 @@ func (s registrationSigner) Sign(ctx context.Context, preimage []byte) ([]byte, 
 	if connection := connectionFrom(ctx); connection != nil {
 		connection.custodyCause = cause
 	}
-	if ctx.Err() != nil {
+	if auditContextExpired(ctx) {
 		return nil, proof.DeadlineExceeded
 	}
 	return signature, proof.Code(code)
@@ -106,9 +106,11 @@ func (n *Native) signRegistration(ctx context.Context, peer control.Peer, r cont
 		return nil, control.Code(code)
 	}
 	var result control.Object
-	c := n.Engine.Generations.WithActive(ctx, peer.UID, peer.Generation, func() Code {
+	c := n.Engine.Generations.WithActive(ctx, peer.UID, peer.Generation, func(ctx context.Context) Code {
 		s := n.Engine.Store
-		s.mu.Lock()
+		if !s.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer s.mu.Unlock()
 		b, c := s.lookup(peer.UID, peer.Generation)
 		if c != "" {
@@ -178,13 +180,13 @@ func (n *Native) signRegistration(ctx context.Context, peer control.Peer, r cont
 			}
 			record := n.record(&peer, r, args, "")
 			record.Result = "unknown"
-			if c := n.audit(record); c != "" {
+			if c := n.auditContext(ctx, record); c != "" {
 				return enrollment.Code(c)
 			}
 			// Retain before release, including a lost response. Serialization prevents
 			// concurrent same-ID attempts from ever obtaining a second signed nonce.
 			s.appendRequest(entry)
-			if c := s.persist(); c != "" {
+			if c := s.persistContext(ctx); c != "" {
 				s.failed = true
 				n.Engine.fail()
 				return enrollment.Code(c)
@@ -196,7 +198,7 @@ func (n *Native) signRegistration(ctx context.Context, peer control.Peer, r cont
 }
 
 // Called only inside Native.WithActive's generation barrier and Store lock.
-func (n *Native) releaseRegistration(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func() control.Code) Code {
+func (n *Native) releaseRegistration(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) Code {
 	s := n.Engine.Store
 	if _, c := s.lookup(peer.UID, peer.Generation); c != "" {
 		return c
@@ -235,17 +237,17 @@ func (n *Native) releaseRegistration(ctx context.Context, peer control.Peer, r c
 			return enrollment.Code(pc)
 		}
 		args, _ := requestArguments(r)
-		if c := n.audit(n.record(&peer, r, args, "")); c != "" {
+		if c := n.auditContext(ctx, n.record(&peer, r, args, "")); c != "" {
 			return enrollment.Code(c)
 		}
 		// Durable evidence may take time. Sample again immediately before release.
 		if pc := retained.Recheck(ctx); pc != "" {
 			return enrollment.Code(pc)
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return "request_deadline_exceeded"
 		}
-		return enrollment.Code(release())
+		return enrollment.Code(release(ctx))
 	}))
 }
 

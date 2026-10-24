@@ -31,14 +31,14 @@ type nativeFenceProbe struct {
 	once    atomic.Bool
 }
 
-func (f *nativeFenceProbe) WithActive(ctx context.Context, p control.Peer, r control.Request, result control.Object, release func() control.Code) control.Code {
+func (f *nativeFenceProbe) WithActive(ctx context.Context, p control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) control.Code {
 	if r.Method != f.method || !f.once.CompareAndSwap(false, true) {
 		return f.native.WithActive(ctx, p, r, result, release)
 	}
 	if f.before != nil {
 		f.before()
 	}
-	return f.native.WithActive(ctx, p, r, result, func() control.Code {
+	return f.native.WithActive(ctx, p, r, result, func(ctx context.Context) control.Code {
 		if f.entered != nil {
 			close(f.entered)
 			select {
@@ -47,7 +47,7 @@ func (f *nativeFenceProbe) WithActive(ctx context.Context, p control.Peer, r con
 				return control.DeadlineExceeded
 			}
 		}
-		return release()
+		return release(ctx)
 	})
 }
 

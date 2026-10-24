@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper or packaging controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging or genjournal-core controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -35,9 +35,11 @@ func main() {
 	// Move only the authoritative retained snapshot before the generation
 	// barrier, retaining Store synchronization and every authority predicate.
 	replayInside := `	var result control.Object
-	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func() Code {
+	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func(ctx context.Context) Code {
 		s := n.Engine.Store
-		s.mu.Lock()
+		if !s.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer s.mu.Unlock()
 		if c := connection.bindingActive(s); c != "" {
 			return c
@@ -47,9 +49,11 @@ func main() {
 	n.Engine.Store.mu.Lock()
 	outside, outsideCode := n.Engine.Store.retained(p, r)
 	n.Engine.Store.mu.Unlock()
-	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func() Code {
+	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func(ctx context.Context) Code {
 		s := n.Engine.Store
-		s.mu.Lock()
+		if !s.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer s.mu.Unlock()
 		if c := connection.bindingActive(s); c != "" {
 			return c
@@ -80,7 +84,7 @@ func main() {
 		{"native-target-release", "native.go", "connection.conditions = conditions", "connection.conditions = conditions[:1]", "^TestNativeMutationReleasePrincipals$/^target$", "--- FAIL: TestNativeMutationReleasePrincipals/target", "mutation release lost target authority but emitted result"},
 		{"native-binding-pin", "native.go", "if c := connection.pin(n.Engine.Store, b); c != \"\" {", "if c := Code(\"\"); c != \"\" {", "^TestNativeConnectionBindingPin$", "--- FAIL: TestNativeConnectionBindingPin", "old control connection adopted replacement binding"},
 		{"native-accepted-generation", "server_linux.go", "s.controlWire.ServeConnAccepted(nativeCtx, c, control.Peer{UID: p.UID, Generation: g.Generation})", "s.controlWire.ServeConn(nativeCtx, c)", "^TestNativeAcceptTupleBeforeHello$/^true$", "--- FAIL: TestNativeAcceptTupleBeforeHello/true", "accepted tuple changed before hello but emitted success"},
-		{"native-release-fence", "native.go", "return n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, release)", "return release()", "^TestNativeReleaseFence$/^hello$/^retirement-wins$", "--- FAIL: TestNativeReleaseFence/hello/retirement-wins", "native retirement released success"},
+		{"native-release-fence", "native.go", "return n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, release)", "return release(ctx)", "^TestNativeReleaseFence$/^hello$/^retirement-wins$", "--- FAIL: TestNativeReleaseFence/hello/retirement-wins", "native retirement released success"},
 	}
 	// Preserve the default custody controls; native selects only their subset.
 	if *group == "native" {
@@ -131,6 +135,13 @@ func main() {
 			{"packaging-git-boundary", "source.go", "return runConfined(cmd, anchor, null)", "return runCommand(cmd)", "^TestReleaseGitPreflightBoundary$/^true$", "--- FAIL: TestReleaseGitPreflightBoundary/true", "Git preflight escaped scratch boundary"},
 			{"packaging-filters", "source.go", "status, err := worktreeStatus(ctx, repo, commit)", "status, err := gitRead(ctx, repo, \"status\", \"--porcelain=v1\", \"--untracked-files=all\")", "^TestReleaseConfiguredFilters$/^attributes-file$", "--- FAIL: TestReleaseConfiguredFilters/attributes-file", "configured filter admitted"},
 			{"packaging-null-rdev", "root_linux.go", "st.Rdev == unix.Mkdev(1, 3)", "true", "^TestReleaseNullDeviceVerification$", "--- FAIL: TestReleaseNullDeviceVerification", "wrong rdev admitted"},
+		}
+	}
+	if *group == "genjournal-core" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"generation-stale-retryable", "generation_linux.go", `case "journal_rollback", "journal_fork", "journal_writer_stale", "journal_capacity_reserve":`, `case "journal_writer_stale": return "generation_source_unavailable"
+case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGenerationSourceIncidentClassification$/^journal_writer_stale$", "--- FAIL: TestGenerationSourceIncidentClassification/journal_writer_stale", "generation_source_unavailable want generation_source_fenced"},
+			{"generation-skip-floor", "generation_linux.go", `g.window.WithEvidence(ctx, g.anchor.Path, g.anchor.Floor,`, `g.window.WithEvidence(ctx, g.anchor.Path, gj.Floor{Hash:gj.ZeroHash},`, "^TestGenerationAnchorContinuity$/^(rollback|fork)$", "--- FAIL: TestGenerationAnchorContinuity/rollback", "incident not fenced once"},
 		}
 	}
 	good := true

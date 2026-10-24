@@ -19,7 +19,7 @@ type nativePauseEffect struct {
 	resume  <-chan struct{}
 }
 
-func (g *nativePauseEffect) WithEvidence(ctx context.Context, cs []GenerationCondition, fn func() Code) Code {
+func (g *nativePauseEffect) WithEvidence(ctx context.Context, cs []GenerationCondition, fn func(context.Context) Code) Code {
 	if len(cs) > 1 && g.calls.Add(1) == 1 {
 		close(g.entered)
 		select {
@@ -159,7 +159,7 @@ func TestNativeFreshTargetEvidence(t *testing.T) {
 // deferred-verdict contract. Its silence must never default to authorization.
 type nativeUnrecordedVerdict struct{ *fakeGenerations }
 
-func (g nativeUnrecordedVerdict) WithEvidence(ctx context.Context, cs []GenerationCondition, fn func() Code) Code {
+func (g nativeUnrecordedVerdict) WithEvidence(ctx context.Context, cs []GenerationCondition, fn func(context.Context) Code) Code {
 	cs = append([]GenerationCondition(nil), cs...)
 	for i := range cs {
 		cs[i].Verdict = nil
@@ -176,7 +176,7 @@ type nativePauseReplay struct {
 	resume  <-chan struct{}
 }
 
-func (g *nativePauseReplay) WithActive(ctx context.Context, uid uint32, token string, fn func() Code) Code {
+func (g *nativePauseReplay) WithActive(ctx context.Context, uid uint32, token string, fn func(context.Context) Code) Code {
 	claimed := g.armed.CompareAndSwap(true, false)
 	c := g.delayedGenerationWatch.WithActive(ctx, uid, token, fn)
 	if claimed {
@@ -206,7 +206,7 @@ func TestNativePauseReplayOwnership(t *testing.T) {
 				callbackEntered, returnCallback := make(chan struct{}), make(chan struct{})
 				previous := make(chan Code, 1)
 				go func() {
-					previous <- g.WithActive(ctx, uid, nativeToken, func() Code {
+					previous <- g.WithActive(ctx, uid, nativeToken, func(ctx context.Context) Code {
 						close(callbackEntered)
 						select {
 						case <-returnCallback:
@@ -239,7 +239,7 @@ func TestNativePauseReplayOwnership(t *testing.T) {
 			next := make(chan Code, 1)
 			var callbackRan atomic.Bool
 			go func() {
-				next <- g.WithActive(ctx, uid, nativeToken, func() Code {
+				next <- g.WithActive(ctx, uid, nativeToken, func(ctx context.Context) Code {
 					callbackRan.Store(true)
 					return "fixture_next"
 				})

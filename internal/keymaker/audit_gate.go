@@ -44,3 +44,14 @@ func (g *auditGate) LockContext(ctx context.Context) bool {
 
 func (g *auditGate) Lock()   { g.LockContext(context.Background()) }
 func (g *auditGate) Unlock() { <-g.held }
+
+// TryLock supports nonblocking admission probes without creating a waiter.
+func (g *auditGate) TryLock() bool {
+	g.init()
+	select {
+	case g.held <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}

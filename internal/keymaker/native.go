@@ -184,7 +184,20 @@ func (n *Native) record(p *control.Peer, r control.Request, body []byte, c Code)
 	return out
 }
 func (n *Native) audit(record AuditRecord) Code {
-	if n.Engine.closed.Load() || n.Engine.Audit.Append(record) != "" {
+	return n.auditContext(context.Background(), record)
+}
+func (n *Native) auditContext(ctx context.Context, record AuditRecord) Code {
+	if n.Engine.closed.Load() {
+		return "audit_unavailable"
+	}
+	if auditContextExpired(ctx) {
+		return "request_deadline_exceeded"
+	}
+	c := n.Engine.Audit.AppendContext(ctx, record)
+	if c == "request_deadline_exceeded" {
+		return c
+	}
+	if n.Engine.closed.Load() || c != "" {
 		n.Engine.fail()
 		return "audit_unavailable"
 	}
@@ -192,7 +205,7 @@ func (n *Native) audit(record AuditRecord) Code {
 }
 func (n *Native) Refuse(ctx context.Context, conn net.Conn, p *control.Peer, r control.Request, body []byte, refusal control.Code) control.Code {
 	// The wire supplies the remaining admission budget or a separate bounded
-	// refusal-report budget. Successful operation auditing stays non-cancellable.
+	// refusal-report budget. An append already begun still owns its durable sync.
 	if auditContextExpired(ctx) {
 		return control.DeadlineExceeded
 	}
@@ -241,7 +254,7 @@ func (n *Native) Refuse(ctx context.Context, conn net.Conn, p *control.Peer, r c
 // Admit consults durable state. The coordinator repeats this check atomically
 // with intent/result persistence; concurrent connections cannot race the hint.
 func (n *Native) Admit(ctx context.Context, p control.Peer, r control.Request) control.Code {
-	if ctx.Err() != nil {
+	if auditContextExpired(ctx) {
 		return control.DeadlineExceeded
 	}
 	principal := nativePrincipal(p)
@@ -329,9 +342,11 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 	// A replay needs current caller authority, not a still-unbound target. It
 	// returns the original result even if later transactions changed that target.
 	var replay control.Object
-	c := n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, func() Code {
+	c := n.Engine.Generations.WithActive(ctx, p.UID, p.Generation, func(ctx context.Context) Code {
 		s := n.Engine.Store
-		s.mu.Lock()
+		if !s.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer s.mu.Unlock()
 		if c := connection.bindingActive(s); c != "" {
 			return c
@@ -367,9 +382,11 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		effectConditions[1].Verdict = &targetCode
 	}
 	var result control.Object
-	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func() Code {
+	c = n.Engine.Generations.WithEvidence(ctx, effectConditions, func(ctx context.Context) Code {
 		s := n.Engine.Store
-		s.mu.Lock()
+		if !s.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer s.mu.Unlock()
 		if c := connection.bindingActive(s); c != "" {
 			return c
@@ -389,7 +406,7 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		if plan.target != nil && targetCode != "" {
 			return targetCode
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return "request_deadline_exceeded"
 		}
 		records := append([]Binding(nil), s.records...)
@@ -455,18 +472,18 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		audit.Result = "unknown"
 		audit.Path = &b.Path
 		audit.Epoch = &b.Epoch
-		if c := n.audit(audit); c != "" {
+		if c := n.auditContext(ctx, audit); c != "" {
 			return c
 		}
 		entry.Status = "pending"
 		entry.Result = json.RawMessage("null")
 		s.appendRequest(entry)
-		if c := s.persist(); c != "" {
+		if c := s.persistContext(ctx); c != "" {
 			s.failed = true
 			n.Engine.fail()
 			return c
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			s.failed = true
 			n.Engine.fail()
 			return "audit_unavailable"
@@ -475,7 +492,7 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 		entry.Status = "committed"
 		entry.Result = encoded
 		s.requests[len(s.requests)-1] = entry
-		if c := s.persist(); c != "" {
+		if c := s.persistContext(ctx); c != "" {
 			s.failed = true
 			n.Engine.fail()
 			return c
@@ -607,7 +624,7 @@ func (n *Native) plan(ctx context.Context, p Principal, r control.Request) (nati
 
 // The actual write remains inside one authority barrier and the Store lock. No lookup
 // outside that barrier authorizes release; hello deliberately needs no binding.
-func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func() control.Code) control.Code {
+func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) control.Code {
 	p := nativePrincipal(peer)
 	connection := connectionFrom(ctx)
 	if connection == nil || connection.requestID != r.ID {
@@ -620,14 +637,16 @@ func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Re
 		}
 		conditions = connection.conditions
 	}
-	c := n.releaseFence(ctx, p, conditions, func() Code {
+	c := n.releaseFence(ctx, p, conditions, func(ctx context.Context) Code {
 		s := n.Engine.Store
-		s.mu.Lock()
+		if !s.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer s.mu.Unlock()
 		if s.failed || n.Engine.closed.Load() {
 			return "audit_unavailable"
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return "request_deadline_exceeded"
 		}
 		if c := connection.bindingActive(s); c != "" {
@@ -676,7 +695,7 @@ func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Re
 				return "state_capacity_exceeded"
 			}
 			s.appendRequest(entry)
-			if c := s.persist(); c != "" {
+			if c := s.persistContext(ctx); c != "" {
 				s.failed = true
 				n.Engine.fail()
 				return c
@@ -690,18 +709,18 @@ func (n *Native) WithActive(ctx context.Context, peer control.Peer, r control.Re
 		if epoch, ok := result["master_epoch"].(string); ok {
 			record.Epoch = &epoch
 		}
-		if c := n.audit(record); c != "" {
+		if c := n.auditContext(ctx, record); c != "" {
 			return c
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return "request_deadline_exceeded"
 		}
-		return Code(release())
+		return Code(release(ctx))
 	})
 	return control.Code(c)
 }
 
-func (n *Native) releaseFence(ctx context.Context, p Principal, conditions []GenerationCondition, release func() Code) Code {
+func (n *Native) releaseFence(ctx context.Context, p Principal, conditions []GenerationCondition, release func(context.Context) Code) Code {
 	if conditions != nil {
 		return n.Engine.Generations.WithEvidence(ctx, conditions, release)
 	}

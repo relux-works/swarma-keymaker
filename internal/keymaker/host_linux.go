@@ -234,10 +234,10 @@ type UnavailableGeneration struct{}
 func (UnavailableGeneration) Lookup(context.Context, uint32) (Generation, Code) {
 	return Generation{}, "generation_source_unavailable"
 }
-func (UnavailableGeneration) WithActive(context.Context, uint32, string, func() Code) Code {
+func (UnavailableGeneration) WithActive(context.Context, uint32, string, func(context.Context) Code) Code {
 	return "generation_source_unavailable"
 }
-func (UnavailableGeneration) WithEvidence(context.Context, []GenerationCondition, func() Code) Code {
+func (UnavailableGeneration) WithEvidence(context.Context, []GenerationCondition, func(context.Context) Code) Code {
 	return "generation_source_unavailable"
 }
 func (UnavailableGeneration) Watch(uint32, string) (<-chan struct{}, func()) {

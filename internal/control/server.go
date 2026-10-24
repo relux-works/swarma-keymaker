@@ -53,7 +53,7 @@ type RequestIDs interface {
 // Transport deadline setup and encoding precede the barrier; actual writes are
 // exclusively inside it. Refusals carry no result and can report a failed fence.
 type ReleaseFence interface {
-	WithActive(ctx context.Context, peer Peer, request Request, result Object, release func() Code) Code
+	WithActive(ctx context.Context, peer Peer, request Request, result Object, release func(context.Context) Code) Code
 }
 
 // Observer supplies shared workload admission and durable refusal reporting.
@@ -377,11 +377,20 @@ func (s *Server) release(ctx context.Context, conn net.Conn, peer Peer, req Requ
 	}
 	started := false
 	var writeErr error
-	release := func() Code {
+	release := func(ctx context.Context) Code {
 		if started {
 			return RequestConflict
 		}
-		if ctx.Err() != nil || !time.Now().Before(deadline) {
+		// The authority may shorten the request budget to its locked read window.
+		bounded := deadline
+		if d, ok := ctx.Deadline(); ok && d.Before(bounded) {
+			bounded = d
+		}
+		if ctx.Err() != nil || !time.Now().Before(bounded) {
+			return DeadlineExceeded
+		}
+		if err := conn.SetWriteDeadline(bounded); err != nil {
+			writeErr = err
 			return DeadlineExceeded
 		}
 		started = true

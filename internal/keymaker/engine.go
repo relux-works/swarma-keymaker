@@ -205,7 +205,7 @@ func (e *Engine) RejectBusy(s Session, body []byte) Code {
 // Handle releases a complete response only inside both the generation barrier and
 // the binding lock, after durable audit. The network callback must be deadline-
 // bounded. No state mutex is held while waiting for the generation dependency.
-func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release func([]byte) error) Code {
+func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release func(context.Context, []byte) error) Code {
 	if e.closed.Load() {
 		return "audit_unavailable"
 	}
@@ -261,7 +261,7 @@ func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release fun
 		if !bytes.Equal(q.key, blob) {
 			return e.refuse(s, q, body, "sign_key_mismatch")
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return e.refuse(s, q, body, "request_deadline_exceeded")
 		}
 		sig, code, cause := signForAudit(e.Signer, current.Path, q.data)
@@ -277,13 +277,15 @@ func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release fun
 		erase(sig)
 	}
 	defer erase(response)
-	c = e.Generations.WithActive(ctx, s.Peer.UID, s.Generation, func() Code {
-		e.Store.mu.Lock()
+	c = e.Generations.WithActive(ctx, s.Peer.UID, s.Generation, func(ctx context.Context) Code {
+		if !e.Store.mu.LockContext(ctx) {
+			return "request_deadline_exceeded"
+		}
 		defer e.Store.mu.Unlock()
 		if e.closed.Load() {
 			return "audit_unavailable"
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return "request_deadline_exceeded"
 		}
 		b, code := e.Store.lookup(s.Peer.UID, s.Generation)
@@ -296,14 +298,17 @@ func (e *Engine) Handle(ctx context.Context, s Session, body []byte, release fun
 		if b.UID != s.Peer.UID {
 			return "peer_binding_mismatch"
 		}
-		if e.Audit.Append(e.record(s, q, body, "")) != "" {
+		if c := e.Audit.AppendContext(ctx, e.record(s, q, body, "")); c != "" {
+			if c == "request_deadline_exceeded" {
+				return c
+			}
 			e.fail()
 			return "audit_unavailable"
 		}
-		if ctx.Err() != nil {
+		if auditContextExpired(ctx) {
 			return "request_deadline_exceeded"
 		}
-		if release(response) != nil {
+		if release(ctx, response) != nil {
 			return "request_deadline_exceeded"
 		}
 		return ""

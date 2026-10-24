@@ -184,27 +184,28 @@ Its 67-case manifest and exact raw files are copied under
 in `provenance.json`. Drift controls check those bytes; they do not establish
 adapter conformance. `generation_source_fenced` is a stable nonretryable
 incident refusal, with audited native admission coverage. The production
-journal adapter and its activation remain pending.
+journal adapter wiring and its activation remain pending.
 
-- The source library exports a single-active-UID barrier and an inspection
-  operation that releases its locks before returning. Keymaker needs a common
-  window for multiple principal predicates, including retired targets and
-  deferred verdicts. The reusable read-window and marker validator, including
-  nonroot fixture policy, are private. Resolve ownership of a reusable consumer
-  window/test interface versus a consumer-owned path/lock/marker implementation;
-  do not silently fork the source validator or substitute an unlocked check.
-- The format requires a 250 ms cooperative data window. The current final
-  callback carries no shorter context to audit and actual response handoff.
-  A bounded-context interface must reach those operations; a check after the
-  callback cannot recall bytes already released.
-- Explicit initial-floor enrollment and external restore authorization need
-  an agreed contract. Missing/corrupt established reader floors must fence,
-  without initializing from the restored journal. The witness supplement is
-  not activated and cannot be represented as an implemented authorization source.
-- The source module requires registrar `5f44ebf3f788`, while this module pins
-  `263ca7fcfd97`. Their CCJ package trees are identical
-  (`53452b3e84a131d811221834a1d84c1328dcd5d3`), as are the public registration,
-  enrollment and registry packages. A normal import still changes Go's selected
-  module version and requires the dependency/conformance pin to be reconciled.
-- The landed user-manager commit pin and qualification against a real root-owned
-  journal remain pending. Synthetic nonroot fixtures cannot satisfy either gate.
+- The format owner has agreed to a release-authorizing public `WithEvidence`
+  window and a build-tagged `genjournal_testseam` fixture constructor. Its
+  landed head is pending. The internal window matches that public signature;
+  no private path, marker or lock validator is copied and no release uses
+  `Checkpoint`. Production wiring, real-flock and protected-path fixture checks,
+  and all67 adapter vector verdicts remain PENDING on that head.
+- The bounded callback context now reaches audit admission and both transport
+  handoffs. Cooperative deadlines cannot cancel an already-started durable
+  sync; expired authority suppresses response emission. Real root-owned storage
+  latency qualification remains PENDING.
+- The owner-approved pristine enrollment rule is implemented locally: protected
+  initial floor only with no anchor and no binding ever issued. Audit-indexed
+  enrollment detects an absent/corrupt established anchor and interrupted
+  publication; incident fencing survives restart without automatic recovery.
+  Content confirmation and external restore authorization (WC1) remain PENDING.
+  No dummy restore-success callback is present.
+- Go MVS selects registrar `5f44ebf3f788` and the shared minimum x/sys0.37.0.
+  The exact conformance pin is updated; ccj, registration, enrollment and
+  registry tree-equality evidence is retained beside the assertion. No replace
+  directive is used. The current source dependency is landed user-manager
+  `4da5aa5`; the agreed API's exact landed head will replace it when supplied.
+- Qualification against a real root-owned journal remains PENDING. Synthetic
+  nonroot fixtures cannot satisfy the production custody, ACL or restore gates.

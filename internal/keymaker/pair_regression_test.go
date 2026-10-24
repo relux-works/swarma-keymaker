@@ -75,7 +75,7 @@ func TestSnapshotJournalDivergence(t *testing.T) {
 			if mode == "active-intact" {
 				want = ""
 			}
-			if c = prior.Handle(context.Background(), priorSession, validBody(public, "git"), func(response []byte) error {
+			if c = prior.Handle(context.Background(), priorSession, validBody(public, "git"), func(_ context.Context, response []byte) error {
 				if mode != "active-intact" {
 					t.Fatal("revoked control released")
 				}

@@ -35,7 +35,7 @@ func TestRateLimits(t *testing.T) {
 			}
 			e.rateMu.Unlock()
 			body := validBody(signer.key[32:], "git")
-			if code := e.Handle(context.Background(), s, body, func([]byte) error { t.Fatal("rate refusal released"); return nil }); code != "rate_limited" || signer.calls.Load() != 0 {
+			if code := e.Handle(context.Background(), s, body, func(context.Context, []byte) error { t.Fatal("rate refusal released"); return nil }); code != "rate_limited" || signer.calls.Load() != 0 {
 				t.Fatal("exhausted bucket admitted", code)
 			}
 			if len(a.records) != 1 || a.records[0].RefusalCode == nil || *a.records[0].RefusalCode != "rate_limited" {
@@ -45,7 +45,7 @@ func TestRateLimits(t *testing.T) {
 			e.global = bucket{}
 			e.peers = map[Principal]*bucket{}
 			e.rateMu.Unlock()
-			if code := e.Handle(context.Background(), s, body, func([]byte) error { return nil }); code != "" || signer.calls.Load() != 1 {
+			if code := e.Handle(context.Background(), s, body, func(context.Context, []byte) error { return nil }); code != "" || signer.calls.Load() != 1 {
 				t.Fatal("rate control denied", code)
 			}
 		})
@@ -70,10 +70,10 @@ func (f *fakeGenerations) Lookup(_ context.Context, uid uint32) (Generation, Cod
 	defer f.mu.Unlock()
 	return f.lookup(uid)
 }
-func (f *fakeGenerations) WithActive(ctx context.Context, uid uint32, token string, fn func() Code) Code {
+func (f *fakeGenerations) WithActive(ctx context.Context, uid uint32, token string, fn func(context.Context) Code) Code {
 	return f.WithEvidence(ctx, []GenerationCondition{{Principal: Principal{uid, token}}}, fn)
 }
-func (f *fakeGenerations) WithEvidence(ctx context.Context, conditions []GenerationCondition, fn func() Code) Code {
+func (f *fakeGenerations) WithEvidence(ctx context.Context, conditions []GenerationCondition, fn func(context.Context) Code) Code {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if ctx.Err() != nil {
@@ -102,7 +102,7 @@ func (f *fakeGenerations) WithEvidence(ctx context.Context, conditions []Generat
 			return c
 		}
 	}
-	return fn()
+	return fn(ctx)
 }
 func (f *fakeGenerations) Watch(uid uint32, _ string) (<-chan struct{}, func()) {
 	f.mu.Lock()
@@ -295,7 +295,7 @@ func runVector(t *testing.T, layer string, raw json.RawMessage, expected Code) {
 	before := e.Store.Snapshot()
 	var response []byte
 	var actual Code
-	release := func(b []byte) error { response = append([]byte(nil), b...); return nil }
+	release := func(_ context.Context, b []byte) error { response = append([]byte(nil), b...); return nil }
 	switch layer {
 	case "binding_authorize":
 		var in struct {
@@ -441,12 +441,12 @@ func TestProductionGenerationRefuses(t *testing.T) {
 	e.Generations = UnavailableGeneration{}
 	s = e.OpenSession(context.Background(), s.Peer)
 	var out []byte
-	c := e.Handle(context.Background(), s, validBody(k.key[32:], "git"), func(b []byte) error { out = append(out, b...); return nil })
+	c := e.Handle(context.Background(), s, validBody(k.key[32:], "git"), func(_ context.Context, b []byte) error { out = append(out, b...); return nil })
 	if c != "generation_source_unavailable" || len(out) != 0 || k.calls.Load() != 0 || len(a.records) != 1 {
 		t.Fatal("production generation bypass", c)
 	}
 	e, g, k, _, s = fixtureEngine(t)
-	if c = e.Handle(context.Background(), s, validBody(k.key[32:], "git"), func([]byte) error { return nil }); c != "" {
+	if c = e.Handle(context.Background(), s, validBody(k.key[32:], "git"), func(context.Context, []byte) error { return nil }); c != "" {
 		t.Fatal(c)
 	}
 	g.mu.Lock()
@@ -454,7 +454,7 @@ func TestProductionGenerationRefuses(t *testing.T) {
 	bad.Verified = false
 	g.entries[s.Peer.UID] = bad
 	g.mu.Unlock()
-	if c = e.Handle(context.Background(), s, []byte{11}, func([]byte) error { t.Fatal("unverified evidence released"); return nil }); c != "generation_source_unavailable" {
+	if c = e.Handle(context.Background(), s, []byte{11}, func(context.Context, []byte) error { t.Fatal("unverified evidence released"); return nil }); c != "generation_source_unavailable" {
 		t.Fatal(c)
 	}
 }
@@ -471,7 +471,7 @@ func TestReleaseFences(t *testing.T) {
 			var released atomic.Bool
 			body := validBody(k.key[32:], "git")
 			go func() {
-				result <- e.Handle(context.Background(), s, body, func([]byte) error { released.Store(true); return nil })
+				result <- e.Handle(context.Background(), s, body, func(context.Context, []byte) error { released.Store(true); return nil })
 			}()
 			<-k.entered
 			expected := Code("identity_revoked")
@@ -491,7 +491,7 @@ func TestReleaseFences(t *testing.T) {
 			if c := <-result; c != expected || released.Load() {
 				t.Fatal("late signature release", c)
 			}
-			if c := e.Handle(context.Background(), s, []byte{11}, func([]byte) error { released.Store(true); return nil }); c != expected || released.Load() {
+			if c := e.Handle(context.Background(), s, []byte{11}, func(context.Context, []byte) error { released.Store(true); return nil }); c != expected || released.Load() {
 				t.Fatal("old session reused", c)
 			}
 			if len(a.records) != 2 {

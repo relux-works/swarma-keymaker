@@ -180,6 +180,7 @@ type Journal struct {
 	reserve      int64
 	clock        AuditClock
 	binding      bindingCommit
+	generation   generationCommit
 }
 
 func auditDigest(r AuditRecord) (string, error) {
@@ -276,6 +277,9 @@ func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.R
 			digest, e2 := auditDigest(r)
 			if e != nil || e2 != nil || !bytes.Equal(b, line) || r.Seq != j.seq+1 || r.Previous != j.previous || r.Digest != digest {
 				return nil, failure("audit continuity failure")
+			}
+			if err := j.observeGeneration(r); err != nil {
+				return nil, err
 			}
 			if err := j.observeBinding(r); err != nil {
 				return nil, err
@@ -452,7 +456,7 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 		j.failed = true
 		return "audit_unavailable"
 	}
-	if j.observeBinding(r) != nil {
+	if j.observeGeneration(r) != nil || j.observeBinding(r) != nil {
 		j.failed = true
 		return "audit_unavailable"
 	}

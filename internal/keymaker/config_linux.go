@@ -6,27 +6,35 @@ import (
 	"bytes"
 	"io"
 	"path/filepath"
+
+	gj "github.com/relux-works/swarma-user-manager/tools/genjournal"
 )
 
 // Config is the daemon's configuration schema. Offline parsing checks the same
 // required members and types; serve additionally enforces protected ownership,
 // current service identity, registry/state recovery and generation readiness.
+type generationJournalConfig struct {
+	Path         string   `json:"path"`
+	InitialFloor gj.Floor `json:"initial_floor"`
+}
+
 type Config struct {
-	Registration     *registrationConfig `json:"registration_helper,omitempty"`
-	SocketDir        string              `json:"socket_dir"`
-	StateDir         string              `json:"state_dir"`
-	MasterFile       string              `json:"master_file"`
-	RegistryFile     string              `json:"registry_file"`
-	ServiceUID       uint32              `json:"service_uid"`
-	ServiceGID       uint32              `json:"service_gid"`
-	ControlGID       uint32              `json:"control_gid"`
-	Operator         Principal           `json:"operator_principal"`
-	Epoch            string              `json:"master_epoch"`
-	RegistryRevision string              `json:"registry_revision"`
+	GenerationJournal *generationJournalConfig `json:"generation_journal,omitempty"`
+	Registration      *registrationConfig      `json:"registration_helper,omitempty"`
+	SocketDir         string                   `json:"socket_dir"`
+	StateDir          string                   `json:"state_dir"`
+	MasterFile        string                   `json:"master_file"`
+	RegistryFile      string                   `json:"registry_file"`
+	ServiceUID        uint32                   `json:"service_uid"`
+	ServiceGID        uint32                   `json:"service_gid"`
+	ControlGID        uint32                   `json:"control_gid"`
+	Operator          Principal                `json:"operator_principal"`
+	Epoch             string                   `json:"master_epoch"`
+	RegistryRevision  string                   `json:"registry_revision"`
 }
 
 func (cfg *Config) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper")
+	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper", "generation_journal")
 	if err != nil {
 		return failure("invalid service configuration members")
 	}
@@ -42,6 +50,15 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 			return err
 		}
 	}
+	if raw, ok := fields["generation_journal"]; ok {
+		journal, err := objectMembers(raw, []string{"path", "initial_floor"})
+		if err != nil {
+			return err
+		}
+		if _, err := objectMembers(journal["initial_floor"], []string{"seq", "hash"}); err != nil {
+			return err
+		}
+	}
 	type plain Config
 	var parsed plain
 	if err := StrictJSON(bytes.NewReader(raw), &parsed); err != nil {
@@ -54,6 +71,11 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 	}
 	if parsed.Epoch == "" || parsed.RegistryRevision == "" {
 		return failure("service configuration pins required")
+	}
+	if g := parsed.GenerationJournal; g != nil {
+		if !filepath.IsAbs(g.Path) || filepath.Clean(g.Path) != g.Path || !validGenerationFloor(g.InitialFloor) {
+			return failure("invalid generation journal configuration")
+		}
 	}
 	*cfg = Config(parsed)
 	return nil

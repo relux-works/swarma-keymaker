@@ -273,7 +273,17 @@ func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peer
 		c.SetWriteDeadline(time.Now().Add(2 * time.Second))
 		select {
 		case s.requests <- struct{}{}:
-			code = s.Engine.Handle(ctx, session, body, func(b []byte) error { return writeResponse(c, b) })
+			code = s.Engine.Handle(ctx, session, body, func(ctx context.Context, b []byte) error {
+				if auditContextExpired(ctx) {
+					return context.DeadlineExceeded
+				}
+				if deadline, ok := ctx.Deadline(); ok {
+					if err := c.SetWriteDeadline(deadline); err != nil {
+						return err
+					}
+				}
+				return writeResponse(c, b)
+			})
 			<-s.requests
 		default:
 			code = s.Engine.RejectBusy(session, body)

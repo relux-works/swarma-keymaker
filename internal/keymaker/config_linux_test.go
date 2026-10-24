@@ -163,3 +163,59 @@ func TestPackagingRegistrationHelper(t *testing.T) {
 		})
 	}
 }
+
+// The protected source stanza admits an explicit pristine floor, rejects owner
+// policy knobs and ambiguous floors, and remains optional. Parsing does not
+// qualify on-disk authority or allow an established anchor to be replaced.
+func TestGenerationJournalConfig(t *testing.T) {
+	original, err := os.ReadFile("../../packaging/config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const floor = `{"seq":0,"hash":"0000000000000000000000000000000000000000000000000000000000000000"}`
+	good := `{"path":"/var/lib/swarma-generations","initial_floor":` + floor + `}`
+	for _, tc := range []struct {
+		name, stanza string
+		valid        bool
+	}{
+		{"omitted", "", true}, {"valid", good, true},
+		{"null", "null", false}, {"missing-floor", `{"path":"/var/lib/swarma-generations"}`, false},
+		{"missing-path", `{"initial_floor":` + floor + `}`, false},
+		{"owner-knob", `{"path":"/var/lib/swarma-generations","initial_floor":` + floor + `,"owner":1000}`, false},
+		{"relative", `{"path":"relative","initial_floor":` + floor + `}`, false},
+		{"unclean", `{"path":"/var/lib/../generations","initial_floor":` + floor + `}`, false},
+		{"bad-zero", `{"path":"/x","initial_floor":{"seq":0,"hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}`, false},
+		{"negative", `{"path":"/x","initial_floor":{"seq":-1,"hash":"0000000000000000000000000000000000000000000000000000000000000000"}}`, false},
+		{"hash-case", `{"path":"/x","initial_floor":{"seq":1,"hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}`, false},
+		{"floor-extra", `{"path":"/x","initial_floor":{"seq":0,"hash":"0000000000000000000000000000000000000000000000000000000000000000","restore":true}}`, false},
+		{"duplicate", `{"path":"/x","path":"/y","initial_floor":` + floor + `}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(original, &fields); err != nil {
+				t.Fatal(err)
+			}
+			if tc.stanza != "" {
+				fields["generation_journal"] = json.RawMessage(tc.stanza)
+			}
+			raw, err := json.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := ParseConfig(bytes.NewReader(raw))
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%t error=%v", tc.valid, err)
+			}
+			if tc.valid && tc.stanza != "" {
+				encoded, err := json.Marshal(cfg)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var roundtrip map[string]json.RawMessage
+				if json.Unmarshal(encoded, &roundtrip) != nil || roundtrip["generation_journal"] == nil {
+					t.Fatal("source config silently discarded")
+				}
+			}
+		})
+	}
+}

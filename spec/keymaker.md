@@ -611,19 +611,30 @@ restoring protected custody before a new admission attempt.
 | Native control methods on B | No signing key operation | Binding mutations and public metadata only |
 | Native registration helper on B | Configured purpose 2 | Registrar-built `registration/1` preimage only |
 | Internal state witness (separate proposal) | Reserved purpose 3 | `keymaker-witness-record/1` + NUL + service-built CCJ-1 body only |
-| Native `sign_message` on B (unimplemented candidate) | Purpose 4, active peer's author message sibling | Draft-aligned exact `swarma-msg/2` + LF + canonical signed record, with `key` and `body.author` equal to that peer's active attested purpose-4 key ID; accepted-head re-pin pending |
-| Internal message-key certification (decided, unimplemented) | Purpose 5, owner-pinned certification root | Only waggle `swarma-attestation attestation/1` + LF + service-built signed record, with validity at most 24 hours; same-root shared-revocation signing conflict remains gated in the supplement |
+| Native `sign_message` on B (unimplemented candidate) | Purpose 4, active peer's author message sibling | Landed-S0-aligned exact `swarma-msg/2` + LF + canonical signed record: `key` and `body.author` equal that peer's active attested purpose-4 key ID; `body.author_attestation` equals its service-resolved current attestation content ID, under `with_active` through release and on retries |
+| Internal message-key certification (decided, unimplemented) | Purpose 5, owner-pinned certification root | Only waggle `swarma-attestation attestation/1` + LF + service-built signed record for agent keys, with validity at most 24 hours; never `revocation/1`, whose agent-withdrawal snapshots use the separately pinned registry-owner revocation root |
 
 The last three rows summarize unactivated proposals, not current signing
 capabilities. See the [witness supplement](keymaker-witness.md#31-protected-identity-and-purpose-separation)
 and [message supplement](keymaker-msg.md#1-purpose-registry-and-domain-separation).
-The message candidate's accepted bounded language includes only two body
-checks: caller-bound signer identity and key ID. It narrows section 7's
-byte-signing ban and section 8's single-signing-method rule only on
-activation; its [change inventory](keymaker-msg.md#9-normative-change-inventory) lists all
-required amendments. Purpose 5 and its exclusive attestation use are decided;
-implementation, exact format alignment and root/publication qualification
-remain gates.
+The message candidate checks exactly three identity paths: `key`,
+`body.author` and `body.author_attestation`. The first two equal the caller's
+own active attested purpose-4 key ID; the third equals its service-resolved
+current attestation content ID. Signing and retries reject a noncurrent
+renewal or another generation's attestation even when the stable key is equal.
+All three checks use the same active binding under `with_active` through
+actual release. Other record fields remain opaque to the signer. This narrows
+section 7's byte-signing ban and section 8's single-signing-method rule only
+on activation; the [change inventory](keymaker-msg.md#9-normative-change-inventory)
+lists the required amendments.
+
+MSG1 format alignment to landed S0
+`67df75bec015ea463f685e4daf4975ecda18816a` is satisfied. Purpose 5 signs only
+agent attestations; a distinct scoped registry-owner revocation root signs
+agent-withdrawal snapshots. These resolved mappings are recorded in the
+[supplement's alignment ledger](keymaker-msg.md#44-landed-s0-alignment-and-qualification-gates).
+Implementation, root/publication and live-authority qualification remain gates;
+no message method, attestation issuer or snapshot publisher is activated here.
 
 No request on one surface may yield a signature accepted in another domain.
 This relies on both distinct purpose-derived keys and non-overlapping

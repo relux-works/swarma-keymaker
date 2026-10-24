@@ -164,3 +164,51 @@ func TestTimeConfidenceUncertainExpiry(t *testing.T) {
 		})
 	}
 }
+
+// Reauthorization keeps a prepared proof's original grant and revalidates the
+// current signed key window. Restoring bytes for a separate attempt obtains an
+// independent current observation, without another signature or nonce.
+func TestTimeConfidenceReauthorize(t *testing.T) {
+	for _, expired := range []bool{false, true} {
+		t.Run(map[bool]string{false: "within", true: "endpoint"}[expired], func(t *testing.T) {
+			f := setup(t)
+			p, c, clock := confidenceFixture(t, f.clock.at)
+			c.e.Tracking.Reference = clock.point.Now.Add(-2047 * time.Second)
+			f.builder.clock = p
+			prepared, code := f.builder.Build(context.Background(), f.in)
+			if code != OK {
+				t.Fatal(code)
+			}
+			d := 500 * time.Millisecond
+			if expired {
+				d = time.Second
+			}
+			clock.point.Now = clock.point.Now.Add(d)
+			clock.point.Elapsed += d
+			c.e.Tracking.Reference = clock.point.Now.Add(-time.Second)
+			got, code := prepared.Reauthorize(context.Background(), f.in)
+			want := OK
+			if expired {
+				want = ClockUntrusted
+			}
+			if code != want || (got != nil) != (want == OK) {
+				t.Fatal("original grant reset", code, want)
+			}
+			if got != nil && !got.authorityUntil.Equal(prepared.authorityUntil) {
+				t.Fatal("grant changed")
+			}
+			if _, code = f.builder.Restore(context.Background(), prepared.Envelope(), f.in); code != OK || f.calls != 1 {
+				t.Fatal("separate-attempt control", code, f.calls)
+			}
+			changed := f.in
+			changed.Enrolled.NotAfter = clock.point.Now.Unix()
+			if _, code = prepared.Reauthorize(context.Background(), changed); code != KeyNotValidNow {
+				t.Fatal("current enrollment ignored", code)
+			}
+		})
+	}
+	var absent *Proof
+	if p, c := absent.Reauthorize(context.Background(), Input{}); p != nil || c != RequestExpired {
+		t.Fatal("absent proof authorized", c)
+	}
+}

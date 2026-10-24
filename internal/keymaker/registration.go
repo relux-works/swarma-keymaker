@@ -153,7 +153,10 @@ func (n *Native) signRegistration(ctx context.Context, peer control.Peer, r cont
 			}
 			in := proof.Input{Name: name, Audience: aud, Enrolled: enrolled}
 			if old != nil {
-				_, pc := h.builder.Restore(ctx, raw, in)
+				prepared, pc := h.builder.Restore(ctx, raw, in)
+				if pc == "" {
+					conn.registrationProof = prepared
+				}
 				return enrollment.Code(pc)
 			}
 			built, pc := h.builder.Build(ctx, in)
@@ -191,6 +194,8 @@ func (n *Native) signRegistration(ctx context.Context, peer control.Peer, r cont
 				n.Engine.fail()
 				return enrollment.Code(c)
 			}
+			// Preserve Build's grant across persistence and the final release barrier.
+			conn.registrationProof = built
 			return ""
 		}))
 	})
@@ -232,7 +237,11 @@ func (n *Native) releaseRegistration(ctx context.Context, peer control.Peer, r c
 		return c
 	}
 	return Code(h.authority.WithAuthorized(ctx, peer.UID, peer.Generation, h.key, name, aud, issued, now, func(enrolled enrollment.EnrolledKey) enrollment.Code {
-		retained, pc := h.builder.Restore(ctx, raw, proof.Input{Name: name, Audience: aud, Enrolled: enrolled})
+		connection := connectionFrom(ctx)
+		if connection == nil || connection.registrationProof == nil || !bytes.Equal(connection.registrationProof.Envelope(), raw) {
+			return "audit_unavailable"
+		}
+		retained, pc := connection.registrationProof.Reauthorize(ctx, proof.Input{Name: name, Audience: aud, Enrolled: enrolled})
 		if pc != "" {
 			return enrollment.Code(pc)
 		}

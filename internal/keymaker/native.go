@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/relux-works/swarma-keymaker/internal/control"
+	proof "github.com/relux-works/swarma-keymaker/internal/registration"
 )
 
 // OperatorActVerifier is trusted injected authority. Production supplies nil
@@ -42,14 +43,15 @@ type Native struct {
 // pins the first self binding and subscribes while the Store lock is held.
 type nativeConnectionKey struct{}
 type nativeConnection struct {
-	custodyCause  custodyCause
-	conn          net.Conn
-	done          <-chan struct{}
-	binding       uint64
-	cancelBinding func()
-	requestID     string
-	conditions    []GenerationCondition
-	prepared      bool
+	custodyCause      custodyCause
+	conn              net.Conn
+	done              <-chan struct{}
+	binding           uint64
+	cancelBinding     func()
+	requestID         string
+	conditions        []GenerationCondition
+	prepared          bool
+	registrationProof *proof.Proof // one live request, including retained-envelope retries
 }
 
 func (c *nativeConnection) close() {
@@ -263,6 +265,7 @@ func (n *Native) Admit(ctx context.Context, p control.Peer, r control.Request) c
 		return "peer_identity_unavailable"
 	}
 	connection.requestID, connection.prepared = r.ID, false
+	connection.registrationProof = nil
 	connection.custodyCause = ""
 	connection.conditions = []GenerationCondition{{Principal: principal}}
 	if mutation(r.Method) {

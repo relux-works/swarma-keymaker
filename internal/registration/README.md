@@ -179,3 +179,10 @@ key/name/audience/window/expiry without entropy or signing. `Builder.Time` suppl
 the same rollback-detecting time source to the enrollment authorization barrier.
 `TestRestoreRetained` covers refusal/control boundaries and a fresh clock owner
 that observes a retained proof issued in the future.
+
+Prepared proof authority is carried through the native request's release barrier.
+`Reauthorize` verifies current enrollment and confidence while preserving that
+proof's original exclusive authority endpoint. `Restore` is for retained bytes
+being prepared for a separate request; those bytes grant no clock authority. A
+same-ID retry must preserve its newly prepared observation through its own final
+audit and release rather than restore again at the release barrier.

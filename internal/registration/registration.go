@@ -228,6 +228,21 @@ func (b *Builder) Time(ctx context.Context) (time.Time, Code) { return b.now(ctx
 // Restore revalidates a durably retained envelope without signing or consuming
 // entropy. Current enrollment and binding authority remain the caller's duty.
 func (b *Builder) Restore(ctx context.Context, raw []byte, in Input) (*Proof, Code) {
+	return b.restore(ctx, raw, in, time.Time{})
+}
+
+// Reauthorize verifies the same prepared bytes against current enrollment and a
+// fresh confidence observation, preserving the original exclusive clock grant.
+// Use it at the live release barrier; Restore is only for previously retained
+// bytes being prepared under a new request's independent observation.
+func (p *Proof) Reauthorize(ctx context.Context, in Input) (*Proof, Code) {
+	if p == nil || p.builder == nil || p.authorityUntil.IsZero() {
+		return nil, RequestExpired
+	}
+	return p.builder.restore(ctx, p.raw, in, p.authorityUntil)
+}
+
+func (b *Builder) restore(ctx context.Context, raw []byte, in Input, authorityUntil time.Time) (*Proof, Code) {
 	body, err := format.Verify(raw)
 	if err != nil {
 		return nil, registrarCode(err)
@@ -259,7 +274,10 @@ func (b *Builder) Restore(ctx context.Context, raw []byte, in Input) (*Proof, Co
 	proof := &Proof{raw: append([]byte(nil), raw...), issued: issued, expires: expires, window: windows.Window{Key: in.Enrolled.Key, NotBefore: in.Enrolled.NotBefore, NotAfter: in.Enrolled.NotAfter}, builder: b}
 	v, code := b.sample(ctx)
 	now := v.Now
-	proof.authorityUntil = v.AuthorityUntil
+	if authorityUntil.IsZero() {
+		authorityUntil = v.AuthorityUntil
+	}
+	proof.authorityUntil = authorityUntil
 	if code != OK {
 		return nil, code
 	}

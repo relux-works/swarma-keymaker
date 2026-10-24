@@ -47,17 +47,14 @@ func generationTestJournal(t *testing.T, anchor string) generationWindow {
 }
 
 func generationFixtureHandle(owner uint32, anchor string) *gj.TestHandle {
-	// Ordinary fixtures retain the two-argument API and its production 250ms
-	// window. Only race instrumentation gets the owner's per-handle extension.
-	if generationFixtureReaderHold == gj.ReaderHold {
-		return gj.NewTestHandle(owner, anchor)
-	}
+	// Semantic fixtures isolate verdicts from ordinary anchor-sync latency in
+	// both normal and race runs. Dedicated deadline tests use default handles.
 	return gj.NewTestHandle(owner, anchor, gj.WithReaderHold(generationFixtureReaderHold))
 }
 
 // A fixture's callback receives a real deadline with the selected bound. The
-// two-argument neighbor stays at 250ms even beside a race-extended handle;
-// extension is instrument accommodation, not production timing qualification.
+// two-argument neighbor stays at 250ms beside the semantic fixture handle;
+// the extension does not qualify production timing.
 func TestGenerationTaggedReaderHoldWindow(t *testing.T) {
 	if gj.ReaderHold != 250*time.Millisecond {
 		t.Fatal("production reader bound changed", gj.ReaderHold)
@@ -192,6 +189,73 @@ func TestGenerationTaggedAnchorSyncDeadline(t *testing.T) {
 			g.window = h
 			if code = g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" }); code != "" || !called || barrier.writes.Load() != writes {
 				t.Fatal("enrolled positive control failed or rewrote the floor", code, called)
+			}
+		})
+	}
+}
+
+// Delay the real Sync, preserving its result and counting exercised calls.
+// This fixture changes local latency only, never durability or source policy.
+type generationSyncDelay struct {
+	durableFile
+	delay time.Duration
+	calls int
+}
+
+func (w *generationSyncDelay) Sync() error {
+	w.calls++
+	time.Sleep(w.delay)
+	return w.durableFile.Sync()
+}
+
+// The two positive vector histories still admit after a real 300ms anchor
+// sync with the semantic fixture window. The same delay must refuse before
+// callback entry with the default 250ms handle, after durable publication.
+// This isolates the reviewer's latency mechanism; it does not qualify storage.
+func TestGenerationTaggedVectorSyncDelay(t *testing.T) {
+	for _, name := range []string{"active", "floor-ancestor"} {
+		t.Run(name, func(t *testing.T) {
+			for _, semantic := range []bool{true, false} {
+				label := "default-window"
+				if semantic {
+					label = "semantic-window"
+				}
+				t.Run(label, func(t *testing.T) {
+					dir, anchor := generationFixture(t, generationBytes(t, name))
+					before := recoveryFiles(t, anchor)
+					s, _ := generationStore(t)
+					writer := s.journal.writer
+					delayed := &generationSyncDelay{durableFile: writer, delay: 300 * time.Millisecond}
+					s.journal.writer = delayed
+					defer func() { s.journal.writer = writer }()
+					h := gj.NewTestHandle(uint32(os.Getuid()), anchor)
+					if semantic {
+						h = generationFixtureHandle(uint32(os.Getuid()), anchor)
+					}
+					g := newJournalGeneration(h, s, dir, gj.Floor{Hash: gj.ZeroHash})
+					called := false
+					code := g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
+					want := Code("request_deadline_exceeded")
+					if semantic {
+						want = ""
+					}
+					if code != want || called != semantic || delayed.calls != 1 {
+						t.Fatal("delayed anchor sync verdict/effect", code, want, called, delayed.calls)
+					}
+					loaded, damaged := loadGenerationAnchor(s, dir, gj.Floor{Hash: gj.ZeroHash})
+					if damaged || !g.enrolled || loaded != g.anchor || s.journal.generation.Anchor == nil || loaded != *s.journal.generation.Anchor || generationIncidentCount(t, s) != 0 {
+						t.Fatal("delayed sync lost publication or spuriously fenced", loaded, damaged)
+					}
+					if fmt.Sprint(before) != fmt.Sprint(recoveryFiles(t, anchor)) {
+						t.Fatal("delayed reader changed the source")
+					}
+					// A fresh default window succeeds without another anchor sync.
+					g.window = gj.NewTestHandle(uint32(os.Getuid()), anchor)
+					called = false
+					if code = g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" }); code != "" || !called || delayed.calls != 1 {
+						t.Fatal("fresh enrolled control failed or republished", code, called, delayed.calls)
+					}
+				})
 			}
 		})
 	}

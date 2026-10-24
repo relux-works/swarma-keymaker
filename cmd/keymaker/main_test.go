@@ -23,9 +23,9 @@ func TestCommandDispatch(t *testing.T) {
 	}
 }
 
-// A real production binary has no fixture-generation switch and cannot serve or
-// sign before the journal format exists. A fake-backed positive is kept in the
-// core's TestProductionGenerationRefuses and TestRealClients.
+// The real production entry rejects an unsafe configuration parent before
+// journal readiness or service startup. TestProductionConfigGenerationGate in
+// the core separately covers a parsed configuration with no journal configured.
 func TestProductionBinaryGenerationGate(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Fatal("test requires an unprivileged runner")
@@ -40,8 +40,8 @@ func TestProductionBinaryGenerationGate(t *testing.T) {
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + d, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null", "SSH_AUTH_SOCK=" + filepath.Join(d, "absent.sock")}
 	out, e := cmd.CombinedOutput()
 	exit, failed := e.(*exec.ExitError)
-	if !failed || exit.ExitCode() != 1 || strings.TrimSpace(string(out)) != "generation_source_unavailable" {
-		t.Fatalf("production admission must refuse: %v %s", e, out)
+	if !failed || exit.ExitCode() != 1 || strings.TrimSpace(string(out)) != "keymaker: unsafe configuration parent" {
+		t.Fatalf("production configuration must refuse before readiness: %v %s", e, out)
 	}
 }
 

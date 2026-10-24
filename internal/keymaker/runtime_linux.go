@@ -34,6 +34,13 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 	if e := ProtectedConfig(path, &cfg); e != nil {
 		return e
 	}
+	return serveValidatedConfig(ctx, cfg, status, generation)
+}
+
+// Production reaches typed startup only after ProtectedConfig succeeds. Keeping
+// that load separate permits unprivileged tests of the readiness gate without
+// an alternate configuration owner policy or a production fixture switch.
+func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.Writer, generation GenerationSource) error {
 	if generation == nil && cfg.GenerationJournal == nil {
 		return Code("generation_source_unavailable")
 	}

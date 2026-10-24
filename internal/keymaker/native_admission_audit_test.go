@@ -18,8 +18,65 @@ type admissionAuditBudget struct {
 }
 
 func (a *admissionAuditBudget) AppendContext(ctx context.Context, r AuditRecord) Code {
-	a.entered <- ctx
+	if r.Result == "refused" {
+		select {
+		case a.entered <- ctx:
+		default:
+		}
+	}
 	return a.Auditor.AppendContext(ctx, r)
+}
+
+// An unconsumed refusal observation cannot block a subsequent healthy hello /
+// pubkey audit sequence or replace its observation with a success. Both success
+// records still reach the durable journal; a fresh refusal remains observable.
+// This probes the observer, while the existing deadline tests use real sockets.
+func TestNativeAdmissionAuditObserverSuccessSequence(t *testing.T) {
+	f, _, _ := nativeAdmissionFixture(t, "generation_inactive", false)
+	j := f.store.journal
+	a := &admissionAuditBudget{Auditor: j, entered: make(chan context.Context, 1)}
+	f.engine.Audit = a
+	probe, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a.entered <- probe
+	before := len(nativeAudit(t, j))
+	for _, operation := range []string{"hello", "pubkey"} {
+		done := make(chan Code, 1)
+		go func() {
+			done <- f.native.auditContext(context.Background(), AuditRecord{Surface: "control", Operation: operation, Result: "success"})
+		}()
+		select {
+		case code := <-done:
+			if code != "" {
+				t.Fatal("healthy audit refused", operation, code)
+			}
+		case <-time.After(time.Second):
+			// Unblock the old one-send observer on failure, so this regression
+			// reports its assertion instead of leaving a hung fixture behind.
+			<-a.entered
+			<-done
+			t.Fatal("success audit blocked on refusal observer", operation)
+		}
+	}
+	if len(a.entered) != 1 || <-a.entered != probe {
+		t.Fatal("success audit changed refusal observation")
+	}
+	refusal := Code("generation_inactive")
+	if code := f.native.auditContext(probe, AuditRecord{Surface: "control", Operation: "hello", Result: "refused", RefusalCode: &refusal}); code != "" {
+		t.Fatal("refusal control failed", code)
+	}
+	select {
+	case got := <-a.entered:
+		if got != probe {
+			t.Fatal("wrong refusal context observed")
+		}
+	default:
+		t.Fatal("refusal control not observed")
+	}
+	rows := nativeAudit(t, j)[before:]
+	if len(rows) != 3 || rows[0].Operation != "hello" || rows[0].Result != "success" || rows[1].Operation != "pubkey" || rows[1].Result != "success" || rows[2].RefusalCode == nil || *rows[2].RefusalCode != refusal {
+		t.Fatal("observer dropped or changed durable records", rows)
+	}
 }
 
 type admissionSyncBarrier struct {
@@ -104,7 +161,8 @@ func TestNativeAdmissionStartedAuditDeadline(t *testing.T) {
 		t.Fatal("started refusal audit lost or duplicated", out)
 	}
 	nativeAdmissionUnchanged(t, f, g, calls, before)
-	// Restore the ordinary writer and observer after the once-only boundary probe.
+	// Restore the ordinary writer after the once-only sync probe. The refusal
+	// observer stays installed for the healthy hello/pubkey control.
 	j.mu.Lock()
 	j.writer = j.file
 	j.mu.Unlock()

@@ -240,18 +240,25 @@ no network access and accepts no client-selected URL, root or witness stream.
 | Publication member | Retained bytes/facts and required verification |
 | --- | --- |
 | `transaction,content_id` | Exact committed certification transaction and T; match envelope body content ID, purpose-5 signature, policy, key and full binding independently. |
-| `entry,suffix` | Original unsigned `journal-entry/1` envelope `{version,body,id}`, with `op:add`, `record_type:attestation/1`, `record:T`, exact protected registry/owner, seq/prev/time. Retain the complete bounded contiguous suffix that establishes inclusion. An entry alone or Git commit is not proof. |
+| `entry,suffix` | Retain the original unsigned target `journal-entry/1` envelope `{version,body,id}` with `op:add`, `record_type:attestation/1`, `record:T`, and exact protected registry/owner/seq/prev/time. Retain the complete oldest-first contiguous inclusion suffix, including the authenticated raw anchor required by the owner-registry adapter. Other suffix entries retain their own exact supported types and record IDs: a snapshot reissue contributes `op:add,record_type:revocation/1,record:<new snapshot ID>`. Verify every entry ID/link/time and the target entry's exact T independently. An entry alone or Git commit is not proof. |
 | `checkpoint,conflict,snapshot` | Original registry-root-signed `checkpoint/1` and its exact referenced signed complete revocation snapshot; optional original second checkpoint for fork detection. Checkpoint seq equals the attestation entry or is the nearest subsequent checkpoint covering it, with verified ancestry to that exact entry. Registry/owner/root role, author signature, ids, seq/head/snapshot and time all verify under S3. Purpose 5 never signs checkpoints/snapshots. |
 | `validation` | Exact original verified anchor projection, protected root/policy revision, decision-time context (including durable W), verifier plan and input manifest/digests. S3's six-field projection is exactly `{registry_id,owner,registry_seq,registry_head,checkpoint_id,previous_checkpoint_id}`; do not add timestamps or trust caller-created facts. |
 | `witness` | WC1 stream/policy pins, original registry intent and matching committed resolution bytes, both original receipts, checkpoint/candidate association, independently authenticated head/control anchor and continuity evidence. Verify checkpoint time verbatim in WC1 evidence. A mere intent receipt, cached head, registry writer's claim or another consumer's stream cannot confirm publication. |
 
-Store the covering checkpoint **at publication time**. `VerifyJournal` accepts at
-most 64 entries and two checkpoints per call, so fetching a recent head after an
-arbitrarily long history cannot replace the original inclusion proof. If the
-nearest covering checkpoint cannot be proven within those bounds, fail closed;
-never skip a middle entry. Advancing a witness anchor uses separately verified
-bounded continuity steps, persisting each accepted anchor; no call silently
-truncates a suffix or treats a partial prefix as inclusion.
+Store the covering checkpoint at publication time. For an attestation entry E_n,
+retain C_n or the nearest subsequent qualifying covering checkpoint with every
+linking entry. If the registry appends a fresh snapshot reissue as E_(n+1),
+retain E_(n+1), C_(n+1) and the exact new snapshot referenced by C_(n+1); never
+rewrite C_n. With the owner-registry bundle's raw anchor at n-1, the anchor, E_n
+and E_(n+1) occupy three of S3's 64 total entry slots. An anchor leaves at most
+63 new entries, including any reissue. Supply one candidate checkpoint; the
+optional second is fully admitted fork evidence, never a previous/next
+checkpoint slot. Keep the per-record, 540672-byte S3 aggregate, received-bundle
+and whole-witness-wrapper caps independently. If complete inclusion or
+continuity does not fit, fail closed; never skip an entry or truncate. Advance
+anchors only through separately verified current bounded steps, persisting each
+accepted anchor; expired intermediate checkpoints require another qualified
+path, not an old time sample.
 
 At original acceptance use the real qualified time/W, current signed snapshot
 and already independently verified witness projection. S3 checks freshness
@@ -270,11 +277,23 @@ before reopening, under final serialized authority checks. Missing/stale or
 conflicting evidence keeps messages closed; restart does not turn `published`
 into `active`, forget a fence or erase a stored acknowledgement.
 
-D38 chooses **B**, a separate `freshness/1` profile for snapshot freshness.
-That profile is not required to establish this historical publication inclusion
-proof, and is not implemented or invented here. Live-status/snapshot freshness
-and its eventual transport remain distinct activation gates; do not implement
-D38-A snapshot reissue or rewrite a historical checkpoint to make it fresh.
+D38=B separates ongoing snapshot freshness from retained publication inclusion.
+At initial publication, the pinned S3 path requires both the covering checkpoint
+and its exact referenced snapshot to be current under real qualified Now/W and
+protected max_age <=60 seconds. Providing current evidence is the registry's
+responsibility. One S3-compatible path is a registry-authorized same-content
+revocation/1 reissue at a real head change: retain the cumulative entries,
+advance issued_at strictly, append an add/revocation/1 entry for the new
+snapshot ID, and use its descendant covering checkpoint (waggle P-JRN-reissue).
+The additional entry must be included in the bounded inclusion suffix. An aged
+unchanged base instead requires a separately reviewed and qualified S4
+freshness-aware path; pinned VerifyJournal still rejects it. Until an applicable
+path is accepted and available, retain pending, refuse key_not_enrolled, do not
+activate T2 and never fall back to T1. Do not lower time/W, substitute another
+snapshot under an existing checkpoint, or rewrite a historical checkpoint. This
+specifies no registry reissue cadence. Retain an already qualified proof
+unchanged; later live activity, revocation freshness and WC1 checks remain
+separate activation/use gates, including S4 when an unchanged base ages.
 Fresh witness observation proves retained history/continuity, not issuer honesty,
 a future lease, complete upstream publication or permission to ignore revocation.
 
@@ -341,7 +360,7 @@ merely any error. Bound examples satisfy all other limits.
 | MS-S09 history capacity | Attempt transaction/association/native-ID 65537, 256 MiB+1 actual staging bytes, 65-entry/3-checkpoint/540673-byte verification input, or deletion of required old evidence: refuse growth, retain existing state; pending insufficiency stays fenced. | Within count AND byte limits, a complete <=64-entry/<=2-checkpoint/<=540672-byte proof and reserved state can commit; no promise each maximum coexists with all others. |
 | MS-S10 missing/stale publication | Remove entry, checkpoint, snapshot, original receipt or committed WC1 resolution; use an unverified projection or stale live confirmation; `key_not_enrolled`, no output/current-T promotion, original acknowledgement preserved if present. | Exact covering proof accepted at publication plus fresh live witness/status evidence permits activation/restart; historical checkpoint age alone does not erase inclusion. |
 | MS-S11 fallback T1 | After fence or issued T2 without proof, try new signing and exact retained T1-result retry: `key_not_enrolled`; caller cannot choose old/new T. | After fully qualified T2 activation, fresh T2 request proceeds; old T1 request/exact retry refuses `signer_identity_mismatch` while retaining its result. Only proven pre-issuance abort may reopen valid T1. |
-| MS-S12 proof substitution/fork | Wrong T/owner/root/stream, skipped middle entry, later unrelated checkpoint, equal-seq different signed head/checkpoint or intent-only receipt never qualifies; fence and retain fork evidence, no partial plan use. | Original exact entry, contiguous ancestry to nearest covering checkpoint, independently verified WC1 committed pairing and matching six-field projection qualify inclusion. |
+| MS-S12 proof substitution/fork | Wrong T/owner/root/stream, skipped middle entry, later unrelated checkpoint, equal-seq different signed head/checkpoint or intent-only receipt never qualifies; fence and retain fork evidence, no partial plan use. For a same-content snapshot reissue, substituting the previous snapshot under the new checkpoint refuses; rewriting the old checkpoint at the same sequence without the reissue entry is a fork. | Original exact target entry, complete ancestry, independently verified WC1 committed pairing and matching projection qualify inclusion. Also cover a registry-authorized reissue: raw anchor E_(n-1), attestation E_n, add/revocation E_(n+1), descendant C_(n+1), and its exact fresh snapshot qualify within all bounds; activation still requires live authority. |
 
 ## 7. Remaining gates
 
@@ -351,12 +370,14 @@ publisher integration and all paired executable/fault evidence remain review gat
 WC1 service acceptance/transport and independent observer/custodian qualification
 remain required; no colocated or writer-controlled fake witness qualifies.
 
-**Deferred until PR #22 lands:** durable watermark bootstrap/advancement and
-continuity (including conservative Now/W mapping), and time-provider collection
-latency/uncertainty under admission and actual-release deadlines. Do not decide
-these by copying provider logic, sampling the wall clock, setting W=Now, holding a
-generation barrier across provider I/O or relaxing deadlines. Activation must wait
-for reviewed integration of that landed provider and the watermark transaction.
+**Remaining time/continuity activation gates:** the shared time-provider
+consumption has landed. Durable watermark bootstrap/advancement and continuity
+(including conservative Now/W mapping), and time-provider collection
+latency/uncertainty under admission and actual-release deadlines still require
+reviewed integration and qualification. Do not decide these by copying provider
+logic, sampling the wall clock, setting W=Now, holding a generation barrier
+across provider I/O or relaxing deadlines. Activation must wait for the qualified
+provider/watermark transaction.
 
 No surface table accompanied this brief (coverage-map brief gap). No requested
 spec row is excluded. Runtime code/tests/mutants, deployment, public publisher

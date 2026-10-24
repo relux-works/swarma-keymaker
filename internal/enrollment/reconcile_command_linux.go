@@ -517,6 +517,11 @@ func publishCommandApproval(ctx context.Context, configPath string, c PinConfig,
 	if err = ctx.Err(); err != nil {
 		return err
 	}
+	// Reporting can block after the earlier publication check. Confidence must
+	// still hold when the command clears the retained root fence.
+	if err = approvalValid(approval, source); err != nil {
+		return err
+	}
 	// Final fallible action: do not fsync after clearing the fence. If a crash
 	// resurrects this marker, startup safely refuses and requires operator repair.
 	return os.Remove(pending)
@@ -665,6 +670,17 @@ func (r *commandReconciler) startup(ctx context.Context, location configLocation
 		return startupResult{}, err
 	}
 	if err = ctx.Err(); err != nil {
+		return startupResult{}, err
+	}
+	// Close the consumed descriptor before the final confidence observation;
+	// the deferred Close is now inert rather than I/O after that observation.
+	if err = f.Close(); err != nil {
+		return startupResult{}, err
+	}
+	// The final directory Sync and descriptor checks can block after the earlier
+	// consumption check. Refuse authority on loss; the consumed-ID ledger stays
+	// durable, so a failed attempt cannot replay its removed receipt.
+	if err = approvalValid(approval, source); err != nil {
 		return startupResult{}, err
 	}
 	return startupResult{high, c, policy}, nil

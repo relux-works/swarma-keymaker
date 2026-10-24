@@ -72,7 +72,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
 | `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |
-| `go.mod`, `go.sum` | Go version and exact registrar dependency pin |
+| `go.mod`, `go.sum` | Go version and exact dependency pins |
 | `vectors/` | Paired refusal cases, published derivation controls and path examples |
 | `cmd/keymaker/` | Production `serve`, `version` and operator `enrollment reconcile` entry points |
 | `internal/keymaker/` | Linux custody, derivation, bindings/results, audit and both socket servers |
@@ -235,13 +235,38 @@ Native public results contain `public_key` (base64 of 32 raw Ed25519 bytes),
 beyond the public key. A revoke result contains the registration number and
 `status: "revoked"`.
 
+## Internal message-key slice
+
+K3 S1 adds an internal purpose-4 sibling key capability and canonical waggle
+key IDs. It has no production constructor or dispatch; `sign_message` remains
+unsupported. Surface A and ordinary key APIs retain purpose-1 identity keys.
+Attestation issuance, durable renewal state, native message admission and
+publication qualification remain later K3 slices.
+
+The byte/crypto helper is pinned to waggle
+`98c9cfd26cfc57a7ee82176cd599e92af03e69bb`
+(`v0.0.0-20261024203737-98c9cfd26cfc`). It shares the existing registrar pin;
+this slice retains `golang.org/x/sys v0.37.0`.
+
+| Tool | Exact entry point | Evidence |
+| --- | --- | --- |
+| Go | `go test ./internal/keymaker -run '^TestMsg' -count=1` | Independent static SLIP-0010 fixtures, binding/custody guards and production boundary controls; task scratch logs |
+| Mutation tool | `go run ./tools/mutations/main.go -group message-key -scratch "$SCRATCH"` | Four overlay controls with named failing tests, child PIDs and logs below the supplied task scratch directory |
+
+`internal/keymaker/testdata/message-key.json` records the pinned upstream
+SLIP-0010 Python reference, its hash, the independent Ed25519 backend and public
+test seed. The three custom purpose tuples are reference-generated goldens,
+checked after all 12 committed published SLIP nodes matched the reference.
+They are not claimed to be published SLIP vectors. Tests read static fixtures;
+no Python dependency or fixture-generation code enters the production daemon.
+
 ## Registrar dependency
 
 The registration proof format, enrollment schema, publisher verification,
 registry snapshot loader and name rules belong to
 `github.com/relux-works/swarma-registrar`. The dependency is pinned
-to reviewed main commit `263ca7fcfd97518ace7e740792500f6c92f4ba1e`
-(`v0.0.0-20261023150327-263ca7fcfd97`). Keymaker supplies caller-side trust,
+to reviewed main revision `5f44ebf3f788`
+(`v0.0.0-20261023164451-5f44ebf3f788`). Keymaker supplies caller-side trust,
 persistence and local authorization; it does not maintain a second loader.
 
 Any registrar API or behavior change requires a separate reviewed pull request

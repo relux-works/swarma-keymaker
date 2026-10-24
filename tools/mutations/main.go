@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core or genjournal controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal or message-key controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -97,6 +97,20 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "message-key" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"message-caller-path", "message_key.go", `if current != selected ||`, `comparison := current
+	comparison.Path = selected.Path
+	if comparison != selected ||`, "^TestMsgV09PurposeKeyBytes$", "--- FAIL: TestMsgV09PurposeKeyBytes", "caller-selected path admitted"},
+			{"message-unhardened", "derive.go", `indices, _ := parsePath(path)
+	node := deriveNode(m.seed, indices)`, `indices, _ := parsePath(path)
+	indices[0] &^= 0x80000000
+	node := deriveNode(m.seed, indices)`, "^TestMsgV09PurposeKeyBytes$", "--- FAIL: TestMsgV09PurposeKeyBytes", "independent purpose-4 oracle mismatch"},
+			{"message-purpose-one", "message_key.go", `path := "m/4'"`, `path := "m/1'"`, "^TestMsgV09PurposeKeyBytes$", "--- FAIL: TestMsgV09PurposeKeyBytes", "independent purpose-4 oracle mismatch"},
+			{"message-public-exposure", "derive.go", `func (m *Master) Public(path string) ([]byte, Code) {`, `func (m *Master) Public(path string) ([]byte, Code) {
+	if strings.HasPrefix(path, "m/4'") { return m.withPurpose(path, "swarma-msg", func(k ed25519.PrivateKey) []byte { return append([]byte(nil), k[32:]...) }) }`, "^TestMsgPurposeGuards$", "--- FAIL: TestMsgPurposeGuards", "general Public exposed another purpose"},
+		}
+	}
 	if *group == "registration" {
 		pkg = "./internal/registration"
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
@@ -278,6 +292,22 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 // replace one uniquely matched authority gate.
 func plant(name, source, old, replacement string) string {
 	mutant := strings.Replace(source, old, replacement, 1)
+	if name == "message-caller-path" {
+		old := `strings.TrimPrefix(current.Path, "m/1'")`
+		if strings.Count(mutant, old) != 1 {
+			fmt.Fprintln(os.Stderr, "caller path source plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, old, `strings.TrimPrefix(selected.Path, "m/1'")`, 1)
+	}
+	if name == "message-purpose-one" {
+		old := `a.master.withPurpose(path, "swarma-msg", use)`
+		if strings.Count(mutant, old) != 1 {
+			fmt.Fprintln(os.Stderr, "purpose-one guard plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, old, `a.master.withPurpose(path, "agent-identity", use)`, 1)
+	}
 	if name == "registration-caller-iat" {
 		const timestamp = "issued := now.Truncate(time.Second)"
 		if strings.Count(mutant, timestamp) != 1 {

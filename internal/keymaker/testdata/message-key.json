@@ -1,0 +1,48 @@
+{
+  "format": "keymaker-message-key-controls/1",
+  "source": "https://github.com/satoshilabs/slips/blob/570ed55b7fde158f1116be34fc2faa35dada5912/slip-0010/testvectors.py",
+  "source_sha256": "0e50eebf2726daee760fdb457847a35498d33e06f5e8453c77c1e55bcb27c119",
+  "oracle": "Upstream seed2hdnode/derive/publickey, Python cryptography 46.0.5 Ed25519; independently checked against all 12 committed published SLIP-0010 nodes. Custom purpose paths below are generated reference results, not published SLIP vectors. Public test seed only.",
+  "seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "vectors": [
+    {
+      "identity_path": "m/1'/1'/1'/1'",
+      "message_path": "m/4'/1'/1'/1'",
+      "public_key_hex": "c7d60c5d93c3c478abdd972ee6703f168cdc220d2d1282f40fb44692e6b260c4",
+      "key_id": "ed25519:x9YMXZPDxHir3Zcu5nA_FozcIg0tEoL0D7RGkuayYMQ",
+      "sibling_public_hex": {
+        "1": "235885a73fee9784df0dcc49faa05adc0fb75a6d507d36739f119389c32fc051",
+        "2": "c6923bd08753e294704047bb7c942330f9bfdd3cd514bba6066eb23b905daf30",
+        "3": "f87be01d10fe28d79445f6c18bd573e7ee8c2dbf5f319ee1ceb1b530527bd5ed",
+        "4": "c7d60c5d93c3c478abdd972ee6703f168cdc220d2d1282f40fb44692e6b260c4",
+        "5": "c97c9547b820b10aa5fccec92760c3c1ac9b43450ffdf43d015e3782bb8ba2a5"
+      }
+    },
+    {
+      "identity_path": "m/1'/7'/11'/13'",
+      "message_path": "m/4'/7'/11'/13'",
+      "public_key_hex": "dd7db7a359141ca0fedc01ce8754256cb78655ed0151f91c04681b1dfbab96a0",
+      "key_id": "ed25519:3X23o1kUHKD-3AHOh1QlbLeGVe0BUfkcBGgbHfurlqA",
+      "sibling_public_hex": {
+        "1": "9fb0712790de3756c41c32befa8cac9de1c5613b7703e9a70a22a319cf8c8674",
+        "2": "3b9af608c521ae2a7153de80b4e4f2ab78cccdc381910f58b8c0e16f985fc40c",
+        "3": "e1a15917deb011794b63c9e07ba9e4368ddd96273e1776c07550cb0968012857",
+        "4": "dd7db7a359141ca0fedc01ce8754256cb78655ed0151f91c04681b1dfbab96a0",
+        "5": "e34e3a9256808ecf47aa3f991d9f86f9447faa38e65215c4297afcd4d13187e4"
+      }
+    },
+    {
+      "identity_path": "m/1'/2147483647'/2'/2147483646'",
+      "message_path": "m/4'/2147483647'/2'/2147483646'",
+      "public_key_hex": "5b0e180a4b582940792e7f07f4f238302b02d4ea4e37db0df9b0cc6ac926a950",
+      "key_id": "ed25519:Ww4YCktYKUB5Ln8H9PI4MCsC1OpON9sN-bDMaskmqVA",
+      "sibling_public_hex": {
+        "1": "ec8ecd59727d019ba9e3bcf18588af1512bf80300ad4371597126773a9611cb4",
+        "2": "d7eebfa964553f243d886c56d88163afdd7137d95a67a9f0564e1d4308aa3ad4",
+        "3": "764164d09d6e97eba708552c048a5e91db254142ff9bb322567d7a2a4b14216a",
+        "4": "5b0e180a4b582940792e7f07f4f238302b02d4ea4e37db0df9b0cc6ac926a950",
+        "5": "27beffb8d30189c22d729095cef790219a73c50b75a754cc7c95bf59cb64ad39"
+      }
+    }
+  ]
+}

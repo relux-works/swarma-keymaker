@@ -2,7 +2,7 @@
 
 package keymaker
 
-// PENDING: execute only after the format owner's WithEvidence/OpenForTest head
+// PENDING: execute only after the format owner's WithEvidence/NewTestHandle head
 // is supplied and pinned. This is an executable contract, never a skipped test.
 // Production builds must not enable this tag (generation_build_test.go).
 
@@ -43,7 +43,7 @@ func generationFixture(t *testing.T, raw []byte) (string, string) {
 }
 func generationTestJournal(t *testing.T, anchor string) generationWindow {
 	t.Helper()
-	return gj.OpenForTest(uint32(os.Getuid()), anchor)
+	return gj.NewTestHandle(uint32(os.Getuid()), anchor)
 }
 func generationPending(t *testing.T, mode string) []byte {
 	t.Helper()
@@ -84,71 +84,6 @@ func generationPending(t *testing.T, mode string) []byte {
 		return append(append([]byte{}, raw[:len(raw)-2]...), []byte(",\"budget_ms\":1000}\n")...)
 	case "oversized":
 		return bytes.Repeat([]byte("x"), 513)
-	}
-	return raw
-}
-
-// Materialize exact capacity boundaries using only public Encode and Digest.
-// Valid removed filler incarnations consume bytes; no padding bypasses CCJ.
-func generationCapacityBytes(t *testing.T, target int) []byte {
-	t.Helper()
-	var rows []gj.Record
-	total := 0
-	add := func(uid int64, gen, state string) {
-		r := gj.Record{Seq: int64(len(rows) + 1), Prev: gj.ZeroHash, UID: uid, Generation: gen, State: state, Writer: "user-manager", Time: "2026-01-01T00:00:00Z"}
-		b, e := gj.Encode(r)
-		if e != nil {
-			t.Fatal(e)
-		}
-		rows = append(rows, r)
-		total += len(b)
-	}
-	add(4294967294, strings.Repeat("f", 32), "creating")
-	add(4294967294, strings.Repeat("f", 32), "active")
-	for n := 1; ; n++ {
-		old, totalBefore := len(rows), total
-		add(1, fmt.Sprintf("%032x", n), "creating")
-		add(1, fmt.Sprintf("%032x", n), "removed")
-		if total > target || target-total == 1 {
-			rows = rows[:old]
-			total = totalBefore
-			break
-		}
-	}
-	gap := target - total
-	if gap%2 != 0 {
-		rows[2].Writer = "operator-manual"
-		gap -= 3
-	}
-	for i := 2; gap > 0 && i < len(rows); i += 2 {
-		digits := gap / 2
-		if digits > 9 {
-			digits = 9
-		}
-		uid := int64(1)
-		for j := 0; j < digits; j++ {
-			uid *= 10
-		}
-		rows[i].UID = uid
-		rows[i+1].UID = uid
-		gap -= digits * 2
-	}
-	if gap != 0 {
-		t.Fatal("capacity fixture gap", gap)
-	}
-	var raw []byte
-	prev := gj.ZeroHash
-	for _, r := range rows {
-		r.Prev = prev
-		b, e := gj.Encode(r)
-		if e != nil {
-			t.Fatal(e)
-		}
-		raw = append(raw, b...)
-		prev = gj.Digest(b)
-	}
-	if len(raw) != target {
-		t.Fatal("capacity fixture size", len(raw), target)
 	}
 	return raw
 }
@@ -203,7 +138,7 @@ func materializeGenerationCase(t *testing.T, c generationVectorCase) (string, ge
 	case violation == "owner":
 		// Non-root execution cannot chown individual files. This is an expected-owner
 		// mismatch at the protected boundary, not isolated target-inode qualification.
-		window = gj.OpenForTest(uint32(os.Getuid())+1, anchor)
+		window = gj.NewTestHandle(uint32(os.Getuid())+1, anchor)
 	case violation == "mode":
 		if e := os.Chmod(path, 0777); e != nil {
 			t.Fatal(e)
@@ -257,41 +192,65 @@ func TestGenerationTaggedVectors(t *testing.T) {
 	if len(manifest.Cases) != 67 {
 		t.Fatal("inventory changed")
 	}
-	for _, c := range manifest.Cases {
-		t.Run(c.Name, func(t *testing.T) {
-			dir, window := materializeGenerationCase(t, c)
-			s, _ := generationStore(t)
-			floor := gj.Floor{Hash: gj.ZeroHash}
-			if c.Floor != nil {
-				floor = *c.Floor
-			}
-			observed := "not-called"
-			spy := generationWindowFunc(func(ctx context.Context, path string, floor gj.Floor, fn func(gj.View, time.Time) error) error {
-				err := window.WithEvidence(ctx, path, floor, fn)
-				observed = "ok"
-				if err != nil {
-					var r *gj.Refusal
-					if !errors.As(err, &r) {
-						t.Fatalf("unexpected window error %v", err)
-					}
-					observed = r.Code
+	checkVector := func(t *testing.T, c generationVectorCase) {
+		dir, window := materializeGenerationCase(t, c)
+		s, _ := generationStore(t)
+		floor := gj.Floor{Hash: gj.ZeroHash}
+		if c.Floor != nil {
+			floor = *c.Floor
+		}
+		observed := "not-called"
+		spy := generationWindowFunc(func(ctx context.Context, path string, floor gj.Floor, fn func(gj.View, time.Time) error) error {
+			err := window.WithEvidence(ctx, path, floor, fn)
+			observed = "ok"
+			if err != nil {
+				var r *gj.Refusal
+				if !errors.As(err, &r) {
+					t.Fatalf("unexpected window error %v", err)
 				}
-				return err
-			})
-			g := newJournalGeneration(spy, s, dir, floor)
-			called := false
-			code := g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
-			if observed != c.Expect {
-				t.Fatalf("format verdict=%s want=%s adapter=%s", observed, c.Expect, code)
+				observed = r.Code
 			}
-			expected := Code("")
-			if c.Expect != "ok" {
-				expected = generationSourceCode(&gj.Refusal{Code: c.Expect})
-			}
-			if code != expected || called != (c.Expect == "ok") {
-				t.Fatal("adapter verdict/effect mismatch", code, expected, called)
-			}
+			return err
 		})
+		g := newJournalGeneration(spy, s, dir, floor)
+		called := false
+		code := g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
+		if observed != c.Expect {
+			t.Fatalf("format verdict=%s want=%s adapter=%s", observed, c.Expect, code)
+		}
+		// Independent section15 mapping; do not derive expected values by
+		// calling the adapter's own classifier.
+		expected := Code("generation_source_unavailable")
+		switch c.Expect {
+		case "ok":
+			expected = ""
+		case "journal_rollback", "journal_fork", "journal_writer_stale", "journal_capacity_reserve":
+			expected = "generation_source_fenced"
+		}
+		if code != expected || called != (c.Expect == "ok") {
+			t.Fatal("adapter verdict/effect mismatch", code, expected, called)
+		}
+	}
+	controls := map[string]generationVectorCase{}
+	for _, c := range manifest.Cases {
+		controls[c.Name] = c
+	}
+	for _, negative := range []bool{true, false} {
+		for _, c := range manifest.Cases {
+			if (c.Expect != "ok") != negative {
+				continue
+			}
+			t.Run(c.Name, func(t *testing.T) {
+				checkVector(t, c)
+				if c.Control != "" {
+					control, ok := controls[c.Control]
+					if !ok {
+						t.Fatal("unknown positive control", c.Control)
+					}
+					t.Run("positive-control-"+control.Name, func(t *testing.T) { checkVector(t, control) })
+				}
+			})
+		}
 	}
 }
 

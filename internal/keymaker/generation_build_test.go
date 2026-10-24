@@ -23,6 +23,13 @@ func generationProductionSettings(settings []debug.BuildSetting) error {
 	return nil
 }
 
+func generationProductionAPI(api string) error {
+	if strings.Contains(api, "func NewTestHandle(") || strings.Contains(api, "func OpenForTest(") {
+		return fmt.Errorf("production API exposes fixture constructor")
+	}
+	return nil
+}
+
 // A normal cmd/keymaker build must require no fixture package or tag. The
 // planted build setting establishes that the check rejects the named violation;
 // this does not qualify a separately built or installed release artifact.
@@ -38,6 +45,17 @@ func TestGenerationProductionBuildBoundary(t *testing.T) {
 		if strings.Contains(p, "genjournaltest") || strings.Contains(p, "genjournal_testseam") {
 			t.Fatal("production fixture dependency", p)
 		}
+	}
+	cmd = exec.CommandContext(ctx, "go", "doc", "-all", "github.com/relux-works/swarma-user-manager/tools/genjournal")
+	api, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("normal source API: %v: %s", err, api)
+	}
+	if err = generationProductionAPI(string(api)); err != nil {
+		t.Fatal(err)
+	}
+	if err = generationProductionAPI(string(api) + "\nfunc NewTestHandle(owner uint32, anchor string) *TestHandle\n"); err == nil || err.Error() != "production API exposes fixture constructor" {
+		t.Fatal("fixture API control was not rejected", err)
 	}
 	binary := filepath.Join(t.TempDir(), "keymaker")
 	cmd = exec.CommandContext(ctx, "go", "build", "-o", binary, "../../cmd/keymaker")

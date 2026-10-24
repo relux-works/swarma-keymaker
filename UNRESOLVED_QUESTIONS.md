@@ -178,7 +178,7 @@ register-after-active; no key-purpose or signed-receipt authority is added.
 ## Generation-journal adapter integration gates
 
 The pinned vector source is the public user-manager
-[`gen-journal/1` candidate at `33d0b94`](https://github.com/relux-works/swarma-user-manager/blob/33d0b941dcd4a7ee6d2b5b4ee03c4357056034df/spec/generation-journal.md).
+[`gen-journal/1` vectors at `33d0b94`](https://github.com/relux-works/swarma-user-manager/blob/33d0b941dcd4a7ee6d2b5b4ee03c4357056034df/spec/generation-journal.md).
 Its 67-case manifest and exact raw files are copied under
 `internal/keymaker/testdata/gen-journal/`, with per-file source paths and SHA256
 in `provenance.json`. Drift controls check those bytes; they do not establish
@@ -187,11 +187,11 @@ incident refusal, with audited native admission coverage. The production
 journal adapter wiring and its activation remain pending.
 
 - The format owner has agreed to a release-authorizing public `WithEvidence`
-  window and a build-tagged `genjournal_testseam` fixture constructor. Its
+  window and a build-tagged `genjournal_testseam` fixture constructor (`NewTestHandle`). Its
   landed head is pending. The internal window matches that public signature;
   no private path, marker or lock validator is copied and no release uses
   `Checkpoint`. Production wiring, real-flock and protected-path fixture checks,
-  and all67 adapter vector verdicts remain PENDING on that head.
+  and all 67 adapter vector verdicts remain PENDING on that head.
 - The bounded callback context now reaches audit admission and both transport
   handoffs. Cooperative deadlines cannot cancel an already-started durable
   sync; expired authority suppresses response emission. Real root-owned storage

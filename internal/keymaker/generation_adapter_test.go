@@ -80,7 +80,9 @@ func TestGenerationAnchorContinuity(t *testing.T) {
 			raw := generationBytes(t, "active")
 			g := fixtureJournalGeneration(t, s, &raw)
 			if mode == "established-unenrolled" {
-				s.next = 2
+				if _, c := s.Register(fixtureOperator, fixtureOperator, fixtureBinding(uint32(os.Getuid()))); c != "" {
+					t.Fatal(c)
+				}
 			} else {
 				if c := g.withWindow(context.Background(), func(context.Context, gj.View) Code { return "" }); c != "" {
 					t.Fatal(c)
@@ -151,13 +153,6 @@ func TestGenerationAnchorContinuity(t *testing.T) {
 			raw = generationBytes(t, "active")
 			if code = g.withWindow(context.Background(), func(context.Context, gj.View) Code { t.Fatal("auto recovered"); return "" }); code != "generation_source_fenced" {
 				t.Fatal(code)
-			}
-			// The established-unenrolled artificial counter must be persisted through
-			// the normal binding protocol to exercise restart without invalid custody.
-			if mode == "established-unenrolled" {
-				if c := s.persist(); c != "" {
-					t.Fatal(c)
-				}
 			}
 			if e := s.Close(); e != nil {
 				t.Fatal(e)
@@ -313,5 +308,90 @@ func TestGenerationAnchorAdvance(t *testing.T) {
 	raw = generationBytes(t, "active")
 	if _, c := next.Lookup(context.Background(), uid); c != "generation_source_fenced" || generationIncidentCount(t, recovered) != 1 {
 		t.Fatal("restart accepted old active tail", c)
+	}
+}
+
+// The two sides of journal-first anchor publication must agree after restart.
+// Restoring one side or leaving a staged write fences without repair. Restoring
+// the complete old pair is the explicit limit of local continuity: WC1 external
+// restore authorization remains pending and this test does not claim to supply it.
+func TestGenerationAnchorCrashImages(t *testing.T) {
+	for _, mode := range []string{"intact", "old-anchor", "old-journal", "journal-only", "staged", "joint-old-pair"} {
+		t.Run(mode, func(t *testing.T) {
+			s, dir := generationStore(t)
+			raw := generationBytes(t, "active")
+			g := fixtureJournalGeneration(t, s, &raw)
+			if c := g.withWindow(context.Background(), func(context.Context, gj.View) Code { return "" }); c != "" {
+				t.Fatal(c)
+			}
+			anchorPath := filepath.Join(dir.Name(), "generation.anchor")
+			journalPath := filepath.Join(dir.Name(), "audit", auditName(1))
+			read := func(path string) []byte {
+				t.Helper()
+				b, e := os.ReadFile(path)
+				if e != nil {
+					t.Fatal(e)
+				}
+				return b
+			}
+			write := func(path string, b []byte) {
+				t.Helper()
+				if e := os.WriteFile(path, b, 0600); e != nil {
+					t.Fatal(e)
+				}
+			}
+			oldAnchor, oldJournal := read(anchorPath), read(journalPath)
+			raw = generationBytes(t, "retiring")
+			if c := g.withWindow(context.Background(), func(context.Context, gj.View) Code { return "" }); c != "" {
+				t.Fatal(c)
+			}
+			if e := s.Close(); e != nil {
+				t.Fatal(e)
+			}
+			switch mode {
+			case "old-anchor":
+				write(anchorPath, oldAnchor)
+			case "old-journal":
+				write(journalPath, oldJournal)
+			case "joint-old-pair":
+				write(anchorPath, oldAnchor)
+				write(journalPath, oldJournal)
+			case "journal-only":
+				if e := os.Remove(anchorPath); e != nil {
+					t.Fatal(e)
+				}
+			case "staged":
+				write(filepath.Join(dir.Name(), "generation.next"), read(anchorPath))
+			}
+			var before []byte
+			if mode != "journal-only" {
+				before = read(anchorPath)
+			}
+			next, e := OpenStore(dir, uint32(os.Getuid()))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer next.Close()
+			resumed := fixtureJournalGeneration(t, next, &raw)
+			called := false
+			code := resumed.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
+			if mode == "intact" || mode == "joint-old-pair" {
+				if code != "" || !called || generationIncidentCount(t, next) != 0 {
+					t.Fatal("consistent local pair denied", code, called)
+				}
+				return
+			}
+			if code != "generation_source_fenced" || called || generationIncidentCount(t, next) != 1 {
+				t.Fatal("incomplete anchor commit admitted", code, called)
+			}
+			if mode != "journal-only" && !bytes.Equal(before, read(anchorPath)) {
+				t.Fatal("damaged anchor repaired")
+			}
+			if mode == "journal-only" {
+				if _, e := os.Lstat(anchorPath); !os.IsNotExist(e) {
+					t.Fatal("missing anchor recreated", e)
+				}
+			}
+		})
 	}
 }

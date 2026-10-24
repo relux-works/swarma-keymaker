@@ -248,7 +248,7 @@ publication qualification remain later K3 slices.
 The byte/crypto helper is pinned to waggle
 `98c9cfd26cfc57a7ee82176cd599e92af03e69bb`
 (`v0.0.0-20261024203737-98c9cfd26cfc`). It shares the existing registrar pin;
-this slice retains `golang.org/x/sys v0.37.0`.
+the shared time provider requires `golang.org/x/sys v0.38.0`.
 
 | Tool | Exact entry point | Evidence |
 | --- | --- | --- |

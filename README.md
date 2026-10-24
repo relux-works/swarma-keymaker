@@ -10,8 +10,13 @@ generation. Private identity keys never enter station processes.
 SSH-agent subset and native control socket use the same binding/result store,
 audit journal, generation authority and admission limits. Tests include real
 Unix sockets and OpenSSH/Git with fixture authority. Production `keymaker serve`
-still refuses `generation_source_unavailable` until the authoritative generation
-journal and ordering adapter exist. No fixture authority is compiled into it.
+uses the root-policy `gen-journal/1` adapter when protected configuration supplies
+`generation_journal: {path, initial_floor: {seq, hash}}`. Without it, readiness
+refuses `generation_source_unavailable`. Pristine enrollment accepts that explicit
+floor only before any binding has been issued; damaged established anchors,
+rollback, fork, stale writers and reserve incidents fence without automatic
+recovery. The real root-owned journal remains an activation qualification gate.
+No fixture authority is compiled into normal production builds.
 Persistent operator revocation remains closed without a signed-act verifier;
 `sign_registration` builds registrar proofs with a separate purpose-2 key,
 current binding/enrollment authority and durable same-ID recovery. The curator-approved
@@ -100,9 +105,10 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Verify copied generation-vector provenance and bounded drift controls: `go test ./internal/keymaker -run '^TestGenerationVector(Provenance\|DriftControl)$' -count=1 -v` | Exact public source hashes and 67-case inventory; this does not run adapter verdicts |
 | Go | Check terminal generation refusal handling: `GOMAXPROCS=2 GOFLAGS=-p=2 GORACE=atexit_sleep_ms=0 go test -race ./internal/control ./internal/keymaker -run '^Test(GenerationSourceFencedContract\|NativeGenerationAdmissionRefusal\|ResponseRefusals\|RetryableAllowlist)$' -count=1 -v` | Nonretryable typed refusals, one admission audit and no effects, paired active controls; private test sockets under TMPDIR |
 | Go | Check local generation anchors and bounded callbacks: `go test ./internal/keymaker ./internal/control -run '^TestGeneration(AnchorContinuity\|SourceIncidentClassification\|EvidencePredicates\|DeadlineAgentAudit\|DeadlineTransport\|JournalConfig)$' -count=1 -v` | Local verified-view fakes, restart/incident evidence and actual bounded transport; no root-owned journal qualification |
-| Go | Tagged source fixture contracts (PENDING upstream API pin): `go test -tags genjournal_testseam ./internal/keymaker -run '^TestGenerationTagged' -count=1 -v` | All 67 vectors, source no-create and real-flock ordering; currently unrun until the agreed seam and exact-gap hook exist |
+| Go | Tagged source fixture contracts: `go test -tags genjournal_testseam ./internal/keymaker -run '^TestGenerationTagged' -count=1 -v` | All 67 vectors, source no-create and real-flock ordering; isolated nonroot fixture policy |
 | Go | Check normal production build isolation: `go test ./internal/keymaker -run '^TestGenerationProductionBuildBoundary$' -count=1 -v` | Dependency inventory and `go version -m` metadata for a temporary binary; detects a planted forbidden test tag |
-| Go | Local generation narrowing controls: `go run ./tools/mutations/main.go -group genjournal-core -scratch "$SCRATCH"` | Two exact failing witnesses under scratch; real-lock/chain controls remain pending on the upstream tagged seam |
+| Go | All four generation controls: `go run ./tools/mutations/main.go -group genjournal -scratch "$SCRATCH"` | Four named expected failures; the dependency controls use an exact public module snapshot and test-only go.work outside GOMODCACHE, with a green unmutated control; no product module replacements |
+| Go | Local generation narrowing controls: `go run ./tools/mutations/main.go -group genjournal-core -scratch "$SCRATCH"` | Two exact failing local anchor/classification witnesses under scratch |
 | Go | Test pure proof construction: `go test ./internal/registration -count=1` | Local pinned registration vectors and generated in-memory fixture keys; no host SSH access |
 | Go | Race-check proof construction: `GOMAXPROCS=2 go test -race ./internal/registration -count=1 -p=1` | Race diagnostics and verdicts |
 | Go | Vet proof construction: `go vet ./internal/registration ./tools/mutations` | Diagnostics |
@@ -270,8 +276,8 @@ request budget ends, releasing the shared generation and Store locks.
 The Linux helper clock trusts UTC only when read-only `adjtimex` reports no
 unsynchronized/error state; unavailable health refuses. The shared proof builder
 also detects backwards UTC steps and permanently fences its clock owner. Restart
-still requires independently reconciled enrollment; production generation and
-operator-act adapters remain activation gates.
+still requires independently reconciled enrollment; real root-owned generation
+qualification and the operator-act adapter remain activation gates.
 
 | Tool | Purpose / exact command | Artifacts |
 | --- | --- | --- |

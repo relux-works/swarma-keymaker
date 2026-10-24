@@ -2,8 +2,7 @@
 
 package keymaker
 
-// PENDING: execute only after the format owner's WithEvidence/NewTestHandle head
-// is supplied and pinned. This is an executable contract, never a skipped test.
+// These fixtures use the source owner's tagged API at the pinned public commit.
 // Production builds must not enable this tag (generation_build_test.go).
 
 import (
@@ -449,23 +448,17 @@ func TestGenerationTaggedWriterProgress(t *testing.T) {
 	defer syscall.Flock(int(data.Fd()), syscall.LOCK_UN)
 }
 
-// The deterministic gap requires an upstream hook unavailable in the ordinary
-// public API. Until the agreed tagged seam supplies it this contract fails as
-// PENDING, never skips or claims that publishing before the first read suffices.
+// Publishing intent in the exact first-check-to-gate gap must prevent release.
+// The source owner's tagged hook schedules this boundary; its ordinary production
+// API exposes no scheduling hook. The unmodified first-check neighbor releases.
 func TestGenerationTaggedPendingGap(t *testing.T) {
-	dir, anchor := generationFixture(t, generationBytes(t, "active"))
+	dir, _ := generationFixture(t, generationBytes(t, "active"))
 	s, _ := generationStore(t)
-	journal := generationTestJournal(t, anchor)
-	boundary, ok := journal.(interface {
-		WithEvidenceAtBoundary(context.Context, string, gj.Floor, func(), func(gj.View, time.Time) error) error
-	})
-	if !ok {
-		t.Fatal("PENDING upstream genjournal_testseam exact pending-check boundary")
-	}
+	boundary := gj.NewTestHandle(uint32(os.Getuid()), dir)
 	for _, pending := range []bool{false, true} {
 		observed := false
 		window := generationWindowFunc(func(ctx context.Context, path string, floor gj.Floor, commit func(gj.View, time.Time) error) error {
-			return boundary.WithEvidenceAtBoundary(ctx, path, floor, func() {
+			return boundary.WithEvidenceAtBoundary(ctx, floor, func() {
 				observed = true
 				if pending {
 					if e := os.WriteFile(filepath.Join(dir, "writer.pending"), generationPending(t, "present"), 0644); e != nil {
@@ -484,5 +477,104 @@ func TestGenerationTaggedPendingGap(t *testing.T) {
 		if !observed || code != expected || called == pending {
 			t.Fatal("pending gap admitted or active control denied", code, called, observed)
 		}
+	}
+}
+
+// The production delegate keeps root policy even when linked beside a tagged
+// fixture handle. It rejects our service-owned tree without creating files;
+// the exact same bytes admit through the explicit test-only handle.
+func TestGenerationTaggedProductionPolicy(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Fatal("this ownership boundary requires an unprivileged fixture")
+	}
+	dir, anchor := generationFixture(t, generationBytes(t, "active"))
+	before := recoveryFiles(t, anchor)
+	called := false
+	err := (productionGenerationWindow{}).WithEvidence(context.Background(), dir, gj.Floor{Hash: gj.ZeroHash}, func(gj.View, time.Time) error { called = true; return nil })
+	var refusal *gj.Refusal
+	if !errors.As(err, &refusal) || refusal.Code != "journal_owner" || called {
+		t.Fatal("production fixture policy escape", err, called)
+	}
+	if fmt.Sprint(before) != fmt.Sprint(recoveryFiles(t, anchor)) {
+		t.Fatal("production reader changed source")
+	}
+	err = generationTestJournal(t, anchor).WithEvidence(context.Background(), dir, gj.Floor{Hash: gj.ZeroHash}, func(gj.View, time.Time) error { called = true; return nil })
+	if err != nil || !called {
+		t.Fatal("explicit fixture control denied", err, called)
+	}
+}
+
+// The actual protected reader receives the persisted floor after Keymaker
+// restart. A valid shorter source or equal-sequence alternate chain fences once;
+// restoring good source bytes does not clear that incident. The intact file
+// is the positive control; writes occur only in this isolated fixture.
+func TestGenerationTaggedAnchorRestart(t *testing.T) {
+	for _, mode := range []string{"intact", "rollback", "fork"} {
+		t.Run(mode, func(t *testing.T) {
+			raw := generationBytes(t, "active")
+			dir, anchor := generationFixture(t, raw)
+			s, state := generationStore(t)
+			window := generationTestJournal(t, anchor)
+			g := newJournalGeneration(window, s, dir, gj.Floor{Hash: gj.ZeroHash})
+			if c := g.withWindow(context.Background(), func(context.Context, gj.View) Code { return "" }); c != "" {
+				t.Fatal(c)
+			}
+			floor := g.anchor.Floor
+			if e := s.Close(); e != nil {
+				t.Fatal(e)
+			}
+			switch mode {
+			case "rollback":
+				raw = generationBytes(t, "creating")
+			case "fork":
+				raw = generationBytes(t, "equal-seq-fork")
+				v, e := gj.Verify(bytes.NewReader(raw), gj.Floor{Hash: gj.ZeroHash})
+				if e != nil || v.Tail.Seq != floor.Seq || v.Tail.Hash == floor.Hash {
+					t.Fatal("fork fixture is not a valid alternate chain", e)
+				}
+			}
+			gate := generationLock(t, filepath.Join(dir, "gate.lock"), syscall.LOCK_EX)
+			data := generationLock(t, filepath.Join(dir, "data.lock"), syscall.LOCK_EX)
+			f, e := os.OpenFile(filepath.Join(dir, "journal"), os.O_WRONLY|os.O_TRUNC, 0)
+			if e != nil {
+				t.Fatal(e)
+			}
+			_, e = f.Write(raw)
+			if e == nil {
+				e = f.Sync()
+			}
+			f.Close()
+			if e != nil {
+				t.Fatal(e)
+			}
+			syscall.Flock(int(data.Fd()), syscall.LOCK_UN)
+			syscall.Flock(int(gate.Fd()), syscall.LOCK_UN)
+			next, e := OpenStore(state, uint32(os.Getuid()))
+			if e != nil {
+				t.Fatal(e)
+			}
+			defer next.Close()
+			resumed := newJournalGeneration(window, next, dir, gj.Floor{Hash: gj.ZeroHash})
+			if resumed.anchor.Floor != floor {
+				t.Fatal("restart reset floor")
+			}
+			called := false
+			code := resumed.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
+			if mode == "intact" {
+				if code != "" || !called || generationIncidentCount(t, next) != 0 {
+					t.Fatal("intact restart denied", code)
+				}
+				return
+			}
+			if code != "generation_source_fenced" || called || generationIncidentCount(t, next) != 1 {
+				t.Fatal("rollback/fork admitted after restart", code, called)
+			}
+			if e := os.WriteFile(filepath.Join(dir, "journal"), generationBytes(t, "active"), 0644); e != nil {
+				t.Fatal(e)
+			}
+			if code = resumed.withWindow(context.Background(), func(context.Context, gj.View) Code { t.Fatal("restored source cleared incident"); return "" }); code != "generation_source_fenced" || generationIncidentCount(t, next) != 1 {
+				t.Fatal("incident recovered or duplicated", code)
+			}
+		})
 	}
 }

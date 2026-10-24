@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging or genjournal-core controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core or genjournal controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -137,16 +137,80 @@ func main() {
 			{"packaging-null-rdev", "root_linux.go", "st.Rdev == unix.Mkdev(1, 3)", "true", "^TestReleaseNullDeviceVerification$", "--- FAIL: TestReleaseNullDeviceVerification", "wrong rdev admitted"},
 		}
 	}
-	if *group == "genjournal-core" {
+	if *group == "genjournal-core" || *group == "genjournal" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
 			{"generation-stale-retryable", "generation_linux.go", `case "journal_rollback", "journal_fork", "journal_writer_stale", "journal_capacity_reserve":`, `case "journal_writer_stale": return "generation_source_unavailable"
 case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGenerationSourceIncidentClassification$/^journal_writer_stale$", "--- FAIL: TestGenerationSourceIncidentClassification/journal_writer_stale", "generation_source_unavailable want generation_source_fenced"},
 			{"generation-skip-floor", "generation_linux.go", `g.window.WithEvidence(ctx, g.anchor.Path, g.anchor.Floor,`, `g.window.WithEvidence(ctx, g.anchor.Path, gj.Floor{Hash:gj.ZeroHash},`, "^TestGenerationAnchorContinuity$/^(rollback|fork)$", "--- FAIL: TestGenerationAnchorContinuity/rollback", "incident not fenced once"},
 		}
 	}
+	dependencySource := ""
+	dependencyWorkspace := ""
+	if *group == "genjournal" {
+		out, err := exec.Command("go", "list", "-f", "{{.Dir}}", "github.com/relux-works/swarma-user-manager/tools/genjournal").Output()
+		if err != nil || !filepath.IsAbs(strings.TrimSpace(string(out))) {
+			fmt.Fprintln(os.Stderr, "pinned genjournal source unavailable")
+			os.Exit(2)
+		}
+		dependencySource = strings.TrimSpace(string(out))
+		// Go refuses overlays beneath GOMODCACHE. Materialize the exact pinned
+		// public module in private scratch and select it in a test-only workspace.
+		// No product go.mod replace directive or dependency bytes are changed.
+		moduleRoot := filepath.Dir(filepath.Dir(dependencySource))
+		snapshot := filepath.Join(dir, "source-snapshot")
+		if err := os.CopyFS(snapshot, os.DirFS(moduleRoot)); err != nil {
+			fmt.Fprintln(os.Stderr, "source snapshot unavailable", err)
+			os.Exit(2)
+		}
+		dependencySource = filepath.Join(snapshot, "tools", "genjournal")
+		dependencyWorkspace = filepath.Join(dir, "go.work")
+		body := fmt.Sprintf("go 1.26.0\nuse (\n %q\n %q\n)\n", root, snapshot)
+		if err := os.WriteFile(dependencyWorkspace, []byte(body), 0600); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		baseline := exec.Command("go", "test", "-tags", "genjournal_testseam", pkg, "-run", "^TestGenerationTagged(PendingGap|Vectors)$/^(broken-chain|late-broken-chain)$", "-count=1", "-v")
+		baseline.Env = append(baseline.Environ(), "GOWORK="+dependencyWorkspace)
+		var baselineLog bytes.Buffer
+		baseline.Stdout, baseline.Stderr = &baselineLog, &baselineLog
+		err = baseline.Start()
+		baselinePID := 0
+		if err == nil {
+			baselinePID = baseline.Process.Pid
+			err = baseline.Wait()
+		}
+		baselineExit := 0
+		if err != nil {
+			if e, ok := err.(*exec.ExitError); ok {
+				baselineExit = e.ExitCode()
+			} else {
+				baselineExit = 127
+			}
+		}
+		baselinePath := filepath.Join(dir, "source-workspace-control.log")
+		if os.WriteFile(baselinePath, baselineLog.Bytes(), 0600) != nil {
+			os.Exit(2)
+		}
+		fmt.Printf("baseline=source-workspace actual_exit=%d pid=%d log=%s\n", baselineExit, baselinePID, baselinePath)
+		if baselineExit != 0 {
+			os.Exit(2)
+		}
+
+		controls = append(controls, []struct{ name, file, old, new, test, needle, witness string }{
+			{"generation-pending-before-lock", "@genjournal/secure_linux.go", `	if e = d.pending(); e != nil {
+		unlock(gate)
+		return e
+	}
+`, ``, "^TestGenerationTaggedPendingGap$", "--- FAIL: TestGenerationTaggedPendingGap", "pending gap admitted or active control denied"},
+			{"generation-skip-chain", "@genjournal/journal.go", `if r.Prev != view.Tail.Hash {`, `if false && r.Prev != view.Tail.Hash {`, "^TestGenerationTaggedVectors$/^(broken-chain|late-broken-chain)$", "--- FAIL: TestGenerationTaggedVectors/broken-chain", "format verdict=ok want=journal_chain"},
+		}...)
+	}
 	good := true
 	for _, c := range controls {
 		source := filepath.Join(root, pkg, c.file)
+		if strings.HasPrefix(c.file, "@genjournal/") {
+			source = filepath.Join(dependencySource, strings.TrimPrefix(c.file, "@genjournal/"))
+		}
 		raw, e := os.ReadFile(source)
 		if e != nil || strings.Count(string(raw), c.old) != 1 {
 			fmt.Fprintln(os.Stderr, c.name, "plant not applied")
@@ -161,7 +225,15 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		if os.WriteFile(overlay, mapping, 0600) != nil {
 			os.Exit(2)
 		}
-		cmd := exec.Command("go", "test", "-overlay", overlay, pkg, "-run", c.test, "-count=1", "-v")
+		args := []string{"test", "-overlay", overlay}
+		if *group == "genjournal" {
+			args = append(args, "-tags", "genjournal_testseam")
+		}
+		args = append(args, pkg, "-run", c.test, "-count=1", "-v")
+		cmd := exec.Command("go", args...)
+		if dependencyWorkspace != "" {
+			cmd.Env = append(cmd.Environ(), "GOWORK="+dependencyWorkspace)
+		}
 		// Reproduce the fairness finding's one-processor schedule regardless
 		// of the calling shell's parallelism.
 		if c.name == "helper-reader-handoff" {

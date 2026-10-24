@@ -4,8 +4,10 @@ package keymaker
 
 import (
 	"context"
+	"crypto/sha256"
 	"debug/buildinfo"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
@@ -30,7 +32,8 @@ func generationProductionAPI(api string) error {
 	return nil
 }
 
-// A normal cmd/keymaker build must require no fixture package or tag. The
+// A normal cmd/keymaker build must use the exact source pin without a module
+// replacement and require no fixture package or tag. The
 // planted build setting establishes that the check rejects the named violation;
 // this does not qualify a separately built or installed release artifact.
 func TestGenerationProductionBuildBoundary(t *testing.T) {
@@ -67,12 +70,29 @@ func TestGenerationProductionBuildBoundary(t *testing.T) {
 		t.Fatalf("go version -m: %v: %s", err, out)
 	}
 	t.Logf("production build metadata:\n%s", out)
+	binaryBytes, err := os.ReadFile(binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("production binary sha256=%x", sha256.Sum256(binaryBytes))
 	info, err := buildinfo.ReadFile(binary)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err = generationProductionSettings(info.Settings); err != nil {
 		t.Fatal(err)
+	}
+	foundSource := false
+	for _, dep := range info.Deps {
+		if dep.Path == "github.com/relux-works/swarma-user-manager" {
+			foundSource = true
+			if dep.Version != "v0.0.0-20261024181100-2fba23868045" || dep.Replace != nil {
+				t.Fatalf("production source pin or replacement differs: %+v", dep)
+			}
+		}
+	}
+	if !foundSource {
+		t.Fatal("production binary does not contain the pinned generation source")
 	}
 	plant := append(append([]debug.BuildSetting(nil), info.Settings...), debug.BuildSetting{Key: "-tags", Value: "genjournal_testseam"})
 	if err = generationProductionSettings(plant); err == nil || err.Error() != "production build contains genjournal_testseam" {

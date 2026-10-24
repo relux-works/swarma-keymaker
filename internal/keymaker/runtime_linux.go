@@ -8,11 +8,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	gj "github.com/relux-works/swarma-user-manager/tools/genjournal"
 )
 
-// ServeProduction deliberately has no static generation table or fixture flag.
-// Until the user-manager publishes its journal, this readiness dependency is a
-// closed gate. The exact Server/Engine below are exercised with test-only injection.
+// ServeProduction uses only the root-policy source API. Generation readiness
+// stays closed until protected configuration names a verified journal.
 func ServeProduction(ctx context.Context, config string, status io.Writer) error {
 	if os.Geteuid() == 0 {
 		return failure("service must be unprivileged")
@@ -23,11 +24,7 @@ func ServeProduction(ctx context.Context, config string, status io.Writer) error
 	if e := HardenProcess(); e != nil {
 		return e
 	}
-	generation := UnavailableGeneration{}
-	if _, code := generation.Lookup(ctx, uint32(os.Getuid())); code != "" {
-		return code
-	}
-	return serveConfigured(ctx, config, status, generation)
+	return serveConfigured(ctx, config, status, nil)
 }
 
 type productionConfig = Config
@@ -36,6 +33,9 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 	var cfg productionConfig
 	if e := ProtectedConfig(path, &cfg); e != nil {
 		return e
+	}
+	if generation == nil && cfg.GenerationJournal == nil {
+		return Code("generation_source_unavailable")
 	}
 	uid := uint32(os.Getuid())
 	if cfg.ServiceUID != uid || cfg.ServiceGID != uint32(os.Getgid()) || cfg.Epoch == "" || cfg.RegistryRevision == "" {
@@ -79,6 +79,14 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 			return failure("binding registry or epoch mismatch")
 		}
 	}
+	if generation == nil {
+		g := newJournalGeneration(productionGenerationWindow{}, store, cfg.GenerationJournal.Path, cfg.GenerationJournal.InitialFloor)
+		if c := g.withWindow(ctx, func(context.Context, gj.View) Code { return "" }); c != "" {
+			return c
+		}
+		generation = g
+	}
+
 	helper, stopHelper, e := configureRegistration(ctx, cfg.Registration, master, registry, status)
 	if e != nil {
 		return e

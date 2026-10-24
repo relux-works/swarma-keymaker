@@ -7,10 +7,10 @@ The authoritative decision list and safe defaults are in
 - Q2 and Q3: decrypt out of v0 (`operation_unsupported`) and configured
   operator-only register/revoke intake — decided. Persistent revoke refuses
   until the signed operator-act verifier exists; Q7 remains its activation gate.
-- Q6: interim decision — the authoritative journal format belongs to
-  `swarma-user-manager`; its publication is the remaining gate. K1 reads that
-  format. A reviewed root-run manual writer is production authority until the
-  module writer exists; retirement recorded late is not fenced (section 3.1).
+- Q6: decided — the authoritative `gen-journal/1` format belongs to
+  `swarma-user-manager`. The production read-only adapter uses its protected
+  release window. Qualification on a real root-owned journal remains an
+  activation gate; retirement recorded late is not fenced (section 3.1).
 - Q7: `operator-act/1` record format and exact Keymaker mapping are published
   in [waggle S0 §4.2](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#42-keymaker-operator_record-exact-mapping).
   Waggle S1 verifier library and durable integration/qualification remain
@@ -182,30 +182,26 @@ The pinned vector source is the public user-manager
 Its 67-case manifest and exact raw files are copied under
 `internal/keymaker/testdata/gen-journal/`, with per-file source paths and SHA256
 in `provenance.json`. Drift controls check those bytes; they do not establish
-adapter conformance. `generation_source_fenced` is a stable nonretryable
-incident refusal, with audited native admission coverage. The production
-journal adapter wiring and its activation remain pending.
+adapter conformance. The adapter now pins the signed landed user-manager
+`2fba23868045b37143ef0156c0e88d1d340d9cc3`. Production delegates directly to
+its public `WithEvidence`; no private path, marker or lock validator is copied
+and no release uses `Checkpoint`. The tagged `NewTestHandle` and exact-gap hook
+exist only in fixture builds; normal binary metadata and dependencies are
+checked separately. The 67 adapter verdicts and real-flock/no-create contracts
+are executable in `generation_fixture_linux_test.go`.
 
-- The format owner has agreed to a release-authorizing public `WithEvidence`
-  window and a build-tagged `genjournal_testseam` fixture constructor (`NewTestHandle`). Its
-  landed head is pending. The internal window matches that public signature;
-  no private path, marker or lock validator is copied and no release uses
-  `Checkpoint`. Production wiring, real-flock and protected-path fixture checks,
-  and all 67 adapter vector verdicts remain PENDING on that head.
-- The bounded callback context now reaches audit admission and both transport
-  handoffs. Cooperative deadlines cannot cancel an already-started durable
-  sync; expired authority suppresses response emission. Real root-owned storage
-  latency qualification remains PENDING.
-- The owner-approved pristine enrollment rule is implemented locally: protected
-  initial floor only with no anchor and no binding ever issued. Audit-indexed
-  enrollment detects an absent/corrupt established anchor and interrupted
-  publication; incident fencing survives restart without automatic recovery.
-  Content confirmation and external restore authorization (WC1) remain PENDING.
-  No dummy restore-success callback is present.
-- Go MVS selects registrar `5f44ebf3f788` and the shared minimum x/sys0.37.0.
-  The exact conformance pin is updated; ccj, registration, enrollment and
-  registry tree-equality evidence is retained beside the assertion. No replace
-  directive is used. The current source dependency is landed user-manager
-  `4da5aa5`; the agreed API's exact landed head will replace it when supplied.
-- Qualification against a real root-owned journal remains PENDING. Synthetic
-  nonroot fixtures cannot satisfy the production custody, ACL or restore gates.
+- Qualification against a real root-owned journal remains PENDING. Nonroot
+  tagged fixtures do not qualify production custody, ACLs, storage latency or
+  restore procedures. Cooperative deadlines cannot cancel an already-started
+  durable sync; expired authority suppresses response emission.
+- The owner-approved pristine enrollment rule uses the protected initial floor
+  only with no anchor and no binding ever issued. Audit-indexed enrollment
+  detects an absent/corrupt established anchor and interrupted publication;
+  incident fencing survives restart without automatic recovery. WC1 remains
+  an unactivated separate witness proposal as stated in section 3.1; no dummy
+  restore-success callback is present. Local continuity cannot detect complete
+  joint restoration of the old anchor and audit pair.
+- Go MVS selects registrar `5f44ebf3f788` and x/sys0.37.0. The exact conformance
+  pin and explicit HTTP-only exclusions are updated; ccj, registration,
+  enrollment and registry tree-equality evidence is beside the assertion.
+  No module replacement directive is used.

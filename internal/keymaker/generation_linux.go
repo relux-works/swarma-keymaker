@@ -18,6 +18,14 @@ type generationWindow interface {
 	WithEvidence(context.Context, string, gj.Floor, func(gj.View, time.Time) error) error
 }
 
+// The source package fixes its production owner to root. No fixture policy or
+// owner argument can enter this delegate or protected daemon configuration.
+type productionGenerationWindow struct{}
+
+func (productionGenerationWindow) WithEvidence(ctx context.Context, path string, floor gj.Floor, commit func(gj.View, time.Time) error) error {
+	return gj.WithEvidence(ctx, path, floor, commit)
+}
+
 type journalGeneration struct {
 	gate     auditGate
 	window   generationWindow

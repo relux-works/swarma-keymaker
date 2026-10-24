@@ -73,7 +73,7 @@ func nativeBase(t *testing.T, operator Principal, verifier OperatorActVerifier, 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { lock.Close() })
-	store, err := OpenStore(state, uid)
+	store, err := fixtureOpenStore(state, uid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +447,7 @@ func (f *nativeFixture) restart(t *testing.T, verifier OperatorActVerifier) {
 	t.Helper()
 	f.stop(t)
 	f.store.Close()
-	store, err := OpenStore(f.state, uint32(os.Getuid()))
+	store, err := fixtureOpenStore(f.state, uint32(os.Getuid()))
 	if err != nil {
 		t.Fatal("reopen", err)
 	}

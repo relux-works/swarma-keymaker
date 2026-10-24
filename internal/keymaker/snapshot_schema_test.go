@@ -16,7 +16,7 @@ func writeHistoryFixture(t *testing.T, d string, rows []Binding, next uint64) {
 		t.Fatal(err)
 	}
 	defer dir.Close()
-	s, err := OpenStore(dir, uint32(os.Getuid()))
+	s, err := fixtureOpenStore(dir, uint32(os.Getuid()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestSnapshotSchemaRequired(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer dir.Close()
-			s, err := OpenStore(dir, uint32(os.Getuid()))
+			s, err := fixtureOpenStore(dir, uint32(os.Getuid()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -153,7 +153,7 @@ func TestSnapshotSchemaRequired(t *testing.T) {
 				if err := os.WriteFile(path, original, 0600); err != nil {
 					t.Fatal(err)
 				}
-				got, err := OpenStore(dir, uint32(os.Getuid()))
+				got, err := fixtureOpenStore(dir, uint32(os.Getuid()))
 				if err != nil {
 					t.Fatal(err)
 				}

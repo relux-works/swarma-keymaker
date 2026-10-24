@@ -7,6 +7,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	gj "github.com/relux-works/swarma-user-manager/tools/genjournal"
 )
 
@@ -19,6 +20,7 @@ type generationJournalConfig struct {
 }
 
 type Config struct {
+	TimePolicy        *timeconf.Policy         `json:"time_policy,omitempty"`
 	GenerationJournal *generationJournalConfig `json:"generation_journal,omitempty"`
 	Registration      *registrationConfig      `json:"registration_helper,omitempty"`
 	SocketDir         string                   `json:"socket_dir"`
@@ -34,7 +36,7 @@ type Config struct {
 }
 
 func (cfg *Config) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper", "generation_journal")
+	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper", "generation_journal", "time_policy")
 	if err != nil {
 		return failure("invalid service configuration members")
 	}
@@ -57,6 +59,11 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 		}
 		if _, err := objectMembers(journal["initial_floor"], []string{"seq", "hash"}); err != nil {
 			return err
+		}
+	}
+	if raw, ok := fields["time_policy"]; ok {
+		if _, err := timeconf.DecodePolicy(raw); err != nil {
+			return failure("invalid time policy")
 		}
 	}
 	type plain Config

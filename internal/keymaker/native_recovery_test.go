@@ -163,7 +163,7 @@ func TestNativeTransactionCrash(t *testing.T) {
 			f.stop(t)
 			f.store.Close()
 			before := nativeSnapshot(t, f)
-			recovered, err := OpenStore(f.state, uint32(os.Getuid()))
+			recovered, err := fixtureOpenStore(f.state, uint32(os.Getuid()))
 			if cut == "intent-only" || cut == "result-journal-only" {
 				want := "keymaker: unresolved native mutation intent"
 				if cut == "result-journal-only" {

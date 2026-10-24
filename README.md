@@ -104,6 +104,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Trusted time integration: `go test ./cmd/keymaker ./internal/keymaker ./internal/registration ./internal/enrollment ./internal/control -run '^(TestTimeConfidence\|TestCollectorEntryFirst)' -count=1 -v` | Provider age/uncertainty/hold boundaries, missing-policy refusal, final audit recheck, approval invalidation, null audit time and production collector/pin isolation; private TMPDIR fixtures |
 | Go | Verify copied generation-vector provenance and bounded drift controls: `go test ./internal/keymaker -run '^TestGenerationVector(Provenance\|DriftControl)$' -count=1 -v` | Exact public source hashes and 67-case inventory; this does not run adapter verdicts |
 | Go | Check terminal generation refusal handling: `GOMAXPROCS=2 GOFLAGS=-p=2 GORACE=atexit_sleep_ms=0 go test -race ./internal/control ./internal/keymaker -run '^Test(GenerationSourceFencedContract\|NativeGenerationAdmissionRefusal\|ResponseRefusals\|RetryableAllowlist)$' -count=1 -v` | Nonretryable typed refusals, one admission audit and no effects, paired active controls; private test sockets under TMPDIR |
 | Go | Check local generation anchors and bounded callbacks: `go test ./internal/keymaker ./internal/control -run '^TestGeneration(AnchorContinuity\|SourceIncidentClassification\|EvidencePredicates\|DeadlineAgentAudit\|DeadlineTransport\|JournalConfig)$' -count=1 -v` | Local verified-view fakes, restart/incident evidence and actual bounded transport; no root-owned journal qualification |
@@ -302,11 +303,30 @@ then publishes one complete snapshot or failure fence. New helper admissions
 wait cancellably during reload and return `request_deadline_exceeded` when their
 request budget ends, releasing the shared generation and Store locks.
 
-The Linux helper clock trusts UTC only when read-only `adjtimex` reports no
-unsynchronized/error state; unavailable health refuses. The shared proof builder
-also detects backwards UTC steps and permanently fences its clock owner. Restart
-still requires independently reconciled enrollment; real root-owned generation
-qualification and the operator-act adapter remain activation gates.
+Trusted UTC uses the public `swarma-credential-broker/timeconf` provider pinned to
+`3924ab6e811b5512ad8763a392c2c88abcdd1b2c`. `CollectorEntry` is the first main
+statement. The daemon's root-owned protected configuration may embed `time_policy`
+using the provider's exact [policy schema](https://github.com/relux-works/swarma-credential-broker/blob/3924ab6e811b5512ad8763a392c2c88abcdd1b2c/docs/time-policy.md).
+Enrollment pin configuration uses the same optional member for operator approval
+time. Missing/off/invalid policy supplies no trusted time; service startup refuses
+`clock_untrusted` before readiness. There is no source flag, environment override,
+or kernel synchronization fallback. Policy changes require a new process.
+
+Startup samples fresh confidence before time decisions. The daemon shares that
+provider between helper and audit; enrollment approvals retain one provider across
+their initial and later publication/consumption checks. Every helper decision and
+post-audit release samples again. The returned uncertainty narrows key/proof
+validity and the exclusive authority endpoint is retained for each prepared proof.
+Missing audit confidence retains section11's null-time/unknown behavior. Request
+budgets, rate limiting and the independent CLOCK_BOOTTIME approval TTL use elapsed
+time; they never establish UTC confidence.
+
+Real host provider, NTS inventory, collector isolation and storage latency
+qualification remain PENDING. Durable decision-bound/hold continuity across process
+replacement also remains an activation integration gate under the shared policy;
+this adapter adds fresh start sampling and within-process holds, not durable hold
+storage. Restart still requires independently reconciled enrollment. Root-owned
+generation qualification and the operator-act adapter remain activation gates.
 
 | Tool | Purpose / exact command | Artifacts |
 | --- | --- | --- |

@@ -21,7 +21,7 @@ func custodyResultJournal(t *testing.T, uncertain bool) (*Journal, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { dir.Close() })
-	var clock AuditClock = systemAuditClock{}
+	var clock AuditClock = fixtureAuditClock{}
 	if uncertain {
 		clock = uncertainAuditClock{}
 	}
@@ -107,7 +107,7 @@ func checkCustodyResult(t *testing.T, mode string, r AuditRecord, accept bool) {
 	if err := os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	opened, err := OpenJournal(j.dir, uint32(os.Getuid()))
+	opened, err := fixtureOpenJournal(j.dir, uint32(os.Getuid()))
 	if opened != nil {
 		opened.Close()
 	}
@@ -125,7 +125,7 @@ func checkCustodyResult(t *testing.T, mode string, r AuditRecord, accept bool) {
 	if err := os.WriteFile(path, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	control, err := OpenJournal(j.dir, uint32(os.Getuid()))
+	control, err := fixtureOpenJournal(j.dir, uint32(os.Getuid()))
 	if err != nil {
 		t.Fatal("valid refusal recovery control failed", err)
 	}

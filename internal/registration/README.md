@@ -11,7 +11,7 @@ type Input struct {
     Enrolled enrollment.EnrolledKey
 }
 type TrustedClock interface {
-    Now(context.Context) (time.Time, bool)
+    Sample(context.Context) (timeconf.Sample, error)
 }
 type Signer interface {
     Sign(context.Context, []byte) ([]byte, Code)
@@ -37,6 +37,14 @@ whole-second issue time and exactly 120 seconds of lifetime. It does not define
 a parallel schema, name grammar, codec, signature encoder or point validator.
 Only the local Ed25519 algorithm policy uses a key prefix check; registrar still
 owns format and cryptographic validation.
+
+Production supplies the pinned shared time provider directly. Each observation
+must be trusted and fresh with an unexpired exclusive authority endpoint. The
+provider's returned uncertainty is used unchanged to keep the entire release
+interval inside the key window and before proof expiry; the nominal whole-second
+issue instant must also be authorized. No policy thresholds are copied here.
+A proof's in-memory grant cannot be extended by a later sample. Restoring retained
+bytes starts a new observation, never restored clock authority.
 
 Both issue and release time must be in the key's half-open window, without skew.
 A proof cannot be released at or after expiry. The Builder checks again after

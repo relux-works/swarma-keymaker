@@ -25,7 +25,7 @@ func TestReviewCustodySuccessMetadata(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer dir.Close()
-			j, err := OpenJournal(dir, uint32(os.Getuid()))
+			j, err := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -83,7 +83,7 @@ func TestReviewCustodySuccessMetadata(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			opened, err := OpenJournal(dir, uint32(os.Getuid()))
+			opened, err := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if opened != nil {
 				opened.Close()
 			}

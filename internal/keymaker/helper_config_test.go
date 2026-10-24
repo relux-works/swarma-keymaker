@@ -8,6 +8,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 )
 
@@ -63,7 +64,8 @@ func TestHelperConfiguration(t *testing.T) {
 	}
 	cctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	h, stop, e := configureRegistration(cctx, &registrationConfig{Names: Names{"host-registration", "sample", "core", "station-a"}, EnrollmentConfig: "/fixture/missing-pins.json", ApprovalFile: "/fixture/missing-approval.json"}, f.master, nativeRegistry(), io.Discard)
+	off, _ := timeconf.Production(nil, nil)
+	h, stop, e := configureRegistration(cctx, &registrationConfig{Names: Names{"host-registration", "sample", "core", "station-a"}, EnrollmentConfig: "/fixture/missing-pins.json", ApprovalFile: "/fixture/missing-approval.json"}, f.master, nativeRegistry(), off, io.Discard)
 	if e != nil || h == nil {
 		t.Fatal("unavailable enrollment killed helper owner", e)
 	}
@@ -74,7 +76,7 @@ func TestHelperConfiguration(t *testing.T) {
 	}
 	cancelled, cancelNow := context.WithCancel(context.Background())
 	cancelNow()
-	if _, healthy := (kernelRegistrationClock{}).Now(cancelled); healthy {
+	if _, err := off.Sample(cancelled); err == nil {
 		t.Fatal("cancelled clock trusted")
 	}
 }

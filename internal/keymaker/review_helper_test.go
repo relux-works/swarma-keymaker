@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/control"
 	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 	proof "github.com/relux-works/swarma-keymaker/internal/registration"
@@ -223,9 +224,9 @@ type reviewHelperClockEntry struct {
 	once    sync.Once
 }
 
-func (c *reviewHelperClockEntry) Now(ctx context.Context) (time.Time, bool) {
+func (c *reviewHelperClockEntry) Sample(ctx context.Context) (timeconf.Sample, error) {
 	c.once.Do(func() { close(c.entered) })
-	return c.clock.Now(ctx)
+	return c.clock.Sample(ctx)
 }
 
 // Current UID reuse and trusted-time/key-window failures must also prevent a

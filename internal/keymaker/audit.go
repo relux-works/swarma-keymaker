@@ -15,6 +15,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/relux-works/swarma-credential-broker/timeconf"
+	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
 )
 
 // canonical encodes the CCJ-1 subset used by typed audit records. It does not
@@ -148,9 +151,18 @@ type Auditor interface {
 // AuditClock reports whether UTC is trustworthy. Uncertain time is recorded as
 // null/unknown rather than inventing a timestamp for the operation.
 type AuditClock interface{ UTC() (time.Time, bool) }
-type systemAuditClock struct{}
+type systemAuditClock struct{ provider *timeconf.Provider }
 
-func (systemAuditClock) UTC() (time.Time, bool) { return time.Now().UTC(), true }
+func (c systemAuditClock) UTC() (time.Time, bool) {
+	return c.UTCContext(context.Background())
+}
+
+// Production collection inherits the append budget; fixture clocks retain the
+// small AuditClock interface and cannot enable a production source.
+func (c systemAuditClock) UTCContext(ctx context.Context) (time.Time, bool) {
+	v, err := timeconfidence.Sample(ctx, c.provider)
+	return v.Now, err == nil
+}
 
 type durableFile interface {
 	io.Writer
@@ -396,7 +408,15 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 	r.Seq = j.seq + 1
 	r.Instance = j.instance
 	r.Previous = j.previous
-	instant, trusted := j.clock.UTC()
+	var instant time.Time
+	var trusted bool
+	if bounded, ok := j.clock.(interface {
+		UTCContext(context.Context) (time.Time, bool)
+	}); ok {
+		instant, trusted = bounded.UTCContext(ctx)
+	} else {
+		instant, trusted = j.clock.UTC()
+	}
 	if trusted && instant.Year() >= 1970 && instant.Year() <= 9999 {
 		now := instant.UTC().Format("2006-01-02T15:04:05Z")
 		r.Time = &now

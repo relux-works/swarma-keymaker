@@ -766,7 +766,7 @@ func TestGenerationTaggedAnchorRestart(t *testing.T) {
 			}
 			syscall.Flock(int(data.Fd()), syscall.LOCK_UN)
 			syscall.Flock(int(gate.Fd()), syscall.LOCK_UN)
-			next, e := OpenStore(state, uint32(os.Getuid()))
+			next, e := fixtureOpenStore(state, uint32(os.Getuid()))
 			if e != nil {
 				t.Fatal(e)
 			}

@@ -27,7 +27,7 @@ func TestBindingLifecycle(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer dir.Close()
-	s, e := OpenStore(dir, uint32(os.Getuid()))
+	s, e := fixtureOpenStore(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -55,7 +55,7 @@ func TestBindingLifecycle(t *testing.T) {
 		t.Fatal(c)
 	}
 	s.Close()
-	s, e = OpenStore(dir, uint32(os.Getuid()))
+	s, e = fixtureOpenStore(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -106,7 +106,7 @@ func TestBindingRecoveryFences(t *testing.T) {
 				t.Fatal(e)
 			}
 			defer dir.Close()
-			if _, e = OpenStore(dir, uint32(os.Getuid())); e == nil {
+			if _, e = fixtureOpenStore(dir, uint32(os.Getuid())); e == nil {
 				t.Fatal("invalid state treated as first use")
 			}
 		})

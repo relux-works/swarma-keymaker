@@ -14,7 +14,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"unsafe"
+
+	"github.com/relux-works/swarma-credential-broker/timeconf"
+	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
+	"golang.org/x/sys/unix"
 )
 
 const consumedName = "consumed-approvals"
@@ -29,42 +32,43 @@ type approvalInstant struct {
 type approvalSource interface {
 	sample() (approvalInstant, error)
 }
-type linuxApprovalSource struct{}
+type linuxApprovalSource struct {
+	ctx      context.Context
+	provider *timeconf.Provider
+}
 
-// Query only (Timex.Modes == 0): never change the system clock. CLOCK_BOOTTIME
-// includes suspend and cannot be extended by moving the UTC clock backwards.
-func (linuxApprovalSource) sample() (approvalInstant, error) {
-	b, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
-	if err != nil {
-		return approvalInstant{}, fmt.Errorf("boot_id_unavailable: %w", err)
+// UTC and boot identity come from the shared confidence provider. The separate
+// CLOCK_BOOTTIME reading is only the nonextendable elapsed approval TTL; its
+// wall time is never used as a substitute for a confidence verdict.
+func (s linuxApprovalSource) sample() (approvalInstant, error) {
+	ctx := s.ctx
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	id := strings.TrimSuffix(string(b), "\n")
-	if len(id) != 36 || id[8] != '-' || id[13] != '-' || id[18] != '-' || id[23] != '-' {
-		return approvalInstant{}, errTrust
-	}
-	if raw, err := hex.DecodeString(strings.ReplaceAll(id, "-", "")); err != nil || len(raw) != 16 {
-		return approvalInstant{}, errTrust
-	}
-	var tx syscall.Timex
-	state, err := syscall.Adjtimex(&tx)
+	v, err := timeconfidence.Sample(ctx, s.provider)
 	if err != nil {
 		return approvalInstant{}, fmt.Errorf("clock_untrusted: %w", err)
 	}
-	var ts syscall.Timespec
-	_, _, errno := syscall.Syscall(syscall.SYS_CLOCK_GETTIME, 7 /* CLOCK_BOOTTIME */, uintptr(unsafe.Pointer(&ts)), 0)
-	if errno != 0 {
-		return approvalInstant{}, errno
+	var boot unix.Timespec
+	if unix.ClockGettime(unix.CLOCK_BOOTTIME, &boot) != nil {
+		return approvalInstant{}, fmt.Errorf("clock_untrusted")
 	}
-	return approvalInstant{id, time.Now().UTC().UnixNano(), ts.Nano(), state != 5 && tx.Status&(0x40|0x1000) == 0}, nil
+	return approvalInstant{v.Boot, v.Now.UnixNano(), boot.Nano(), true}, nil
 }
 
-// Only package-local fixture adapters can substitute the clock. Public callers
-// cannot supply a request-controlled clock, boot ID or trust flag.
-func approvalSourceFor(files Files) approvalSource {
+// Fixture substitution is package-private; policy is always decoded from the
+// existing root-owned pin configuration before a production collector is made.
+// Keep one provider across the initial observation and approval decision so a
+// hold observed at process start cannot be erased by constructing another one.
+func approvalSourceFor(ctx context.Context, files Files, policy *timeconf.Policy) (approvalSource, error) {
 	if source, ok := files.(interface{ approvalSource() approvalSource }); ok {
-		return source.approvalSource()
+		return source.approvalSource(), nil
 	}
-	return linuxApprovalSource{}
+	p, err := timeconf.Production(policy, nil)
+	if err != nil || timeconfidence.Start(ctx, p) != nil {
+		return nil, fmt.Errorf("clock_untrusted")
+	}
+	return linuxApprovalSource{ctx, p}, nil
 }
 
 func randomApprovalID() (string, error) {

@@ -10,7 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/enrollment"
+	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
 	windows "github.com/relux-works/swarma-registrar/enrollment"
 	format "github.com/relux-works/swarma-registrar/registration"
 )
@@ -37,11 +39,12 @@ type Input struct {
 	Enrolled enrollment.EnrolledKey
 }
 
-// TrustedClock supplies synchronized UTC health and must honor cancellation.
+// TrustedClock supplies the shared provider verdict, uncertainty and authority
+// endpoint unchanged, and must honor cancellation.
 // Builder additionally detects backward wall-time steps across all its proofs;
 // a clock failure fences that Builder permanently. Recovery needs a new owner.
 type TrustedClock interface {
-	Now(context.Context) (time.Time, bool)
+	Sample(context.Context) (timeconf.Sample, error)
 }
 
 // Signer signs only the internally built registrar preimage with the admitted
@@ -71,29 +74,33 @@ func New(clock TrustedClock, random io.Reader, signer Signer) (*Builder, error) 
 	return &Builder{clock: clock, random: random, signer: signer}, nil
 }
 
-func (b *Builder) now(ctx context.Context) (time.Time, Code) {
+func (b *Builder) sample(ctx context.Context) (timeconf.Sample, Code) {
 	if ctx.Err() != nil {
-		return time.Time{}, DeadlineExceeded
+		return timeconf.Sample{}, DeadlineExceeded
 	}
 	b.clockMu.Lock()
 	defer b.clockMu.Unlock()
 	if b.fenced {
-		return time.Time{}, ClockUntrusted
+		return timeconf.Sample{}, ClockUntrusted
 	}
-	now, trusted := b.clock.Now(ctx)
+	v, err := b.clock.Sample(ctx)
+	now := v.Now
 	if ctx.Err() != nil {
-		return time.Time{}, DeadlineExceeded
+		return timeconf.Sample{}, DeadlineExceeded
 	}
 	// Strip monotonic metadata: wall-clock rollback must remain visible even when
 	// the Go monotonic clock continues forward through a UTC correction.
 	now = now.Round(0).UTC()
-	if !trusted || now.IsZero() || !b.last.IsZero() && now.Before(b.last) {
+	if err != nil || !timeconfidence.Valid(v) || !b.last.IsZero() && now.Before(b.last) {
 		b.fenced = true
-		return time.Time{}, ClockUntrusted
+		return timeconf.Sample{}, ClockUntrusted
 	}
 	b.last = now
-	return now, OK
+	v.Now = now
+	return v, OK
 }
+
+func (b *Builder) now(ctx context.Context) (time.Time, Code) { v, c := b.sample(ctx); return v.Now, c }
 
 // Proof has immutable bytes and validity data. Envelope returns a copy; it is not
 // release authority. Integration must call Recheck inside its final authority
@@ -102,6 +109,7 @@ func (b *Builder) now(ctx context.Context) (time.Time, Code) {
 type Proof struct {
 	raw             []byte
 	issued, expires time.Time
+	authorityUntil  time.Time
 	window          windows.Window
 	builder         *Builder
 }
@@ -112,12 +120,20 @@ func (p *Proof) Envelope() []byte {
 	}
 	return append([]byte(nil), p.raw...)
 }
-func (p *Proof) validAt(now time.Time) Code {
-	if !p.window.ValidAt(p.issued.Unix(), now.Unix()) {
+
+// Keep the provider's uncertainty unchanged; authorization must contain both
+// extremes. Earlier key/expiry refusal precedence is retained when bounds end
+// together. A later sample never extends this proof's original exclusive grant.
+func (p *Proof) validAt(v timeconf.Sample) Code {
+	now := v.Now
+	if !p.window.ValidAt(p.issued.Unix(), now.Add(-v.Uncertainty).Unix()) || !p.window.ValidAt(p.issued.Unix(), now.Add(v.Uncertainty).Unix()) {
 		return KeyNotValidNow
 	}
-	if !now.Before(p.expires) {
+	if !now.Add(v.Uncertainty).Before(p.expires) {
 		return RequestExpired
+	}
+	if !now.Before(p.authorityUntil) {
+		return ClockUntrusted
 	}
 	return OK
 }
@@ -127,24 +143,25 @@ func (p *Proof) Recheck(ctx context.Context) Code {
 	if p == nil || p.builder == nil {
 		return RequestExpired
 	}
-	now, code := p.builder.now(ctx)
+	v, code := p.builder.sample(ctx)
 	if code != "" {
 		return code
 	}
-	return p.validAt(now)
+	return p.validAt(v)
 }
 
 // Build accepts no caller body, key selector, nonce, timestamp, TTL or preimage.
 // Format construction, validation, encoding and strict signature verification
 // all belong to the pinned registrar package. No envelope escapes on refusal.
 func (b *Builder) Build(ctx context.Context, in Input) (*Proof, Code) {
-	now, code := b.now(ctx)
+	v, code := b.sample(ctx)
+	now := v.Now
 	if code != "" {
 		return nil, code
 	}
 	issued := now.Truncate(time.Second)
 	window := windows.Window{Key: in.Enrolled.Key, NotBefore: in.Enrolled.NotBefore, NotAfter: in.Enrolled.NotAfter}
-	if !window.ValidAt(issued.Unix(), now.Unix()) {
+	if !window.ValidAt(issued.Unix(), now.Add(-v.Uncertainty).Unix()) || !window.ValidAt(issued.Unix(), now.Add(v.Uncertainty).Unix()) {
 		return nil, KeyNotValidNow
 	}
 	nonce := make([]byte, 16)
@@ -187,7 +204,7 @@ func (b *Builder) Build(ctx context.Context, in Input) (*Proof, Code) {
 	if _, err := format.Verify(raw); err != nil {
 		return nil, registrarCode(err)
 	}
-	proof := &Proof{raw: raw, issued: issued, expires: issued.Add(120 * time.Second), window: window, builder: b}
+	proof := &Proof{raw: raw, issued: issued, expires: issued.Add(120 * time.Second), window: window, builder: b, authorityUntil: v.AuthorityUntil}
 	if code = proof.Recheck(ctx); code != "" {
 		return nil, code
 	}
@@ -240,7 +257,9 @@ func (b *Builder) Restore(ctx context.Context, raw []byte, in Input) (*Proof, Co
 		return nil, RequestExpired
 	}
 	proof := &Proof{raw: append([]byte(nil), raw...), issued: issued, expires: expires, window: windows.Window{Key: in.Enrolled.Key, NotBefore: in.Enrolled.NotBefore, NotAfter: in.Enrolled.NotAfter}, builder: b}
-	now, code := b.now(ctx)
+	v, code := b.sample(ctx)
+	now := v.Now
+	proof.authorityUntil = v.AuthorityUntil
 	if code != OK {
 		return nil, code
 	}
@@ -252,7 +271,7 @@ func (b *Builder) Restore(ctx context.Context, raw []byte, in Input) (*Proof, Co
 		b.clockMu.Unlock()
 		return nil, ClockUntrusted
 	}
-	if code := proof.validAt(now); code != OK {
+	if code := proof.validAt(v); code != OK {
 		return nil, code
 	}
 	return proof, OK

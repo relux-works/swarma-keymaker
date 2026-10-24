@@ -298,6 +298,10 @@ func reconcileCommandMode(ctx context.Context, configPath, confirm string, input
 	if err = commandConfig(c, files); err != nil {
 		return err
 	}
+	source, err := approvalSourceFor(ctx, files, c.TimePolicy)
+	if err != nil {
+		return err
+	}
 	lease, err := directoryLease(c.StateDir, files, *c.ServiceUID, true)
 	if err != nil {
 		return err
@@ -378,7 +382,7 @@ func reconcileCommandMode(ctx context.Context, configPath, confirm string, input
 	if _, existingErr := os.Lstat(filepath.Join(c.StateDir, approvalName)); !errors.Is(existingErr, os.ErrNotExist) {
 		return fmt.Errorf("approval_already_present: consume at startup or perform separate operator recovery")
 	}
-	approval, err := newCommandApproval(configPath, c, report.StateSHA256, approvalSourceFor(files))
+	approval, err := newCommandApproval(configPath, c, report.StateSHA256, source)
 	if err != nil {
 		return err
 	}
@@ -394,7 +398,7 @@ func reconcileCommandMode(ctx context.Context, configPath, confirm string, input
 		}
 		return nil
 	}
-	publish := func() error { return publishCommandApproval(ctx, configPath, c, approval, files, ops, output) }
+	publish := func() error { return publishCommandApproval(ctx, configPath, c, approval, source, files, ops, output) }
 	if bootstrap {
 		store := newFileStore(ctx, c.StateDir, files)
 		store.owner = *c.ServiceUID
@@ -434,7 +438,7 @@ func readConfirmation(ctx context.Context, input io.Reader) (string, error) {
 	}
 }
 
-func publishCommandApproval(ctx context.Context, configPath string, c PinConfig, approval commandApproval, files Files, ops durableOps, beforeUnfence func() error) error {
+func publishCommandApproval(ctx context.Context, configPath string, c PinConfig, approval commandApproval, source approvalSource, files Files, ops durableOps, beforeUnfence func() error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -498,6 +502,11 @@ func publishCommandApproval(ctx context.Context, configPath string, c PinConfig,
 		return err
 	}
 	if err = ops.SyncDir(c.StateDir); err != nil {
+		return err
+	}
+	// Publication I/O cannot extend clock authority. The started durable write
+	// completes, while an expired/untrusted observation keeps the root fence.
+	if err = approvalValid(approval, source); err != nil {
 		return err
 	}
 	if beforeUnfence != nil {
@@ -625,13 +634,21 @@ func (r *commandReconciler) startup(ctx context.Context, location configLocation
 	if strictJSON(b, &approval) != nil || approval.Version != 1 || approval.ConfigPathSHA256 != digestBytes([]byte(r.configPath)) || approval.PinSHA256 != pinDigest(c) || approval.StateSHA256 != StateDigest(high) {
 		return startupResult{}, errTrust
 	}
-	if err = approvalValid(approval, approvalSourceFor(r.files)); err != nil {
+	source, err := approvalSourceFor(ctx, r.files, c.TimePolicy)
+	if err != nil {
+		return startupResult{}, err
+	}
+	if err = approvalValid(approval, source); err != nil {
 		return startupResult{}, err
 	}
 	if err = consumeApproval(ctx, c, r.files, approval, ops); err != nil {
 		return startupResult{}, err
 	}
 	if err = ctx.Err(); err != nil {
+		return startupResult{}, err
+	}
+	// Recheck after durable consumption before releasing startup authority.
+	if err = approvalValid(approval, source); err != nil {
 		return startupResult{}, err
 	}
 	if err = ops.Remove(consuming); err != nil {

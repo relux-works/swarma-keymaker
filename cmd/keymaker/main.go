@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 	"github.com/relux-works/swarma-keymaker/internal/keymaker"
 )
@@ -40,6 +41,7 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) int {
 	return 0
 }
 func main() {
+	timeconf.CollectorEntry()
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	os.Exit(run(ctx, os.Args[1:], os.Stdout, os.Stderr))

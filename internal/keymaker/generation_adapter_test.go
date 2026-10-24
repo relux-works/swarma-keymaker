@@ -50,7 +50,7 @@ func generationStore(t *testing.T) (*Store, *os.File) {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { dir.Close() })
-	s, e := OpenStore(dir, uint32(os.Getuid()))
+	s, e := fixtureOpenStore(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -133,7 +133,7 @@ func TestGenerationAnchorContinuity(t *testing.T) {
 				if err := s.Close(); err != nil {
 					t.Fatal(err)
 				}
-				recovered, err := OpenStore(dir, uint32(os.Getuid()))
+				recovered, err := fixtureOpenStore(dir, uint32(os.Getuid()))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -157,7 +157,7 @@ func TestGenerationAnchorContinuity(t *testing.T) {
 			if e := s.Close(); e != nil {
 				t.Fatal(e)
 			}
-			recovered, e := OpenStore(dir, uint32(os.Getuid()))
+			recovered, e := fixtureOpenStore(dir, uint32(os.Getuid()))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -296,7 +296,7 @@ func TestGenerationAnchorAdvance(t *testing.T) {
 	if e := s.Close(); e != nil {
 		t.Fatal(e)
 	}
-	recovered, e := OpenStore(dir, uint32(os.Getuid()))
+	recovered, e := fixtureOpenStore(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -367,7 +367,7 @@ func TestGenerationAnchorCrashImages(t *testing.T) {
 			if mode != "journal-only" {
 				before = read(anchorPath)
 			}
-			next, e := OpenStore(dir, uint32(os.Getuid()))
+			next, e := fixtureOpenStore(dir, uint32(os.Getuid()))
 			if e != nil {
 				t.Fatal(e)
 			}

@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
+	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
 	gj "github.com/relux-works/swarma-user-manager/tools/genjournal"
 )
 
@@ -48,6 +50,10 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 	if cfg.ServiceUID != uid || cfg.ServiceGID != uint32(os.Getgid()) || cfg.Epoch == "" || cfg.RegistryRevision == "" {
 		return failure("configuration identity mismatch")
 	}
+	clock, err := timeconf.Production(cfg.TimePolicy, nil)
+	if err != nil || timeconfidence.Start(ctx, clock) != nil {
+		return Code("clock_untrusted")
+	}
 	for _, dir := range []string{cfg.SocketDir, cfg.StateDir, filepath.Dir(cfg.MasterFile)} {
 		if e := safeAncestors(dir, uid); e != nil {
 			return e
@@ -75,7 +81,7 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 		return e
 	}
 	defer lock.Close()
-	store, audit, auditDir, e := openCustodyState(state, uid)
+	store, audit, auditDir, e := openCustodyStateClock(state, uid, systemAuditClock{provider: clock})
 	if e != nil {
 		return e
 	}
@@ -94,7 +100,7 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 		generation = g
 	}
 
-	helper, stopHelper, e := configureRegistration(ctx, cfg.Registration, master, registry, status)
+	helper, stopHelper, e := configureRegistration(ctx, cfg.Registration, master, registry, clock, status)
 	if e != nil {
 		return e
 	}

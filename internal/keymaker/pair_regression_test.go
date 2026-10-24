@@ -30,7 +30,7 @@ func TestSnapshotJournalDivergence(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer lock.Close()
-			s, j, ad, err := openCustodyState(dir, uid)
+			s, j, ad, err := fixtureOpenCustodyState(dir, uid)
 			if err != nil {
 				t.Fatal("bootstrap", err)
 			}
@@ -99,7 +99,7 @@ func TestSnapshotJournalDivergence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			s, j, ad, err = openCustodyState(dir, uid)
+			s, j, ad, err = fixtureOpenCustodyState(dir, uid)
 			if err != nil {
 				if mode == "intact" || mode == "active-intact" {
 					t.Fatal("intact control", err)

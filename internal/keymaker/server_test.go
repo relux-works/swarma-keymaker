@@ -128,7 +128,7 @@ func startRealFixture(t *testing.T, overrideUID ...uint32) *runningFixture {
 	if e != nil {
 		t.Fatal(e)
 	}
-	audit, e := OpenJournal(auditDir, uint32(os.Getuid()))
+	audit, e := fixtureOpenJournal(auditDir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}

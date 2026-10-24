@@ -537,11 +537,12 @@ changes:
   confidence at process start before any time decision and preserve the
   policy's continuity requirements; later decisions/releases still require
   confidence. Keymaker MAY be stricter, never looser.
-  The provider package is **not yet consumed**. Keymaker will import a
-  published public provider package once one exists; it MUST NOT copy the
-  provider's rules into local logic. Until that dependency is published,
-  consumed and qualified, production trusted time stays unavailable and the
-  helper refuses `clock_untrusted`, **`retryable=false`**.
+  Keymaker consumes the public `swarma-credential-broker/timeconf` provider
+  pinned to `3924ab6e811b5512ad8763a392c2c88abcdd1b2c`; it MUST NOT copy the
+  provider's rules into local logic. Missing protected policy or unavailable
+  confidence refuses `clock_untrusted`, **`retryable=false`**. Real host
+  qualification and durable process-replacement continuity remain activation
+  gates; consuming the package alone does not satisfy them.
 - A same-ID native retry returns the retained envelope only while all current
   binding/enrollment checks and proof expiry still permit it; it never mints
   another nonce for that ID. The registrar may already have consumed that

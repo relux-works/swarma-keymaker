@@ -87,7 +87,7 @@ func TestNativeRetainedSchema(t *testing.T) {
 	if err := os.WriteFile(path, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	recovered, err := OpenStore(f.state, uint32(os.Getuid()))
+	recovered, err := fixtureOpenStore(f.state, uint32(os.Getuid()))
 	if err != nil {
 		t.Fatal(err)
 	}

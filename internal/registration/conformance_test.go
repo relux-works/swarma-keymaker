@@ -191,8 +191,10 @@ func releaseFixture(t *testing.T, row registrationVector, at int64) Code {
 	f := setup(t)
 	f.clock.set(time.Unix(at, 0), true)
 	// Original verified bytes/window are guard fixtures, not a production import
-	// API. No registry authority, replay or receiver admission is manufactured.
-	p := &Proof{raw: decodeFixture(t, row.Input.Bytes), issued: issued, expires: expires, window: signedWindow(t, row, body.Key), builder: f.builder}
+	// API. The point-clock fixture supplies an explicit five-minute observation
+	// grant, as production Build/Restore now require. No registry authority,
+	// replay or receiver admission is manufactured.
+	p := &Proof{raw: decodeFixture(t, row.Input.Bytes), issued: issued, expires: expires, window: signedWindow(t, row, body.Key), builder: f.builder, authorityUntil: time.Unix(at, 0).Add(5 * time.Minute)}
 	return p.Recheck(context.Background())
 }
 

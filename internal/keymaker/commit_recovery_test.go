@@ -54,7 +54,7 @@ func TestBindingCommitRecovery(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer lock.Close()
-			s, err := OpenStore(dir, uid)
+			s, err := fixtureOpenStore(dir, uid)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -130,7 +130,7 @@ func TestBindingCommitRecovery(t *testing.T) {
 				write(snapshot, value)
 			}
 			before := recoveryFiles(t, d)
-			recovered, err := OpenStore(dir, uid)
+			recovered, err := fixtureOpenStore(dir, uid)
 			if mode != "intact" && mode != "complete-pair-rollback" {
 				if err == nil || recovered != nil {
 					if recovered != nil {
@@ -200,7 +200,7 @@ func TestBindingCommitCrashWindows(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer lock.Close()
-			s, err := OpenStore(dir, uid)
+			s, err := fixtureOpenStore(dir, uid)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -263,7 +263,7 @@ func TestBindingCommitCrashWindows(t *testing.T) {
 				}
 			}
 			beforeFiles := recoveryFiles(t, d)
-			recovered, err := OpenStore(dir, uid)
+			recovered, err := fixtureOpenStore(dir, uid)
 			if mode != "intact" {
 				if err == nil || recovered != nil {
 					if recovered != nil {

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-registrar/ccj"
 	format "github.com/relux-works/swarma-registrar/enrollment"
 )
@@ -38,6 +39,7 @@ type Files interface {
 // absolute Git directory (a bare repository or an explicitly selected .git).
 // Stations classifies every host independently of its signed enrollment.
 type PinConfig struct {
+	TimePolicy  *timeconf.Policy  `json:"time_policy,omitempty"`
 	Maintainers []string          `json:"maintainers"`
 	Revision    string            `json:"revision"`
 	Publisher   string            `json:"publisher"`
@@ -268,6 +270,15 @@ func ParseConfig(raw []byte) (PinConfig, error) {
 }
 
 func decodeConfig(location configLocation) (PinConfig, *format.Policy, error) {
+	var members map[string]json.RawMessage
+	if json.Unmarshal(location.raw, &members) != nil {
+		return PinConfig{}, nil, errTrust
+	}
+	if raw, ok := members["time_policy"]; ok {
+		if _, err := timeconf.DecodePolicy(raw); err != nil {
+			return PinConfig{}, nil, errTrust
+		}
+	}
 	var c PinConfig
 	if err := strictJSON(location.raw, &c); err != nil {
 		return c, nil, err

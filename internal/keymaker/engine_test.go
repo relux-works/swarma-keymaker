@@ -368,7 +368,7 @@ func runVector(t *testing.T, layer string, raw json.RawMessage, expected Code) {
 			t.Fatal(err)
 		}
 		defer fd.Close()
-		journal, err := OpenJournal(fd, uint32(os.Getuid()))
+		journal, err := fixtureOpenJournal(fd, uint32(os.Getuid()))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -39,7 +39,7 @@ func (f fixtureFiles) approvalSource() approvalSource {
 	if f.approvalClock != nil {
 		return f.approvalClock
 	}
-	return linuxApprovalSource{}
+	return &fixedApprovalSource{instant: approvalInstant{"test-boot", testNow.UnixNano(), int64(time.Hour), true}}
 }
 
 func (f fixtureFiles) Lstat(path string) (Metadata, error) {

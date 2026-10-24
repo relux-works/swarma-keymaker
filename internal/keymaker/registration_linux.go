@@ -10,25 +10,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 )
-
-// Linux reports synchronization loss explicitly. Read-only adjtimex needs no
-// privilege; an unavailable health result is never treated as trusted UTC.
-// Builder detects subsequent backwards UTC steps independently.
-type kernelRegistrationClock struct{}
-
-func (kernelRegistrationClock) Now(ctx context.Context) (time.Time, bool) {
-	if ctx.Err() != nil {
-		return time.Time{}, false
-	}
-	var tx syscall.Timex
-	state, err := syscall.Adjtimex(&tx)
-	now := time.Now().UTC()
-	return now, err == nil && state != 5 && tx.Status&0x0040 == 0
-}
 
 type registrationConfig struct {
 	Names            Names  `json:"names"`
@@ -40,7 +25,7 @@ type registrationConfig struct {
 // A failed initial/live reload fences only the helper. SIGHUP retries the same
 // startup challenge so an operator can reconcile after observing it. No signal
 // can grant authority without the protected approval and complete verification.
-func configureRegistration(ctx context.Context, cfg *registrationConfig, master *Master, registry Registry, status io.Writer) (*RegistrationHelper, func(), error) {
+func configureRegistration(ctx context.Context, cfg *registrationConfig, master *Master, registry Registry, clock *timeconf.Provider, status io.Writer) (*RegistrationHelper, func(), error) {
 	if cfg == nil {
 		return nil, func() {}, nil
 	}
@@ -56,7 +41,7 @@ func configureRegistration(ctx context.Context, cfg *registrationConfig, master 
 		return nil, nil, failure("registration reconciliation configuration invalid")
 	}
 	authority := enrollment.New(cfg.EnrollmentConfig, nil, reconciler)
-	helper, err := NewRegistrationHelper(master, path, authority, kernelRegistrationClock{}, rand.Reader)
+	helper, err := NewRegistrationHelper(master, path, authority, clock, rand.Reader)
 	if err != nil {
 		return nil, nil, err
 	}

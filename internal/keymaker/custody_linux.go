@@ -12,6 +12,10 @@ import (
 // absence can recreate bindings. Both stores must survive independently; only a
 // snapshot initialized from an empty directory permits creating a new journal.
 func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, error) {
+	return openCustodyStateClock(state, uid, systemAuditClock{})
+}
+
+func openCustodyStateClock(state *os.File, uid uint32, clock AuditClock) (*Store, *Journal, *os.File, error) {
 	s, err := loadStore(state, uid)
 	if err != nil {
 		return nil, nil, nil, err
@@ -37,7 +41,7 @@ func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, e
 	if syscall.Fstat(fd, &st) != nil || st.Uid != uid || st.Mode&07777 != 0700 {
 		return fail()
 	}
-	j, err := openJournalChecked(dir, uid, systemAuditClock{}, rand.Reader, func(j *Journal) error {
+	j, err := openJournalChecked(dir, uid, clock, rand.Reader, func(j *Journal) error {
 		if s.initialized {
 			if j.seq != 0 {
 				return failure("unexpected bootstrap audit evidence")

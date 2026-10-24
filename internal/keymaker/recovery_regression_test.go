@@ -22,7 +22,7 @@ func TestMissingSnapshotRecovery(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer dir.Close()
-			s, err := OpenStore(dir, uid)
+			s, err := fixtureOpenStore(dir, uid)
 			if err != nil {
 				t.Fatal("empty control", err)
 			}
@@ -63,7 +63,7 @@ func TestMissingSnapshotRecovery(t *testing.T) {
 					t.Fatal("incomplete recovery admitted a store")
 				}
 			}
-			recovered, err := OpenStore(dir, uid)
+			recovered, err := fixtureOpenStore(dir, uid)
 			if damage != "intact" {
 				if err == nil || recovered != nil {
 					t.Fatal("incomplete recovery admitted a store")
@@ -131,7 +131,7 @@ func TestBindingHistoryUniqueness(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer dir.Close()
-			s, err := OpenStore(dir, uint32(os.Getuid()))
+			s, err := fixtureOpenStore(dir, uint32(os.Getuid()))
 			if scenario != "valid" {
 				if err != Code("binding_conflict") || s != nil {
 					t.Fatalf("history admitted: store=%v code=%v, want binding_conflict", s != nil, err)
@@ -192,7 +192,7 @@ func TestCustodyStartupReconciliation(t *testing.T) {
 			} else if damage == "interrupted-bootstrap" {
 				err = os.Mkdir(filepath.Join(d, "audit"), 0700)
 			} else {
-				s, j, adir, e := openCustodyState(dir, uid)
+				s, j, adir, e := fixtureOpenCustodyState(dir, uid)
 				if e != nil {
 					t.Fatal("empty startup control", e)
 				}
@@ -225,7 +225,7 @@ func TestCustodyStartupReconciliation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			s, j, adir, err := openCustodyState(dir, uid)
+			s, j, adir, err := fixtureOpenCustodyState(dir, uid)
 			if err == nil {
 				defer j.Close()
 				defer adir.Close()

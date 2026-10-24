@@ -40,7 +40,7 @@ func TestCustodyLegacyRecovery(t *testing.T) {
 			if err := os.WriteFile(path, raw, 0600); err != nil {
 				t.Fatal(err)
 			}
-			j, recovery := OpenJournal(dir, uint32(os.Getuid()))
+			j, recovery := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if j != nil {
 				if j.seq != 1 || j.previous != row.digest {
 					t.Error("legacy chain head changed")

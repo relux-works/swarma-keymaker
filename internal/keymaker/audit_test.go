@@ -19,7 +19,7 @@ func TestAuditRecoveryAndRotation(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer dir.Close()
-	j, e := OpenJournal(dir, uint32(os.Getuid()))
+	j, e := fixtureOpenJournal(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -31,7 +31,7 @@ func TestAuditRecoveryAndRotation(t *testing.T) {
 	}
 	last := j.previous
 	j.Close()
-	j, e = OpenJournal(dir, uint32(os.Getuid()))
+	j, e = fixtureOpenJournal(dir, uint32(os.Getuid()))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -51,7 +51,7 @@ func TestAuditRecoveryAndRotation(t *testing.T) {
 	if e = os.WriteFile(p, b, 0600); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = OpenJournal(dir, uint32(os.Getuid())); e == nil {
+	if _, e = fixtureOpenJournal(dir, uint32(os.Getuid())); e == nil {
 		t.Fatal("tampered audit accepted")
 	}
 }
@@ -103,7 +103,7 @@ func TestAuditStartupRejectsIncompleteEvidence(t *testing.T) {
 				t.Fatal(e)
 			}
 			defer dir.Close()
-			j, e := OpenJournal(dir, uint32(os.Getuid()))
+			j, e := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -136,7 +136,7 @@ func TestAuditStartupRejectsIncompleteEvidence(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if recovered, err := OpenJournal(dir, uint32(os.Getuid())); err == nil {
+			if recovered, err := fixtureOpenJournal(dir, uint32(os.Getuid())); err == nil {
 				recovered.Close()
 				t.Fatal("unsafe journal admitted")
 			}
@@ -153,7 +153,7 @@ func TestAuditWriteFailures(t *testing.T) {
 			os.Chmod(d, 0700)
 			dir, _ := OpenDirectory(d, uint32(os.Getuid()), 0700)
 			defer dir.Close()
-			j, e := OpenJournal(dir, uint32(os.Getuid()))
+			j, e := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if e != nil {
 				t.Fatal(e)
 			}

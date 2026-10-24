@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/enrollment"
 	"github.com/relux-works/swarma-registrar/ccj"
 	enrolled "github.com/relux-works/swarma-registrar/enrollment"
@@ -38,10 +39,10 @@ type helperClock struct {
 	healthy bool
 }
 
-func (c *helperClock) Now(context.Context) (time.Time, bool) {
+func (c *helperClock) Sample(context.Context) (timeconf.Sample, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.at, c.healthy
+	return timeconf.Sample{Now: c.at, Trusted: c.healthy, Fresh: c.healthy, AuthorityUntil: c.at.Add(5 * time.Minute), Boot: "fixture-boot"}, nil
 }
 func (c *helperClock) set(at time.Time, healthy bool) {
 	c.mu.Lock()

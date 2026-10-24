@@ -194,7 +194,7 @@ func TestCustodyAuditSchema(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer dir.Close()
-			j, err := OpenJournal(dir, uint32(os.Getuid()))
+			j, err := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -265,7 +265,7 @@ func TestCustodyAuditSchema(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			opened, err := OpenJournal(dir, uint32(os.Getuid()))
+			opened, err := fixtureOpenJournal(dir, uint32(os.Getuid()))
 			if kind == "unknown" || kind == "other-refusal" {
 				if opened != nil || err == nil || !strings.Contains(err.Error(), "invalid audit record") {
 					t.Fatal("invalid stored custody cause recovered", err)

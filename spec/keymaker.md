@@ -101,8 +101,8 @@ wins this ordering MUST prevent subsequent release. A response released first
 is already issued; later retirement cannot recall its signature. The concrete
 ordering contract belongs to the user-manager journal format (Q6).
 
-Until that format is published, the production source MUST return
-`generation_source_unavailable`. Once published, and until the user-manager
+Without an explicitly configured and available verified journal, the production
+source MUST return `generation_source_unavailable`. Until the user-manager
 writer exists, the operator writes entries using a reviewed root-run procedure
 in that same format. This is the real authoritative journal with a manual
 writer and qualifies as the production generation source, not a static UID

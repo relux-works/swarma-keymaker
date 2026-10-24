@@ -500,6 +500,20 @@ changes:
   unavailable trusted time refuses `clock_untrusted`; failed random generation
   refuses `entropy_unavailable`. Revalidate expiry after audit and before
   release, returning `request_expired` instead of an expired proof.
+  "Trusted time" MUST satisfy the shared [platform time policy](https://github.com/relux-works/swarma-credential-broker/blob/191c0c35aa2f4e6a850246b26c05c0462ff96c41/docs/time-policy.md)
+  in full: option A's protected NTS configuration, tracking evidence,
+  clock-step/hold, uncertainty and process-start rules. `MaxSyncAge` is
+  **2048 s** (sync must be strictly younger); `δ = |offset| + root distance`
+  is the minimum uncertainty bound, not a replacement for the policy's
+  conservative returned δ, whose inclusive cap is **1.5 s**. Check fresh time
+  confidence at process start before any time decision and preserve the
+  policy's continuity requirements; later decisions/releases still require
+  confidence. Keymaker MAY be stricter, never looser.
+  The provider package is **not yet consumed**. Keymaker will import a
+  published public provider package once one exists; it MUST NOT copy the
+  provider's rules into local logic. Until that dependency is published,
+  consumed and qualified, production trusted time stays unavailable and the
+  helper refuses `clock_untrusted`, **`retryable=false`**.
 - A same-ID native retry returns the retained envelope only while all current
   binding/enrollment checks and proof expiry still permit it; it never mints
   another nonce for that ID. The registrar may already have consumed that

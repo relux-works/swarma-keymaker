@@ -8,7 +8,8 @@ claim that the daemon supports it. There is no new socket or deployment step.
 The stable-key lifecycle (MSG2), purpose-5 issuer and 24-hour ceiling (MSG3),
 and bounded signing language with caller identity/key checks are decided.
 Landed S0 alignment (MSG1) is recorded; implementation and qualification
-remain gates.
+remain gates. The [durable certification contract](keymaker-msg-state.md) specifies
+state schema, recovery, publication-backed activation and issuance audit before S2.
 
 The owner of `swarm-envelope/2` is
 [the waggle repository](https://github.com/relux-works/waggle).
@@ -231,45 +232,44 @@ and current generation, not request data. Resolve its **current attestation
 content ID** T from the exact service-built `attestation/1` issued by Keymaker
 under the pinned purpose-5 root for this active `(uid,generation)` and its
 registration/epoch/owner/path. T is `sha256:` plus 64 lowercase hex digits,
-computed by §4.2 from that attestation body. A current attestation is a protected
+computed by §4.2 from that attestation body. Missing/unqualified publication
+refuses `key_not_enrolled` under the [state contract](keymaker-msg-state.md#1-authority-and-readiness).
+A current attestation is a protected
 service fact, not any valid certificate for the same stable key; renewal may
-change T within one generation. Missing/invalid service-resolved key, current
-attestation or identity policy refuses `signer_identity_unavailable`. Existing precise
+change T within one generation. After the precise publication/certification
+checks, missing/invalid service-resolved key, current attestation or identity policy refuses `signer_identity_unavailable`. Existing precise
 peer/binding/generation/certification failures retain their base codes (§2.3,
 §6); this code covers inability to resolve a usable signer identity after those
 checks, not an alias that hides a known revoke or retirement.
 
 **Current-attestation state and renewal ordering.** T lives in Keymaker's own
 protected durable state for the active `(uid,generation)` binding. It identifies
-the most recently issued and durably committed purpose-5 `attestation/1` for
-that binding; it MUST still be valid at sign time. Read that committed record
-and T under `with_active` in the **same admission transaction** as the binding
+the latest purpose-5 `attestation/1` whose publication-backed activation has
+durably committed for that binding; it MUST still be valid at sign time. Read
+that committed record and T under `with_active` in the **same admission transaction** as the binding
 and key checks. T MUST NOT come from the caller or a cache outside that
 transaction. Issuance order is protected durable commit order, not caller
 selection or timestamp sorting. An expired current record does not authorize
 automatic fallback to an older renewal; existing validity refusals apply.
 
-A renewal becomes current only after its attestation, content ID, binding
-association and required successful audit are durably committed together.
-Publication or construction alone never makes it current. From that commit,
-new signing and retained-result release require the new ID. A receiver may
-still authenticate an older message using its exact referenced still-valid
-renewal, as specified in §4.3.
+A renewal becomes current only after its attestation, content ID, binding,
+qualified registry journal/checkpoint proof and WC1 confirmation, and required
+successful audit are durably committed together in activation. Issuance commit
+or publication alone never makes it current. From activation, new signing and
+retained-result release require the new ID. A receiver may still authenticate
+an older message using its exact referenced still-valid renewal (§4.3).
 
-Renewal uses the same protected admission/release ordering as signing. Once a
-renewal wins that ordering it **fences signing and retained-result disclosure**
-for the binding while in flight or uncertain; it does not serve the old ID
-concurrently. A signing release ordered before that fence may already have
-succeeded and cannot be recalled. Waiting consumes the existing native request
-deadline; there is no late success or new retryable code. This fence avoids
-choosing authority from a partially committed issuance. A confirmed abort with
-no issuance commit keeps the previous valid T current and removes the fence.
-A confirmed commit installs only the new T before admission reopens. An unknown
-outcome keeps the fence across restart until durable reconciliation establishes
-which outcome committed; readable cached/current bytes alone cannot clear it.
-Reconciliation never signs, reissues or invents a replacement attestation.
-This is proposed state/ordering behavior, not an implemented renewal method or
-new caller-controlled selector.
+Renewal wins the same protected admission/release ordering as signing and then
+**fences signing and retained-result disclosure** across restart. Until the
+new certificate has qualified publication and activation, refuse
+`key_not_enrolled`; no fallback to T1. A signing release ordered before the
+fence cannot be recalled. Waiting consumes the existing native deadline;
+there is no late success or new retryable code. Only a proven abort before
+issuance commit may reopen previous valid T1. A proven issuance commit retains
+T2 as a candidate, still fenced until publication-backed activation. Unknown
+outcomes stay closed. Reconciliation never signs, reissues or invents a
+replacement attestation. The exact schema, retained evidence, recovery authority
+and audit pairing are in the [state contract](keymaker-msg-state.md).
 
 Then extract **exactly three identity paths**, each exactly once:
 
@@ -359,7 +359,7 @@ or another generation's attestation refuses even with the same stable key;
 a retry does not substitute a new attestation ID or re-sign the retained bytes.
 Retirement, revocation, attestation expiry or a changed current attestation can
 therefore deny disclosure of an earlier success. In particular, after renewal
-T1→T2 commits, an exact same-ID/same-preimage retry that references T1 refuses
+T1→T2 activation commits, an exact same-ID/same-preimage retry that references T1 refuses
 `signer_identity_mismatch`; it releases no retained signature, keeps the
 committed result unchanged and does not sign again. Changing the preimage to
 T2 under that retained ID instead refuses `request_conflict`; use a fresh ID
@@ -455,7 +455,14 @@ Publish certificates, independent root pins and authenticated current binding
 status through the owner's identity registry; no new socket, lookup RPC or
 network listener. Publication must preserve exact content-addressed attestation bytes and their
 key/registration association; receivers select by the signed attestation ID.
-Private material is never published. Publication/freshness/root continuity remain Q10
+Publication is an internal step at binding and by expiry, to the trust-node
+owner registry. Until that registry exists, nothing is published and message
+signing is closed. Retain the exact journal entry for T, its nearest covering
+signed checkpoint and WC1 confirmation; only publication-backed activation
+makes T current. The [publication state contract](keymaker-msg-state.md#4-publication-record-and-restart)
+pins landed waggle S3 and specifies durable acknowledgement/restart and bounded
+verification (64 entries, two checkpoints). Private material is never published.
+Publication/freshness/root continuity remain Q10
 gates. Signing stays closed until runtime implementation and qualification.
 
 ### 4.3 Verifier checks and withdrawn authority
@@ -702,8 +709,8 @@ signs/verifies P with the certified purpose-4 key or states its narrower control
 | MSG-V24 shared revocation and currency | Missing/stale/future/incomplete/rolled-back registry snapshot refuses current use as unavailable; malformed/signature-invalid or purpose-5-root-signed snapshot, registry-root-signed attestation, wrong scope/purpose or overlapping root roles refuse as invalid; effective key or attestation-record entry rejects even with old body.iat. Bound is max(S + A, from), A <=60 s | Complete authentic fresh continuous snapshot with no effective match plus independently active status allows the ordinary certificate/message checks; registry-owner revocation root, purpose and scope satisfy §4.3 |
 | MSG-V25 exact current attestation binding | With active g2 and the same stable K as retired g1, supply g1's attestation ID T1 at body.author_attestation while key and body.author equal K: signer_identity_mismatch, retryable=false, no new successful result. An older noncurrent renewal ID within g2 also refuses. Missing/wrong-type author_attestation is signer_identity_malformed. At receiver, exact referenced evidence is fully verified; an inactive g1 record refuses earlier as key_binding_invalid, while otherwise valid evidence whose content ID disagrees with the reference refuses late author_attestation_mismatch; no newer-record substitution | Active g2's exact current purpose-5 attestation ID T2, with key=body.author=K, signs without rewriting under with_active. Receiver fetches T2 exactly and verifies all binding/profile/time/snapshot evidence before equality; the valid current g2 association verifies |
 
-| MSG-V26 committed renewal between sign requests | Sign P1/T1 under R1, then durably commit a distinct overlapping-validity renewal T2 for the same active binding and stable K. A new request still containing T1 refuses signer_identity_mismatch; exact R1/P1 retry also refuses signer_identity_mismatch without disclosing or changing its retained result; R1 with changed T2 bytes refuses request_conflict | Fresh R2/P2 with key=body.author=K and body.author_attestation=T2 signs. While T1 and its exact referenced message remain otherwise valid for that same active binding, receiver accepts P1/T1 without substitution, as in PW-concurrent-first/second; retirement still refuses |
-| MSG-V27 in-flight and uncertain renewal | After renewal wins the fence, new signing and retained-result disclosure stay fenced until its issuance outcome is resolved, including across restart after an unknown commit; no old/new-ID choice from a caller or out-of-transaction cache, no late success, no reissuance during reconciliation | Proven no-commit abort reopens only previous valid T1; proven commit reopens only T2 and old-ID signing refuses. A signing release ordered before the renewal fence remains released; otherwise healthy requests proceed after resolution within their remaining deadline |
+| MSG-V26 committed renewal between sign requests | Sign P1/T1 under R1, then durably activate a distinct overlapping-validity renewal T2 with qualified publication for the same active binding and stable K. A new request still containing T1 refuses signer_identity_mismatch; exact R1/P1 retry also refuses signer_identity_mismatch without disclosing or changing its retained result; R1 with changed T2 bytes refuses request_conflict | Fresh R2/P2 with key=body.author=K and body.author_attestation=T2 signs. While T1 and its exact referenced message remain otherwise valid for that same active binding, receiver accepts P1/T1 without substitution, as in PW-concurrent-first/second; retirement still refuses |
+| MSG-V27 in-flight and uncertain renewal | After renewal wins the fence, new signing and retained-result disclosure stay fenced until its issuance outcome and publication-backed activation are resolved, including across restart after an unknown commit; no old/new-ID choice from a caller or out-of-transaction cache, no late success, no reissuance during reconciliation | Proven pre-issuance no-commit abort reopens only previous valid T1; proven issuance commit without publication stays key_not_enrolled with no fallback; proven qualified activation reopens only T2 and old-ID signing refuses. A signing release ordered before the renewal fence remains released; otherwise healthy requests proceed after resolution within their remaining deadline |
 
 Construct MSG-V06 from a correct caller-bound record with opaque string
 padding split across an array of at most 64 strings, each <=8192 bytes.
@@ -758,7 +765,8 @@ explicit amendments; publishing this proposal does not amend them silently:
 | 7 | Add exact method/binary schema and validated-domain exception to the unrestricted-byte ban; include signatures in durable same-ID recovery |
 | 8 | Replace "only signing method on B" with the two method-specific signing authorities; helper bytes, enrollment and purpose 2 remain unchanged |
 | 9 | Add the proposed purpose-3/4/5 separation rows, including reverse-direction checks; ordinary metadata/mutations still perform no key signing |
+| 4.3, 11 | Add [schema-2 inventory, protected minimum-reader floor, migration and exact-candidate recovery](keymaker-msg-state.md#2-state-schema-and-bounds); issuance commit alone is not current-T activation |
 | 10 | Count message encoding, canonicalization, signing, retries and results inside existing limits; qualify group provisioning without implying helper permission |
-| 11 | Add `swarma-msg` logical domain, exact preimage digest/null rules and result audit transaction; preserve custody extension and failure closure |
+| 11 | Add `swarma-msg` logical domain, exact preimage digest/null rules and result audit transaction; add the [explicit internal certification operation/commit mapping](keymaker-msg-state.md#5-audit-mapping-and-explicit-base-deltas), schema-aware full-state commit digest and migration; no new audit members, preserve custody extension and failure closure |
 | 13–14 | Implement paired vectors, fault/race controls and acceptance coverage; resolve MSG1 and qualify decided MSG2/MSG3 before activation |
 | 15 | Add non-retryable `message_too_large` and the three `signer_identity_*` codes with §6 mappings; keep native schema/canonicality/domain errors separate |

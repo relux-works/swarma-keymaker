@@ -208,8 +208,10 @@ and no release uses `Checkpoint`. The tagged `NewTestHandle` and exact-gap hook
 exist only in fixture builds; normal binary metadata and dependencies are
 checked separately. The 67 adapter verdicts and real-flock/no-create contracts
 are executable in `generation_fixture_linux_test.go`.
-Semantic fixtures use the source owner's per-handle `WithReaderHold(5s)`
-option in both ordinary and race-tagged runs, including all 67 vectors.
+Semantic byte-backed anchor and watcher fixtures use an explicit 5s test-only
+window in ordinary and race runs. Tagged source fixtures use the source owner's
+per-handle `WithReaderHold(5s)` option, including all 67 vectors. Real 300ms Sync
+regressions pair both semantic paths with explicit 250ms refusal controls.
 Dedicated deadline tests keep the two-argument 250ms real-clock window;
 the normal source API exposes no reader-duration option. Invalid duration and
 nil-option tests require refusal before callbacks or source/local persistence.

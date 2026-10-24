@@ -15,7 +15,8 @@ import (
 // Idle watchers read new windows instead of caching authority. A healthy poll
 // leaves the connection lifetime open; retirement or uncertain source evidence
 // closes it, and cancellation terminates the polling goroutine. The window is
-// a byte-validating fake, not a filesystem notification qualification.
+// a byte-validating fake with the semantic fixture budget, not a filesystem
+// notification qualification. The production watcher still bounds each poll.
 func TestGenerationWatchLifetime(t *testing.T) {
 	for _, mode := range []string{"retirement", "unavailable", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
@@ -23,7 +24,7 @@ func TestGenerationWatchLifetime(t *testing.T) {
 			active, retiring := generationBytes(t, "active"), generationBytes(t, "retiring")
 			var changed atomic.Bool
 			polled := make(chan struct{}, 1)
-			window := generationWindowFunc(func(ctx context.Context, _ string, floor gj.Floor, commit func(gj.View, time.Time) error) error {
+			window := generationWindowFunc(func(ctx context.Context, path string, floor gj.Floor, commit func(gj.View, time.Time) error) error {
 				raw := active
 				if changed.Load() {
 					if mode == "unavailable" {
@@ -31,11 +32,7 @@ func TestGenerationWatchLifetime(t *testing.T) {
 					}
 					raw = retiring
 				}
-				v, e := gj.Verify(bytes.NewReader(raw), floor)
-				if e != nil {
-					return e
-				}
-				e = commit(v, time.Now().Add(gj.ReaderHold))
+				e := byteGenerationWindow(&raw).WithEvidence(ctx, path, floor, commit)
 				select {
 				case polled <- struct{}{}:
 				default:

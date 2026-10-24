@@ -21,14 +21,15 @@ func (f generationWindowFunc) WithEvidence(c context.Context, p string, a gj.Flo
 }
 
 // This fake delegates byte semantics to the format owner. It does not qualify
-// filesystem policy or locking; those require the upstream tagged seam.
+// filesystem policy or locking; those require the upstream tagged seam. Its
+// explicit semantic budget isolates anchor durability from production timing.
 func byteGenerationWindow(raw *[]byte) generationWindowFunc {
 	return func(ctx context.Context, _ string, floor gj.Floor, fn func(gj.View, time.Time) error) error {
 		v, err := gj.Verify(bytes.NewReader(*raw), floor)
 		if err != nil {
 			return err
 		}
-		return fn(v, time.Now().Add(gj.ReaderHold))
+		return fn(v, time.Now().Add(generationFixtureReaderHold))
 	}
 }
 func generationBytes(t *testing.T, name string) []byte {

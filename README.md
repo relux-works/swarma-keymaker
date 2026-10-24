@@ -110,6 +110,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Check local generation anchors and bounded callbacks: `go test ./internal/keymaker ./internal/control -run '^TestGeneration(AnchorContinuity\|SourceIncidentClassification\|EvidencePredicates\|DeadlineAgentAudit\|DeadlineTransport\|JournalConfig)$' -count=1 -v` | Local verified-view fakes, restart/incident evidence and actual bounded transport; no root-owned journal qualification |
 | Go | Tagged source fixture contracts: `go test -tags genjournal_testseam ./internal/keymaker -run '^TestGenerationTagged' -count=1 -v` | All 67 vectors, source no-create and real-flock ordering; isolated nonroot fixture policy. Semantic fixtures use the owner's explicit 5s window in normal and race runs; dedicated deadline tests retain 250ms |
 | Go | Race-check tagged journal paths: `GOMAXPROCS=2 GOFLAGS=-p=2 GORACE=atexit_sleep_ms=0 go test -race -tags genjournal_testseam ./internal/keymaker -run '^TestGenerationTagged' -count=1 -v` | All 67 vectors, lock winners, writer progress, exact gap and restart; semantic windows accommodate instrumentation and local anchor sync without changing production timing |
+| Go | Untagged byte anchor timing regression: `go test ./internal/keymaker -run '^TestGenerationByteAnchorSyncDelay$' -count=1 -v` | Real 300ms Sync preserves intact/corrupt semantics under the explicit 5s test window; the 250ms neighbor refuses before callback |
 | Go | Check delayed-sync fixture isolation: `go test -tags genjournal_testseam ./internal/keymaker -run '^TestGenerationTagged(VectorSyncDelay\|AnchorSyncDeadline\|ReaderHoldWindow)$' -count=1 -v` | Real 300ms anchor audit sync admits both semantic control histories but refuses before callback with default 250ms; durable publication, source preservation and fresh default controls checked |
 | Go | Check normal production build isolation: `go test ./internal/keymaker -run '^TestGenerationProductionBuildBoundary$' -count=1 -v` | Dependency inventory and `go version -m` metadata for a temporary binary; detects a planted forbidden test tag |
 | Go | All four generation controls: `go run ./tools/mutations/main.go -group genjournal -scratch "$SCRATCH"` | Four named expected failures; the dependency controls use an exact public module snapshot and test-only go.work outside GOMODCACHE, with a green unmutated control; no product module replacements |
@@ -316,7 +317,9 @@ Startup samples fresh confidence before time decisions. The daemon shares that
 provider between helper and audit; enrollment approvals retain one provider across
 their initial and later publication/consumption checks. Every helper decision and
 post-audit release samples again. The returned uncertainty narrows key/proof
-validity and the exclusive authority endpoint is retained for each prepared proof.
+validity and the exclusive authority endpoint is retained for each prepared proof
+through persistence and live release, including same-ID retry preparation. Reauthorization
+checks current enrollment without renewing that grant.
 Missing audit confidence retains section11's null-time/unknown behavior. Request
 budgets, rate limiting and the independent CLOCK_BOOTTIME approval TTL use elapsed
 time; they never establish UTC confidence.

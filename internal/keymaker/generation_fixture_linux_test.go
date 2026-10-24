@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -123,6 +124,74 @@ func TestGenerationTaggedReaderHoldRefusals(t *testing.T) {
 			good := newJournalGeneration(generationTestJournal(t, anchor), s, dir, gj.Floor{Hash: gj.ZeroHash})
 			if code = good.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" }); code != "" || !called {
 				t.Fatal("valid reader control refused", code, called)
+			}
+		})
+	}
+}
+
+// A real anchor audit sync can outlast the default 250ms reader window. Finish
+// its durable publication, but refuse before the predicate/handoff callback.
+// The same enrolled state then admits with sync unblocked. This reproduces a
+// callback-expiry mechanism, not the exact uninstrumented reviewer I/O stall.
+func TestGenerationTaggedAnchorSyncDeadline(t *testing.T) {
+	for _, name := range []string{"active", "floor-ancestor"} {
+		t.Run(name, func(t *testing.T) {
+			dir, anchor := generationFixture(t, generationBytes(t, name))
+			before := recoveryFiles(t, anchor)
+			s, _ := generationStore(t)
+			j := s.journal
+			writer := j.writer
+			barrier := &admissionSyncBarrier{durableFile: writer, entered: make(chan struct{}), resume: make(chan struct{})}
+			j.writer = barrier
+			var once sync.Once
+			resume := func() { once.Do(func() { close(barrier.resume) }) }
+			deadline := make(chan time.Time, 1)
+			// Deliberately use the ordinary two-argument handle even under race.
+			h := gj.NewTestHandle(uint32(os.Getuid()), anchor)
+			window := generationWindowFunc(func(ctx context.Context, path string, floor gj.Floor, commit func(gj.View, time.Time) error) error {
+				return h.WithEvidence(ctx, path, floor, func(v gj.View, d time.Time) error {
+					deadline <- d
+					return commit(v, d)
+				})
+			})
+			g := newJournalGeneration(window, s, dir, gj.Floor{Hash: gj.ZeroHash})
+			called := false
+			done := make(chan struct{})
+			var code Code
+			go func() {
+				defer close(done)
+				code = g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" })
+			}()
+			defer func() { resume(); <-done; j.writer = writer }()
+			select {
+			case <-barrier.entered:
+			case <-done:
+				t.Fatal("reader did not reach the controlled sync", code)
+			case <-time.After(3 * time.Second):
+				t.Fatal("reader failed to reach the sync barrier")
+			}
+			d := <-deadline
+			if left := time.Until(d); left > gj.ReaderHold {
+				t.Fatal("unexpected default reader bound", left)
+			}
+			<-time.After(time.Until(d) + time.Millisecond)
+			resume()
+			<-done
+			if code != "request_deadline_exceeded" || called {
+				t.Fatal("late anchor sync admitted a callback", code, called)
+			}
+			loaded, damaged := loadGenerationAnchor(s, dir, gj.Floor{Hash: gj.ZeroHash})
+			if damaged || !g.enrolled || loaded != g.anchor || j.generation.Anchor == nil || loaded != *j.generation.Anchor || generationIncidentCount(t, s) != 0 {
+				t.Fatal("expired sync lost publication or spuriously fenced", loaded, damaged)
+			}
+			if fmt.Sprint(before) != fmt.Sprint(recoveryFiles(t, anchor)) {
+				t.Fatal("reader changed the source")
+			}
+			// The next call needs no floor advance and must not publish again.
+			writes := barrier.writes.Load()
+			g.window = h
+			if code = g.withWindow(context.Background(), func(context.Context, gj.View) Code { called = true; return "" }); code != "" || !called || barrier.writes.Load() != writes {
+				t.Fatal("enrolled positive control failed or rewrote the floor", code, called)
 			}
 		})
 	}

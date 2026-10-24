@@ -103,15 +103,19 @@ func TestReviewHelperReloadDeadline(t *testing.T) {
 			}
 			pub := nativeRequest(4, "pubkey", control.Object{})
 			pub["timeout_ms"] = int64(1500)
-			nativeSend(t, other, pub)
 			if !slow {
+				// This control proves both valid operations succeed. Start pubkey's
+				// unchanged 1500ms budget after the helper's durable work; parallel
+				// progress before reload resumes is asserted in the slow branch.
 				helperResult(t, nativeReceive(t, c), nativeID(3), "", tr.helper.key)
+				nativeSend(t, other, pub)
 				nativeResponse(t, nativeReceive(t, other), nativeID(4), "")
 				if entropy.calls.Load() != 1 || signer.calls.Load() != 1 {
 					t.Fatal("undelayed control did not build exactly one proof")
 				}
 				return
 			}
+			nativeSend(t, other, pub)
 			// Keep the original review's 2.2s read bound; independently tighten
 			// the normal deadline-response check to a 500ms scheduling margin.
 			_ = c.SetReadDeadline(started.Add(2200 * time.Millisecond))

@@ -294,15 +294,19 @@ requests MUST NOT have `uid`, `generation`, `identity` or `path` selectors.
 v0 register/revoke intake is limited to the configured operator principal
 (Q3, decided). Operator UID possession does not stand in for
 a human signature where required. `mode` is `operator` or `ephemeral`.
-`operator_record` is an opaque signed-record object for the future platform
-verifier, or null for `ephemeral`. A verified operator record must bind this
-exact operation, target registration, owner, epoch, action ID and canonical
-arguments, with current authority and replay checks. Its bytes and verifier
-are a publication gate (Q7). Persistent revoke MUST return
-`operator_record_unavailable` until this verifier is available; it MUST NOT
-accept an unsigned substitute. Invalid or changed evidence refuses
-`operator_record_invalid`. Positive fixture verdicts model the verifier
-interface and MUST NOT be mistaken for an available production wire format.
+`operator_record` is the whole canonical `swarm-envelope/2` object for
+`operator-act/1`, or null for `ephemeral`. The record format and exact
+persistent-revoke mapping are published in
+[waggle S0 §4.2](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#42-keymaker-operator_record-exact-mapping).
+There is no extra wrapper or request member. It binds operation `revoke`,
+registration target, protected owner and master epoch, action ID, audience,
+nonce and canonical arguments digest; current P-256 operator-device authority,
+trusted time, revocation and durable replay/effect checks are mandatory.
+The waggle S1 verifier library and durable consumer integration remain pending
+(Q7). Persistent revoke MUST return `operator_record_unavailable` until that
+verifier is available; it MUST NOT accept an unsigned substitute. Invalid or
+changed evidence refuses `operator_record_invalid`. Positive fixture verdicts
+model the verifier interface and MUST NOT be mistaken for runtime availability.
 
 An `ephemeral` revoke MUST require an ephemeral identity, its original
 registrant principal and authoritative evidence of target retirement. A
@@ -1163,8 +1167,11 @@ tests in this initial repository. Future rework MUST retain them by name.
    `generation_source_unavailable`. Release revalidation fences recorded
    retirement; an operator update made late does not fence account removal.
    Section 3.1 retains `with_active` ordering and states the manual-writer limit.
-7. **Q7 — signed-act gate:** publish operator-record verification, pins,
-   replay and canonical argument binding. No unsigned persistent revoke.
+7. **Q7 — signed-act gate:** the operator-act/1 format and exact mapping are
+   published in [waggle S0 §4.2](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#42-keymaker-operator_record-exact-mapping).
+   The S1 verifier library, pins, replay/effect integration and qualification
+   remain pending; persistent revoke refuses `operator_record_unavailable`.
+   No unsigned substitute.
 8. **Q8 — decided:** the explicit, append-only, scoped name-to-index registry
    is approved. Field names and path syntax stay as specified in section 4.2;
    a truncated hash cannot supply the required collision-free mapping.
@@ -1215,9 +1222,9 @@ strings. Registrar-owned signed-document verdicts retain registrar spelling.
 | `operation_unsupported`, `request_malformed`, `request_conflict` | Unsupported method, invalid schema or conflicting effect ID |
 | `frame_too_large`, `frame_truncated`, `frame_malformed`, `ccj_noncanonical` | Transport/canonical-byte failure |
 | `message_too_large` (decided, unimplemented message contract) | Complete decoded message preimage >24576 bytes within a valid native frame; `retryable=false` |
-| `signer_identity_unavailable` (unimplemented message contract) | Missing/invalid service-resolved attested caller key or identity policy after precise native authority checks; `retryable=false` |
-| `signer_identity_malformed` (unimplemented message contract) | Missing `key` or `body.author`, non-object record/path container or wrongly typed/multi-value identity field after canonical validation; `retryable=false` |
-| `signer_identity_mismatch` (unimplemented message contract) | Either string differs byte-for-byte from caller's own active attested purpose-4 key ID, even if both foreign strings agree; `retryable=false` |
+| `signer_identity_unavailable` (unimplemented message contract) | Missing/invalid service-resolved attested caller key, current attestation or identity policy after precise native authority checks; `retryable=false` |
+| `signer_identity_malformed` (unimplemented message contract) | Missing `key`, `body.author` or `body.author_attestation`, non-object record/path container or wrongly typed/multi-value identity field after canonical validation; `retryable=false` |
+| `signer_identity_mismatch` (unimplemented message contract) | Any extracted string differs byte-for-byte from caller's own active attested purpose-4 key ID or current attestation content ID; equal foreign keys or another generation's attestation still refuse; `retryable=false` |
 | `version_unsupported`, `hello_required`, `hello_already_negotiated` | Invalid negotiation state |
 | `request_deadline_exceeded`, `request_expired` | Request budget or retained helper result lifetime ended |
 | `enrollment_unavailable`, `enrollment_unverified`, `enrollment_unsupported`, `host_revoked` | Unavailable, untrusted, unsupported or revoked enrollment |

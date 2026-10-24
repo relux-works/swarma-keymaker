@@ -40,12 +40,14 @@ The [Swarm Signer message proposal](spec/keymaker-msg.md) defines a purpose-4
 message key, constrained native signing, certification and paired text vectors.
 It is spec only: stable persistent-key continuity, generation-bound authority
 attestations, an owner-pinned purpose-5 issuer and its 24-hour ceiling are
-decided. Signing checks `key` and `body.author` against the caller's own active attested
-purpose-4 key. The draft aligns to waggle `136dba2`: exact `swarma-msg/2`,
-24576-byte/depth12 signed records and shared attestation/revocation formats.
-Accepted-head re-pin, the explicit authority/format differences in the
-[supplement's mismatch ledger](spec/keymaker-msg.md#44-draft-alignment-differences-and-unresolved-gates),
-publication and qualification remain gates.
+decided. Signing checks `key`, `body.author` and `body.author_attestation`
+against the caller's own active key and current purpose-5 attestation. The
+proposal aligns to accepted waggle `67df75bec015ea463f685e4daf4975ecda18816a`:
+exact `swarma-msg/2`, 24576-byte/depth12 signed records, attestation/1 and
+separate registry-owner revocation authority. The
+[supplement's alignment ledger](spec/keymaker-msg.md#44-landed-s0-alignment-and-qualification-gates)
+records resolved mappings; runtime implementation, publication and qualification
+remain gates.
 No new method is enabled.
 
 The [pre-active provision/confirm proposal](spec/keymaker-provision.md) reserves

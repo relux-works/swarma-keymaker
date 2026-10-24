@@ -335,7 +335,10 @@ exact-tuple confirmation. It is **spec only; not implemented or activated**.
 The target-only metadata exception never relaxes active caller or signing
 checks. Ordinary `register` above remains active-target-only. Confirmation
 currency through the user-manager active append remains a joint qualification
-gate; the supplemental query alone does not claim an activation lease.
+gate; the supplemental query alone does not claim an activation lease. The
+proposed instance correlation uses the confirmation result only; native hello
+keeps its version-only result. Reconnect or service restart invalidates pending
+correlation; instance equality cannot establish currency through activation.
 
 ## 6. Surface A: SSH agent subset
 

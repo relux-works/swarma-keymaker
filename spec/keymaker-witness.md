@@ -12,8 +12,9 @@ The required guarantee follows the public
 acknowledged external intent, durable local commit, acknowledged external
 resolution, then authority use; fresh challenge-bound latest-head verification
 at startup. Keymaker has its own mechanism and **separate consumer stream**
-(WC3). Registrar receipts cannot reconcile Keymaker state. Placement remains
-an owner decision (WC1); this document specifies the required interface only.
+(WC3). Registrar receipts cannot reconcile Keymaker state. The placement
+direction is decided (WC1); deployment/qualification remain open, and the
+existing honest mode A holds until those gates close.
 
 ## 1. Guarantee and trust boundary
 
@@ -450,10 +451,13 @@ does not establish coverage. No such tests or mutants are claimed in this slice.
 
 ## 8. Open activation questions
 
-- **WC1 — placement and independent retention:** owner chooses the witness
-  location, administration/restore boundary and independently surviving trusted
-  checkpoint. Qualify independent restore and joint-loss limits; this proposal
-  chooses no deployment.
+- **WC1 — placement and independent retention:** the decided placement is
+  a separately administered trust node outside the platform's administrative
+  domain, shared with the owner registry, in separate accounts and processes,
+  with the trusted checkpoint kept off that node. Until deployed and qualified,
+  the existing honest mode A holds and WC1 stays open for activation. Qualify
+  independent restore, off-node checkpoint retention and joint-loss limits;
+  this placement decision is not deployment or qualification evidence.
 - **WC2 — protocol, clock and freshness:** close transport/authentication,
   signed response framing, proof size/paging bounds, durable-ack/linearizable-read
   evidence and restart-safe challenge entropy. A challenge proves response

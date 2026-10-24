@@ -57,7 +57,7 @@ receipt equality and boot/TTL checks cannot provide that guarantee.
 
 | Question | Direction / remaining decision and evidence |
 | --- | --- |
-| WC1: placement | Owner chooses an independently administered restore/failure boundary and independently surviving checkpoint. No location is selected here; joint host/witness loss or undetectable joint rollback remains outside the guarantee. |
+| WC1: placement | Decided: a separately administered trust node outside the platform's administrative domain, shared with the owner registry, in separate accounts and processes, with the trusted checkpoint kept off that node. Until deployed and qualified, the existing honest mode A holds and WC1 stays open for activation. Qualify independent restore, off-node checkpoint retention and joint-loss limits; undetectable joint rollback remains outside the guarantee. |
 | WC2: clock and freshness | Qualify authoritative serialized latest reads, challenge-bound signed replies, post-restore unpredictable entropy, transport/authentication, bounded framing/proofs and operation deadlines. Wall-clock freshness/TTL alone is insufficient; existing trusted-time checks remain. |
 | WC3: Keymaker consumer stream | Separate Keymaker/station stream is the accepted direction. Qualify protected station/lineage enrollment, ACLs, exact artifact inventory/manifest and continuity-preserving migration. Registrar receipts cannot reconcile this consumer. |
 | Witness key custody | Curator must approve internal SLIP-0010 purpose 3 and qualify writer custody, independent witness verifier-key provisioning, purpose binding, rotation/revocation and lost-master recovery without resetting the stream/epoch. No socket gains a witness-key operation. |
@@ -157,7 +157,7 @@ The local adapter and its explicit bounds are in [internal/enrollment/README.md]
 ## Provision and confirmation gates
 
 The [provision/confirm supplement](spec/keymaker-provision.md) aligns its
-account-side inputs to user-manager `4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1`,
+account-side inputs to user-manager `2fba23868045b37143ef0156c0e88d1d340d9cc3`,
 `spec/stations-v0.md` §6.2, `spec/generation-journal.md` §§4/6.1 and
 `docs/station-core.md`. It is spec only; production bump remains
 `bump_key_admission_unconfirmed` until joint acceptance and qualification.
@@ -166,7 +166,7 @@ register-after-active; no key-purpose or signed-receipt authority is added.
 
 | Gate | Remaining decision / evidence |
 | --- | --- |
-| PC1: joint interface and observer authentication | Accept the separate operator-only provision and scoped read-only confirm schemas on both sides. Qualify the actual user-manager adapter and protected pending-intent correlation, active observer UID/generation, socket/server authentication and owner/target scope. A root caller is not exempt from Keymaker generation checks. Signed confirmation would need a separate authorized signer/purpose decision; purposes 2/5 are not widened. |
-| PC2: currency through activation | Specify and qualify final ordering between the two confirmation facts, pin withdrawal, revoke/epoch change and user-manager active append, without RPC under either side's state/journal locks. A fresh nonce/2000ms local observation is not a lease and cannot close this race. No shared-lock/lease/commit protocol is claimed implemented. Until this is resolved, bump refuses rather than using a cached receipt. |
+| PC1: joint interface and observer authentication | Accept the separate operator-only provision and scoped read-only confirm schemas on both sides. Qualify the real observer/user-manager adapter and protected operator-to-manager handoff/pending-intent correlation, active observer UID/generation, socket/server authentication and owner/target scope. Pin service instance only from the first fully verified confirmation result on the authenticated connection; reconnect/restart invalidates correlation, not the effect intent. A root caller is not exempt from Keymaker generation checks. Signed confirmation would need a separate authorized signer/purpose decision; purposes 2/5 are not widened. |
+| PC2: currency through activation | Specify and qualify final ordering between the two confirmation facts, pin withdrawal, revoke/epoch change and user-manager active append, without RPC under either side's state/journal locks. A fresh nonce/2000ms local observation or equal service instance ID is not a lease and cannot close this race. No shared-lock/lease/commit protocol is claimed implemented. Until this is resolved, bump refuses rather than using a cached receipt. |
 | PC3: creating guard, durability and restore | Qualify metadata-only creating target guard with active caller, published gate→data→commit order and <=250ms local window. Cover exact replay, audit/commit uncertainty, restart/promotion/removal history, protected policy-digest provenance and epoch/journal floor restore. No timer activation or deleting committed evidence; include new state in option C inventory if activated. |
 | PC4: identity allocation and rollout | Operator preallocates a never-used purpose-1 identity for bump: ordinary persistent same-path reuse would reproduce the old key and is not this operation. Confirm this account-to-identity mapping, local generation-pin review/install flow, resource budgets and actual fresh account-token acquisition through its owning service. Keep normal create register-after-active unless separately reviewed. Runtime/root/backend and joint negative-vector qualification remain open. |

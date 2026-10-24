@@ -6,15 +6,15 @@ capabilities. Ordinary `register` still requires an active target. No endpoint,
 key purpose, signed document or enrollment wire member is enabled here.
 
 The account lifecycle owner is the user-manager repository, pinned here to
-**`4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1`**:
+**`2fba23868045b37143ef0156c0e88d1d340d9cc3`**:
 
-- [spec/stations-v0.md §6.2](https://github.com/relux-works/swarma-user-manager/blob/4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1/spec/stations-v0.md#62-keymaker-handoff-and-activation-order)
+- [spec/stations-v0.md §6.2](https://github.com/relux-works/swarma-user-manager/blob/2fba23868045b37143ef0156c0e88d1d340d9cc3/spec/stations-v0.md#62-keymaker-handoff-and-activation-order)
   requires old removed → reviewed re-admission → new binding → new active.
-- [spec/generation-journal.md §4](https://github.com/relux-works/swarma-user-manager/blob/4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1/spec/generation-journal.md#4-lifecycle-and-generation-bump)
+- [spec/generation-journal.md §4](https://github.com/relux-works/swarma-user-manager/blob/2fba23868045b37143ef0156c0e88d1d340d9cc3/spec/generation-journal.md#4-lifecycle-and-generation-bump)
   owns states, fresh tokens, retained history and non-overlap;
-  [§6.1](https://github.com/relux-works/swarma-user-manager/blob/4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1/spec/generation-journal.md#61-reader--with_active)
+  [§6.1](https://github.com/relux-works/swarma-user-manager/blob/2fba23868045b37143ef0156c0e88d1d340d9cc3/spec/generation-journal.md#61-reader--with_active)
   owns the final reader ordering.
-- [docs/station-core.md](https://github.com/relux-works/swarma-user-manager/blob/4da5aa5ca6d4710a9ff87a756489e1a89a5a24f1/docs/station-core.md)
+- [docs/station-core.md](https://github.com/relux-works/swarma-user-manager/blob/2fba23868045b37143ef0156c0e88d1d340d9cc3/docs/station-core.md)
   keeps production bump closed as `bump_key_admission_unconfirmed` pending this
   joint contract and backend qualification. Create and retire are independent.
 
@@ -144,6 +144,13 @@ This is a proposed semantic extension, **not a claim that the existing
 `with_active` adapter accepts creating or that a new journal API is shipped**.
 It permits only bounded metadata commit/audit/response, never a signing callback.
 
+The pinned journal [§5 WithEvidence contract](https://github.com/relux-works/swarma-user-manager/blob/2fba23868045b37143ef0156c0e88d1d340d9cc3/spec/generation-journal.md#5-reader-algorithm-durable-high-water-and-refusals)
+provides a verified, data-locked multi-tuple window. `WithEvidence` itself does
+not admit identity pairs: the consumer checks the caller with `View.Active`
+and target/predecessor lifecycle with `View.Generation` in that same window.
+A creating target is never admitted as active; `WithActive` retains its active
+predicate. Neither primitive alone qualifies the Keymaker adapter.
+
 Use journal gate → data → Keymaker commit lock; gate/data acquisition is
 nonblocking, no lock upgrade, and the shared data window including validation,
 floor persistence, local transaction/audit and response handoff is **<=250 ms**.
@@ -248,8 +255,14 @@ unknown transactions, missing predecessor evidence or untrusted service state.
 User-manager records local boot ID and CLOCK_BOOTTIME **before sending** a
 query. It verifies authenticated endpoint, echoed native ID and challenge,
 version and closed schema/types, both facts against the pending exact tuple,
-registration/epoch/owner/provision_effect, and new journal checkpoint without
-rollback relative to its preserved floor. All target/status facts must remain
+registration/epoch/owner/provision_effect, and **predecessor_generation against
+the predecessor generation of the consumer's protected pending effect**.
+For `journal:{seq,hash}`, independently verify the journal's complete chain:
+the checkpoint's exact hash must occur at its stated sequence, and the
+consumer's preserved checkpoint must be an ancestor at its exact hash.
+A checkpoint later than the preserved floor must extend that verified chain;
+`seq >= floor` alone is insufficient. Unknown ancestry or an equal-sequence
+hash mismatch refuses confirmation. All target/status facts must remain
 creating/provisioned. Observed boot must equal its own current boot; observed
 time must lie between local start and receipt. The receipt may be used once
 for this pending effect, only before **start + 2000 ms**, with continuity of
@@ -259,6 +272,23 @@ activation check in time. A future observation, reused challenge or changed
 service instance during correlation refuses. Persist pending correlation and
 its consumption; after consumer/service restart, boot change, lost response
 or uncertain consumption, obtain a **new query**, never import old receipt bytes.
+
+**Recommend pinning the service instance from the confirmation result only.**
+Native `hello` continues to return only `{version:1}`; do not expect or add an
+instance field there. On a newly authenticated connection, the consumer pins
+`instance_id` only after fully validating the first fresh confirmation result,
+including its challenge, tuple, predecessor and checkpoint. Persist that pin
+with the protected pending correlation, bound to this connection and query;
+subsequent correlated responses must match it exactly. It is not a durable
+cross-connection trust pin. Any disconnect/reconnect invalidates that pending
+correlation even if the next result claims the same instance ID. A service
+restart or changed instance ID also invalidates it. Retain the effect intent,
+but discard the observation and obtain a new request ID/challenge and fully
+verified result on the new authenticated connection before pinning anew.
+A retained old result cannot re-establish the pin. PC1 must qualify the real
+observer and protected operator-to-manager handoff, not station-supplied
+expectations. Instance equality, including an unchanged instance on a live
+connection, **does not prove currency through the active write (PC2)**.
 
 A confirmation query has no binding effect but retains its result/arguments
 with audit under the caller's ID for bounded exact retry semantics. Same ID
@@ -390,8 +420,8 @@ Indeterminate commits use §6's keep/reconcile/recover rule, not that blanket.
 | --- | --- | --- |
 | PC-V01 target creating only | Provision separately at active, retiring, removed: `provision_state_invalid`, no new binding | Exact fresh creating token after removed predecessor provisions once |
 | PC-V02 no pre-active issuance | Creating target's sign/pubkey/helper/K3 requests: `generation_inactive`, no key/proof/signature/result disclosure; internal unpromoted binding-use control: `binding_provisioned` | After qualified active append and durable with_active promotion, fresh own-generation connection can use its new binding |
-| PC-V03 confirmation exact tuple | Wrong target generation: `generation_mismatch`; wrong expected registration or epoch: `binding_conflict`. Consumer given mismatched response refuses bump_key_admission_unconfirmed without active append | Exact tuple/reg/epoch/effect and both verified facts match pending intent |
-| PC-V04 old receipt replay | Replay g0 confirmation into g1, reuse challenge, expired2000ms observation, boot/instance mismatch or post-restart cached bytes: consumer bump_key_admission_unconfirmed, no activation | New live challenge, matching boot/instance/tuple and current observation for the same pending effect within age bound |
+| PC-V03 confirmation exact tuple | Wrong target generation: `generation_mismatch`; wrong expected registration or epoch: `binding_conflict`. Consumer given a mismatched response, including predecessor or checkpoint with unknown ancestry/wrong hash, refuses bump_key_admission_unconfirmed without active append | Exact tuple/predecessor/reg/epoch/effect, both facts and verified checkpoint ancestry/hash match pending intent |
+| PC-V04 old receipt replay | Replay g0 confirmation into g1, reuse challenge, expired2000ms observation, boot/instance mismatch, reconnect even with equal instance ID, or post-restart cached bytes: consumer bump_key_admission_unconfirmed, no activation | New live challenge, matching boot/instance/tuple and current observation for the same pending effect within age bound |
 | PC-V05 predecessor removal | Malformed overlapping journal introducing g1 before g0 removed: source fenced, `generation_source_unavailable`, no provision; user-manager must not append active or create overlap | Full history proves g0 removed before fresh g1 creating and binding |
 | PC-V06 binding/active crash | Crash after durable provision but before active: restart cannot issue, replace binding or allocate another registration; creating remains fenced for key use | Same-ID/args recovers committed provision; new confirm then qualified active/promotion uses that same registration |
 | PC-V07 changed retry | Same operator ID with different target, predecessor, owner, names, lifetime or method: `request_conflict`, original record/result unchanged | Exact ID/args under still-creating/current authority returns byte-identical original result |

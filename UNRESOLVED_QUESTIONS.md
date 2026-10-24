@@ -93,6 +93,21 @@ only in activated C; historical consumed IDs and pending evidence remain
 protected. An outage never automatically switches modes. Every item above
 remains open for activation; unchanged-code checks cannot close it.
 
+### Shared witness-service proposal
+
+[Witness-service protocol and server](spec/witness-service.md) specifies a
+candidate contract; it does not close WC1–WC5 or activate option C.
+
+| Open service question | Required acceptance / evidence |
+| --- | --- |
+| Implementation owner | Assign the service implementation and joint consumer qualification owners. No implementation is assigned or supplied here. |
+| Host and independent retention | Qualify the decided trust-node/account/process/key isolation, exclusive serving instances, off-node checkpoint custodian, synchronous durability barrier, restart entropy, backup/archive recovery and joint-loss bounds. A periodic checkpoint does not meet the proposed strict profile. |
+| Registrar transport and consumer wire | Registrar owners must accept the proposed dedicated mutual-TLS1.3 RPC instead of mandatory §9-channel wire reuse, update §4.5.3/C.3/WC2 explicitly, and accept neutral receipts/head/proofs. Existing audit semantics stay mandatory; no registrar edit/acceptance claimed. |
+| Keymaker wire and egress | Explicitly accept proposed receipt/head metadata, proof encoding, service-wide control-metadata disclosure scope, caps and added durability cost; qualify a narrow witness path without general egress or budget increases. Existing consumer §3.3 changes only by a candidate link. |
+| Registry checkpoint profile | Align with the [public registry design draft](https://github.com/relux-works/swarma-owner-registry/blob/1cc08a6b4fd1cd5a123a5b38e4c3f17114f32496/design/owner-registry.md), independently reviewed but not content-accepted. Accept its journal/checkpoint schema and adapter, exact candidate inventory/commit validation, checkpoint-time representation, intent/resolution coordination and old-instance exclusion; the registry writer has no witness credential. Distinct maintainer signing remains separate. No registry content tag is assigned here. |
+| Joint draft differences | Registry Q10 leaves coordinator/API qualification open; accept the proposed paired inclusion wrapper and receipts jointly. Its off-node checkpoint discussion does not require this proposal's per-ack custodian barrier: explicitly accept provider/cost and qualify per-entry signing/sync load. Registry Q2's purpose-5 domain mismatch in its older Keymaker pin remains with those format owners; no witness alias or purpose expansion. |
+| Capacity and proof recovery | Measure proposed frame/record/page/rate/storage numbers, archival growth and off-node round trips against all consumer deadlines. Specify bounded offline continuity recovery for over-cap gaps; never truncate evidence. |
+
 ## Swarm Signer message specification gates
 
 The [message supplement](spec/keymaker-msg.md) is spec only. Purpose 4,

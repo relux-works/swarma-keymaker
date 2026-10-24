@@ -41,6 +41,10 @@ The [option C witness proposal](spec/keymaker-witness.md) defines a separate
 Keymaker stream, witnessed state epochs and startup/commit recovery rules.
 It is spec only: option A remains in use, and witness placement, keys,
 freshness, exclusion and lifecycle qualification remain open activation gates.
+The [shared witness-service candidate](spec/witness-service.md) proposes typed
+streams, append/head/proof operations, registry-checkpoint inclusion and server
+restore rules. It is spec only; implementation ownership, consumer-wire/transport
+acceptance, independent retention and capacity qualification remain open.
 
 The [Swarm Signer message proposal](spec/keymaker-msg.md) defines a purpose-4
 message key, constrained native signing, certification and paired text vectors.
@@ -66,6 +70,7 @@ normal create keeps register-after-active. No new method is enabled.
 | --- | --- |
 | `spec/keymaker-operator-record.md` | Proposed S1 operator-record integration, fact sources, durable replay and audit delta; no runtime activation |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
+| `spec/witness-service.md` | Proposed shared typed witness protocol, registry intent/resolution inclusion, server durability and paired text vectors; no implementation or activation |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |
 | `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |

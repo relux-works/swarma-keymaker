@@ -174,6 +174,11 @@ original receipt; a different record at that position MUST fail.
 
 ### 3.3 Required operations
 
+The separate [witness-service candidate](witness-service.md) proposes the shared
+server, concrete wire encodings, transport and qualification gates. Its
+[consumer-delta list](witness-service.md#12-consumer-deltas-and-activation-decisions)
+requires explicit acceptance; the existing consumer contract below is unchanged.
+
 The placement-independent interface MUST provide:
 
 1. **Compare-and-append** of a signed record against the exact expected previous

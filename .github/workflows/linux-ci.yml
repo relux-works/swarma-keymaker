@@ -1,0 +1,50 @@
+name: Linux Go CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      GOMAXPROCS: '2'
+      GOFLAGS: '-p=2'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.26.0'
+      - name: Prepare private test scratch
+        run: |
+          scratch="$(mktemp -d "$RUNNER_TEMP/keymaker.XXXXXXXX")"
+          chmod 0700 "$scratch"
+          printf 'TMPDIR=%s\n' "$scratch" >> "$GITHUB_ENV"
+      - name: Verify modules
+        run: go mod verify
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Check formatting
+        run: bash --noprofile --norc -eo pipefail .github/scripts/check-format.sh
+      - name: Verify vet and formatting controls
+        run: bash --noprofile --norc -eo pipefail .github/scripts/check-controls.sh
+      # Compilation is not privileged qualification. No tagged tests execute here.
+      - name: Compile privileged rows and report PENDING
+        run: |
+          go vet -tags multiuid ./internal/keymaker
+          printf '%s\n' 'PENDING: TestMultiUID, TestMultiUIDControl, TestMultiUIDHelper require the provisioned multi-UID test window; compile-only in CI. Use cmd/keymaker-window (make test-multiuid); runner exit 3 means PENDING.'
+      - name: Test
+        run: go test ./... -count=1 -timeout=25m -v

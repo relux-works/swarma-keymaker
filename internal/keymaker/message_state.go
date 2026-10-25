@@ -226,8 +226,63 @@ func (m *messageInventory) reservation() int64 {
 	}
 	return total
 }
+
+// messageCapacity charges every byte that coexists on disk, plus unspent proof
+// reservations. Callers supply future immutable artifacts, recovery copies and
+// install staging separately; installed bindings.json is measured, not inferred
+// from a prospective state which may shrink. No write is needed for this check.
+func (s *Store) messageCapacity(artifacts, recovery, staging int64) bool {
+	if s.messages == nil || s.dir == nil {
+		return false
+	}
+	f, err := openRelative(s.dir, "bindings.json", syscall.O_RDONLY, s.uid, 0600)
+	if err != nil {
+		return false
+	}
+	st, err := f.Stat()
+	closeErr := f.Close()
+	if err != nil || closeErr != nil {
+		return false
+	}
+	total := int64(0)
+	for _, n := range []int64{st.Size(), s.messages.artifactBytes, s.messages.reservation(), artifacts, recovery, staging} {
+		if n < 0 || n > stateBudget-total {
+			return false
+		}
+		total += n
+	}
+	return true
+}
 func (s *Store) messageFits(rawBytes int) bool {
-	return s.messages != nil && int64(rawBytes)*2+s.messages.artifactBytes+s.messages.reservation() <= stateBudget
+	return s.messageFitsTransitions(rawBytes, 1, 0)
+}
+
+// Each transition retains a new recovery body. At a later transition the prior
+// installed snapshot may itself have grown to rawBytes. Reserving its upper
+// bound as well covers the peak across a native intent/effect pair.
+func (s *Store) messageFitsTransitions(rawBytes, transitions int, artifacts int64) bool {
+	if rawBytes < 0 || rawBytes > stateBudget || transitions < 1 || transitions > 3 {
+		return false
+	}
+	recovery := int64(rawBytes) * int64(transitions)
+	staging := int64(rawBytes)
+	if transitions > 1 {
+		staging += int64(rawBytes)
+	}
+	return s.messageCapacity(artifacts, recovery, staging)
+}
+
+// messagePreview deliberately copies only sizing/serialization inputs, never
+// the Store gate, watchers or request index. Caller already holds Store's gate.
+func (s *Store) messagePreview() *Store {
+	return &Store{dir: s.dir, uid: s.uid, schema: s.schema, messages: s.messages,
+		records: s.records, requests: s.requests, next: s.next, version: s.version, journal: s.journal}
+}
+
+// Audit linkage is not known until commit. Bound its complete encoded form
+// before creating the recovery file or appending anything to the journal.
+func (s *Store) messageSnapshotBound(version uint64) ([]byte, error) {
+	return canonical(s.disk(version, bindingCommit{Seq: 9007199254740991, Hash: strings.Repeat("0", 64)}))
 }
 
 // Store/generation checks are held through preparation and each durable phase.
@@ -455,7 +510,8 @@ func (s *Store) persistMessagesContext(ctx context.Context, ids ...string) Code 
 	}
 	version := s.version + 1
 	body, e := s.messageBody(version)
-	if e != nil || !s.messageFits(len(body)) {
+	bound, boundErr := s.messageSnapshotBound(version)
+	if e != nil || boundErr != nil || !s.messageFits(len(bound)) {
 		return "state_capacity_exceeded"
 	}
 	if code := s.writeMessageFile(ctx, id, "snapshot-"+strconv.FormatUint(version, 10), body); code != "" {
@@ -472,8 +528,10 @@ func (s *Store) persistMessagesContext(ctx context.Context, ids ...string) Code 
 		return code
 	}
 	raw, e := canonical(s.disk(version, commit))
-	if e != nil || !s.messageFits(len(raw)) {
-		return "state_capacity_exceeded"
+	if e != nil || len(raw) > len(bound) {
+		// A violated encoder bound is an internal failure, never a capacity refusal
+		// after a journal commit. The preflight already reserved both future copies.
+		return "audit_unavailable"
 	}
 	if code = s.installMessageSnapshot(ctx, raw); code != "" {
 		return code

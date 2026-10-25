@@ -119,16 +119,21 @@ func (m *messageMaintenance) migrate(ctx context.Context) Code {
 	if e != nil {
 		return "audit_unavailable"
 	}
-	s.schema = 2
-	s.messages = newMessageInventory()
-	if code := s.writeMessageFile(ctx, "migration", "base", old); code != "" {
-		s.failed = true
-		return code
-	}
 	decision := messageMigrationDecision{1, 2, s.version, base}
 	raw, e := canonical(decision)
 	if e != nil {
 		return "audit_unavailable"
+	}
+	preview := s.messagePreview()
+	preview.schema, preview.messages = 2, newMessageInventory()
+	bound, e := preview.messageSnapshotBound(s.version + 1)
+	if e != nil || !preview.messageFitsTransitions(len(bound), 1, int64(len(old))+int64(len(raw))) {
+		return "state_capacity_exceeded"
+	}
+	s.schema, s.messages = preview.schema, preview.messages
+	if code := s.writeMessageFile(ctx, "migration", "base", old); code != "" {
+		s.failed = true
+		return code
 	}
 	if code := s.writeMessageFile(ctx, "migration", "decision", raw); code != "" {
 		s.failed = true
@@ -254,6 +259,28 @@ func (m *messageMaintenance) reconcile(ctx context.Context, expected messageReco
 	resolution := messageResolution{Outcome: "issued", Intent: tx.Intent, Candidate: tx.Candidate, Version: s.version, Digest: s.journal.binding.Digest}
 	if expected.Outcome == "abort" {
 		resolution.Outcome = "aborted"
+	}
+	// Size the complete proposed resolution, its artifact, recovery copy and
+	// install staging before retaining any new evidence or appending its audit.
+	resolutionBytes, e := canonical(resolution)
+	if e != nil {
+		return "audit_unavailable"
+	}
+	preview := s.messagePreview()
+	inventory := *s.messages
+	inventory.Transactions = append([]messageTransaction(nil), inventory.Transactions...)
+	inventory.Associations = append([]messageAssociation(nil), inventory.Associations...)
+	preview.messages = &inventory
+	proposed := preview.messageTx(tx.ID)
+	proposedRef := messageRef(resolutionBytes)
+	proposed.Resolution = &proposedRef
+	if expected.Outcome == "abort" {
+		proposed.Phase = "aborted"
+		preview.messageAssociationOfTransaction(proposed).Pending = nil
+	}
+	bound, e := preview.messageSnapshotBound(s.version + 1)
+	if e != nil || !preview.messageFitsTransitions(len(bound), 1, int64(len(resolutionBytes))) {
+		return "state_capacity_exceeded"
 	}
 	ref, code := s.writeMessageArtifact(ctx, tx.ID, resolution)
 	if code != "" {

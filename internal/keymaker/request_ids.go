@@ -98,12 +98,15 @@ func (s *Store) resultObject(r *retainedRequest) (control.Object, Code) {
 
 // Preflight the combined binding/result budget before an intent or effect. The
 // largest references reserve room for the real journal position and hash.
+// Schema 2 also reserves both native intent/effect recovery copies and the
+// installed/staging peak. One-commit retained results use the same conservative
+// admission bound so no caller can omit a simultaneous durable copy.
 func (s *Store) fitsState(records []Binding, next uint64, requests []retainedRequest) bool {
 	if len(requests) > maxRetainedRequests {
 		return false
 	}
 	b, err := json.Marshal(bindingDisk{Next: next, Records: records, Requests: requests, Version: 9007199254740991, AuditSeq: 9007199254740991, AuditHash: string(bytes.Repeat([]byte("0"), 64)), SchemaVersion: s.schema, Messages: s.messages})
-	return err == nil && len(b) <= stateBudget && (s.schema != 2 || s.messageFits(len(b)))
+	return err == nil && len(b) <= stateBudget && (s.schema != 2 || s.messageFitsTransitions(len(b), 2, 0))
 }
 func (s *Store) appendRequest(r retainedRequest) {
 	s.requestIndex[requestKey{r.Caller, r.ID}] = len(s.requests)

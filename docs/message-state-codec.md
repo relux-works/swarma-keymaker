@@ -62,9 +62,19 @@ reference; unknown/conflicting staging is preserved and fences recovery.
 The shared 256 MiB budget charges encoded artifacts, all retained recovery
 copies, installed/staged snapshots and a 4 MiB proof reservation per pending
 association. Admission conservatively checks eight prospective base-body copies
-plus 8 MiB and existing artifacts/reservations before the intent. The intent
+plus 8 MiB, the actual installed snapshot and existing artifacts/reservations
+before the intent. The intent
 records its transition reservation of eight base-body copies plus 4 MiB. All
-subsequent writes recheck capacity. Journal control headroom is separately
+subsequent writes recheck capacity. Every snapshot transition reserves its new
+immutable recovery body and complete install staging before writing either or
+appending the journal commit. The encoded bound includes the maximum audit
+sequence/hash linkage. The native `fitsState` preflight additionally reserves
+both intent/effect recovery copies and their installation peak. Migration sizes
+the retained original legacy bytes and decision before writing; reconciliation
+sizes its complete resolution, artifact and snapshot copies before writing.
+Capacity refusal leaves the journal and installed state unchanged, and startup
+checks existing inventory without requiring space for another transition.
+Journal control headroom is separately
 earmarked for eight maximum-size audit records; unrelated appends cannot spend
 that ticket. Insufficient capacity never evicts evidence. S4 must qualify the
 actual publication/witness bounds against these reservations and stays closed

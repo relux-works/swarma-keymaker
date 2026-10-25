@@ -99,6 +99,7 @@ func main() {
 	pkg := "./internal/keymaker"
 	if *group == "message-state" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"message-capacity-drops-recovery-snapshot", "message_state.go", `recovery := int64(rawBytes) * int64(transitions)`, `recovery := int64(0)`, "^TestMsgCapacityCommitAfterRefusal$", "--- FAIL: TestMsgCapacityCommitAfterRefusal", "capacity admitted simultaneous snapshot copies"},
 			{"message-arbitrary-root-sign", "message_attestation.go", `type messageBinding struct {`, `func(i *messageIssuer) Sign(raw []byte)([]byte,Code){return i.master.withPurpose(i.policy.Path,"root-attestation",func(k ed25519.PrivateKey)[]byte{return ed25519.Sign(k,raw)})}
 type messageBinding struct {`, "^TestMsgV17RootIsolation$", "--- FAIL: TestMsgV17RootIsolation", "arbitrary issuer signing API"},
 			{"message-issuer-purpose-two", "derive.go", `// Internal fixed-body issuer only; public APIs and bindings remain purpose 1.

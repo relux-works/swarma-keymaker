@@ -71,7 +71,7 @@ func (s *Store) writeMessageFile(ctx context.Context, id, name string, raw []byt
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
 	}
-	if int64(len(raw))+s.messages.artifactBytes+s.messages.reservation() > stateBudget {
+	if !s.messageCapacity(int64(len(raw)), 0, 0) {
 		return "state_capacity_exceeded"
 	}
 	dir, e := s.messageDirectory(id, true)
@@ -456,8 +456,7 @@ func (s *Store) validateMessageFiles(refs map[string]map[string]bool) error {
 		}
 	}
 	s.messages.artifactBytes = total
-	raw, e := s.messageBody(s.version)
-	if e != nil || !s.messageFits(len(raw)) {
+	if !s.messageCapacity(0, 0, 0) {
 		return failure("message state capacity exceeded")
 	}
 	return nil

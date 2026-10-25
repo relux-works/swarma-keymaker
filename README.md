@@ -306,8 +306,9 @@ No S4 module pin or production fake evidence source is introduced.
 | Tool | Exact entry point | Evidence |
 | --- | --- | --- |
 | Go | `go test ./internal/keymaker -run '^TestMsg' -count=1 -timeout=120s` | Issuer/profile/status refusals, original key controls, migration, graph/budget checks and real-store recovery |
+| Go | `go test ./internal/keymaker -run '^TestMsg(NativeCapacityCommitAfterRefusal|CapacityCommitAfterRefusal)$' -count=1 -timeout=120s` | Real 256 MiB retained-history boundary, last-fitting positive controls, unchanged journal on refusal and clean restart; native accounting covers the intent/effect persistence pair |
 | Go race detector | `go test -race ./internal/keymaker -run '^TestMsg(ConcurrentCertification|V27RenewalRestart|CrashMatrix|JournalUncertainty)$' -count=1 -timeout=120s` | Deterministic barriers and injected process/journal interruptions; does not simulate hardware power loss |
-| Mutation tool | `go run ./tools/mutations/main.go -group message-state -scratch "$SCRATCH"` | Seven named expected-red controls, child exits/PIDs and overlay logs under private scratch; reconciliation control checks signer dependency exclusion |
+| Mutation tool | `go run ./tools/mutations/main.go -group message-state -scratch "$SCRATCH"` | Eight named expected-red controls, child exits/PIDs and overlay logs under private scratch; reconciliation control checks signer dependency exclusion |
 | Go | `go mod graph`; `go mod verify`; `go vet ./internal/keymaker ./cmd/keymaker ./tools/mutations` | Module graph, checksum and affected static validation; capture logs in private scratch |
 
 ## Registrar dependency

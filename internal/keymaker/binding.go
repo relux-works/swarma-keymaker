@@ -316,6 +316,12 @@ func (s *Store) Register(caller, operator Principal, b Binding) (Binding, Code) 
 		return Binding{}, c
 	}
 	if c := s.persist(); c != "" {
+		if s.schema == 2 && c == "state_capacity_exceeded" {
+			// Schema-2 capacity is checked before every durable write.
+			s.records = s.records[:len(s.records)-1]
+			s.next--
+			return Binding{}, c
+		}
 		s.failed = true
 		return Binding{}, c
 	}
@@ -359,6 +365,10 @@ func (s *Store) Revoke(ctx context.Context, caller, operator Principal, number u
 		if b.Number == number {
 			s.records[i].Status = "revoked"
 			if c := s.persist(); c != "" {
+				if s.schema == 2 && c == "state_capacity_exceeded" {
+					s.records[i] = b
+					return c
+				}
 				s.failed = true
 				return c
 			}
@@ -456,6 +466,10 @@ func (s *Store) Unbind(caller, operator Principal, uid uint32, generation string
 		if b.UID == uid && b.Generation == generation && b.Status == "active" {
 			s.records[i].Status = "unbound"
 			if c := s.persist(); c != "" {
+				if s.schema == 2 && c == "state_capacity_exceeded" {
+					s.records[i] = b
+					return c
+				}
 				s.failed = true
 				return c
 			}

@@ -131,10 +131,10 @@ func checkFixtureSources(root string) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		// Private scratch and VCS internals are not repository source. Hidden
-		// source directories otherwise participate, as do all inactive files.
+		// Explicit imports can reach dot/underscore and scratch-named directories
+		// even when ./... omits them. Only VCS internals are outside this scan.
 		if entry.IsDir() {
-			if path != root && (entry.Name() == ".git" || entry.Name() == ".tmp" || entry.Name() == ".temp") {
+			if path != root && entry.Name() == ".git" {
 				return filepath.SkipDir
 			}
 			return nil
@@ -325,6 +325,7 @@ func TestTimeconfFixtureDependencyPolicy(t *testing.T) {
 			{"UnrelatedANDTest", "probe_test.go", "other && another", "_ ", "", "fixture_build_constraint"},
 			{"NegatedGuardTest", "probe_test.go", "!" + fixtureTag, "_ ", "", "fixture_build_constraint"},
 			{"GuardedTest", "probe_test.go", "linux && " + fixtureTag, "_ ", "", ""},
+			{"NonLinuxGuardedTest", "probe_test.go", fixtureTag + " && !linux", "_ ", "", ""},
 			{"DeMorganGuardedTest", "probe_test.go", "!(!" + fixtureTag + " || other)", "_ ", "", ""},
 			{"OrdinarySource", "probe.go", "", "_ ", "", ""},
 		}
@@ -377,6 +378,34 @@ func TestTimeconfFixtureDependencyPolicy(t *testing.T) {
 				t.Fatalf("expected failed Go command to refuse, got %v", err)
 			}
 		})
+	})
+	// Scratch-named directories can hold a real, explicitly imported application
+	// package. Both required graphs may omit its alternate-tag caller, so they
+	// cannot replace the all-source check. The adjacent positive control permits
+	// an ordinary application plus a properly guarded fixture test in that path.
+	t.Run("ScratchSourceCoverage", func(t *testing.T) {
+		for _, name := range []string{".temp", ".tmp", ".hidden", "_private"} {
+			t.Run(name, func(t *testing.T) {
+				dir := fixtureGraphRoot(t, root, "package probe\nimport _ "+strconv.Quote(brokerModule+"/timeconf")+"\n")
+				app := filepath.Join(dir, name, "x", "x.go")
+				fixturePolicyWrite(t, app, "package x\nimport _ \"context\"\n")
+				fixturePolicyWrite(t, filepath.Join(dir, name, "x", "x_test.go"), "//go:build "+fixtureTag+"\n\npackage x\nimport _ "+strconv.Quote(fixturePackage)+"\n")
+				fixturePolicyWrite(t, filepath.Join(dir, "other.go"), "//go:build other_boundary\n\npackage probe\nimport _ \"github.com/relux-works/swarma-keymaker/"+name+"/x\"\n")
+				fixturePolicyWant(t, checkFixtureSources(dir), "")
+				if _, err := fixtureGo(ctx, dir, "build", "-mod=readonly", "-tags=other_boundary", "./..."); err != nil {
+					t.Fatal("ordinary hidden application control must compile", err)
+				}
+				fixturePolicyWrite(t, app, "package x\nimport _ "+strconv.Quote(fixturePackage)+"\n")
+				for _, tags := range []string{"", fixtureTag} {
+					fixturePolicyWant(t, checkFixtureGraph(ctx, dir, tags), "")
+				}
+				if _, err := fixtureGo(ctx, dir, "build", "-mod=readonly", "-tags=other_boundary", "./..."); err != nil {
+					t.Fatal("explicit scratch application import must compile before policy rejection", err)
+				}
+				fixturePolicyWant(t, checkFixtureGraph(ctx, dir, "other_boundary"), "graph_fixture_import")
+				fixturePolicyWant(t, checkFixtureSources(dir), "fixture_application_import")
+			})
+		}
 	})
 	// The actual pinned timeconf package is copied privately. Both the clean
 	// graph and a compiling qualification-construction plant use identical module

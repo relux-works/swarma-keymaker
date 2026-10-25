@@ -1,0 +1,3 @@
+# tag|test-name pattern|missing qualification|packages
+multiuid|^TestMultiUID|the provisioned multi-UID test window|./internal/keymaker
+qualifiedtime|^TestQualifiedTimePending|the qualified-time external inputs|./internal/enrollment ./internal/registration ./internal/keymaker

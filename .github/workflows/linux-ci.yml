@@ -51,10 +51,11 @@ jobs:
         run: |
           bash --noprofile --norc -eo pipefail .github/scripts/check-controls.sh
           bash --noprofile --norc -eo pipefail .github/scripts/check-pending-controls.sh
-      # Compilation is not privileged qualification. No tagged tests execute here.
-      - name: Compile privileged rows and report PENDING
+      # Compilation is not qualification. No PENDING test bodies execute here.
+      - name: Compile tagged rows and report PENDING
         run: |
           go vet -tags multiuid ./internal/keymaker
+          go vet -tags qualifiedtime ./internal/enrollment ./internal/registration ./internal/keymaker
           bash --noprofile --norc -eo pipefail .github/scripts/report-pending.sh
       - name: Test
         run: go test ./... -count=1 -timeout=25m -v

@@ -1,0 +1,11 @@
+# Required lower bound, not the report: discover and report new rows too.
+# Removing a gate requires an explicit review of this baseline.
+# tag package test-name
+multiuid ./internal/keymaker TestMultiUID
+multiuid ./internal/keymaker TestMultiUIDControl
+multiuid ./internal/keymaker TestMultiUIDHelper
+multiuid ./internal/keymaker TestMultiUIDPC2FenceIdentity
+qualifiedtime ./internal/enrollment TestQualifiedTimePendingEnrollmentIssueBound
+qualifiedtime ./internal/registration TestQualifiedTimePendingRegistrationContinuity
+qualifiedtime ./internal/keymaker TestQualifiedTimePendingAuditPreWindow
+qualifiedtime ./internal/keymaker TestQualifiedTimePendingK3Receipt

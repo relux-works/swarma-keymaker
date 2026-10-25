@@ -237,6 +237,11 @@ The two fixed purpose indices are `agent-identity = 1` and
 binding registration accept only purpose 1. Purpose 2 is configured once for
 the host helper and MUST NOT be registered as a station key.
 
+The [station-caller supplement](keymaker-station-caller.md) proposes the separate
+purpose `station-caller = 6`, following reservations 3–5, with typed caller
+signing and a default-closed qualification gate. It allocates no index or method
+and does not change this section's current purpose allowlist.
+
 ### 4.2 Exact name-to-index mapping
 
 Unbounded names cannot be injected into 31 bits by truncating a hash without

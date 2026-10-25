@@ -25,6 +25,18 @@ The authoritative decision list and safe defaults are in
   enforcement capability. All matched rows with `exe` refuse locally, including
   matching procfs snapshots. No UID-only fallback is allowed.
 
+## Station-caller purpose proposal
+
+The [station-caller supplement](spec/keymaker-station-caller.md) proposes purpose
+6 without allocating it or activating a method. Its [SC-Q1–SC-Q6 decision table](spec/keymaker-station-caller.md#8-owner-questions-and-safe-defaults)
+names the exact owners, questions and safe defaults for allocation/scope,
+closed plan schemas/adapters, public association/bootstrap/rotation,
+currentness/release ordering, independent qualification/activation and
+audit/storage recovery. Every dependent station caller path, including
+operator-enrolled bootstrap and recursive delegation, remains disabled until
+qualified. Readable keys, interim Git signing and arbitrary-bytes substitutes
+are forbidden; the protected operator service root retains its own authority.
+
 ## Q7: operator-record integration sources
 
 The [Q7 supplement](spec/keymaker-operator-record.md) recommends retaining the

@@ -27,12 +27,16 @@ The authoritative decision list and safe defaults are in
 
 ## Station-caller purpose proposal
 
-The [station-caller supplement](spec/keymaker-station-caller.md) proposes purpose
-6 without allocating it or activating a method. Its [SC-Q1–SC-Q6 decision table](spec/keymaker-station-caller.md#8-owner-questions-and-safe-defaults)
-names the exact owners, questions and safe defaults for allocation/scope,
-closed plan schemas/adapters, public association/bootstrap/rotation,
-currentness/release ordering, independent qualification/activation and
-audit/storage recovery. Every dependent station caller path, including
+The [station-caller supplement](spec/keymaker-station-caller.md) records the
+owner decision (2026-10-25): SC-Q1 approves `station-caller = 6`, both signing
+domains/scopes and only "grant narrowing by the requester"; approval does not
+allocate the purpose or activate a method. SC-Q3 selects (a) protected dispatcher
+association for now, with (b) registry publication later at federation. SC-Q5
+allows enabling only fully qualified combinations, with macOS only after native
+qualification. The [SC-Q1–SC-Q6 decision table](spec/keymaker-station-caller.md#8-owner-questions-and-safe-defaults)
+keeps SC-Q2, SC-Q4 and SC-Q6 open and unchanged. Every implementation, activation
+and qualification gate remains closed. Every dependent station caller path,
+including
 operator-enrolled bootstrap and recursive delegation, remains disabled until
 qualified. Readable keys, interim Git signing and arbitrary-bytes substitutes
 are forbidden; the protected operator service root retains its own authority.

@@ -1,8 +1,9 @@
 # Station-caller signing purpose proposal
 
-Status: **proposal only; disabled until qualified**. No purpose allocation,
-native method, registry method, audit schema or deployment is activated here.
-Requirements below describe the candidate after separate approval. Private keys,
+Status: **owner decisions recorded; disabled until qualified**. No purpose
+allocation, native method, registry method, audit schema or deployment is
+activated here. The decisions in §8 leave every implementation, activation and
+qualification gate closed. Private keys,
 seeds and chain codes remain inside Keymaker; there is no readable key file,
 export operation, interim Git key or arbitrary-bytes signing fallback.
 
@@ -16,8 +17,11 @@ grammar/currentness gaps keep their profiles closed.
 
 ## 1. Purpose identity and separation
 
-Propose **`station-caller = 6`**. The reservation inventory across the existing
-specifications is:
+The owner decision (2026-10-25), SC-Q1, approves **`station-caller = 6`**, the
+two signing domains in [§2.1](#21-closed-native-requests-and-signed-bytes), and the
+narrow exception "grant narrowing by the requester". This approval does not
+allocate the purpose or activate any method. The reservation inventory across
+the existing specifications is:
 
 | Index | Name | Source and scope |
 |---|---|---|
@@ -26,11 +30,11 @@ specifications is:
 | 3 | `state-witness` | [Witness §3.1](keymaker-witness.md#31-protected-identity-and-purpose-separation); reserved internal witness signer |
 | 4 | `swarma-msg` | [Message §1](keymaker-msg.md#1-purpose-registry-and-domain-separation); author message sibling |
 | 5 | `root-attestation` | Message §1 and §4.1; internal attestation root, not a caller key |
-| 6 | `station-caller` | This proposal; no registry allocation yet |
+| 6 | `station-caller` | owner decision (2026-10-25): assignment approved; no registry allocation yet |
 
 No other purpose index is reserved by the current spec set. Index 0 remains
-reserved in the name-index registry. Approval must recheck the complete inventory
-against the then-current base before allocating 6.
+reserved in the name-index registry. Actual allocation must still recheck the
+complete inventory against the then-current base before allocating 6.
 
 Use Ed25519 SLIP-0010 at exactly `m/6'/product'/project'/agent'`, with the
 same master epoch and protected name-index registry as the active purpose-1
@@ -93,10 +97,12 @@ These domains are existing **external** formats, not new domains created by
 CIP-0025. Broker `broker/1` is peer-authenticated transport and defines no broker
 request-signature domain. Purpose 6 cannot sign `revocation/1`, root grants,
 dispatcher-issued agent credential leaves, operator acts, `team/1`, boundary
-receipts, qualification records or arbitrary broker requests. Signing requester
-delegation would require an explicit narrow amendment to base §1's ban on minting
-grants; it does not give Keymaker a policy-issuer or dispatcher role. Until that
-amendment and the typed authority transaction are approved, delegation stays shut.
+receipts, qualification records or arbitrary broker requests. The owner decision
+(2026-10-25), SC-Q1, approves only the narrow exception "grant narrowing by the
+requester" to base §1's grant ban; it gives Keymaker no policy-issuer or dispatcher
+role. The corresponding base amendment and typed authority transaction remain
+subject to [§5](#5-disabled-until-qualified); delegation stays shut. Approval
+alone supplies no signing implementation or activation.
 
 ### 2.2 Freshness, retries and refusal order
 
@@ -191,19 +197,22 @@ or invalid delegation keeps O pending with no spawn authority.
 The registrar's `registration/1` helper remains purpose 2 and its existing
 enrollment snapshot has no authority to enroll station-caller keys. No existing
 registrar/registry publication method has been established for purpose 6; this
-proposal allocates **none**. Initial recommendation: protected dispatcher-owned
-association rather than overloading Matrix registration or message attestation.
-If distributed publication is required, its owner must publish a separately
-reviewed association record/API, revocation/currentness and restore protocol.
+proposal allocates **none**. The owner decision (2026-10-25), SC-Q3, selects
+option (a), a protected association at the dispatcher, for now. Option (b),
+publication in the registry, is deferred until federation; it does not overload
+Matrix registration or message attestation. Such publication still requires a
+separately reviewed association record/API, revocation/currentness and restore
+protocol. The existing registration, proof/rotation and disabled-bootstrap
+constraints above remain in force.
 Do not call a hypothetical method or accept an unsigned registry row as evidence.
 
 | Dependency | Owning module/decision authority | Required publication or evidence |
 |---|---|---|
-| Purpose allocation, custody, methods and public metadata | Keymaker specification owner and operator | Approve 6, scope, closed schemas and migration; no private export |
+| Purpose allocation, custody, methods and public metadata | Keymaker specification owner and operator | owner decision (2026-10-25): assignment 6, both §2.1 signing domains and only requester grant narrowing approved; actual allocation, custody, methods, closed schemas and migration remain gated by §5; no private export |
 | Active UID/generation and retirement ordering | User-manager | Existing protected generation source and release exclusion; real native qualification |
 | Protected typed plan catalog and caller registration/replay | Dispatcher adapter owner with Keymaker | Complete versioned schemas, policy/provenance, exact key association, receiver IDs, bootstrap/rotation and durable recovery |
 | Caller-chain attenuation, revocation and final issue/renewal | Credential-broker adapter owner with dispatcher | Existing grant verifier semantics plus qualified versioned integration; no new broker request-signature format inferred |
-| Optional external public association | Registry/registrar owners with dispatcher | Decide whether needed and publish new schema/API if so; existing registration is insufficient |
+| Optional external public association | Registry/registrar owners with dispatcher | owner decision (2026-10-25): protected dispatcher association now (a); registry publication later, at federation (b), still requiring a separately published schema/API; existing registration is insufficient |
 | Qualification/activation, protected profile and stop/revocation | Independent qualification authority, operator and launcher/session-host owners | Exact tuple acceptance, joint activation, immediate fences and bounded confirmed disposition |
 | Authority time/currentness | Shared time-policy owner and each consumer | Qualified current evidence and continuity; no caller wall-clock or receipt-only substitute |
 
@@ -225,6 +234,11 @@ caller-supplied boolean or a standalone enable flag:
 4. The operator explicitly activates only that accepted tuple/scope; no hold,
    emergency stop, revoked key/association/tuple, stale epoch or integrity fault
    applies. Live per-request authority still passes §§2–3.
+
+The owner decision (2026-10-25), SC-Q5, permits enabling only fully qualified
+combinations; macOS only after native qualification. No combination is qualified
+or activated by this decision record. The stricter exact-tuple requirements above
+and native macOS prerequisites below remain in force.
 
 The operator decides activation using independent qualification acceptance;
 Keymaker/adapters enforce it. Documentation, fixture success, a support label or
@@ -316,13 +330,13 @@ challenge negatives and a consumed-once valid positive before activating it.
 
 ## 8. Owner questions and safe defaults
 
-| ID; decision owner | Exact question | Safe default until answered and qualified |
+| ID; decision owner | Exact question / recorded owner decision | Safe default until answered and qualified |
 |---|---|---|
-| SC-Q1; Keymaker specification owner/operator | Approve `station-caller = 6`, sibling lifecycle and both signing scopes, including the explicit requester-delegation exception to the base grant ban? | No allocation, public method or delegation signing; preserve existing allowlists |
+| SC-Q1; Keymaker specification owner/operator | owner decision (2026-10-25): approved `station-caller = 6`, both §2.1 signing domains/scopes, and only the narrow exception "grant narrowing by the requester". This approval does not allocate the purpose or activate a method; implementation/publication and qualification remain gated by §§1–2 and §5. | No allocation, public method or delegation signing; preserve existing allowlists |
 | SC-Q2; dispatcher/broker adapter owners with Keymaker | Which immutable complete closed plan schemas, per-operation allowlists, finite bounds, catalog writer/provenance, receiver binding and replay/result transaction implement these two exact domains? | Both profiles closed; no opaque nested body or arbitrary-bytes substitute |
-| SC-Q3; dispatcher registration and registry/registrar owners | Is protected dispatcher association sufficient, or is distributed publication needed; what exact proof-of-possession, registration/rotation/restore grammar and authority-install transaction bind the public key/current generation? | No implicit registry method, overloaded registration proof or activated bootstrap/rotation; recursive delegation pending |
+| SC-Q3; dispatcher registration and registry/registrar owners | owner decision (2026-10-25): option (a), a protected association at the dispatcher, for now; option (b), registry publication, later at federation. Exact proof-of-possession, registration/rotation/restore grammar and authority-install transaction remain publication/qualification dependencies under §4 and §5. | No implicit registry method, overloaded registration proof or activated bootstrap/rotation; recursive delegation pending |
 | SC-Q4; user-manager/dispatcher/broker/Keymaker owners | Which production evidence source and acyclic exclusion/recheck protocol order execution/profile/receiver currency, emergency stop and revocation against signing, replay and onward effects? | Missing/unconfirmed currency closes release; no RPC under short locks or cached-current fallback |
-| SC-Q5; independent qualification authority/operator | Which exact native tuple, adapters, policy, public association and joint receipt/issue/renewal path are accepted, and which operator activation record opens only that scope? | `station_caller_ready=false`; bootstrap/delegation disabled, macOS port and optional backends unavailable |
+| SC-Q5; independent qualification authority/operator | owner decision (2026-10-25): enable only fully qualified combinations; macOS only after native qualification. Exact tuple/adapters/policy/association, joint receipt/issue/renewal and operator activation still require the existing §5 acceptance and gates; this record activates none. | `station_caller_ready=false`; bootstrap/delegation disabled, macOS port and optional backends unavailable |
 | SC-Q6; Keymaker storage/audit and adapter owners | Approve operation/domain additions, old-reader fencing, protected retained-plan/result schema, crash/restore/replay evidence and finite aggregate budgets? | No new audit combinations or signing; no historical rewrite, lost unknown effect or unaudited output |
 
 There are exactly **three newly proposed refusal members** (§2.2), **two new

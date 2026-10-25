@@ -265,6 +265,15 @@ latency sacrifices availability of **both** surfaces; this is intentional.
    its root, all participant/attempt/hold state and the exact S2 phase. Establish
    coordinator quiescence, then release **all** journal/Store/enrollment/F locks
    before witness I/O; no witness lock may introduce a reverse acquisition.
+   Apply the [two-boundary rule](keymaker-pc2.md#11-short-critical-sections-and-continuous-exclusion-leases):
+   witness network I/O and notifications remain outside all maintenance locks;
+   durable closed-admission/hold state persists across the external phases.
+   Never drop a required continuous exclusion lease to make the call. If the
+   coordinator cannot preserve exclusion and the unlocked network boundary,
+   refuse with admission closed. Fixed local lease operations require reviewed
+   authenticated targets, bounded time and transitive no-back-edge graphs; none
+   is an exception inside the journal/C/F critical section. Qualification parents
+   release D before launching/waiting for children; children own D independently.
    Qualifying that cross-owner unlocked coordinator remains WC5, not a shipped API.
 2. Outside all locks, compare-and-append intent for epoch n+1 against the exact
    resolved head.

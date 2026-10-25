@@ -15,7 +15,10 @@ allowlist and native methods remain unchanged until separately activated.
 
 The [PC2 authority contract](keymaker-pc2.md) is normative for the future
 admission-through-activation path. It requires one durable root transaction,
-all-writer exclusion and exact-attempt recovery, with no RPC under locks.
+all-writer exclusion and exact-attempt recovery. Its
+[two-boundary call rule](keymaker-pc2.md#11-short-critical-sections-and-continuous-exclusion-leases)
+forbids external calls in short critical sections and separately constrains
+fixed local operations under continuous exclusion leases.
 Its combined message-state format/migration and joint qualification gates remain
 open; no existing file or callback is thereby promoted to PC2 authority.
 
@@ -164,9 +167,11 @@ For PC2, every authority-changing commit and **actual release**, including root
 tooling and retained-result disclosure, MUST use the stable terminal F after
 journal gate -> data -> C, with required audit serialization before F. The
 [descriptor/access/order contract](keymaker-pc2.md#1-stable-fence-and-forward-order)
-forbids F -> C/gate/data/effects/audit edges, implicit locking reads and RPC.
-The manager reads bounded authoritative metadata directly under F, never through
-a daemon/Store callback. Creating-target metadata remains the sole target-only
+forbids F -> C/gate/data/effects/audit edges, implicit locking reads and RPC
+in the final C/F window. The separate continuous-lease rule grants no exception
+inside that short critical section; unknown continuity/deadline keeps admission
+closed. The manager reads bounded authoritative metadata directly under F, never
+through a daemon/Store callback. Creating-target metadata remains the sole target-only
 exception; all callers and issuance still require active generation.
 
 Surface B MUST report an accept-time generation refusal as one audited,

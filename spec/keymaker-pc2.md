@@ -47,8 +47,11 @@ RPC, inventory/account tools, wait for a service/operator or obtain external
 evidence. In particular, an F reader cannot wait for the C held by a daemon
 waiting for F. No locking Store/enrollment API may hide beneath that reader.
 
-Preparation takes place outside all locks. A separate local preparation read
-may take F alone and release it before querying or other external work. Under F,
+Preparation releases the short critical-section locks defined below. Network
+proof acquisition and notifications run outside all locks; retaining a continuous
+exclusion lease for fixed local preparation requires the separate §1.1 checks.
+A separate local preparation read may take F alone and release it before querying
+or other external work. Under terminal F,
 the manager uses only bounded direct openat/fstat/read, closed metadata decoding
 and the qualified local durability-consumption barrier. Final F acquisition,
 root validation, local transaction/audit and actual handoff fit the original
@@ -57,6 +60,46 @@ root validation, local transaction/audit and actual handoff fit the original
 native two-second deadline is not enlarged. Retry/reconnect never renews any
 budget. Cooperative clocks cannot interrupt a stuck sync: qualify latency or
 refuse the path. An expired possible write retains its real outcome and hold.
+
+### 1.1 Short critical sections and continuous exclusion leases
+
+PC2 adopts the two-boundary requirement recorded in the landed
+[A3c Q1 text](https://github.com/relux-works/swarma-user-manager/blob/a71d15a030b0e23ac3bf7d9a26ecad6efa1bea0c/spec/qualification-maintenance-journal.md#91-q1-recommendation--pending-curator-decision).
+That pinned text still labels its recommendation pending; it supplies no runtime
+qualification or waiver. The requirements here do not authorize an integration.
+
+**Short critical sections:** no external, provider or service-manager calls under
+manager effects/core, generation gate/data, recorder R or journal-append locks.
+The final Keymaker C/F commit/append/release window is such a section: only
+bounded local checks and local durable operations are permitted. No relay/helper
+makes a synchronous wait unlocked. Terminal F's no-back-edge rule above remains
+strict, including for root tools and recovery.
+
+**Continuous exclusion leases:** native F/B, W, root-writer exclusion, closed
+admission and qualification D form a separately enumerated boundary. Retain each
+required lease continuously across both qualifier runs. Only explicitly reviewed
+fixed local operations may run under a lease: each needs a fixed authenticated
+target, bounded completion/failure time, and a transitive call/dependency graph
+that never acquires or waits for a caller-owned exclusion lock. Provider and unit
+observations require that same explicit review; no general provider/RPC allowance
+is inferred. Any inner effects/core/gate/data/R/journal locks must be released
+before such an operation. Lease permission never permits a call inside the final
+C/F window. The platform F/B lease notation does not broaden terminal PC2 F.
+
+The qualification parent MUST release D before launching or waiting for the
+qualifier. The child acquires its own exclusive D; no held descriptor is inherited.
+This is a qualification boundary, not a new Keymaker method or D interface.
+A reservation snapshot may use the separately published D -> effects -> gate ->
+data edge, with R and journal append excluded; no F/B/W/D/R acquisition from
+inside lifecycle locks. It grants no reverse edge in the PC2 order.
+
+Network proof acquisition and notification delivery remain outside **all locks**,
+including maintenance leases. Dropping a required continuous lease to perform a
+call is forbidden. If the required exclusion cannot compose with an unlocked
+external phase, keep the path closed until its coordinator is reviewed and
+qualified. Unknown continuity or callee dependency, or an exceeded deadline,
+refuses with admission closed; neither an exception nor an extended budget is
+permitted. A durable closed-admission/hold state is not a lock held across a call.
 
 ## 2. One authoritative transaction root
 
@@ -133,17 +176,18 @@ audit/floor publication, migration/recovery and process-instance publication.
 All policy installers participate: root pin install/edit/remove/reload/re-admit,
 trust-anchor replacement, generation maps, UID/name/audience/executable policy,
 signed enrollment high-water, approvals and consumption history. Stage and verify
-external evidence outside locks; live policy installation occurs under F in the
-same root transaction. No replace-first/notify-later installer is permitted.
+external evidence outside the short critical sections and apply §1.1 to any
+continuous lease; network evidence remains outside all locks. Live policy
+installation occurs under F in the same root transaction. No replace-first/notify-later installer is permitted.
 
 Reserve the complete worst-case bytes and audit headroom **before intent**.
 S2 reserve -> intent/pending fence -> prepared -> issued -> published -> active
 ordering and no-T1-fallback remain requirements; each durable phase must compose
 with the same authority root, not a second independent commit point. No issuance
 while creating; no certification intent promotes a binding or a current T.
-Qualifying publication/evidence occurs unlocked, followed by fresh local final
-validation. Shared budget accounting includes roots, both owners' retained
-attempts/holds, message history, simultaneous snapshots and recovery copies.
+Qualifying publication/evidence follows §1.1's two boundaries, followed by
+fresh bounded local final validation. Shared budget accounting includes roots,
+both owners' retained attempts/holds, message history, simultaneous snapshots and recovery copies.
 S2's internal reserve alone is not proof this larger transaction fits.
 
 For each authority transaction under its C/F window:
@@ -212,8 +256,9 @@ without proven durability it is **unknown outcome**. Both retain any joint hold;
 neither authorizes a duplicate active append or deleting the reservation.
 
 Only the authorized root recovery coordinator may release an uncertain hold.
-Exclude serving/old writers and prepare independent evidence outside all locks;
-open the offline Store/enrollment lifetime exclusion before taking effects ->
+Exclude serving/old writers. Prepare network evidence outside all locks;
+fixed local recovery observations under continuous exclusion require §1.1 review.
+Open the offline Store/enrollment lifetime exclusion before taking effects ->
 gate -> data -> C where repair requires it -> F. No RPC to a running daemon.
 Retain and sync the root-owned append-only recovery ledger in this order:
 
@@ -272,7 +317,10 @@ All witness/network preparation and recovery evidence work occur outside **all
 locks**. A future coordinator quiesces dependent admission across external intent,
 local root commit and matching external resolution; intent precedes local change,
 resolution precedes release. It must compose with F/C and both owners' holds,
-not call a witness under them. Qualified custody/protocol/latency remains open.
+not call a witness under them. Retain the durable closed-admission/hold state;
+§1.1 forbids dropping a required continuous exclusion lease to make a call. If
+these boundaries cannot compose, WC5 stays closed rather than relaxing either.
+Qualified custody/protocol/latency remains open.
 
 ## 6. Paired qualification and narrowing plants
 
@@ -295,6 +343,17 @@ qualify actual power loss, privileged exclusion or filesystem sync semantics.
 | KP1 promotion/authority | Creating/revoked/unadmitted target promotes; reservation remains inert | Exact active T, resolved attempt and current two facts promote durably before use | PC2AuthorityNotProjection; PC2WithdrawalWins | P-KP1_PROMOTE_CREATING: accept creating as active |
 | KP2 promotion/race | Promotion overwrites prior withdrawal; no promotion or release | Append/promotion wins then later withdrawal fences all subsequent release | PC2AppendWins | P-KP2_SKIP_COUNTER: ignore withdrawal-counter ABA |
 | KP3 promotion/recovery | Death/restore/replay creates second registration/active/effect; retain exact histories | Exact outcome resolves once with fresh correlation; consumed attempt may finish once in original budgets | PC2FenceDeathUnknown; PC2IncarnationRestore; PC2CorrelationNotReplay | P-KP3_RETRY_NEW_ID: retry uncertain append under a new identity |
+
+Under PC2NoRPCOrReverseOrder, pair a reviewed fixed local lease operation that
+retains exclusion and releases inner critical locks with rejection controls for
+an external/provider/unit call inside the C/F window, an unauthenticated target,
+unknown transitive dependency, continuity loss and an expired lease-operation
+budget. Rejection retains closed admission and performs no active append/release.
+P-KR3_LEASE_BYPASS permits an unreviewed lease call; the test must catch the
+forbidden call even if it returns successfully. Pair independent parent/child D
+handoff under continuous F/B/W/root-writer exclusion with P-KR3_INHERIT_D, which
+passes a held D to the qualifier; require no child launch under inherited D and
+retain admission closed. These are future qualification controls, not runs here.
 
 Each real policy writer, including root pin installers, needs an F-omission plant
 under KR1/KI1; also plant skipped audit/participant/directory sync, old incarnation,

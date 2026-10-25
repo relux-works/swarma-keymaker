@@ -345,13 +345,18 @@ Neither a cached response nor an extra last query proves this property.
 
 The [PC2 contract](keymaker-pc2.md) selects the conditional stable local F and
 authoritative root/intent ordering; implementation and qualification remain
-absent. User-manager prepares a fresh correlated observation outside all locks,
-then under final F rereads both exact committed facts, counter/epoch/incarnation/
+absent. User-manager prepares a fresh correlated observation outside short
+critical sections, applying the [two-boundary rule](keymaker-pc2.md#11-short-critical-sections-and-continuous-exclusion-leases)
+to any continuous exclusion lease. Network/notifications remain outside all locks.
+Then under final F the manager rereads both exact committed facts, counter/epoch/incarnation/
 instance, policy, ancestry, guards and original budgets. Its durable activation
 attempt consumes that observation once **before** journal write and keeps F
 through append, file/directory sync, verification and normal finish. No RPC occurs
-under effects/gate/data/C/F. The existing check-only AppendPrepared callback or
-a caller defer releasing F after journal unlock is not an append-lifetime guard.
+under effects/gate/data/C/F during that final short critical section. Fixed
+local lease operations require an authenticated target, bounded time and a
+verified transitive no-back-edge graph; they grant no C/F call exception. Unknown
+continuity/deadline refuses with admission closed. The existing check-only
+AppendPrepared callback or a caller defer releasing F after journal unlock is not an append-lifetime guard.
 
 Before consumption, observed disconnect/restart/uncertain correlation refuses and
 requires fresh unlocked preparation. After it, unchanged durable facts support

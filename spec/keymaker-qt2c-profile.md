@@ -149,17 +149,53 @@ unchanged. There is no spare H field in any of them. In particular, the audit
 request ID remains `binding:<revision>` and its payload digest keeps its current
 body preimage; no reinterpretation or hidden filename field is allowed.
 
-The protected, versioned enrollment mapping is exactly native **`QTUse/1` ↔
-broker `transition_version="QTUse:1"`**. The enrolled consumer profile fixes this
-one pair; authenticated preparation and handoff encoding must apply the same
-lookup and require exact equality with that enrollment. On receipt, match the
-exact enrolled value before interpreting the native transition. Never send the
-literal slash spelling, perform generic slash replacement, accept an unknown
-version or fall back to another transition. Changing this mapping requires a
-new reviewed enrollment/version; it does not change native use keys or closed
-consumer records. The broker's [identifier alphabet][r6-alphabet] accepts
-`QTUse:1`, and its [handoff check][r6-encoding] applies that alphabet to
-`transition_version`; alphabet acceptance alone is not enrollment authority.
+The protected **Keymaker QT-2c name mapping, version 1**, is this single closed
+field-scoped table. It assigns native profile identifiers to the window selectors
+used here; these are proposed enrolled names, not active profiles.
+
+| Broker destination / selector | Native name | Exact enrolled value |
+| --- | --- | --- |
+| `transition_version` / all consuming windows | `QTUse/1` | `QTUse:1` |
+| `window.profile` / A | `keymaker-audit/1` | `keymaker-audit:1` |
+| `window.profile` / P | `keymaker-publication/1` | `keymaker-publication:1` |
+| `window.profile` / E-I | `keymaker-enrollment-issue/1` | `keymaker-enrollment-issue:1` |
+| `window.profile` / E-C | `keymaker-enrollment-consume/1` | `keymaker-enrollment-consume:1` |
+| `window.profile` / R-S | `keymaker-registration-stage/1` | `keymaker-registration-stage:1` |
+| `window.profile` / R-X | `keymaker-registration-release/1` | `keymaker-registration-release:1` |
+| `NativeOperationDigest` profile argument / all consuming windows | `keymaker-operation/1` | `keymaker-operation:1` |
+
+Authenticated enrollment fixes the table version, destination field and native
+window selector. Preparation and handoff encoding apply that **same exact
+lookup**; the expected operation and final check retain those bindings. Decode
+requires exact enrolled equality in the correct field/window before interpreting
+the native name. Literal slashes, wrong versions, swapped fields/windows and
+unregistered names refuse before burn/act. There is no generic slash substitution
+or fallback. Table changes need reviewed enrollment/version migration and cannot
+create a fresh logical use key or reset a burned operation.
+
+The [broker identifier alphabet][r6-alphabet] accepts every enrolled value above,
+and its [handoff check][r6-encoding] applies it to window profile and transition
+version. Alphabet acceptance alone is not enrollment authority. For the
+[operation-digest helper][r6-operation], use the table's mapped profile argument
+and exact owner-validated canonical native identity bytes, including the original
+operation kind/tuple, arguments and protected predecessor/read-set bindings.
+Do not serialize tuple/path labels directly into an identifier, truncate a digest
+into a generation, or let a requester choose this profile. Its native identity
+codec still needs the owning transition's review; the mapping supplies no codec.
+
+Restricted-name audit: the seven receipt names (authority ID/version, machine,
+consumer, purpose, continuity scope and store) are exact **protected provider
+enrollment values**, not derived native labels or paths; validate their alphabet
+and exact enrollment match without rewriting original receipt facts. This
+profile assigns no additional native aliases to them. Any future native alias
+needs an explicit field-scoped table revision before use; absent enrollment
+refuses. Native method names, lock/store paths and G4 codec tags remain in their
+original native bindings, not broker name fields. The broker's fixed envelope,
+retained-anchor and witness-placeholder version/profile literals have their own
+closed literal checks (including their specified slashes), so this table must
+not rewrite those. Boot IDs, run/challenge nonces, digests and numeric sequence/
+revision fields keep their distinct grammars; they are not names in this table.
+R-B/R-V/R-A and the other nonconsuming paths have no broker window identifier.
 
 The following are exact semantic keys, compared as tuples, not new hash recipes:
 
@@ -436,6 +472,8 @@ to every consuming profile; no helper-only pass qualifies an endpoint.
 
 [r6-alphabet]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/timeconf/receipt.go#L103
 [r6-encoding]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/timeconf/handoff_linux.go#L158
+[r6-operation]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/timeconf/receipt.go#L286-L296
+
 [r6-success]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/docs/time-handoff.md#L148-L155
 
 [command-context]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/cmd/keymaker/main.go#L43-L67
@@ -483,7 +521,7 @@ forbidden act/release and exact provider/use/recovery post-state.
 
 | Proposed named test | Negative and expected invariant | Positive / narrowing control |
 | --- | --- | --- |
-| `QT2cTransitionVersionMapping` | Literal enrolled `QTUse/1`, wrong `QTUse:2`, mismatched prepare/encode values or unknown native version refuses before burn/act; generic slash substitution must not admit another native label. | Protected native `QTUse/1` maps exactly to enrolled `QTUse:1` at both preparation and encoding and may pass the alphabet/enrollment predicates. Remove exact version lookup while keeping alphabet validation: the wrong-version assertion must fail. Alphabet-only checks are not native qualification. |
+| `QT2cTransitionVersionMapping` | For every row of the one closed name table, literal slash, wrong version, mismatched prepare/encode values, swapped destination fields/window selectors and unregistered names refuse before burn/act; generic slash substitution must not admit another native label. | Every exact field/window/native-name tuple maps to its enrolled value at preparation and encoding and may pass alphabet/enrollment checks; protected receipt names remain unchanged. Remove exact field-scoped lookup while retaining alphabet validation: wrong-version/swapped-field assertions must fail. Alphabet-only checks are not native qualification. |
 | `QT2cReleaseDurableBeforeFrame` | On Linux and macOS, deliver the full frame, then fail or crash each delivery-accounting write, sync or readback: the exact pre-send authorization/use endpoint must already be durable; window remains burned and recovery never resends. Also fail each required pre-send barrier: no response byte may leave. | Same authorized frame commits all release/use bindings before the first byte and sends once under f_release/g_send within original D. Move a required success binding after the frame: the crash-reopen durable-authorization assertion must fail. Separate late-send/pause controls must prevent late bytes, not just suppress a local success. |
 | `QT2cStaleCapture` | Pause after pre-window capture until original D has passed; unchanged packet cannot authorize an act. The final qualified read gives expiry, or an unqualified path refuses `clock_untrusted`. | Same inputs, on-time admission and qualified post-read enforcement may commit once. Remove the final read in a control: the stale-admission assertion must fail. |
 | `QT2cUseAdmissionOrder` | Capture m before initial persistence/use admission or before protected exact head/epoch/unused revision selection; refuse with no burn/act, even if later admission is nonwaiting. | Complete all initial admissions/state selection before m, pure check then burn under retained admission. Move initial admission after m: the order assertion must fail (`HandoffUseAdmissionOrder`). |

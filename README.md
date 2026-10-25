@@ -73,6 +73,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `spec/witness-service.md` | Proposed shared typed witness protocol, registry intent/resolution inclusion, server durability and paired text vectors; no implementation or activation |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |
+| `spec/keymaker-pc2.md` | Normative candidate PC2 root/intent, terminal authority fence, exact-attempt recovery and paired KR/KI/KP qualification; combined S2 storage and three joint gates remain open, production bump closed |
 | `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |
 | `spec/keymaker-msg-state.md` | Proposed K3 schema, exact-outcome recovery, issuance audit and durable registry/WC1 publication proof; no runtime activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
@@ -92,6 +93,12 @@ normal create keeps register-after-active. No new method is enabled.
 | `tools/vectors/` | Reproducible derivation generator and fixture checks |
 | `tools/runbook-check/` | Offline specification shell-guard checks using stubs |
 | `UNRESOLVED_QUESTIONS.md` | Specification decisions and activation gates |
+
+The [PC2 authority requirements](spec/keymaker-pc2.md) do not change the shipped
+binding/audit/enrollment implementation. Its combined S2 format/migration,
+durable handoff, independent restore custody and withdrawal-blocking gates remain
+open; production bump is closed. Existing runtime and tool checks below do not
+qualify PC2, and historical binding-pair documentation is not its commit model.
 
 ## Tools
 

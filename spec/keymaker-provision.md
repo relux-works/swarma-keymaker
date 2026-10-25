@@ -18,6 +18,13 @@ The account lifecycle owner is the user-manager repository, pinned here to
   keeps production bump closed as `bump_key_admission_unconfirmed` pending this
   joint contract and backend qualification. Create and retire are independent.
 
+The conditional [PC2 authority contract](keymaker-pc2.md) is now a Keymaker
+requirement for the activation path: stable F, one root/intent transaction and
+exact-attempt recovery. Its closed persisted format must compose with S2, not
+extend schema 2 silently. The three joint gates and composition conflicts remain
+[open](../UNRESOLVED_QUESTIONS.md#pc2-and-message-state-composition); production
+bump stays refused. No native hello/result field changes follow from PC2.
+
 ## 1. Binding states and fresh identity
 
 Add `provisioned` to the binding statuses, distinct from journal `creating`.
@@ -130,7 +137,11 @@ qualified active use. No pre-active certificate/helper proof/message signature
 or public-key response is issued under the reserved binding.
 
 Promotion is observed only under **`with_active`**, revalidating exact current
-binding, policy, epoch, revocation and connection pin. Durably promote before
+binding, policy, epoch, revocation and connection pin, plus conclusively
+resolved activation attempt and the admitted root/counter/incarnation under C/F.
+A legitimate intervening transaction/restart may advance the counter; require
+proved nonregression and all current facts, not historical counter equality.
+Durably promote before
 first use; an unknown promotion commit fences all issuance. A timer, response
 receipt, status cache or account's existence cannot promote it. Activation
 never makes an old connection adopt the new token; connect and authenticate
@@ -151,7 +162,7 @@ and target/predecessor lifecycle with `View.Generation` in that same window.
 A creating target is never admitted as active; `WithActive` retains its active
 predicate. Neither primitive alone qualifies the Keymaker adapter.
 
-Use journal gate → data → Keymaker commit lock; gate/data acquisition is
+Use journal gate → data → C → terminal F for PC2; gate/data acquisition is
 nonblocking, no lock upgrade, and the shared data window including validation,
 floor persistence, local transaction/audit and response handoff is **<=250 ms**.
 Honor writer.pending, retirement reserve and all source fences. Remote work
@@ -160,7 +171,12 @@ user-manager or an operator. User-manager persists handoff intent, releases
 **all its journal/effect locks**, and queries outside them. Afterward it
 reacquires its own locks and revalidates the same pending effect, reservation,
 exact identities, fences and fresh inventories. Cross-process local ordering
-must be qualified; a callback name does not establish it (§5.3).
+must be qualified; a callback name does not establish it (§5.3). PC2's manager
+order is effects -> exclusive gate -> exclusive data -> F, released in reverse.
+Its bounded direct root read takes no C, audit/Store/enrollment mutex or implicit
+file lock. F-only local preparation reads release F before any query. Every
+authority commit/release, including root pin installers, participates. Qualify
+F's protected stable inode, distinct OFDs and all-writer exclusion first.
 
 ## 4. Reviewed enrollment re-admission before provision
 
@@ -269,9 +285,12 @@ for this pending effect, only before **start + 2000 ms**, with continuity of
 boot/time/reservation and fresh inventories. This bound includes transport
 and intervening work; the observer must query again if it cannot reach the
 activation check in time. A future observation, reused challenge or changed
-service instance during correlation refuses. Persist pending correlation and
-its consumption; after consumer/service restart, boot change, lost response
-or uncertain consumption, obtain a **new query**, never import old receipt bytes.
+service instance during pending correlation refuses. Persist pending correlation
+and its exact durable consumption. Before consumption, consumer/service restart,
+boot change, lost response or uncertain correlation requires a **new query**,
+never importing old receipt bytes. Once a durable attempt may have consumed it,
+reconcile that exact obligation first; a new query never proves it absent or
+authorizes a second append. Unknown consumption remains recovery-held.
 
 **Recommend pinning the service instance from the confirmation result only.**
 Native `hello` continues to return only `{version:1}`; do not expect or add an
@@ -280,12 +299,15 @@ instance field there. On a newly authenticated connection, the consumer pins
 including its challenge, tuple, predecessor and checkpoint. Persist that pin
 with the protected pending correlation, bound to this connection and query;
 subsequent correlated responses must match it exactly. It is not a durable
-cross-connection trust pin. Any disconnect/reconnect invalidates that pending
-correlation even if the next result claims the same instance ID. A service
+cross-connection trust pin. Before durable consumption, any disconnect/reconnect
+invalidates that pending correlation even if the next result claims the same instance ID. A service
 restart or changed instance ID also invalidates it. Retain the effect intent,
 but discard the observation and obtain a new request ID/challenge and fully
 verified result on the new authenticated connection before pinning anew.
-A retained old result cannot re-establish the pin. PC1 must qualify the real
+A retained old result cannot re-establish the pin. After the qualified durable
+handoff below, these invalidation rules do not abort an already consumed append
+attempt; no old bytes may create a different attempt or refresh its budgets.
+PC1 must qualify the real
 observer and protected operator-to-manager handoff, not station-supplied
 expectations. Instance equality, including an unchanged instance on a live
 connection, **does not prove currency through the active write (PC2)**.
@@ -321,9 +343,25 @@ adapter **must serialize or otherwise prove currency of both facts through
 the final active append**, without holding its locks across a Keymaker RPC.
 Neither a cached response nor an extra last query proves this property.
 
-This final cross-owner ordering remains an explicit **PC2 qualification gate**;
-no new shared lock, lease protocol or distributed commit is claimed published
-by this slice. Until it is jointly specified, accepted and qualified,
+The [PC2 contract](keymaker-pc2.md) selects the conditional stable local F and
+authoritative root/intent ordering; implementation and qualification remain
+absent. User-manager prepares a fresh correlated observation outside all locks,
+then under final F rereads both exact committed facts, counter/epoch/incarnation/
+instance, policy, ancestry, guards and original budgets. Its durable activation
+attempt consumes that observation once **before** journal write and keeps F
+through append, file/directory sync, verification and normal finish. No RPC occurs
+under effects/gate/data/C/F. The existing check-only AppendPrepared callback or
+a caller defer releasing F after journal unlock is not an append-lifetime guard.
+
+Before consumption, observed disconnect/restart/uncertain correlation refuses and
+requires fresh unlocked preparation. After it, unchanged durable facts support
+only that exact attempt within original budgets: Keymaker death cannot prove
+abort, refresh a pin, reset a deadline or release a hold. Restart publication
+waits for F and obligation reconciliation. Continuous process/socket liveness
+through fsync cannot be inferred from F or a PID. Joint acceptance/qualification
+of this observation-absorption boundary remains open; if continuous liveness
+is instead required, preserve refusal rather than weaken it. Until all gates
+close,
 **`user.bump` remains closed as `bump_key_admission_unconfirmed`**. Independent
 create/retire flows remain available subject to their existing gates. Even if
 a journal active append races later withdrawal, Keymaker must still release
@@ -346,10 +384,11 @@ Local authentication suffices for the recommended same-host observation.
 | Pins installed, before provision commit | No binding or issuance; same provision ID/args may retry under current evidence. Pin membership alone grants no key. |
 | Provision commit outcome unknown / acknowledgement lost | Fence affected state, reconcile actual durable outcome. Keep any committed binding/result and recover exactly under same ID/args without another registration; a proven uncommitted outcome has no binding. Never delete an uncertain committed effect or retry under a new identity. |
 | Bound, before confirmation or active | Restart preserves provisioned reservation, original registration/effect and policy provenance. Re-read full journal; while creating, no issuance and a new confirm query is required. |
-| Receipt lost, stale or caller crashes | No activation from cached bytes; new challenge/query outside locks. Same-effect recovery never allocates another successor token. |
+| Unconsumed receipt lost/stale or caller crashes | No activation from cached bytes; new challenge/query outside locks after resolving any uncertain consumption. Same-effect recovery never allocates another successor token. |
+| Consumed attempt; process death, response loss or append/finish error | Preserve exact attempt/hold. Unknown without proven durability and known durable append with uncertain cleanup are distinct; neither permits automatic abort or duplicate append. Resolve once under the root coordinator, retaining original outcome/effect. |
 | Timeout while creating | Timeout withdraws confirmation usability, **not** generation state. Keep reservation inert and request bounded reconciliation; no timer promotion, inferred removed or silent history deletion. User-manager verifies rollback, writes creating→removed, then Keymaker durably marks unbound. |
 | Creating→removed or explicit revoke wins | Never activate; retain unbound record or authorized revoke tombstone and all effect IDs. Revocation cannot be undone by later journal activity. |
-| Crash after active append before Keymaker promotion | Verify exact active journal and qualified ordering under with_active; durably promote the same record once before issuance. Unknown/rolled-back source, pins or commit remain fenced. Never copy the old binding. |
+| Crash after active append before Keymaker promotion | Verify exact active journal and qualified ordering and resolved attempt/current root under with_active/C/F; durably promote the same record once before issuance. Unknown/rolled-back source, pins or commit remain fenced. Never copy the old binding. |
 | Crash after promotion/result commit | Replay the actual durable state; original IDs/results remain exact. Recheck current authority at every release; a timeout cannot undo a committed effect. |
 
 Each reconciliation/promotion/withdrawal transition is durably audited with
@@ -357,7 +396,14 @@ its protected state outcome; restart does not skip audit or invent success.
 Reconciliation never generates a substitute key, token, receipt or successful
 result to fill missing evidence. No old generation resurrection or automatic
 second successor follows failure. Operator reconciliation and ordinary
-retirement fallback belong to their existing owners.
+retirement fallback belong to their existing owners. The PC2 root coordinator
+uses durable open -> resolution -> release-prepared -> owning marker cleanup/
+parent sync -> released/final directory sync. Missing markers or readable
+unsynced release bytes never discharge a hold. Withdrawal completion may block
+indefinitely while append/cleanup remains unresolved, with affected issuance
+suppressed. No caller retry or message-only reconcile clears joint uncertainty.
+Honest A does not supply independently current restore custody; without that
+custody and old-instance exclusion this path stays closed.
 
 **Recommend leaving normal create as register-after-active.** This contract
 fixes bump's explicit pre-active handoff only; it does not make create depend
@@ -421,7 +467,7 @@ Indeterminate commits use §6's keep/reconcile/recover rule, not that blanket.
 | PC-V01 target creating only | Provision separately at active, retiring, removed: `provision_state_invalid`, no new binding | Exact fresh creating token after removed predecessor provisions once |
 | PC-V02 no pre-active issuance | Creating target's sign/pubkey/helper/K3 requests: `generation_inactive`, no key/proof/signature/result disclosure; internal unpromoted binding-use control: `binding_provisioned` | After qualified active append and durable with_active promotion, fresh own-generation connection can use its new binding |
 | PC-V03 confirmation exact tuple | Wrong target generation: `generation_mismatch`; wrong expected registration or epoch: `binding_conflict`. Consumer given a mismatched response, including predecessor or checkpoint with unknown ancestry/wrong hash, refuses bump_key_admission_unconfirmed without active append | Exact tuple/predecessor/reg/epoch/effect, both facts and verified checkpoint ancestry/hash match pending intent |
-| PC-V04 old receipt replay | Replay g0 confirmation into g1, reuse challenge, expired2000ms observation, boot/instance mismatch, reconnect even with equal instance ID, or post-restart cached bytes: consumer bump_key_admission_unconfirmed, no activation | New live challenge, matching boot/instance/tuple and current observation for the same pending effect within age bound |
+| PC-V04 old receipt replay | Before durable consumption, replay g0 confirmation into g1, reuse challenge, expired2000ms observation, boot/instance mismatch, reconnect even with equal instance ID, or post-restart cached bytes: consumer bump_key_admission_unconfirmed, no activation | New live challenge, matching boot/instance/tuple and current observation for the same pending effect within age bound |
 | PC-V05 predecessor removal | Malformed overlapping journal introducing g1 before g0 removed: source fenced, `generation_source_unavailable`, no provision; user-manager must not append active or create overlap | Full history proves g0 removed before fresh g1 creating and binding |
 | PC-V06 binding/active crash | Crash after durable provision but before active: restart cannot issue, replace binding or allocate another registration; creating remains fenced for key use | Same-ID/args recovers committed provision; new confirm then qualified active/promotion uses that same registration |
 | PC-V07 changed retry | Same operator ID with different target, predecessor, owner, names, lifetime or method: `request_conflict`, original record/result unchanged | Exact ID/args under still-creating/current authority returns byte-identical original result |
@@ -429,19 +475,22 @@ Indeterminate commits use §6's keep/reconcile/recover rule, not that blanket.
 | PC-V09 uniqueness and no carryover | Reuse old or otherwise historically issued path, including unbound persistent path; or second live/provisioned reservation: `binding_conflict` | New approved never-issued path and one g1 reservation; old evidence retained |
 | PC-V10 timeout/rollback/revoke | Expire receipt while g1 creating: consumer rejects, binding remains inert; verified removed before activation transitions to unbound; authorized revoke tombstone never promotes | New timely query while still creating can observe same reservation; legitimate rollback preserves registration/history without granting issuance |
 | PC-V11 audit and unknown commit | Known pre-commit audit failure: audit_unavailable, no effect/output. Unknown durability: fence, no success until actual outcome reconciled, never delete a committed record | Confirmed committed result retained and recovered without new registration; confirmed uncommitted has no successful result; healthy audit releases once |
-| PC-V12 authority and locks | Station/observer provision: role_not_permitted; unconfigured observer query: role_not_permitted. Busy/pending journal guard refuses under existing adapter mappings; no remote wait under held locks | Active configured operator provisions; scoped active observer queries with nonblocking gate→data→commit order inside250ms |
+| PC-V12 authority and locks | Station/observer provision: role_not_permitted; unconfigured observer query: role_not_permitted. Busy/pending journal guard refuses under existing adapter mappings; no remote wait under held locks | Active configured operator provisions; scoped active observer queries with nonblocking gate→data→C→terminal F order inside250ms for PC2 |
 | PC-V13 confirmation currency | Withdraw admission or revoke/change epoch between reply and active append: a TTL-only implementation cannot satisfy PC2; bump stays unconfirmed, no claimed qualified activation | Jointly qualified ordering proves both facts current through append; later withdrawal still fences every Keymaker release |
 
 ## 9. Open gates and normative amendments
 
 [PC1–PC4](../UNRESOLVED_QUESTIONS.md#provision-and-confirmation-gates) track joint
-acceptance, actual observer authentication, final confirmation currency,
+acceptance, actual observer authentication, conditional PC2 final currency,
 creating-guard/recovery qualification and rollout. No surface table was supplied
 (brief gap); every requested specification part is addressed. No required text
 vector is out of contract. Runtime implementation and production tests are
 outside this spec-only slice; do not mark these requirements green from prose.
 
-On acceptance/implementation amend base §3.1 for the **target-only,
+The base now incorporates PC2 authority/migration/release/qualification
+requirements; this is not activation or joint implementation acceptance. The
+remaining provision method/schema changes require separately qualified
+implementation. On acceptance/implementation amend base §3.1 for the **target-only,
 metadata-only** creating guard, §3.2 for provisioned state/provenance/uniqueness,
 §5 for separate provision and scoped confirmation authority, §7 for exact
 schemas/retries, §8 for ordered pin checks, §11 for durable audit/results and

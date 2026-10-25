@@ -57,7 +57,7 @@ silently excluded from hashing.
 | `audit` | Exact journal bytes, latest sequence/digest, active and sealed segment linkage, seal bounds and archive/retention acknowledgements. Archived segments remain committed through a verified archive index and hash chain. Removing a segment requires the existing verified durable archive acknowledgement and a witnessed retention transition; it never resets the head. |
 | `enrollment` | Full high-water revision, host sequence/ID/history/tombstones and permanent key/name ownership; acceptance/bootstrap marker and attempt evidence; complete consumed-approval ledger, including its random ledger identity and all consumed IDs. Ledger truncation, replacement or pruning is not recovery. |
 | `reconciliation` | Exact approval receipt or its explicit absence, approval and ledger identities, consuming evidence, pending/orphan publication evidence and the protected publication fence. Receipt digests bind the full pin and protected configuration-path identity. Receipt publication, invalidation, consumption and cleanup are state changes. |
-| `authority` | Protected policy and pin digests, complete append-only name/index registry and tombstones, station/consumer/registry-lineage bindings, admitted UID generations and accepted generation-source head/continuity anchor. An independently advanced source must still be checked at release; recording an anchor does not replace the source's freshness contract. |
+| `authority` | PC2 authoritative root/revisions/digests, global withdrawal counter, durable incarnation and published boot/process instance; exact local intents and retained cross-owner activation attempts, holds and recovery open/resolution/release-prepared/released history. Complete schema-2 message artifacts/phase fences, migration decisions/floors and original results are included, with an explicitly reviewed combined inventory. Protected policy and pin digests, complete append-only name/index registry and tombstones, station/consumer/registry-lineage bindings, admitted UID generations and accepted generation-source head/continuity anchor. An independently advanced source must still be checked at release; recording an anchor does not replace the source's freshness contract. |
 | `custody` | Master public epoch/identity and verification anchors; witness signer public key, derivation tuple, key epoch and authorized rotation history. Secret seed/key bytes and chain codes are excluded. Custody protections and correct public derivation are independently checked, so a different restored seed cannot be authorized by excluding its bytes. |
 
 The daemon, stopped-service operator tools and recovery tools MUST share this
@@ -242,7 +242,8 @@ operation. Read-only startup verification itself appends nothing.
 A logical transaction MAY include a precomputed bounded group of audit/state
 writes if its exact final digest is known before intent and **all** dependent
 responses wait for resolution. This does not waive audit-before-release,
-generation → Store → enrollment ordering, actual-write rechecks, rollback
+generation → Store → enrollment → terminal F ordering where PC2 applies,
+actual-write rechecks, rollback
 fences or the native request budget. No signature can ride on a cached receipt
 for a previous equal state. Witness traffic MUST NOT recursively append to the
 protected audit journal; bounded typed service-health diagnostics are separate,
@@ -260,17 +261,25 @@ latency sacrifices availability of **both** surfaces; this is intentional.
 1. Serialize the complete protected state. Close new release admission and
    drain existing actual-write barriers before irreversible transition; retain
    generation → Store → enrollment ordering. Validate authority and prepare
-   exact candidate bytes/epoch/digest without publishing them. No witness lock
-   may introduce a reverse acquisition of those locks.
-2. Compare-and-append intent for epoch n+1 against the exact resolved head.
+   exact candidate bytes/epoch/digest without publishing them. For PC2 include
+   its root, all participant/attempt/hold state and the exact S2 phase. Establish
+   coordinator quiescence, then release **all** journal/Store/enrollment/F locks
+   before witness I/O; no witness lock may introduce a reverse acquisition.
+   Qualifying that cross-owner unlocked coordinator remains WC5, not a shipped API.
+2. Outside all locks, compare-and-append intent for epoch n+1 against the exact
+   resolved head.
    Validate its exact durable acknowledgement. **Before this succeeds, no
    local durable commit is allowed**, including a receipt invalidation rename.
-3. Commit the exact candidate locally, using the required full-write, file-sync,
+3. Reacquire the local forward journal → C → F order, revalidate the exact
+   candidate/authority and both owners' holds, and commit locally, using the
+   required full-write, file-sync,
    checked-close, rename and directory-sync boundaries. Persist its epoch/header.
    Preserve every existing local fail-closed check. A multi-file error is
    indeterminate durability, never permission to restore the earlier state.
+   Release all local locks while retaining quiesced admission before resolution.
 4. Only after successful local durability, append the matching committed
-   resolution and verify its exact durable acknowledgement. Recompute local
+   resolution **outside all locks** and verify its exact durable acknowledgement.
+   Reenter the forward local order for final validation/release. Recompute local
    state and recheck protected policy, current authority, request deadline and
    actual-write fences. Only then reopen admission/release. If another mandatory
    audit append occurs, witness that transaction before its dependent release.
@@ -483,13 +492,20 @@ does not establish coverage. No such tests or mutants are claimed in this slice.
   and total loss of independent evidence. Qualify latency/storage for audit of
   every operation, especially A, without relaxing resource budgets.
 
+PC2 additionally requires independently current per-transaction root/counter/
+incarnation/journal and unresolved-obligation retention outside the restored
+failure domain. Startup-only/lagging anchors and a restored local floor cannot
+supply it. Complete-state Keymaker evidence is separate from registry WC1
+publication proof; no local F, checksum or message-state schema floor activates C.
+
 All remain open for implementation/activation. A published spec and passing
 unchanged-code tests close none of them.
 
 ## 9. Normative changes to existing sections
 
-These are proposed changes for curator review; existing normative paragraphs
-are not edited by this slice. Section references below are to `keymaker.md`.
+These are C-only proposals for review. The separate PC2 base amendments do not
+activate them, select a witness mode or discharge WC1–WC5. Section references
+below are to `keymaker.md`.
 
 | Existing rule | Proposed C-only change |
 | --- | --- |

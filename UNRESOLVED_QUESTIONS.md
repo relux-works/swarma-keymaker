@@ -206,10 +206,55 @@ register-after-active; no key-purpose or signed-receipt authority is added.
 
 | Gate | Remaining decision / evidence |
 | --- | --- |
-| PC1: joint interface and observer authentication | Accept the separate operator-only provision and scoped read-only confirm schemas on both sides. Qualify the real observer/user-manager adapter and protected operator-to-manager handoff/pending-intent correlation, active observer UID/generation, socket/server authentication and owner/target scope. Pin service instance only from the first fully verified confirmation result on the authenticated connection; reconnect/restart invalidates correlation, not the effect intent. A root caller is not exempt from Keymaker generation checks. Signed confirmation would need a separate authorized signer/purpose decision; purposes 2/5 are not widened. |
-| PC2: currency through activation | Specify and qualify final ordering between the two confirmation facts, pin withdrawal, revoke/epoch change and user-manager active append, without RPC under either side's state/journal locks. A fresh nonce/2000ms local observation or equal service instance ID is not a lease and cannot close this race. No shared-lock/lease/commit protocol is claimed implemented. Until this is resolved, bump refuses rather than using a cached receipt. |
-| PC3: creating guard, durability and restore | Qualify metadata-only creating target guard with active caller, published gate→data→commit order and <=250ms local window. Cover exact replay, audit/commit uncertainty, restart/promotion/removal history, protected policy-digest provenance and epoch/journal floor restore. No timer activation or deleting committed evidence; include new state in option C inventory if activated. |
+| PC1: joint interface and observer authentication | Accept the separate operator-only provision and scoped read-only confirm schemas on both sides. Qualify the real observer/user-manager adapter and protected operator-to-manager handoff/pending-intent correlation, active observer UID/generation, socket/server authentication and owner/target scope. Pin service instance only from the first fully verified confirmation result on the authenticated connection; reconnect/restart invalidates pending unconsumed correlation, not the effect intent or an already consumed attempt. A root caller is not exempt from Keymaker generation checks. Signed confirmation would need a separate authorized signer/purpose decision; purposes 2/5 are not widened. |
+| PC2: currency through activation | The conditional local F/root/intent ordering is now a [Keymaker requirement](spec/keymaker-pc2.md), derived from the accepted user-manager design at 549b4aa89184c974331d1be1af151cec9768658e. Implementation, combined state/migration, durable observation handoff, independent custody, failure/blocking acceptance and cross-process qualification remain open below. No nonce/2000ms observation, equal instance, current callback or cached receipt closes these gates; production bump remains refused. |
+| PC3: creating guard, durability and restore | Qualify metadata-only creating target guard with active caller, journal gate→data→C→terminal F order and <=250ms local window. Cover exact replay, audit/root/commit uncertainty, attempt/hold recovery, restart/promotion/removal history, protected policy-digest provenance and independently current epoch/journal/root floors. No timer activation or deleting committed evidence; include combined state in option C inventory if activated. |
 | PC4: identity allocation and rollout | Operator preallocates a never-used purpose-1 identity for bump: ordinary persistent same-path reuse would reproduce the old key and is not this operation. Confirm this account-to-identity mapping, local generation-pin review/install flow, resource budgets and actual fresh account-token acquisition through its owning service. Keep normal create register-after-active unless separately reviewed. Runtime/root/backend and joint negative-vector qualification remain open. |
+
+## PC2 and message-state composition
+
+The [PC2 contract](spec/keymaker-pc2.md) is normative candidate text, not a new
+runtime capability. It consumes the accepted conditional user-manager
+[design §6.7](https://github.com/relux-works/swarma-user-manager/blob/549b4aa89184c974331d1be1af151cec9768658e/spec/activation-order.md#67-proposed-keymaker-spec-deltas-and-joint-acceptance-limits),
+without editing that owner's sections or claiming joint qualification. The
+three joint gates remain **OPEN**:
+
+1. **Observation absorption versus RPC correlation:** jointly accept/qualify
+   the exact durable consumption boundary under F. Before it disconnect/restart
+   invalidates correlation; after it only the same consumed attempt may complete
+   once or remain held, within original budgets. F cannot establish continuous
+   process/socket liveness through fsync; if that is required, keep refusal.
+2. **Independent restore custody under honest A:** retain every root revision/
+   digest/incarnation/counter, accepted journal floor and unresolved obligation
+   outside the restored failure domain, with independently current continuity
+   and old-instance exclusion. A coherent root/approval/anchor restore can pass
+   local hashes/boot/TTL. Qualify this custody or disable the PC2 path; no implicit
+   option C selection and no registry-publication proof as complete-state witness.
+3. **Potentially indefinite withdrawal-completion block:** uncertain append or
+   cleanup/recovery retains the joint hold and suppresses issuance. Requested
+   withdrawal cannot report completed until append outcome and its own root/
+   tombstone/audit durability are established. Accept/qualify this failure policy;
+   no finite crash-recovery/end-to-end revocation latency or timeout-abort claim.
+
+Comparison includes the read-only S2 implementation candidate
+`266c3ef9bc27531a2e8efe34671adb80b850df3c`; it does not change that candidate.
+The following are exact conflicts/integration gaps, **not silently resolved**.
+Proposals require contract review and a single accepted composition before PC2
+implementation/activation; S2's existing codecs/fixtures are not redefined here.
+
+| ID | Exact mismatch / scenario | Proposed resolution, not an accepted codec or capability |
+| --- | --- | --- |
+| PC2-S2-1 schema and preimage | S2 [§2.1](spec/keymaker-msg-state.md#21-versioned-protected-inventory) closes schema 2 to six legacy members plus schema_version/messages and hashes the full body excluding only audit_seq/audit_hash. PC2 K2 requires authority metadata in its candidate preimage excluding binding_commit/root_digest and a final root digest. Appending root/provision members to schema 2 or reusing its version/hash would violate its exact reader and recovery copies. | Specify a new explicit combined format/preimage/floor, retaining the complete schema-2 messages inventory, artifacts and original native-ID/result namespace. Review an acyclic dependency graph for authority metadata, snapshot body, binding_commit and final root, with distinct versioned digest semantics. No optional-field merge, opaque authority sidecar or circular hash. |
+| PC2-S2-2 authority and recovery ordering | S2 [§3](spec/keymaker-msg-state.md#3-transaction-and-trusted-reconciliation) and candidate persistMessagesContext establish a phase through binding_commit then bindings.next rename/directory sync. PC2 K4 permits authority only after all participants and final root/intent cleanup; a message-only offline reconcile cannot decide or clear a manager/authority hold. Two independently serving commit points can disagree. | Compose each S2 reserve/intent-fence/prepared/issued/publication/activation phase inside the common root transaction and forward C/F ordering, reserving audit before F. One cross-owner coordinator resolves exact outcomes; S2 pending certification and PC2 global holds remain separately retained predicates. Preserve no T1 fallback, no signing/reissue/result invention in recovery, and no RPC under locks. |
+| PC2-S2-3 migration and restore | S2 [§2.2](spec/keymaker-msg-state.md#22-migration-and-downgrade) has clean schema-1→2 migration and floor 2. PC2 additionally commits admission/pins/high-water, incarnation/counter and cross-owner attempts, with independently current per-transaction anchors. Floor 2 and a matched old snapshot/journal alone cannot authorize PC2; existing schema-2 stores also need a path. | One reviewed quiesced upgrade graph accepts validated legacy and existing schema-2 states, retains exact prior/new bodies, histories, decisions and all unresolved obligations, excludes old/restored writers and raises the combined reader/authority floor. Unknown transactions reconcile first. No reset, schema stripping, second independent migration or claimed honest-A rollback protection. |
+| PC2-S2-4 bounded read and capacity | S2 [§2.3](spec/keymaker-msg-state.md#23-capacity-and-history) and candidate codec reserve message artifacts/recovery copies (including a 4 MiB proof reservation), not all PC2 root/attempt/hold copies. A <=1 MiB root/4096-entry read does not itself validate a possible 256 MiB private message snapshot in the final window; acquiring C/implicit Store locks under F would deadlock the stated order. | Review one aggregate 256 MiB reservation and exact bounded direct metadata read-set/immutable participant references with complete validated provenance; qualify rechecks and filesystem sync inside the original windows. Do not add another state budget, trust an asynchronous projection, truncate history or introduce F→C. If the required check cannot fit, leave PC2 closed. |
+
+All eight upstream PC2 cases and every KR/KI/KP row are **PENDING / NOT RUN**.
+All-writer/root installer participation, combined closed artifact/ledger codecs,
+append-lifetime journal guard, read-only sync permissions/latency, root coordinator
+and real separate-process/platform evidence remain qualification gates. Existing
+PC1 observer/bootstrap, shared provider/watermark and WC1–WC5 gates remain; no
+purpose, credential, public error or capability is enabled by this document.
 
 ## Generation-journal adapter integration gates
 

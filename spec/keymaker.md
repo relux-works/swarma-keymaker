@@ -1,7 +1,8 @@
 # Keymaker candidate specification
 
 Status: spec only; Linux v0 candidate. MUST and MUST NOT describe requirements,
-not implemented or qualified capabilities. No service code is included.
+not implemented or qualified capabilities. See the runtime inventory in README
+for the implemented subset; PC2 is not implemented or activated.
 
 The [option C external-witness supplement](keymaker-witness.md) proposes state
 rollback protection, lifecycle vectors and explicitly enumerated normative
@@ -11,6 +12,12 @@ The [Swarm Signer message supplement](keymaker-msg.md) proposes purpose-4
 agent message signatures, certification, lifecycle choices and paired text
 vectors. Its registry/method changes are proposals; the existing purpose
 allowlist and native methods remain unchanged until separately activated.
+
+The [PC2 authority contract](keymaker-pc2.md) is normative for the future
+admission-through-activation path. It requires one durable root transaction,
+all-writer exclusion and exact-attempt recovery, with no RPC under locks.
+Its combined message-state format/migration and joint qualification gates remain
+open; no existing file or callback is thereby promoted to PC2 authority.
 
 ## 1. Scope and public references
 
@@ -153,6 +160,15 @@ old binding snapshot. Retirement similarly refuses `generation_inactive` or
 be transferred to a newly registered path or generation. Clients MUST verify the
 server socket's protected directory, expected owner and kernel peer UID.
 
+For PC2, every authority-changing commit and **actual release**, including root
+tooling and retained-result disclosure, MUST use the stable terminal F after
+journal gate -> data -> C, with required audit serialization before F. The
+[descriptor/access/order contract](keymaker-pc2.md#1-stable-fence-and-forward-order)
+forbids F -> C/gate/data/effects/audit edges, implicit locking reads and RPC.
+The manager reads bounded authoritative metadata directly under F, never through
+a daemon/Store callback. Creating-target metadata remains the sole target-only
+exception; all callers and issuance still require active generation.
+
 Surface B MUST report an accept-time generation refusal as one audited,
 request-ID-bound typed error for the first well-formed frame within its
 admission deadline, then close without admitting any method.
@@ -183,6 +199,17 @@ new registration number and retains the predecessor record. A new UID owner
 MUST NOT inherit a key automatically. A revoked path MUST NOT be resurrected
 under the same master epoch (`identity_revoked`). Ephemeral paths are never
 reassigned to a later execution.
+
+PC2 requires the [authoritative root/intent transaction](keymaker-pc2.md#2-one-authoritative-transaction-root)
+to bind these records, allocator, native IDs/results, full schema-2 message state
+and admission/pin history. The root is mandatory for both facts on the PC2 path;
+a missing/pending/mismatched root closes it. The current binding/audit pair plus
+separate enrollment publication does not meet this requirement. Provision's
+`provisioned` reservation/provenance and the combined format need explicit
+versioned migration; neither extends existing closed persisted rows implicitly.
+Preserve all old records/results and minimum-reader floors; no stripping fields,
+reset or old-state fallback. The exact S2 composition conflicts remain
+[open](../UNRESOLVED_QUESTIONS.md#pc2-and-message-state-composition).
 
 ## 4. Derivation and storage
 
@@ -295,7 +322,9 @@ Admission checks run in this order: bounded frame parsing; kernel peer and
 active generation; method/role; target binding and policy; journal capacity;
 final generation/fence check; durable result; response. Early malformed frames
 may lack an attributable identity. Refusals MUST perform no key operation or
-binding mutation; permitted audit/refusal-budget writes are the only effects.
+binding mutation on a clean pre-effect refusal; permitted audit/refusal-budget
+writes are the only effects in that case. After possible irreversible work,
+retain exact attempt/commit evidence and fence; a refusal is not proof of abort.
 
 | Operation | Inputs | Output | Authority |
 | --- | --- | --- | --- |
@@ -353,6 +382,15 @@ NOT be reported as absent or retried under a new identity. Durable mutation
 results cannot be reclaimed without a rule permanently rejecting expired IDs;
 v0 retains them and refuses admission at its budget.
 
+PC2 adds mandatory C/F participation to **all** these commits and release paths,
+including replay and policy changes by root tools. Its [ordered transaction](keymaker-pc2.md#3-participating-writers-and-durable-ordering)
+reserves bytes/audit before intent, retains original IDs/results, syncs the exact
+intent before live writes and publishes authority only after all participant/root
+file and directory barriers. Both owners' unresolved holds suppress dependent
+issuance. Withdrawal can be requested but cannot report completion while its
+possibly preceding active append is unresolved; completion may block indefinitely.
+No new purpose, capability or public code follows from these requirements.
+
 ### 5.1 Proposed pre-active provision and confirmation
 
 The [provision/confirm supplement](keymaker-provision.md) proposes a separate
@@ -362,11 +400,14 @@ state, no issuance before active, ordered generation-pin re-admission and
 exact-tuple confirmation. It is **spec only; not implemented or activated**.
 The target-only metadata exception never relaxes active caller or signing
 checks. Ordinary `register` above remains active-target-only. Confirmation
-currency through the user-manager active append remains a joint qualification
-gate; the supplemental query alone does not claim an activation lease. The
+currency through the user-manager active append uses the conditional
+[PC2 contract](keymaker-pc2.md); combined storage, durable handoff and real
+qualification remain open. The query alone is not an activation lease. The
 proposed instance correlation uses the confirmation result only; native hello
 keeps its version-only result. Reconnect or service restart invalidates pending
-correlation; instance equality cannot establish currency through activation.
+correlation **before consumption**; instance equality cannot establish currency
+through activation. After qualified durable consumption under F, resolve that
+exact append attempt rather than infer abort from process death (§5.3 supplement).
 
 ## 6. Surface A: SSH agent subset
 
@@ -623,6 +664,15 @@ Keymaker signs admission evidence; it never calls the homeserver, issues a
 JWT, logs a token, or promises that already-issued carrier sessions are ended
 by local revocation.
 
+PC2 applies the root transaction to **every policy installer**, including root
+pin installation/edit/removal/reload/re-admission, trust-anchor/UID-generation maps,
+enrollment high-water, approvals and consumed history. No installer may replace
+a live policy and notify later. Installation/reload/withdrawal and helper release
+share terminal F; the root's historical admission bit cannot mask expired, lost
+or untrusted evidence. Exclude old writers and automatic restoration before PC2
+use; qualify the cross-owner root coordinator and independent current anchors.
+The shared time-provider/continuity gate remains unchanged.
+
 Local signing custody that is closed, unloaded or unable to maintain its required
 protection refuses `custody_unavailable` with `retryable=false`; healthy generation,
 enrollment and audit evidence do not substitute for custody. Recovery requires
@@ -719,6 +769,16 @@ retaining evidence. Operational values need qualification; they are explicit
 candidate bounds, not performance measurements. Service network egress MUST
 be denied; enrollment and journal reads are local.
 
+For PC2, provisioning MUST install and protect F's stable inode, access group
+and per-transaction descriptor rules from the [authority contract §1](keymaker-pc2.md#1-stable-fence-and-forward-order).
+This adds no socket, root credential exemption or network egress. The root's
+1 MiB/4096-entry caps and all message/root/attempt/hold/staging/recovery histories
+share the **existing 256 MiB** state budget; neither subsystem receives another
+256 MiB allocation. Reserve the combined worst case before intent; no eviction.
+F waits, bounded direct metadata/sync, audit and actual handoff remain inside
+the existing 250 ms data, 1000 ms writer and send-start+2000 ms observation
+windows where applicable. No retry, external call or F queue renews them.
+
 ## 11. Audit and fail-closed recovery
 
 The exact record schema is `{seq,time,instance,surface,request_id,peer_uid,
@@ -786,6 +846,24 @@ archive acknowledgement outside online budgets; absence of acknowledgement
 applies backpressure. Startup checks continuity and pending mutation intent.
 Missing/corrupt evidence or uncertain restore fences service admission.
 
+For PC2, audit, full snapshot/messages/native results, admission/pins and the
+[closed logical root inventory](keymaker-pc2.md#2-one-authoritative-transaction-root)
+MUST be one recoverable authority transaction. Final root durability and intent
+cleanup, not the existing pair alone, permit authority. Keep existing closed
+audit members and hashes; PC2 adds no audit field/operation literal. A combined
+preimage/schema and migration must be accepted explicitly, without redefining
+S2's schema 2 or rewriting historical audit. Exact full-write/fsync/close/rename/
+directory barriers and durable counter history are mandatory.
+
+All startup, reload, replay and recovery paths honor local intent and root-owned
+manager attempt/hold/recovery evidence. Unknown without proven durability and a
+known append with uncertain cleanup both retain their exact holds/results; marker
+absence, timeout or process death is not abort/release. Only the qualified root
+coordinator may release uncertainty, using open -> resolution -> release-prepared
+-> owning cleanup/parent sync -> released/final directory sync. Readable release
+bytes alone are insufficient. Preserve S2's independent pending fences and no
+signer/reissue/result-invention rule in offline reconcile.
+
 ## 12. Privileged Linux step: operator handoff
 
 These are proposed owner-run commands for reviewed v0 artifacts, not commands
@@ -793,7 +871,16 @@ executed for this specification. The infrastructure owner provisions the
 service and a reusable test window once. Later integration runs are entirely
 unprivileged and never create/delete OS accounts. The host must have working
 local NSS, Bash, Python 3, sudo/visudo and the usual account-management tools.
-No daemon or integration runner is supplied by this spec-only repository.
+This runbook supplies no PC2 root/fence installer or qualified PC2 integration
+runner; existing runtime artifacts do not implement this new contract.
+
+PC2 activation additionally requires qualified provisioning of the stable F
+object, participating root policy installers, cross-owner attempt/recovery
+custody, old-instance exclusion and independently current per-transaction restore
+anchors. The commands below do **not** provision or qualify those obligations.
+Honest A's coherent-restore residual remains; no local boot/TTL/hash equality
+closes it. Future C retains WC1–WC5 and a separate complete-state inventory; all
+external preparation is unlocked and no mode switch is implied.
 
 ### 12.1 Explicit preflight and dynamic service IDs
 
@@ -1127,19 +1214,21 @@ reviewed teardown and are not required by this procedure.
 
 ## 13. Tests and vector evidence
 
-Negative vectors are listed before positive controls. Every vector names a
+Byte-fixture negative vectors are listed before positive controls. Each names a
 stable ID, complete fixture input, exact refusal code, paired valid control
 and a single changed input field. `peer_uid` and generation/journal/verifier
 fields in fixtures are injected harness facts, NEVER wire credentials. For
 malformed packets the changed field is the complete byte-string packet.
-Each refusal asserts no signature returned, no private material disclosed,
-and no binding/enrollment mutation; bounded audit writes are permitted.
+Each clean pre-effect refusal asserts no signature returned, no private material
+disclosed and no binding/enrollment mutation; bounded audit writes are permitted.
+Uncertain-commit/crash qualification instead retains exact attempts, partial
+evidence and fences as specified; it never treats refusal as rollback.
 
 Current offline checks verify SLIP's published seed/chain/public controls,
 Keymaker path examples, fixture structure and one-field pairing. They do NOT
-execute the candidate refusal semantics against a service. There is no daemon
-and no claimed green service test. Future test harnesses MUST run negatives
-first and controls second; a reject-all implementation MUST fail controls.
+execute PC2 or qualify the complete candidate service contract. Existing runtime
+tests do not establish PC2 authority or production readiness. Future test
+harnesses MUST run negatives first and controls second; a reject-all implementation MUST fail controls.
 
 | Required test | Claim and limits | Current status |
 | --- | --- | --- |
@@ -1176,8 +1265,22 @@ allowing a missing uid_map must fail `TestHelperEnrollmentAndUIDMap` while
 the positive controls remain green. Mutant evidence must identify the mutant,
 the property narrowed, the named failing test, and the bound of any survivor.
 Offline fixture integrity is a different gate; it cannot kill a daemon-policy
-mutant. There are no reviewer tests or previously accepted implementation
-tests in this initial repository. Future rework MUST retain them by name.
+mutant. Previously committed reviewer and implementation tests MUST remain
+present under their original names; this documentation slice changes none.
+
+### 13.1 PC2 reader, issuance and promotion qualification
+
+The normative [KR1–KR3, KI1–KI3 and KP1–KP3 table](keymaker-pc2.md#6-paired-qualification-and-narrowing-plants)
+adds paired negative postconditions, positive controls and named narrowing plants
+for every reader/release/promotion row. Retain all eight upstream names:
+PC2WithdrawalWins, PC2AppendWins, PC2AuthorityNotProjection, PC2FenceDeathUnknown,
+PC2IncarnationRestore, PC2NoRPCOrReverseOrder, PC2BudgetsNotRenewed and
+PC2CorrelationNotReplay. All remain **PENDING / NOT RUN**. Include every root
+installer, same-size/equal-policy counter ABA, distinct OFDs, before/after
+consumption process death, unknown versus known-durable cleanup, and recovery
+death after unlink/before final directory sync. Real separate processes and
+actual admitted-platform durability/exclusion evidence are required; a doc
+checker, build or fixture-integrity pass is not runtime qualification.
 
 ## 14. Open questions and activation gates
 
@@ -1229,6 +1332,15 @@ tests in this initial repository. Future rework MUST retain them by name.
     qualify per-operation executable identity and descriptor delegation, not
     rely on a racy procfs path comparison.
 
+13. **PC2 — conditional normative path, not activated:** qualify the
+    [authority contract](keymaker-pc2.md), all-writer F, combined closed
+    root/message-state migration, bounded metadata and append-lifetime guard.
+    [Three joint gates and four S2 conflicts](../UNRESOLVED_QUESTIONS.md#pc2-and-message-state-composition)
+    remain explicit. Observation consumption versus RPC correlation, independent
+    restore custody under honest A and potentially indefinite withdrawal blocking
+    cannot be replaced by a new confirmation or timeout. Preserve PC1/time and
+    WC1–WC5; production bump stays refused.
+
 No surface table was supplied with this specification assignment; a later
 implementation brief must enumerate its acceptance surfaces and coverage map.
 No listed required behavior is silently considered out of contract. Deferred
@@ -1241,6 +1353,14 @@ denial/default requirements remain inside the candidate contract.
 SSH transports map these to `SSH_AGENT_FAILURE`; native transports use the
 typed error object. Codes are stable identifiers, not arbitrary diagnostic
 strings. Registrar-owned signed-document verdicts retain registrar spelling.
+PC2 adds no public refusal: clean F contention is `busy`, clean expiry
+`request_deadline_exceeded`, uncertain local root/audit `audit_unavailable`;
+preserve precise authority/source/custody/capacity and future selected-C codes.
+Manager pre-write unconfirmed currency uses `bump_key_admission_unconfirmed`;
+after possible write preserve the real journal error and exact outcome, never
+reclassify it as harmless pre-append refusal. Unknown or cleanup-uncertain
+transactions suppress admission until qualified resolution, even after error
+delivery. A typed refusal never authorizes a second effect.
 
 | Code | Meaning |
 | --- | --- |

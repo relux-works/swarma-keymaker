@@ -187,7 +187,7 @@ func newHelperTrust(t *testing.T, f *nativeFixture, body map[string]any, admitte
 	if e != nil {
 		t.Fatal(e)
 	}
-	_, high, loadErr := (registry.Loader{Policy: policy, Verifier: publication, Store: publication}).Load(registry.Input{Revision: revision, Entries: publication.entries, FirstUse: true})
+	_, high, loadErr := (registry.Loader{ObjectFormat: config.ObjectFormat, Policy: policy, Verifier: publication, Store: publication}).Load(registry.Input{Revision: revision, Entries: publication.entries, FirstUse: true})
 	if loadErr != nil && verified {
 		t.Fatal(loadErr)
 	}

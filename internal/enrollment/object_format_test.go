@@ -140,7 +140,7 @@ func TestEnrollmentLoaderRequiresObjectFormat(t *testing.T) {
 			}
 			store := &previewStore{}
 			observed := &objectFormatVerifier{Verifier: v}
-			loader := registry.Loader{Policy: policy, Verifier: observed, Store: store}
+			loader := registry.Loader{ObjectFormat: profile, Policy: policy, Verifier: observed, Store: store}
 			input := registry.Input{Revision: f.config.Revision, Entries: entries, FirstUse: true}
 			for _, bad := range []string{"", "sha512"} {
 				loader.ObjectFormat = bad

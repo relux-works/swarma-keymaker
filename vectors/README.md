@@ -15,7 +15,7 @@ no binding/enrollment mutations, apart from permitted bounded audit writes.
 | --- | --- |
 | `refusals.json` | Foreign peer, inactive/reused generations, unavailable source, open-connection revoke/retire races at release and next request, hardened paths and purposes, SSHSIG restrictions and rejected agent mutations, concrete native malformed frames, operator register/revoke authority, mandatory registrar-array uid_map and pinned enrollment, revoked/missing helper binding, executable-qualified refusal, registrar name bounds, domain separation, private-material request rejection and audit failure |
 | `slip0010-ed25519.json` | Public SLIP-0010 Ed25519 test vectors 1 and 2: all six nodes each, expected chain code and SLIP-encoded public key; source URL and source SHA-256 retained |
-| `authority-root.json`, `authority-root/` | G4 draft: 55 byte goldens, 31 adjacent negative/positive pairs and 14 preimage links; integrity only, PC2 consumer rejection/runtime qualification PENDING |
+| `authority-root.json`, `authority-root/` | G4 draft: 82 byte goldens, 45 adjacent negative/positive pairs and 29 preimage links; integrity only, PC2 consumer rejection/runtime qualification PENDING |
 | `keymaker-paths.json` | Fixed public 32-byte seed, explicit scoped registry and five name → path → Ed25519/SSH public-key examples; purpose and ancestor separation |
 
 `evaluation` names the future harness layer. Binding checks may directly
@@ -87,7 +87,7 @@ MS-S13–MS-S22 remain PENDING in the message-state spec.
 
 The [G4 draft](../spec/keymaker-authority-root.md) is content for architect,
 reviewer and curator acceptance before PC2 S1 code. `authority-root.json` lists
-55 canonical JSON goldens and 31 named adjacent negative/control groups. Each
+82 canonical JSON goldens and 45 named adjacent negative/control groups. Each
 group carries its own claim. Inputs, UIDs, inode metadata, provider digests and
 verity measurements are **invented harness inputs**, not an installed policy,
 valid signed provider document, measured file or independent custody proof.
@@ -101,7 +101,7 @@ existing-schema-2 entry), attempt/hold and domain preimages. The maximal root is
 losslessly gzip-compressed; its expected decompressed SHA256/length are in the
 manifest. Expansion is bounded in the checker. Source JSON bytes have no newline.
 
-Fourteen links pin root/binding/facts/participants/candidate/attempt/hold hashes,
+Twenty-nine links pin root/binding/facts/participants/candidate/attempt/hold hashes,
 including populated freshness-payload/root and freshness-policy preimages. The
 checker materializes each negative mutation, checks its exact SHA256/length and
 unchanged positive-control selection, then checks that control's declaration. It
@@ -124,6 +124,22 @@ Ten new negative/control pairs cover receipt persistence, missing inventory,
 positive-anchor null ID, missing/oversized independent prior, W rollback, skip
 count, boolean audit substitution, missing endpoint and wrong artifact domain.
 Actual signed S4/S5 verification remains a separate consumer qualification gate.
+
+Rework 1 adds 27 goldens and 14 pairs for the zero-checkpoint/genesis domain,
+positive seq-1 controls, zero/nonzero-hash mismatch, rollback/reset, missing
+independent genesis, positive activation tails, and the C0/Q0/M0/Q1/R0 capacity
+bootstrap DAG. The seq-1 hash uses the already-imported public gen-journal
+creating.jsonl line including LF; no journal activity is fabricated or appended.
+All zero-checkpoint root/provenance/facts/link/floor/recovery copies agree.
+
+Raw byte-span mutations preserve negative zero, fraction/exponent spelling,
+max-safe-integer+1, depth17, invalid UTF-8 and decoded duplicate member names.
+Nearby controls use zero/one/max-safe integers, depth16 and valid literal U+00E9.
+The closed depth/UTF8 wrapper is a fixture-only generic CCJ context; it is not
+accepted as a Root. Genesis-authority references and capacity/provider metadata
+remain invented external fixture inputs, not actual independent admission or
+capacity/verity qualification. C0 alone is never serving authority. All reader
+rejections remain PENDING; the tool checks exact planted bytes and pair hashes.
 
 Run `go run ./tools/vectors/main.go -check` from the repository root. `-write`
 still rewrites **only** keymaker-paths.json; it must not regenerate golden expected

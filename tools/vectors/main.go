@@ -388,8 +388,8 @@ func authorityObject(b []byte) map[string]any {
 	return v
 }
 func authorityBytes(v any) []byte {
-	// The fixtures use ASCII strings and integer json.Number values; this is
-	// fixture serialization, not the production CCJ-1 Unicode/schema reader.
+	// These fixture strings (including literal U+00E9) and integer json.Number
+	// values round-trip here; this is not a production CCJ-1/schema reader.
 	var b bytes.Buffer
 	e := json.NewEncoder(&b)
 	e.SetEscapeHTML(false)
@@ -397,6 +397,25 @@ func authorityBytes(v any) []byte {
 	return bytes.TrimSuffix(b.Bytes(), []byte{'\n'})
 }
 func authorityMutate(control []byte, m authorityMutation) []byte {
+	if m.Kind == "replace_bytes" {
+		// Preserve malformed lexical bytes verbatim; parsing/re-encoding a plant
+		// would erase -0/exponent/duplicate/invalid-UTF8 counterexamples.
+		var p struct {
+			Offset    int    `json:"offset"`
+			BeforeHex string `json:"before_hex"`
+			AfterHex  string `json:"after_hex"`
+		}
+		fail(json.Unmarshal(m.Value, &p))
+		before, e := hex.DecodeString(p.BeforeHex)
+		fail(e)
+		after, e := hex.DecodeString(p.AfterHex)
+		fail(e)
+		require(p.Offset >= 0 && p.Offset <= len(control) && len(before) > 0 && len(before) <= len(control)-p.Offset, "authority byte plant bounds")
+		require(bytes.Equal(control[p.Offset:p.Offset+len(before)], before) && !bytes.Equal(before, after), "authority byte plant missed")
+		out := append([]byte{}, control[:p.Offset]...)
+		out = append(out, after...)
+		return append(out, control[p.Offset+len(before):]...)
+	}
 	if m.Kind == "truncate" {
 		require(len(control) > 0, "empty truncate control")
 		return control[:len(control)-1]
@@ -520,7 +539,7 @@ func checkAuthorityVectors() {
 		e := item.(map[string]any)
 		require(e["registration_number"] == json.Number(strconv.Itoa(i+1)) && len(e["owner"].(string)) <= 255, "authority maximal root field bounds")
 	}
-	require(len(f.Goldens) == 55 && len(f.Groups) == 31 && len(f.Links) == 14, "authority vector inventory")
+	require(len(f.Goldens) == 82 && len(f.Groups) == 45 && len(f.Links) == 29, "authority vector inventory")
 	for _, phase := range []string{"legacy_validated", "s2_staged", "s2_committed", "combined_staged", "combined_committed", "released"} {
 		require(goldens["migration-"+phase] != nil, "authority migration vector missing")
 	}

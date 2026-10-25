@@ -441,6 +441,222 @@
       "bytes": 554,
       "sha256": "45ccbae04f0cedefc0c0edcc98f2d67a36db66299a32e2632b61f312ea3bfd23",
       "domain": "keymaker-authority-facts/1"
+    },
+    {
+      "id": "capacity-genesis-reservation",
+      "path": "vectors/authority-root/capacity-genesis-reservation.json",
+      "encoding": "identity",
+      "bytes": 3253,
+      "sha256": "80e6afa40bcd5864a909224415e8187418c2e230f0550bbcbe6019784bba9ec9",
+      "domain": "keymaker-reservation/1"
+    },
+    {
+      "id": "capacity-genesis-commit",
+      "path": "vectors/authority-root/capacity-genesis-commit.json",
+      "encoding": "identity",
+      "bytes": 386,
+      "sha256": "e242983dfbceab824d8797c3f16da89bdb273b87998711c85b6c0cbaf5d1e7f7",
+      "domain": "keymaker-capacity-genesis/1"
+    },
+    {
+      "id": "capacity-genesis-inventory",
+      "path": "vectors/authority-root/capacity-genesis-inventory.json",
+      "encoding": "identity",
+      "bytes": 474,
+      "sha256": "d69a5c996a86146eea0c5b89253e730d096c3eb14b05fb59bfee3e3678468d59",
+      "domain": "pc2-manager-inventory/1"
+    },
+    {
+      "id": "capacity-genesis-migration-history",
+      "path": "vectors/authority-root/capacity-genesis-migration-history.json",
+      "encoding": "identity",
+      "bytes": 201,
+      "sha256": "9cfee85935b0c552b2ea5ebf6ccf9fa36569d000120b33b4e92b183c1208fae3",
+      "domain": "keymaker-migration-history/1"
+    },
+    {
+      "id": "capacity-genesis-next-reservation",
+      "path": "vectors/authority-root/capacity-genesis-next-reservation.json",
+      "encoding": "identity",
+      "bytes": 3260,
+      "sha256": "ccf5734531acb876fb24164060a5f809f6542c884e3d95d0a88dc630a95af922",
+      "domain": "keymaker-reservation/1"
+    },
+    {
+      "id": "journal-genesis-participants",
+      "path": "vectors/authority-root/journal-genesis-participants.json",
+      "encoding": "identity",
+      "bytes": 3395,
+      "sha256": "934cc2785cf17725c9989d9ef35487caa9a16b6b481db30907eb32e800e81e4e",
+      "domain": "keymaker-participants/1"
+    },
+    {
+      "id": "journal-genesis-root",
+      "path": "vectors/authority-root/journal-genesis-root.json",
+      "encoding": "identity",
+      "bytes": 1821,
+      "sha256": "17ac8f9bbe21fc8f045457ba22542f997c4a7c6101b9661a018c7bb6e9c71582",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "journal-genesis-facts",
+      "path": "vectors/authority-root/journal-genesis-facts.json",
+      "encoding": "identity",
+      "bytes": 554,
+      "sha256": "6f5f03a948b8360834a1ccffb26b5eb76b39a1499c6647afbcac25f8c6f66e83",
+      "domain": "keymaker-authority-facts/1"
+    },
+    {
+      "id": "journal-genesis-provenance",
+      "path": "vectors/authority-root/journal-genesis-provenance.json",
+      "encoding": "identity",
+      "bytes": 338,
+      "sha256": "f518a92252dba0e78e47815c42cc5c1954d7f29d8f2e44b8b7d542e4be468bfe",
+      "domain": "keymaker-provenance/1"
+    },
+    {
+      "id": "journal-genesis-body",
+      "path": "vectors/authority-root/journal-genesis-body.json",
+      "encoding": "identity",
+      "bytes": 1934,
+      "sha256": "350ad59fe078aa35eceb5da495b94b74cff889b7b4fc33704c48a48697d2ce8c",
+      "domain": "keymaker-combined-body/3"
+    },
+    {
+      "id": "journal-genesis-root-preimage",
+      "path": "vectors/authority-root/journal-genesis-root-preimage.json",
+      "encoding": "identity",
+      "bytes": 1733,
+      "sha256": "b8bd9c2a77c995b73396a178994415592d35e40537760b22b4a725d774f766a9",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "journal-genesis-guard",
+      "path": "vectors/authority-root/journal-genesis-guard.json",
+      "encoding": "identity",
+      "bytes": 408,
+      "sha256": "e0858520d8c576edd1dd37f1f91ef85d308c4c7d67c3e9687599c400260a1e7c",
+      "domain": "pc2-recovery-guard/1"
+    },
+    {
+      "id": "journal-genesis-link",
+      "path": "vectors/authority-root/journal-genesis-link.json",
+      "encoding": "identity",
+      "bytes": 456,
+      "sha256": "a68bdb48f9bb419d76215fd927f856f97f309f6964226e0b18d37a02862bd9d1",
+      "domain": "keymaker-authority-link/1"
+    },
+    {
+      "id": "journal-genesis-floor",
+      "path": "vectors/authority-root/journal-genesis-floor.json",
+      "encoding": "identity",
+      "bytes": 550,
+      "sha256": "5d873cdc2ad2c8d55b534f079d38ee971fac8ee7981f290e979d9a32e13039a0",
+      "domain": "keymaker-authority-floor/1"
+    },
+    {
+      "id": "journal-genesis-recovery",
+      "path": "vectors/authority-root/journal-genesis-recovery.json",
+      "encoding": "identity",
+      "bytes": 431,
+      "sha256": "050c370c828a42d40c60703042693fee5a52c8c96061dea9edb800f03438101d",
+      "domain": "pc2-recovery-record/1"
+    },
+    {
+      "id": "journal-domain-empty",
+      "path": "vectors/authority-root/journal-domain-empty.json",
+      "encoding": "identity",
+      "bytes": 434,
+      "sha256": "8efa51bc23759675f9042653bf0db935b6143c3ccb79552b4769de39995e4858",
+      "domain": "keymaker-journal-domain-fixture/1"
+    },
+    {
+      "id": "journal-domain-first-enrollment",
+      "path": "vectors/authority-root/journal-domain-first-enrollment.json",
+      "encoding": "identity",
+      "bytes": 429,
+      "sha256": "c60fd62a781a28c469a322ebcca27991f6a46fdc8f16c2e6a8a9d0166f5b7c11",
+      "domain": "keymaker-journal-domain-fixture/1"
+    },
+    {
+      "id": "journal-domain-one",
+      "path": "vectors/authority-root/journal-domain-one.json",
+      "encoding": "identity",
+      "bytes": 301,
+      "sha256": "b559f27a46b7e3c690dd05467956d75ed615c7c14a064b37b530b168029595b8",
+      "domain": "keymaker-journal-domain-fixture/1"
+    },
+    {
+      "id": "journal-domain-active",
+      "path": "vectors/authority-root/journal-domain-active.json",
+      "encoding": "identity",
+      "bytes": 434,
+      "sha256": "6656359143275f069cbc66464e465358440820ff0398e25f52feaf3942a1b1d7",
+      "domain": "keymaker-journal-domain-fixture/1"
+    },
+    {
+      "id": "journal-domain-replay",
+      "path": "vectors/authority-root/journal-domain-replay.json",
+      "encoding": "identity",
+      "bytes": 301,
+      "sha256": "3da4d537b03932190af2fd1093232ed377fd9e8b058f03b0c6f18d3a2ff4b97e",
+      "domain": "keymaker-journal-domain-fixture/1"
+    },
+    {
+      "id": "integer-boundary-root",
+      "path": "vectors/authority-root/integer-boundary-root.json",
+      "encoding": "identity",
+      "bytes": 1950,
+      "sha256": "31ebf2e9d2666a80e75a2e73c3d511052fdd8c1e1dfdb096a202117b057b9949",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "ccj-depth16",
+      "path": "vectors/authority-root/ccj-depth16.json",
+      "encoding": "identity",
+      "bytes": 85,
+      "sha256": "0b26635ea6b972faf392889bd9b520061dc5d368bbb09d9476db02a0644188d6",
+      "domain": "keymaker-ccj-boundary-fixture/1"
+    },
+    {
+      "id": "ccj-utf8",
+      "path": "vectors/authority-root/ccj-utf8.json",
+      "encoding": "identity",
+      "bytes": 58,
+      "sha256": "e7622092f27113192dcdc5a70448bdd0239749f52b8a45f79f51948fd809f322",
+      "domain": "keymaker-ccj-boundary-fixture/1"
+    },
+    {
+      "id": "migration-empty-journal",
+      "path": "vectors/authority-root/migration-empty-journal.json",
+      "encoding": "identity",
+      "bytes": 519,
+      "sha256": "a935d3ff05a5dee27d08a2a04209e11eb4d5256a853d5567a4f58be1a6f3f726",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "journal-genesis-authority-hold",
+      "path": "vectors/authority-root/journal-genesis-authority-hold.json",
+      "encoding": "identity",
+      "bytes": 126,
+      "sha256": "233e08fdf8af80be2de99b0b3655423c18ba384a3444624421b19846a0dc55ca",
+      "domain": "pc2-hold/1"
+    },
+    {
+      "id": "integer-boundary-payload",
+      "path": "vectors/authority-root/integer-boundary-payload.json",
+      "encoding": "identity",
+      "bytes": 356,
+      "sha256": "1bb86d980ff77b343ff544489e76e7a2fba522980918ea7b7fe02dcaba65e34e",
+      "domain": "keymaker-private/3"
+    },
+    {
+      "id": "integer-boundary-participants",
+      "path": "vectors/authority-root/integer-boundary-participants.json",
+      "encoding": "identity",
+      "bytes": 3393,
+      "sha256": "1486d4a218e2ba08e5ffddfcbe31b19d6860428b0192a7707a68834e154f44f5",
+      "domain": "keymaker-participants/1"
     }
   ],
   "links": [
@@ -527,6 +743,96 @@
       "member": "policy.hash",
       "preimage": "message-recovery-policy",
       "prefix": ""
+    },
+    {
+      "object": "capacity-genesis-commit",
+      "member": "reservation.digest",
+      "preimage": "capacity-genesis-reservation",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "capacity-genesis-inventory",
+      "member": "slot_reservation",
+      "preimage": "capacity-genesis-reservation",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-root",
+      "member": "manager_baseline.digest",
+      "preimage": "capacity-genesis-inventory",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-root",
+      "member": "participants.digest",
+      "preimage": "journal-genesis-participants",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-root",
+      "member": "reservation.digest",
+      "preimage": "capacity-genesis-next-reservation",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-root",
+      "member": "provenance.digest",
+      "preimage": "journal-genesis-provenance",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-root",
+      "member": "root_digest",
+      "preimage": "journal-genesis-root-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-root",
+      "member": "binding_commit.digest",
+      "preimage": "journal-genesis-body",
+      "prefix": ""
+    },
+    {
+      "object": "journal-genesis-provenance",
+      "member": "facts_digest",
+      "preimage": "journal-genesis-facts",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-link",
+      "member": "root_digest",
+      "preimage": "journal-genesis-root-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-floor",
+      "member": "logical_link_digest",
+      "preimage": "journal-genesis-link",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-floor",
+      "member": "guard_digest",
+      "preimage": "journal-genesis-guard",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-authority-hold",
+      "member": "origin_id",
+      "preimage": "capacity-genesis-commit",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "integer-boundary-root",
+      "member": "payload.digest",
+      "preimage": "integer-boundary-payload",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "integer-boundary-root",
+      "member": "participants.digest",
+      "preimage": "integer-boundary-participants",
+      "prefix": "sha256:"
     }
   ],
   "groups": [
@@ -1255,6 +1561,305 @@
       },
       "positive": {
         "golden": "freshness-artifact-normal",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "journal-zero-nonzero-hash",
+      "claim": "Zero sequence requires exactly the empty zero hash; paired empty context carries independent unused-writer genesis authority. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-domain-empty",
+        "mutation": {
+          "kind": "set",
+          "member": "checkpoint",
+          "value": {
+            "seq": 0,
+            "hash": "bc3192646b921aae14ab1c4a0a636313dacd3bd215d7dde53917562323071398"
+          }
+        },
+        "bytes": 434,
+        "sha256": "367c83bd79b310113c6464077f95603f6b5fb9decda629f1e1082a86737e4700",
+        "expected_rejection": "empty_checkpoint_hash"
+      },
+      "positive": {
+        "golden": "journal-domain-empty",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "journal-reset-after-activity",
+      "claim": "A protected seq-1 high-water cannot be reset to empty; paired exact seq-1 tail is the published creating line including LF. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-domain-replay",
+        "mutation": {
+          "kind": "set",
+          "member": "checkpoint",
+          "value": {
+            "seq": 0,
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "bytes": 301,
+        "sha256": "d831c76838e6248a0f6e550c392c1d3e952cec7f5c2e59d7d23621e963f459d6",
+        "expected_rejection": "journal_rollback"
+      },
+      "positive": {
+        "golden": "journal-domain-replay",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "journal-zero-without-genesis",
+      "claim": "Zero checkpoint needs independently admitted genesis, never missing-file bootstrap; paired authority is an external fixture input only. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-domain-empty",
+        "mutation": {
+          "kind": "set",
+          "member": "genesis_authority",
+          "value": null
+        },
+        "bytes": 301,
+        "sha256": "dad11cc77bdccacb1ec466104cb339acb5c63a5cdd5ddb8188eaacadb8ae6fb7",
+        "expected_rejection": "genesis_unavailable"
+      },
+      "positive": {
+        "golden": "journal-domain-empty",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "journal-first-enrollment-without-authority",
+      "claim": "First enrollment has the same explicit-authority requirement as unused-writer genesis; paired context names that admission. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-domain-first-enrollment",
+        "mutation": {
+          "kind": "set",
+          "member": "genesis_authority",
+          "value": null
+        },
+        "bytes": 301,
+        "sha256": "dad11cc77bdccacb1ec466104cb339acb5c63a5cdd5ddb8188eaacadb8ae6fb7",
+        "expected_rejection": "genesis_unavailable"
+      },
+      "positive": {
+        "golden": "journal-domain-first-enrollment",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "journal-activation-zero",
+      "claim": "Even an independent genesis decision cannot authorize a real post-creation activation with zero tail; paired creating seq-1 tail is positive. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-domain-active",
+        "mutation": {
+          "kind": "set",
+          "member": "checkpoint",
+          "value": {
+            "seq": 0,
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "bytes": 434,
+        "sha256": "87314ae76fa3e53e51c832c1baf126e756d3836cca8fddca3adaaaae40ed5a86",
+        "expected_rejection": "activation_requires_positive_tail"
+      },
+      "positive": {
+        "golden": "journal-domain-active",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "attempt-zero-tail",
+      "claim": "Activation attempt inherits checkpoint shape but additionally requires positive prepared tail; paired attempt has seq1. Reader verdict PENDING.",
+      "negative": {
+        "control": "attempt",
+        "mutation": {
+          "kind": "set",
+          "member": "prepared_tail",
+          "value": {
+            "seq": 0,
+            "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "bytes": 1136,
+        "sha256": "0ad37b8464f44ac582369a19bbcb9d2a334e418ea94343f8f1ff7dd62f23d72a",
+        "expected_rejection": "activation_requires_positive_tail"
+      },
+      "positive": {
+        "golden": "attempt",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "slot-reservation-uncommitted-successor",
+      "claim": "Initial M0 must consume already independently committed Q0, not future Q1 that first includes M0; paired reference points through C0 to Q0. Reader verdict PENDING.",
+      "negative": {
+        "control": "capacity-genesis-inventory",
+        "mutation": {
+          "kind": "set",
+          "member": "slot_reservation",
+          "value": "sha256:ccf5734531acb876fb24164060a5f809f6542c884e3d95d0a88dc630a95af922"
+        },
+        "bytes": 474,
+        "sha256": "7b6257e3766478e717e4f11bd100e5589d2d88fbbffecfc8538b8f025bea199b",
+        "expected_rejection": "uncommitted_reservation"
+      },
+      "positive": {
+        "golden": "capacity-genesis-inventory",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-negative-zero",
+      "claim": "Signed zero token is forbidden without normalization; paired genesis root uses the admissible Z boundary zero. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-genesis-root",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 479,
+            "before_hex": "22736571223a30",
+            "after_hex": "22736571223a2d30"
+          }
+        },
+        "bytes": 1822,
+        "sha256": "85ba2adbc30a51b035156373bc5492658de8569cfaece2fc776a2a954a7ac085",
+        "expected_rejection": "negative_zero"
+      },
+      "positive": {
+        "golden": "journal-genesis-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-fraction",
+      "claim": "Nonintegral sequence token refuses before hashing; paired first tail is integer1. Reader verdict PENDING.",
+      "negative": {
+        "control": "integer-boundary-root",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 509,
+            "before_hex": "22736571223a31",
+            "after_hex": "22736571223a312e35"
+          }
+        },
+        "bytes": 1952,
+        "sha256": "11cb5bc8d3d9a3cd31506f75dbac0ec2b0b4bd871c82c56cf89b528c0909295f",
+        "expected_rejection": "fraction"
+      },
+      "positive": {
+        "golden": "integer-boundary-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-exponent",
+      "claim": "Exponent spelling cannot be normalized to integer1; paired decimal spelling is exact. Reader verdict PENDING.",
+      "negative": {
+        "control": "integer-boundary-root",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 509,
+            "before_hex": "22736571223a31",
+            "after_hex": "22736571223a316530"
+          }
+        },
+        "bytes": 1952,
+        "sha256": "b671a0ce69f2555354f142693185ce78ff8376d5e98757e0b6e229a9c262c9ff",
+        "expected_rejection": "exponent"
+      },
+      "positive": {
+        "golden": "integer-boundary-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-safe-integer-overflow",
+      "claim": "Max safe integer passes its numeric gate; max+1 refuses before digest linkage checks. Reader verdict PENDING.",
+      "negative": {
+        "control": "integer-boundary-root",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 1839,
+            "before_hex": "227472616e73616374696f6e5f7265766973696f6e223a39303037313939323534373430393931",
+            "after_hex": "227472616e73616374696f6e5f7265766973696f6e223a39303037313939323534373430393932"
+          }
+        },
+        "bytes": 1950,
+        "sha256": "efd755a059feda635d4b9e2f2d61ec0238bc39932045259c5b137b85cd3869f8",
+        "expected_rejection": "integer_overflow"
+      },
+      "positive": {
+        "golden": "integer-boundary-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-depth17",
+      "claim": "Generic CCJ document depth17 exceeds16; paired closed fixture reaches exactly16, not a claim of typed Root acceptance. Reader verdict PENDING.",
+      "negative": {
+        "control": "ccj-depth16",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 1,
+            "before_hex": "2276616c7565223a5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b305d5d5d5d5d5d5d5d5d5d5d5d5d5d5d",
+            "after_hex": "2276616c7565223a5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b305d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d"
+          }
+        },
+        "bytes": 87,
+        "sha256": "203ea9ae1978ad8afe0598019b00252cef36a829244159bead352860c386fb60",
+        "expected_rejection": "depth_limit"
+      },
+      "positive": {
+        "golden": "ccj-depth16",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-invalid-utf8",
+      "claim": "One invalid UTF-8 byte cannot be repaired into U+FFFD; paired literal U+00E9 has valid two-byte UTF-8. Reader verdict PENDING.",
+      "negative": {
+        "control": "ccj-utf8",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 10,
+            "before_hex": "c3a9",
+            "after_hex": "ff"
+          }
+        },
+        "bytes": 57,
+        "sha256": "e270455ec41443111305b784f8f0ec0960c892d7fa2e700fef9a772c234ee408",
+        "expected_rejection": "invalid_utf8"
+      },
+      "positive": {
+        "golden": "ccj-utf8",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "ccj-duplicate-unescaped-name",
+      "claim": "Decoded version duplicates the later literal member; raw-name comparison or map collapse is insufficient. Paired root has one version. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "replace_bytes",
+          "value": {
+            "offset": 0,
+            "before_hex": "7b22617574686f726974795f696e6361726e6174696f6e223a",
+            "after_hex": "7b227665725c7530303733696f6e223a226b65796d616b65722d617574686f726974792f32222c22617574686f726974795f696e6361726e6174696f6e223a"
+          }
+        },
+        "bytes": 1928,
+        "sha256": "87655abd0088396b32a7436e28b439251242b86fd2a077a286ddfafd0c11479f",
+        "expected_rejection": "duplicate_member"
+      },
+      "positive": {
+        "golden": "minimal-root",
         "expected": "format-control-only"
       }
     }

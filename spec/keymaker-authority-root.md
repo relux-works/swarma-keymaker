@@ -41,6 +41,21 @@ aliases. All listed members are required unless an explicit union says otherwise
 | Arrays | Bounds below apply together with encoded-byte limits; empty is [], never null |
 | Null | Only fields explicitly marked nullable; absent and null never interchange |
 
+The generation-journal **checkpoint** domain is `{seq:Z,hash:H}`, not the
+positive record-sequence domain. At seq=0 the hash MUST be exactly 64 zeroes.
+An empty journal admits no UID. `(0,zeroes)` is allowed only with independently
+admitted first enrollment or unused-writer genesis and the matching protected
+zero high-water; missing/lost/corrupt history is never such authority. After
+activity, no root, migration, restore or new bootstrap claim may reset a positive
+protected high-water to zero. Positive tails must match the complete qualified
+owner chain and cannot decrease/fork the protected floor. Do not append or
+invent activity to satisfy a positive-only type. See the owner's
+[checkpoint and high-water rules](https://github.com/relux-works/swarma-user-manager/blob/70df6763c7e26341219d3c31055a477ec94dfa52/spec/generation-journal.md#5-reader-algorithm-durable-high-water-and-refusals).
+This domain applies to Root, facts/provenance, logical link, recovery record,
+floor/continuity anchor and prepared_tail. An activation attempt additionally
+requires prepared_tail.seq>=1 at the real post-creation append; allowing an
+empty bootstrap does not permit active state from an empty journal.
+
 The logical root is <=1048576 bytes and <=4096 retained reservation entries.
 These are simultaneous caps: 4096 rows of maximum-size fields need not fit.
 All retained metadata/history, attempts, artifacts, recovery/staging and both
@@ -133,7 +148,7 @@ implementation/lifecycle and provider bindings, not invent optional members):
 | keymaker-native-inventory/3 | {version:matching literal,entries:[{caller:{uid:UID,generation:Token},request_id:ID,method:Text,arguments_digest:D,result_digest:D,status:"pending"|"committed"}]}; <=65536 rows, <=256 MiB; must match complete retained namespace, not a replacement cache |
 
 HistoryRef is exactly {kind:HistoryKind,id:Text,digest:D,bytes:N}. HistoryKind is
-legacy_snapshot, s2_snapshot, combined_payload, message2, message3, approval,
+legacy_snapshot, s2_snapshot, combined_payload, capacity_genesis, message2, message3, approval,
 freshness, signed_input, message_policy, policy, migration, attempt, hold or
 recovery; bytes <=256 MiB, IDs unique within
 kind, sorted by (kind,id). The role/ID selects a protected owner-defined retained
@@ -172,7 +187,7 @@ Root is exactly the following (all members required):
  binding_commit:{version:N,digest:H,audit_seq:N,audit_hash:H},
  authority_incarnation:Token,instance_id:ID,boot_id:Boot,master_epoch:Text,
  pin_policy_digest:D,registry_digest:D,custody_ready:boolean,
- withdrawal_counter:N,journal:{seq:N,hash:H},recovery:"clear",entries:[Entry],
+ withdrawal_counter:N,journal:{seq:Z,hash:H},recovery:"clear",entries:[Entry],
  payload:Ref,participants:MetaRef,provenance:MetaRef,reservation:MetaRef,
  manager_baseline:{revision:N,digest:D}}
 Entry = {uid:UID,generation:Token,predecessor_generation:Token,
@@ -202,7 +217,7 @@ snapshot, policy, histories and the complete aggregate inventories.
 
 Closed provenance:
 `{version:"keymaker-provenance/1",base_root_digest:D|null,facts_digest:D,
-participants_digest:D,journal:{seq:N,hash:H}}`, <=4096 bytes.
+participants_digest:D,journal:{seq:Z,hash:H}}`, <=4096 bytes.
 Facts are the exact Root members authority_incarnation, instance_id, boot_id,
 master_epoch, pin_policy_digest, registry_digest, custody_ready,
 withdrawal_counter, journal and entries, with version
@@ -228,7 +243,7 @@ Domain separation is in the required version/type member, not a hidden prefix.
 | Final root | CCJ(Root with **only root_digest removed**); includes keymaker-authority/2 and binding_commit; no outer wrapper is silently added |
 | Activation attempt | CCJ(exact attempt below with only attempt_id, disposition and evidence_digest removed), including pc2-activation-attempt/1; unchanged A2 identity recipe |
 | Hold | CCJ({type:"pc2-hold/1",kind:"activation"|"authority",origin_id:D}); unchanged A2 recipe |
-| Logical root link | CCJ({type:"keymaker-authority-link/1",root_digest:D,transaction_revision:N,authority_incarnation:Token,withdrawal_counter:N,journal:{seq:N,hash:H},guard_digest:D,minimum_reader_schema:3,floor_epoch:N}) |
+| Logical root link | CCJ({type:"keymaker-authority-link/1",root_digest:D,transaction_revision:N,authority_incarnation:Token,withdrawal_counter:N,journal:{seq:Z,hash:H},guard_digest:D,minimum_reader_schema:3,floor_epoch:N}) |
 
 The binding body's H is binding_commit.digest. Prepare exact audit frames/tail
 under audit serialization **before F**, with provider evidence obtained before
@@ -317,8 +332,60 @@ Manager inventory, <=65536 bytes:
  objects:Z,slot_reservation:D}`. The three inventory digests bind the complete
 append-only retained histories (not only live entries); slot_reservation refers
 to an already committed reservation. Its later checkpoint may appear in a root;
-it never refers to the future root that first carries it. Initial genesis uses
-an explicitly authorized empty-history digest and no invented past identity.
+it never refers to the future root that first carries it.
+
+### 4.1 First independent capacity commit
+
+The first independent commit is **C0**, a non-serving capacity-genesis commit
+by the independently admitted protected bootstrap authority, before any manager
+inventory M0 or common root R0 exists. It is not a Keymaker binding_commit,
+eligibility grant, second serving snapshot, or an inference from missing state.
+The exact closed C0 object, <=65536 bytes, is
+`{version:"keymaker-capacity-genesis/1",authority_incarnation:Token,
+ minimum_reader_schema:3,epoch:N,reservation:MetaRef,authorization:BlobRef}`.
+reservation has codec keymaker-reservation/1 and binds initial reservation Q0;
+authorization resolves to <=65536 original protected authorization bytes binding
+this installation/incarnation, epoch, Q0 and permitted first initialization.
+Q0.base_root_digest is null only for this independently admitted first combined
+root, never a reset of established root history. C0 and the retained original
+authorization use root-owned protected metadata custody (uid 0, mode 0640,
+root-owned 0750 parents, regular single-link/no-alias files); no received object
+can choose its own expected owner or genesis authority.
+Hash C0 as D(CCJ(C0 including version)); it contains no self or future root hash.
+Independent custody/currentness of that authorization/commit is required, not
+asserted by these bytes. Its owner API and all durability/exclusion privileges
+remain G2/G5 acceptance gates; no provider is implemented here.
+
+Q0 counts actual preexisting installed/S2/history bytes and reserves conservative
+future tickets for C0/Q0 themselves, M0, guard, R0, migration/staging/recovery and
+integrity/audit growth under the SAME 256 MiB peak before writes. Initial class
+inventories contain only already materialized objects; M0 is a prospective
+bounded ticket, not its own invented future hash. Confirm protected Q0/C0
+publication, file/directory durability and independent commit before creating M0.
+M0 has explicit empty-history digests and slot_reservation=D(Q0), never D of the
+uncommitted reservation that will first include M0. Only then prepare Q1, whose
+class inventories count materialized Q0/C0/M0 and remaining tickets, and R0.
+Tickets convert once to materialized bytes; Q1 carries the same single unspent
+manager credit, never a second allocation or double-spent Q0 credit.
+
+The genesis DAG is:
+`actual old inventories + future size tickets -> Q0 -> independent C0 commit
+ -> M0(slot_reservation=D(Q0)) -> participant/class inventories -> Q1 -> R0`.
+This is preparation of combined_staged after the exact schema-2 edge, under
+the same parent intent, raised floor and writer exclusion; it adds no migration
+phase or independently serving format.
+C0 is retained as kind capacity_genesis in migration_history; Q0 remains retained
+reservation metadata. Thus R0 binds the original C0/Q0 evidence and M0 without
+requiring C0 to name M0, Q1 or R0. C0 alone never permits serving or slot use;
+consume only after the exact final R0/floor/guard and cleanup are eligible.
+Validate the independent C0 proof unlocked with the immutable migration/manager
+participants; §6 adds no F-time C0 open or provider call.
+
+Exclude old/restored/serving writers for this same migration graph. Unknown C0
+commit outcome stays closed and resumes the exact Q0/C0, never initializes a
+replacement. Confirmed C0 without R0 is retained non-serving initialization;
+no floor downgrade or root fallback. C0 is admitted once per installation,
+never used to reset a previously active journal or lost manager history.
 
 ## 5. Attempts, holds and root-owned recovery guard
 
@@ -330,12 +397,14 @@ Exact activation attempt, <=4096 bytes, is the unchanged A2 closed record:
          predecessor_generation:Token},owner:Text,
  provision_effect:{caller_uid:UID,caller_generation:Token,request_id:ID},ordinal:N,
  source:{transaction_revision:N,root_digest:D,authority_incarnation:Token,
-         withdrawal_counter:N},prepared_tail:{seq:N,hash:H},active_record_hash:H,
+         withdrawal_counter:N},prepared_tail:{seq:Z,hash:H},active_record_hash:H,
  boot_id:Boot,instance_id:ID,disposition:"pending"|"absent"|"durable",
  evidence_digest:D|null}
 ```
 
-Evidence is null exactly for pending. Manager ID, effect, ordinal, tuple, source,
+For a real activation after creation prepared_tail.seq MUST be >=1; the
+checkpoint type's zero alternative is not an activation exception. Evidence is
+null exactly for pending. Manager ID, effect, ordinal, tuple, source,
 tail and exact proposed active-record hash are immutable; source instance is
 not a new attempt identity. New ordinal only after conclusive resolution of the
 previous attempt, never another generation or OS mutation. Hold is exactly
@@ -367,7 +436,7 @@ change forces fresh unlocked preparation. No unbounded history walk under F.
 Recovery record, <=8192 bytes:
 `{version:"pc2-recovery-record/1",recovery_id:ID,previous_digest:D|null,
  phase:"open"|"resolved"|"release-prepared"|"released",holds:[D],
- root_digest:D,journal:{seq:N,hash:H},outcome:"unknown"|"absent"|"durable",
+ root_digest:D,journal:{seq:Z,hash:H},outcome:"unknown"|"absent"|"durable",
  evidence_digest:D|null}`. One exact hold; unknown iff evidence null. Full
 continuity/proof artifacts remain in sealed retained recovery_history. open
 closes admission; exact resolution does not reopen it. Only full linked
@@ -432,7 +501,9 @@ permission for two additional schemas. The manager reconstructs the combined
 binding preimage from Root minus C/root_digest and its payload Ref, verifying
 binding_commit.digest without scanning payload. Complete payload/history/policy
 semantic validation was prepared against the exact measured immutable files;
-changed root/guard/participant/independent anchor demands fresh unlocked
+at real post-creation activation, Root.journal MUST match prepared_tail and
+have seq>=1. An allowed empty bootstrap never passes that activation check.
+Changed root/guard/participant/independent anchor demands fresh unlocked
 preparation, never reuse of an admitted cache. Unrelated revision growth is not
 itself withdrawal, but may be conservatively refused for fresh preparation.
 
@@ -449,7 +520,7 @@ clocks cannot interrupt a stuck fsync; possible-write expiry retains real outcom
 Closed floor/continuity anchor, <=8192 bytes:
 `{version:"keymaker-authority-floor/1",minimum_reader_schema:3,epoch:N,
  root_digest:D,logical_link_digest:D,guard_digest:D,authority_incarnation:Token,
- transaction_revision:N,withdrawal_counter:N,journal:{seq:N,hash:H}}`.
+ transaction_revision:N,withdrawal_counter:N,journal:{seq:Z,hash:H}}`.
 Its ownership/failure domain/currentness come from the independent custody
 protocol, not this self-described file. Its logical link uses §3 exactly; the
 link contains the fixed floor number/epoch,
@@ -735,6 +806,23 @@ The offline [vector tool](../tools/vectors/main.go) checks these through
 `go run ./tools/vectors/main.go -check`. Claims are scoped to fixture integrity:
 no daemon/manager reader exists here, and expected negative verdicts are future
 consumer conformance obligations rather than passing runtime tests.
+
+Two fixture-only closed contexts make the additional boundaries explicit;
+neither is a serving codec or a source of genesis authority:
+`{version:"keymaker-journal-domain-fixture/1",checkpoint:{seq:Z,hash:H},
+ protected_high_water:{seq:Z,hash:H},genesis_authority:null|
+ {kind:"first_enrollment"|"unused_writer_genesis",authorization:BlobRef},
+ operation:"checkpoint"|"activation"}` captures independently supplied inputs.
+The authorization reference is invented harness input, never a local admitted
+flag. The seq-1 checkpoint hashes the already-published creating.jsonl line
+including LF; it does not fabricate an append on an empty journal.
+`{version:"keymaker-ccj-boundary-fixture/1",value:Value}` has a string or a
+single-element nested array terminating in integer zero. Its depth-16/17 pair
+tests the generic CCJ intake ceiling, not a claim that a typed Root reaches
+depth 16 or that this wrapper is accepted as a Root. The UTF-8 control uses
+literal U+00E9 and its negative replaces its encoded bytes with invalid UTF-8.
+Other raw-byte pairs retain -0, fraction, exponent, safe-integer overflow and
+duplicate names after unescaping without normalizing them before validation.
 
 Controls include a minimal root, an exactly byte-maximal root, every closed
 migration state and valid attempt/hold/reservation/provenance/link preimages.

@@ -24,7 +24,7 @@ type fixtureModule struct {
 func fixtureModules(root string) ([]fixtureModule, error) {
 	cmd := exec.Command("go", "mod", "download", "-json")
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOTELEMETRY=off")
+	cmd.Env = append(os.Environ(), "GOENV=off", "GOPROXY=off", "GONOPROXY=none", "GOSUMDB=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOTELEMETRY=off")
 	var diagnostic bytes.Buffer
 	cmd.Stderr = &diagnostic
 	raw, commandErr := cmd.Output()
@@ -137,13 +137,15 @@ func TestReleaseFixtureModuleCacheIgnoresStaleSums(t *testing.T) {
 }
 
 // A completely unprovisioned module is refused offline with its exact identity
-// and preparation command; no network fallback creates a module artifact.
+// and preparation command; inherited proxy exemptions cannot enable a direct
+// network fallback, and no unavailable module artifact is created.
 func TestReleaseFixtureModuleCacheUnavailableGraph(t *testing.T) {
 	root, cache := t.TempDir(), t.TempDir()
 	t.Setenv("GOMODCACHE", cache)
+	t.Setenv("GONOPROXY", "example.invalid/*")
 	writeFixture(t, filepath.Join(root, "go.mod"), []byte("module example.invalid/control\n\ngo 1.26.0\n\nrequire example.invalid/uncached v1.2.3\n"))
 	modules, err := fixtureModules(root)
-	if err == nil || modules != nil || !strings.Contains(err.Error(), "example.invalid/uncached@v1.2.3") || !strings.Contains(err.Error(), "run go mod download before tests") {
+	if err == nil || modules != nil || !strings.Contains(err.Error(), "example.invalid/uncached@v1.2.3") || !strings.Contains(err.Error(), "GOPROXY=off") || !strings.Contains(err.Error(), "run go mod download before tests") {
 		t.Fatal("unprovisioned dependency lost offline refusal or remedy", modules, err)
 	}
 	for _, ext := range []string{".mod", ".info", ".zip"} {

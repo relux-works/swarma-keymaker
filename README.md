@@ -106,6 +106,13 @@ durable handoff, independent restore custody and withdrawal-blocking gates remai
 open; production bump is closed. Existing runtime and tool checks below do not
 qualify PC2, and historical binding-pair documentation is not its commit model.
 
+PC2 S2a adds an isolated preprovisioned authority-fence primitive and a pure
+fourteen-class aggregate capacity preflight. No serving path calls either.
+The preflight preserves retained recovery accounting and reserves both native
+snapshots, their staging copies, the logical root, metadata, proof tickets and
+one manager slot. Foreign-owner fence tests remain PENDING in the existing
+multi-UID window; transaction ordering, migration and fs-verity remain later gates.
+
 ## Tools
 
 Linux and Go 1.26 are required. Enrollment validation uses the pinned registrar
@@ -174,7 +181,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Ten native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Twelve named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all twelve are killed, logs/PIDs in scratch |
-| Go | PC2 S1 codec/identity checks: `go test ./internal/keymaker -run 'TestPC2' -count=1` | G4 negative/control verdicts and exact independent byte oracles; no store/lock/platform qualification |
+| Go | PC2 S1 codec/identity and isolated S2a fence/capacity checks: `go test ./internal/keymaker -run 'TestPC2' -count=1` | G4 byte oracles, real unprivileged OFD checks and pure aggregate preflight; no serving integration or platform qualification |
 | Go | Check published controls, G4 byte/preimage pairs and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |

@@ -77,7 +77,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |
 | `spec/keymaker-pc2.md` | Normative candidate PC2 root/intent, terminal authority fence, exact-attempt recovery and paired KR/KI/KP qualification; combined S2 storage and three joint gates remain open, production bump closed |
-| `spec/keymaker-authority-root.md` | G4 combined schema/floor-3 format draft, version-2 logical root, manager read set and golden byte vectors; mandatory architect/reviewer/curator content gates, no implementation |
+| `spec/keymaker-authority-root.md` | G4 combined schema/floor-3 format oracle, version-2 logical root, manager read set and golden byte vectors; isolated S1 codec/identity checks, no serving reader or activation |
 | `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |
 | `spec/keymaker-msg-state.md` | Proposed K3 schema, exact-outcome recovery, issuance audit and durable registry/WC1 publication proof; no runtime activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
@@ -99,7 +99,9 @@ normal create keeps register-after-active. No new method is enabled.
 | `UNRESOLVED_QUESTIONS.md` | Specification decisions and activation gates |
 
 The [PC2 authority requirements](spec/keymaker-pc2.md) do not change the shipped
-binding/audit/enrollment implementation. Its combined S2 format/migration,
+binding/audit/enrollment implementation. The pure S1 codec and immutable identity
+functions in `internal/keymaker/authority_{codec,identity}.go` are unreachable
+from serving. Combined-state migration,
 durable handoff, independent restore custody and withdrawal-blocking gates remain
 open; production bump is closed. Existing runtime and tool checks below do not
 qualify PC2, and historical binding-pair documentation is not its commit model.
@@ -171,6 +173,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Ten native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Twelve named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all twelve are killed, logs/PIDs in scratch |
+| Go | PC2 S1 codec/identity checks: `go test ./internal/keymaker -run 'TestPC2' -count=1` | G4 negative/control verdicts and exact independent byte oracles; no store/lock/platform qualification |
 | Go | Check published controls, G4 byte/preimage pairs and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |

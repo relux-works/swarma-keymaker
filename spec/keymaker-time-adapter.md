@@ -158,6 +158,15 @@ durable local commit of the act together with use state requires an independentl
 enforced bound or an act that itself honors the original deadline; otherwise
 the handoff remains `handoff_unqualified` and activation stays closed.
 
+The profiles now also resolve [enrollment approval issue and consumption](keymaker-qt2c-profile.md#enrollment-e-i-approval-issue-and-publication),
+[private registration helpers](keymaker-qt2c-profile.md#registration-private-helpers-r-b-r-v-and-r-a)
+and [staged result commit versus actual transport release](keymaker-qt2c-profile.md#registration-r-s-staged-result-commit-r-x-actual-transport-release).
+Their pinned native source budgets and read sets do not activate B-1c/B-1d:
+the command's undefined overall budget, the load-only 10-second subdeadline,
+new owning use/approval encodings and qualified full endpoints remain explicit
+gaps. Private Build/Recheck/reauthorization are not handoff-use transitions.
+The four PENDING tests below keep their current names and deliberate failures.
+
 Proposed tests `TestQualifiedTimeGateClosed` and
 `TestQualifiedTimeFixtureRequestBinding` pair default typed refusal/current-path
 selection with a tagged positive consume/codec path. Reject changed operation,

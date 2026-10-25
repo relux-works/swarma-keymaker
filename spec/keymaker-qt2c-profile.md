@@ -85,8 +85,8 @@ GC/preemption, page faults, suspend, all file/namespace barriers and commit.
 Alternatively the act primitive itself must enforce the original deadline through
 that durable endpoint. A context cancellation, timer flag, nonblocking lock,
 watchdog, average latency or post-sync suppression of a late response proves
-neither. There is currently no such qualified primitive for either profile:
-**both are `handoff_unqualified` on both OSes**. The specification of f is an
+neither. There is currently no such qualified primitive for any consuming profile:
+**all are `handoff_unqualified` on both OSes**. The specification of f is an
 activation gate, not permission to fill in a measured percentile as a hard bound.
 
 ## Window A: audit append
@@ -232,20 +232,177 @@ completion primitive. Neither source establishes that a directory flush alone
 persists every rename/cleanup or that a device always honors flush requests.
 Qualify exact OS/filesystem/device, namespace barriers, power-loss/crash recovery
 and latency; unsupported or unproven behavior stays `handoff_unqualified`.
+The [pinned macOS binding](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-handoff-macos.md#clock-boot-and-deadline)
+also identifies a representation gap for **every** consuming profile: the
+current closed receipt accepts only `CLOCK_BOOTTIME`. The proposed
+`MACH_CONTINUOUS_TIME/ns` identifier is not accepted. A reviewed Darwin platform
+version is required; relabeling a Linux receipt cannot qualify it.
 
 | Window | macOS act and use commit | Deadline and parity disposition |
 | --- | --- | --- |
 | A | Exact serialized frame and A-use transaction; full file flush and any rotation seal/new segment/parent namespace barriers; recover exact tail after crash. | Same inherited 250 ms/native/writer/observation intersections as A above, from their original starts. Initial persistence/use admission selects the exact protected head/epoch/unused A revision for this operation/slot before the one continuous read m; pure check then burn under retained admission; pause/suspend after it must prevent a late act. No qualified enforced bound: `handoff_unqualified`. |
 | P | Same intent-before-live-change graph, exact participants/audit, root full flush and same-volume rename with qualified namespace durability; committed P-use state, intent cleanup and parent durability before authority opens. | Same inherited deadlines as P above; no new root-tool budget. Initial persistence/use admission selects the exact protected head/epoch/unused P revision for this operation before the one continuous read m under the full C/audit/F-equivalent chain; pure check then burn under retained admission; full multi-file endpoint must be on time. Lock/storage/act equivalence and post-read bound unqualified: `handoff_unqualified`. |
 
-## Other time consumers
+## Remaining windows: scope and shared schema fields
 
-| Path | QT-2c scope and outstanding condition |
+The following profiles distinguish today's provider observations from proposed
+QT-2c consumption. They add no active adapter. Source links in these profiles
+pin Keymaker **b232f6aec52e9327daffd8e889b52ed0ebd2fd3f**; broker requirements
+remain the unlanded 7294b7a pins above. Each consuming row inherits the common
+admission, interval/reserve, QTUse/1 crash rules, and Linux/macOS requirements;
+its native read set, locks, budget and endpoint below specialize those fields.
+Private-helper rows explicitly exclude use/act fields; a successful helper
+does not authorize either durable retention or later transport.
+
+For E-I, E-C, R-S and R-X, expected input includes the protected native identity
+below, original caller/confirmation occurrence, window/slot, current consumer
+incarnation/epoch, exact predecessor and unused revision, original boot/start/D,
+receipt and complete authenticated original/witness closure. These identities
+are fixed before preparing H; neither a future post-state hash nor H identifies
+the operation. The provider's restricted operation ID needs a reviewed protected
+mapping from each native tuple, not direct encoding of slash-separated labels.
+The owning approval, enrollment, registrar envelope, retained-request, audit and
+G4 codecs/hashes remain closed. QTUse/1 is a proposed **next owning transition**,
+not a field available in any of those current records.
+
+Preparation is outside final locks; retain bounded immutable owned originals
+and live custody/invalidation until completion. Apply the pinned schema's
+64-object, 8 MiB, depth-16 original-closure limits and 65536-byte receipt bound;
+missing/excess closure refuses without a truncated bundle. Enrollment currently
+limits an approval read to 4096 bytes ([startup:635][enrollment-startup]) and the
+consumed ledger to 16 MiB with room for a 65-byte entry
+([approval_linux.go:185][approval-capacity], [store_linux.go:22][enrollment-cap]).
+Native results share the existing 256 MiB state budget and 65536-byte frame
+limit ([base:764][native-resource]). These are existing size limits, **not**
+qualified f bounds. The next transitions still need exact worst-case file,
+history, rollback retention and namespace-work reservations before admission;
+no eviction or second state allowance is granted.
+These are request/confirmation-driven profiles, with no scheduled occurrence.
+R-S's staged-signature extension is mandatory as specified below. They use
+native intent/outcome recovery, not the optional separately witnessed immutable
+content/completion bridge; no new content-witness protocol is inferred.
+
+For each consuming row, after every listed final exclusion and initial
+persistence/use-CAS admission, select its exact protected head/epoch/unused
+revision **before m**. Take the sole fixed qualified read m, pure-check that
+unchanged read set, then burn under retained admission before a separable act.
+No row permits today's under-lock provider samples as an implementation of m.
+Nested A/P work has fresh evidence/use and remains inside the parent's f/D;
+later visibility is a separate window. All proposed f/epsilon/rate and storage
+enforcement qualifications are absent: `handoff_unqualified`, with admission
+closed even when a native timeout is specified. Independent stop and old-writer
+exclusion must cover every paused holder and ambiguous write, on both OSes.
+
+### Enrollment E-I: approval issue and publication
+
+| Field | E-I profile |
 | --- | --- |
-| Enrollment approval issue/recheck/consume | Named but **out of this A/P adapter slice**. Its approval/reload lock and root-owned invalidation/consumed-ID protocol require a separate reviewed profile and new approval version. Preserve D_approval<=L_issue+600 s, U_current<D_approval and same-boot elapsed age <600 s; 600 s is an approval lifetime, not a new operation budget. A/P burns do not consume approval IDs. Version 1's `confirmed_utc_ns` remains O_issue, not L_issue. `TestQualifiedTimePendingEnrollmentIssueBound` stays pending. |
-| Registration proof construction, reauthorization and actual release | Named but **out of this A/P adapter slice**. B-1c fixtures concern provider settlement, not a qualified final-lock adapter. Preserve original proof A, U_current<A and the native <=2 s/remaining timeout and generation <=250 ms final release when applicable. The retained native request is dedup, not a shared handoff ledger. Needs its own exact enrollment/generation/Store/release locks, use key and durable release semantics; no registration QT-2c activation here. `TestQualifiedTimePendingRegistrationContinuity` stays pending. |
-| K3 message issuance/receipt/actual release | A/P cover its audit/root constituents only. The interval-preserving authenticated G4/K3 receipt mapping, native per-method operation and final transport release profile are slice C, still unqualified; do not treat an A/P commit as one-use permission to disclose a signature. `TestQualifiedTimePendingK3Receipt` stays pending. |
-| Read/hello/refusal/public response | A may audit them; A is not permission for the later transport act. Any qualified release needs its separate operation/window identity, original deadline and one-use endpoint. No generic audit-to-release capability is created. |
+| Native operation / expected read set | Root `enrollment reconcile`, including explicit bootstrap: confirmed exact state digest, protected config-path/pin digests, service identity, boot, fixed approval ID and consumed-ledger generation, existing approval/fence/high-water predecessor and command occurrence. Freeze these before H. Current issue construction is [approval_linux.go:87][approval-check]; confirmation, protected reread and reinspection precede it at [reconcile_command_linux.go:352][enrollment-confirm]. A new independently authorized confirmation is a new operation; a retry is not. |
+| Locks | Root-exclusive directory lease, then existing high-water Store inode EX/nonwaiting for normal reconcile ([reconcile_command_linux.go:305][enrollment-command-locks]); bootstrap instead uses the initial publisher's own Store exclusion ([reconcile_command_linux.go:403][enrollment-bootstrap]). Retain the applicable chain through final publication. Admit exact approval/fence/ledger head and unused E-I slot before m. Current provider sampling while these exclusions are held remains a gap; unlocked preparation needs review. |
+| Original budget and authority | Whole command/publication budget **`undefined`**: the CLI uses a signal context without a timeout ([main.go:45][command-context]); each inspection alone gets 10 seconds ([reconcile_command_linux.go:330][enrollment-command-locks]). Neither inspection timer covers human confirmation, output or publication. Admission refuses until the owner supplies an original finite deadline. The [10-minute TTL:24][approval-ttl] and [strict age checks:121][approval-check] are approval lifetime, not command allowance. Proposed encoding must retain L_issue and D_approval<=L_issue+600 s, U_current<D_approval, U_current<A and same-boot elapsed age <600 s; version 1 retains O_issue, not L_issue ([approval_linux.go:132][approval-check]). |
+| Read / enforcement | Use the shared before-m admission rule under the exact normal/bootstrap chain, with matching confirmed state and reserved publication workload. Pure check then burn E-I. No enforced bound from m through output, file barriers and fence removal exists: `handoff_unqualified`; a post-write `approvalValid` call is not enforcement. |
+| Endpoint | Proposed endpoint includes durable issue-use/outcome, approval file and parent, ledger initialization where needed, bootstrap high-water where applicable, and required fence/namespace cleanup before startup can accept authority. Today's sequence flushes a pending marker before approval replacement, checks again after output, then removes the marker **without a following directory sync** ([reconcile_command_linux.go:441][approval-publication]). That safe-refusal-on-marker-resurrection protocol does not establish the proposed complete durable endpoint. The next version must specify it; this profile does not claim it already exists. |
+| Use transition key / recovery | Proposed owning approval-issue transition: consumer incarnation, original confirmed command occurrence, fixed approval ID, ledger generation, E-I publication slot and expected approval/state predecessor. There is no current durable occurrence/use slot; new format/migration/capacity review is mandatory. Burn before separable publication, retain burned/held evidence through fence cleanup and lost output; do not mint another ID to refund a failed window. A/P uses cannot substitute. |
+| Existing refusals | Preserve command errors such as `clock_untrusted`, `approval_expired`, `approval_boot_changed`, `approval_clock_rollback`, `approval_clock_discontinuity`, `store_writer_live`, configuration/trust and I/O failures ([approval checks][approval-check], [command locks][enrollment-command-locks]). Undefined/unqualified QT-2c admission remains closed; it is not a new CLI success or public code. |
+| macOS | Same identity, undefined command budget, lifetime predicates and endpoint; continuous clock/boot/deadline mapping and checked full file flush plus separately qualified namespace cleanup as above. Linux-only root lease/Store metadata and bootstrap/publication code do not prove a Darwin port. No accepted Darwin receipt platform representation or qualified post-read act/stop exists; `handoff_unqualified`. |
+
+### Enrollment E-C: approval recheck, consumption and authority admission
+
+| Field | E-C profile |
+| --- | --- |
+| Native operation / expected read set | Protected startup approval: exact invalidated approval bytes and inode, approval ID/ledger generation, config/pin/state digests, current retained high-water and registry/policy identity, boot, original issue interval and expiry, exact unused consumer-use revision and candidate authority epoch. Current startup's rename and directory sync invalidate approval **before every retained-state/consent check** ([reconcile_command_linux.go:569][enrollment-startup]). Preserve that ordering even when arranging unlocked preparation; no pre-invalidation consent read is authorized. Invalidation is a required fail-closed precondition, not a successful QT act, and remains effective on refusal before m. |
+| Locks | Service directory lease and enrollment Store EX lock through startup; startup does not hold `Authority.mu` ([authority.go:143][enrollment-load], [startup:569][enrollment-startup]). Reload serializes with `reloadMu`, pauses new readers, loads a private candidate, then takes the admission write barrier only for the swap ([authority.go:99][enrollment-reload]). Specify and review the next transition's protected handover between these phases; never claim the write barrier spans today's load. Before m all final persistence/use admissions must be complete and exact ledger/high-water/authority heads and unused E-C slot selected; no new initial use admission at the later swap. |
+| Original budget and authority | The private `load` gets **10 seconds from load entry**, intersected with a shorter original caller deadline ([authority.go:129][enrollment-load]); startup consumption/cleanup is inside it. The full Reload begins before load and swaps after it returns ([authority.go:111][enrollment-reload]): its operation-wide budget is **`undefined`** absent a finite original caller budget through the swap. Admission for that full endpoint refuses; do not restart the load's 10 seconds at approval recheck. Keep E-I's original D_approval<=L_issue+600 s, current U<D_approval/A and same-boot elapsed bound. A fresh recheck cannot renew issue time or D. |
+| Read / enforcement | After durable invalidation and unlocked authenticated preparation, require the full reviewed final exclusion/handover and unused E-C selection before m; pure check then burn. Current samples at [startup:647/657/684][enrollment-startup] occur under Store and are not QT-2c reads. No enforced m-to-consumption/cleanup/admission bound exists: `handoff_unqualified`. |
+| Endpoint | Consumed-ID append with checked full write/sync/close; remove the invalidated inode, verify no remaining links, directory sync and close; retain exact burned E-C outcome ([approval_linux.go:236][approval-consume], [startup:650][enrollment-startup]). These durable steps alone do not expose the candidate: the final provider check, registry validation/high-water persistence and eventual admission swap also precede authority opening ([startup:684][enrollment-startup], [authority.go:196][enrollment-load], [authority.go:112][enrollment-reload]). Move provider/Git validation into reviewed unlocked preparation; no protected final handover is implemented today. Qualify the complete endpoint or keep the candidate closed; a later swap cannot escape D by calling itself cleanup. |
+| Use transition key / recovery | Proposed next enrollment consumption transition: consumer incarnation, original startup/admission occurrence, approval ID, ledger generation, E-C slot and expected high-water/authority predecessor. Existing ID append prevents approval reuse but carries no generic QTUse/1 state. Integrate/review its new owning transition; never add H to the closed approval or reinterpret an ID as H. Invalidated or consumed approvals remain unavailable on every failure, unknown write, restart or lost response; another H cannot refund them. |
+| Existing refusals | Approval checks keep their existing precise diagnostics internally; startup failures keep authority `enrollment_unverified` ([authority.go:125/156][enrollment-load]). Preserve existing caller deadline, trust/registry/revocation and I/O refusals. Neither an expired approval nor failed consumption grants a callback. |
+| macOS | Same post-invalidation order, exact ID/ledger/use retention, load subdeadline and full-endpoint budget gap. A reviewed Darwin lease, metadata/link verification, no-replace rename and namespace/full-flush protocol plus continuous clock/receipt/stop qualification are missing. `handoff_unqualified`; no Linux startup evidence transfers. |
+
+### Registration private helpers R-B, R-V and R-A
+
+These are **not QT-2c consuming windows today**. The private proof API samples
+the ordinary provider and returns a proof or verdict; it has no handoff, durable
+use home or release capability. Their callers must separately qualify R-S/R-X.
+
+| Field | R-B: `Builder.Build` | R-V: `Proof.Recheck` | R-A: `Proof.Reauthorize` / `Builder.Restore` |
+| --- | --- | --- | --- |
+| Native operation / expected read set | Trusted enrolled key/name/audience/window, original sample interval/A, fixed purpose-2 preimage/nonce, signer and resulting exact envelope ([registration.go:156][proof-build]). | Existing proof bytes, issue/expiry, enrolled window and **original** authorityUntil; fresh current interval ([registration.go:127][proof-recheck]). | Exact retained envelope and current authorized name/audience/key/window; rebuild/check canonical body before accepting it ([registration.go:230][proof-restore]). Reauthorize preserves original A; Restore for an independent request establishes a new observation, not an extension of the earlier grant. |
+| Locks | Builder `clockMu` for provider sample/sticky rollback state and `entropyMu` for nonce; signer callback has its own custody ([registration.go:77][proof-clock], [registration.go:168][proof-build]). Native callers currently additionally hold generation -> Store -> enrollment read barrier ([keymaker/registration.go:101][registration-stage]). | `clockMu` during fresh sample; native release additionally retains the R-X outer chain. | Same `clockMu`/rollback fencing; R-X caller supplies current enrollment read barrier. |
+| Original budget | Only caller context; standalone helper budget **`undefined`**, so no qualified admission by itself. Native caller inherits completed-frame 1..2000 ms and actual generation window below. The [issued+120 s expiry:177][proof-build] is signed proof lifetime, not a Build execution budget. | No new budget; inherit unchanged caller D and original proof A/expiry. Standalone budget **`undefined`**. | No new budget; retained-proof reauthorization inherits original A/expiry and current caller D. Standalone budget **`undefined`**. |
+| Read / mechanism / endpoint | No QT-2c m/use admission or enforced post-read act. Build performs private signing then Recheck and returns private bytes ([registration.go:193/208][proof-build]); it does not persist or transport them. | No QT-2c m/use admission. Returns a private verdict after sample/interval checks; it burns nothing and cannot authorize an arbitrary later callback. | No QT-2c m/use admission. Returns a private restored proof/current verdict; signing is not repeated. None of these helpers qualifies R-S/R-X by moving a sample under their locks. |
+| Use key | Inapplicable: private staging has no durable act/use transition. Bind any later R-S to the fixed native occurrence and staged bytes. | Inapplicable: pure consumer predicate outcome plus provider observation is not a use ledger. Provider W must nevertheless retain its settlement on refusal. | Inapplicable: exact-byte restore/validation does not consume a release slot. It cannot refund a burned R-S/R-X. |
+| Existing refusals | `clock_untrusted`, `request_deadline_exceeded`, `entropy_unavailable`, `key_not_valid_now`, `audience_mismatch`, `enrollment_unsupported`, registrar validation/custody codes ([registration.go:23][proof-codes]). | `clock_untrusted`, `request_expired`, `key_not_valid_now`, deadline refusal; preserve strict current U<original A and U<expiry. | Same plus canonical envelope/key/name/audience rejection; backward time fences the builder ([registration.go:284][proof-restore]). |
+| macOS | No QT-2c port or clock/receipt qualification is implied by these platform-neutral private functions. Future consuming callers must use the continuous mapping and full native R-S/R-X qualification. | Same; a Darwin provider observation is not m. | Same; a different OS cannot recreate or enlarge the retained original grant. |
+
+### Registration R-S: staged result commit; R-X: actual transport release
+
+R-X **does consume qualified time when activated**: the native contract requires
+issue and actual release inside the enrolled key's validity and a recheck after
+audit ([base:577][registration-release-rule]). A private signature or durable
+audit alone is not that release. R-S covers the earlier time-qualified durable
+retention of the exact staged result; it is a separate window from R-X.
+
+| Field | R-S profile | R-X profile |
+| --- | --- | --- |
+| Native operation / expected read set | `sign_registration`, protected `(caller_uid,generation,request_id)`, exact canonical params digest, pinned binding number/path/master epoch, current enrolled record/revision/policy/key/name/audience/window, fixed staged envelope digest/issue/expiry/original A, exact retained-request predecessor and unused R-S slot. Current [stage/persist:179][registration-stage] serializes same-ID retention. | Same independent tuple/args/binding and current enrolled authority, exact retained result and connection proof/original A, current generation and unused R-X release slot. Current release requires retained-result byte equality and matching connection proof ([keymaker/registration.go:219][registration-release]). A fresh H or retry connection alone is not independent authorization for another exposure. |
+| Locks | Generation source data/final reader chain as A, separate in-process generation gate -> `Store.mu` -> `Authority.mu` read, then A audit gate for a nested append ([keymaker/registration.go:109/150/186][registration-stage]). All initial persistence/use admission and exact unused R-S revision selection precede m. No Store/enrollment/audit acquisition below terminal F if a future caller is also under F. | `Native.WithActive` release generation fence -> Store -> enrollment read barrier, then nested audit gate ([native.go:643][native-release], [keymaker/registration.go:239][registration-release]). Same before-m persistence/use admission with exact locked retained-result/epoch/unused R-X revision; retain release exclusion through the endpoint. No unlock/provider/relock inside this final window. |
+| Original budget | Native `timeout_ms` **1..2000 ms from completed frame** ([base:524][native-timeout], [server.go:207/265][native-deadline]); cap by original caller and actual generation read's **250 ms from the original reader-window start**, never a fresh timer ([genjournal:13/191/195][generation-budget]). Require original U<A and key-validity/expiry predicates; 120-second proof lifetime does not extend D. | Same original native D, with this final release entry's actual generation data window intersected from its own original start; preparation/persistence elapsed still consumes native D. Existing socket write deadline is shortened by the fence context ([server.go:384][transport-write]). A fresh final generation entry cannot renew the completed-frame deadline, original proof A or expiry. |
+| Read / enforcement | Prepare/freeze signed bytes, purpose/key, issue/expiry and original grant outside final locks **before H**, avoiding a time/H-dependent signed-preimage cycle. After full initial admission/read-set match take m, pure check, burn R-S then nested audit/result commit. Current Build/provider calls are under outer locks ([keymaker/registration.go:142/162][registration-stage]); moving them is an unresolved implementation change. No enforced m-through-durability bound: `handoff_unqualified`. | Prepare fresh evidence unlocked; after the whole chain and exact unused R-X selection take m, pure check then burn before any response byte. Current `Time`, `Reauthorize`, final `Recheck`, audit and socket paths still sample clocks under locks ([keymaker/registration.go:231/244/253][registration-release], [server.go:389][transport-write]); these are not a conforming final adapter. `SetWriteDeadline` plus post-write checks is not proof of the full use/storage/transport endpoint or exclusion of late delegated writers: `handoff_unqualified`. |
+| Endpoint | Exact audit and retained result fully durable with committed R-S use/outcome, every file/namespace/readback barrier in the owning state transaction, before returning a private release candidate. Today's retention-before-release is [keymaker/registration.go:189][registration-stage]; no current QTUse/1 is present. R-S completion grants no transport use. | Durable R-X burn before transport; bounded actual complete frame write under live authority, then durable committed/held exposure outcome and required readback/cleanup, all strictly before D. Socket delivery is not atomic with local use storage, and remote receipt/HTTP admission is not the local endpoint. Partial write or unknown completion remains burned/held; do not infer delivery from a local intent or durable audit. No current owning transaction realizes this endpoint. |
+| Use transition key / retry | Proposed next binding/result transaction: consumer incarnation, native tuple + original args identity, R-S staged-result slot and exact state predecessor. Fixed bytes are a read-set binding, not a replacement operation identity. Existing retained requests deduplicate a nonce; they are not generic handoff-use records. | Proposed next binding/result **exposure** transition: consumer incarnation, original authorized native occurrence + args identity, R-X slot and protected retained-result/use predecessor. Every H for a burned slot refuses. Existing same-ID envelope retry semantics ([base:597][registration-release-rule]) do not supply durable once-only transport use: a reviewed independent re-exposure occurrence/slot and authorization would be required, never one invented per retry/H. Until that contract/format exists admission stays closed. |
+| Existing refusals | Registration helper codes above, current enrollment/generation/binding/custody refusals, `request_conflict`, `state_capacity_exceeded`, `audit_unavailable` for unknown durable result/use; no new wire members or codes. | Preserve same plus `request_expired` and original deadline refusal. After possible bytes, close/contain ambiguous exposure rather than claiming a clean typed no-effect error ([server.go:407][transport-write]). Lost reply recovers exact stored outcome without automatic retransmission of a burned window; any subsequent exposure requires its own authorized window. |
+| macOS | Continuous clock/boot/D, original staged artifact and interval, exact generation/Store/enrollment exclusion, checked full-file and namespace/use durability all required. Linux generation/credential/custody paths and current receipt literal do not qualify Darwin; `handoff_unqualified`. | Same plus native peer/connection binding, write-deadline semantics, partial delivery containment and independent stop/executor exclusion on Darwin. Linux socket behavior supplies no Darwin timing/storage proof; receipt representation and endpoint remain unqualified. |
+
+### Paths that do not yet consume these handoffs
+
+| Path | Anchored scope and remaining condition |
+| --- | --- |
+| K3 message issuance/receipt/actual release | The [adapter's K3 row](keymaker-time-adapter.md#b-1-inactive-consumer-and-fixture-integration-plan) remains slice C: A/P cover constituents only. Its exact authenticated interval/receipt mapping and method-specific visibility/use endpoint are not supplied by R-S/R-X's purpose-2 `sign_registration` tuple. `TestQualifiedTimePendingK3Receipt` stays pending; activation stays closed, not covered by analogy. |
+| Public key, hello and refusal response | These do not consume a QT-2c handoff in the current API. Ordinary native release invokes its callback ([native.go:715][native-release], [server.go:397][transport-write]); hello uses the ordinary success fence and refusals use their error path ([server.go:347][ordinary-response]). Generation/custody/audit and their original deadlines remain mandatory where applicable. If qualified time is claimed for later exposure, first supply its own native operation/window/use endpoint; A is never transport authority. |
+| Ordinary SSH signature transport | No time-bearing registration proof or QT-2c handoff is consumed: private SSH signing precedes the generation -> Store -> audit -> actual release chain ([engine.go:267][ssh-release]). Its audit's time belongs to A; that does not make the signature write an A act. Original generation/custody/deadline checks remain mandatory, and any future qualified transport use needs its own profile. |
+
+The consuming profiles require additional **PENDING / NOT RUN** paired native
+controls: `QT2cEnrollmentIssueEndpoint` (undefined budget, L_issue substitution,
+blocked output/fence cleanup), `QT2cEnrollmentConsumeEndpoint` (invalidation
+before checks, pause at ledger/cleanup/swap, no approval replay),
+`QT2cRegistrationStageEndpoint` (immutable staged bytes/original A through
+retention), and `QT2cRegistrationReleaseEndpoint` (enrollment change, U=expiry/A,
+post-audit pause, partial transport, lost reply and replacement H). Each pairs
+the same on-time authorized case, exact retained state and named narrowing
+control removing the respective budget/issue-bound/invalidation/use/act check.
+Apply the shared admission-order, post-m pause, restart and macOS controls below
+to every consuming profile; no helper-only pass qualifies an endpoint.
+
+[command-context]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/cmd/keymaker/main.go#L43-L67
+[enrollment-command-locks]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/reconcile_command_linux.go#L293-L334
+[enrollment-confirm]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/reconcile_command_linux.go#L352-L401
+[enrollment-bootstrap]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/reconcile_command_linux.go#L403-L412
+[approval-ttl]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/approval_linux.go#L24
+[approval-check]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/approval_linux.go#L87-L143
+[approval-capacity]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/approval_linux.go#L149-L189
+[enrollment-cap]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/store_linux.go#L22
+[approval-publication]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/reconcile_command_linux.go#L441-L527
+[approval-consume]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/approval_linux.go#L236-L259
+[enrollment-startup]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/reconcile_command_linux.go#L562-L687
+[enrollment-load]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/authority.go#L122-L210
+[enrollment-reload]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/authority.go#L96-L117
+[proof-codes]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/registration/registration.go#L23-L32
+[proof-clock]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/registration/registration.go#L77-L102
+[proof-build]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/registration/registration.go#L156-L211
+[proof-recheck]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/registration/registration.go#L127-L153
+[proof-restore]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/registration/registration.go#L230-L296
+[registration-stage]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/keymaker/registration.go#L101-L202
+[registration-release]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/keymaker/registration.go#L205-L260
+[native-timeout]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/spec/keymaker.md#L522-L525
+[native-resource]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/spec/keymaker.md#L758-L790
+[native-deadline]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/control/server.go#L207-L272
+[transport-write]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/control/server.go#L380-L413
+[ordinary-response]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/control/server.go#L329-L371
+[ssh-release]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/keymaker/engine.go#L267-L315
+[native-release]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/keymaker/native.go#L628-L730
+[registration-release-rule]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/spec/keymaker.md#L561-L602
+[generation-budget]: https://github.com/relux-works/swarma-user-manager/blob/505fb9f55a6d4f3f71db49e5037cd863679a3e41/tools/genjournal/secure_linux.go#L13-L196
 
 `TestQualifiedTimePendingAuditPreWindow` also stays pending. All four existing
 PENDING rows keep their names and deliberate failures. Neither this document
@@ -254,8 +411,9 @@ nor a future arithmetic fixture closes them.
 ## Future paired controls
 
 All rows below are **PENDING / NOT RUN**. They describe required future executable
-claims and controls, not tests implemented by this docs-only change. Run each
-for A and P on Linux and macOS. Keep a nearby on-time positive with the same
+claims and controls, not tests implemented by this docs-only change. Run the
+applicable rows for A, P, E-I, E-C, R-S and R-X on Linux and macOS. Keep a nearby
+on-time positive with the same
 operation, evidence, locks and storage protocol; assert named refusal, no
 forbidden act/release and exact provider/use/recovery post-state.
 
@@ -291,7 +449,7 @@ run/epoch change. These controls remain future requirements, not executed proof.
 2. **Consumer and time-provider owners:** accept the protected original-reader
    and witness-validation interfaces and exact native operation/window profiles;
    qualify interval/reserve/rate mapping, change invalidation and original
-   retention. Option (d)'s trust boundary must hold throughout both windows.
+   retention. Option (d)'s trust boundary must hold throughout every consuming window.
 3. **Consumer/storage owners:** review QTUse/1's next owning transaction format,
    capacity accounting, durable burn-before-act and retained-outcome protocol on
    both OSes. Existing closed bytes/hashes stay unchanged. If this cannot be

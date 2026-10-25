@@ -1,7 +1,9 @@
 # Swarm Signer: agent message signatures
 
-Status: normative candidate for content review, **spec only; not implemented or
-activated**. The shipped native method set and purpose allowlist do not change.
+Status: normative candidate for content review; **native signing not activated**.
+Internal S1 key and S2 issuer/state code exists; the
+[runtime inventory](../README.md#internal-certification-state) states its limits.
+The shipped native method set and general-purpose allowlist do not change.
 This supplement enumerates the changes in [section 9](#9-normative-change-inventory).
 MUST and MUST NOT below describe the proposed contract after approval, not a
 claim that the daemon supports it. There is no new socket or deployment step.

@@ -27,6 +27,10 @@ func (a messageKeyAdapter) withKey(selected Binding, use func(ed25519.PrivateKey
 	}
 	a.store.mu.Lock()
 	defer a.store.mu.Unlock()
+	return a.withKeyLocked(selected, use)
+}
+
+func (a messageKeyAdapter) withKeyLocked(selected Binding, use func(ed25519.PrivateKey) []byte) ([]byte, Code) {
 	current, c := a.store.lookup(selected.UID, selected.Generation)
 	if c != "" {
 		return nil, c
@@ -60,6 +64,21 @@ func (a messageKeyAdapter) public(selected Binding) ([]byte, string, Code) {
 	id := "ed25519:" + base64.RawURLEncoding.EncodeToString(public)
 	algorithm, decoded, err := record.KeyBytes(id)
 	if err != nil || algorithm != "ed25519" || !bytes.Equal(decoded, public) || record.ValidateKey(id) != nil {
+		return nil, "", "sign_key_mismatch"
+	}
+	return public, id, ""
+}
+
+// messagePublicLocked is the internal issuer's sibling resolver; its caller
+// already holds generation -> Store. It grants no signing or current-T authority.
+func messagePublicLocked(master *Master, store *Store, b Binding, epoch, revision string) ([]byte, string, Code) {
+	a := messageKeyAdapter{master: master, store: store, epoch: epoch, registryRevision: revision}
+	public, code := a.withKeyLocked(b, func(k ed25519.PrivateKey) []byte { return append([]byte(nil), k[32:]...) })
+	if code != "" {
+		return nil, "", code
+	}
+	id := "ed25519:" + base64.RawURLEncoding.EncodeToString(public)
+	if _, _, err := record.KeyBytes(id); err != nil || record.ValidateKey(id) != nil {
 		return nil, "", "sign_key_mismatch"
 	}
 	return public, id, ""

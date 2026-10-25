@@ -48,7 +48,7 @@ acceptance, independent retention and capacity qualification remain open.
 
 The [Swarm Signer message proposal](spec/keymaker-msg.md) defines a purpose-4
 message key, constrained native signing, certification and paired text vectors.
-It is spec only: stable persistent-key continuity, generation-bound authority
+The native method remains a proposal. Stable persistent-key continuity, generation-bound authority
 attestations, an owner-pinned purpose-5 issuer and its 24-hour ceiling are
 decided. Signing checks `key`, `body.author` and `body.author_attestation`
 against the caller's own active key and current purpose-5 attestation. The
@@ -56,7 +56,7 @@ proposal aligns to accepted waggle `67df75bec015ea463f685e4daf4975ecda18816a`:
 exact `swarma-msg/2`, 24576-byte/depth12 signed records, attestation/1 and
 separate registry-owner revocation authority. The
 [supplement's alignment ledger](spec/keymaker-msg.md#44-landed-s0-alignment-and-qualification-gates)
-records resolved mappings; runtime implementation, publication and qualification
+records resolved mappings; native signing, publication and qualification
 remain gates.
 No new method is enabled.
 
@@ -255,12 +255,13 @@ beyond the public key. A revoke result contains the registration number and
 K3 S1 adds an internal purpose-4 sibling key capability and canonical waggle
 key IDs. It has no production constructor or dispatch; `sign_message` remains
 unsupported. Surface A and ordinary key APIs retain purpose-1 identity keys.
-Attestation issuance, durable renewal state, native message admission and
-publication qualification remain later K3 slices.
+S2 adds an internal fixed-body purpose-5 issuer and schema-2 certification state,
+described below. Native message admission and publication qualification remain
+later K3 slices.
 
 The byte/crypto helper is pinned to waggle
-`98c9cfd26cfc57a7ee82176cd599e92af03e69bb`
-(`v0.0.0-20261024203737-98c9cfd26cfc`). It shares the existing registrar pin;
+`9b42338b8a57d12a21da4db4375b269deacdd6bf`
+(`v0.0.0-20261024213811-9b42338b8a57`). It shares the existing registrar pin;
 the shared time provider requires `golang.org/x/sys v0.38.0`.
 
 | Tool | Exact entry point | Evidence |
@@ -274,6 +275,40 @@ test seed. The three custom purpose tuples are reference-generated goldens,
 checked after all 12 committed published SLIP nodes matched the reference.
 They are not claimed to be published SLIP vectors. Tests read static fixtures;
 no Python dependency or fixture-generation code enters the production daemon.
+
+## Internal certification state
+
+S2 implements the internal fixed-body purpose-5 issuer, strict schema-2
+migration/floor checks, immutable hashed artifacts, durable intent/prepared/issued
+phases and offline exact-outcome recovery. The state budget includes original
+artifacts and recovery snapshots; admission reserves transition/proof bytes and
+journal headroom before writing an intent. Count or byte exhaustion applies
+backpressure without evicting history. Every pending transaction remains fenced.
+The [artifact codec reference](docs/message-state-codec.md) publishes the exact
+typed intent, candidate effect, resolution and migration formats for review.
+
+There is no production constructor, issuance trigger, administration CLI,
+publisher or activation transition. An issued candidate never becomes current;
+message authority selection stays `key_not_enrolled`. Reconciliation holds the
+exclusive state lock, has no signing dependency, restores only exact retained
+committed bytes, and refuses unknown outcomes without discarding evidence.
+Only known pre-issuance transactions may abort; issued candidates retain pending.
+
+PENDING before production: independently enforced reader-floor deployment,
+protected root policy, real multi-UID integration, qualified Now/W and uncertainty
+mapping, provider/audit collection outside generation windows with bounded
+original authority through persistence, and owner-registry/WC1 evidence. S4 must
+recheck publication slots and `VerifyJournal` inputs against its accepted
+freshness profile. S2 rejects nonempty publication slots and current pointers;
+qualified-T1 renewal/activation and message-result release require later slices.
+No S4 module pin or production fake evidence source is introduced.
+
+| Tool | Exact entry point | Evidence |
+| --- | --- | --- |
+| Go | `go test ./internal/keymaker -run '^TestMsg' -count=1 -timeout=120s` | Issuer/profile/status refusals, original key controls, migration, graph/budget checks and real-store recovery |
+| Go race detector | `go test -race ./internal/keymaker -run '^TestMsg(ConcurrentCertification|V27RenewalRestart|CrashMatrix|JournalUncertainty)$' -count=1 -timeout=120s` | Deterministic barriers and injected process/journal interruptions; does not simulate hardware power loss |
+| Mutation tool | `go run ./tools/mutations/main.go -group message-state -scratch "$SCRATCH"` | Seven named expected-red controls, child exits/PIDs and overlay logs under private scratch; reconciliation control checks signer dependency exclusion |
+| Go | `go mod graph`; `go mod verify`; `go vet ./internal/keymaker ./cmd/keymaker ./tools/mutations` | Module graph, checksum and affected static validation; capture logs in private scratch |
 
 ## Registrar dependency
 

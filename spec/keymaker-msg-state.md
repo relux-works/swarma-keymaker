@@ -1,10 +1,12 @@
 # Message certification: durable state, recovery and issuance audit
 
-Status: normative candidate, **spec only**. This answers the state-schema,
+Status: normative candidate; **production activation unavailable**. This answers the state-schema,
 reconciliation and issuance-audit questions for K3 S2. It extends the
 [message contract](keymaker-msg.md), not the shipped daemon or native methods.
-S1 supplies only an internal purpose-4 key. Nothing here enables message signing,
-a publisher transport, purpose 5 or an administration command.
+The internal S2 implementation covers issuance and closed durable state; see the
+[runtime inventory](../README.md#internal-certification-state) for its limits.
+S1 supplies the internal purpose-4 key. Nothing here enables message signing,
+a publisher transport, a public purpose-5 capability or an administration command.
 
 The journal profile and `verifier.VerifyJournal` are pinned to landed waggle
 [S3, §2.7](https://github.com/relux-works/waggle/blob/9b42338b8a57d12a21da4db4375b269deacdd6bf/spec/swarm-envelope-2.md#27-identity-journal-and-checkpoints).
@@ -365,8 +367,9 @@ merely any error. Bound examples satisfy all other limits.
 ## 7. Remaining gates
 
 State layout, proven-outcome reconciliation and issuance audit are specified here;
-runtime schema codecs, atomic durability, migration/floor deployment, bounded
-publisher integration and all paired executable/fault evidence remain review gates.
+the internal S2 codecs, durability and exact-outcome recovery have executable
+tests. Production migration/floor deployment, bounded publisher integration,
+qualified-T1 renewal/activation tests and live qualification remain review gates.
 WC1 service acceptance/transport and independent observer/custodian qualification
 remain required; no colocated or writer-controlled fake witness qualifies.
 

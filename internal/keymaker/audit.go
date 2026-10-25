@@ -193,6 +193,12 @@ type Journal struct {
 	clock        AuditClock
 	binding      bindingCommit
 	generation   generationCommit
+
+	messageReserved        int64
+	messageEvents          map[string]AuditRecord
+	messageCommits         map[uint64]bindingCommit
+	messageHistory         bool
+	messageMigrationDigest *string
 }
 
 func auditDigest(r AuditRecord) (string, error) {
@@ -452,7 +458,8 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 	if r.Surface == "control" || r.RefusalCode != nil || r.Result == "refused" {
 		budget = j.totalLimit
 	}
-	if j.total+int64(len(b)) > budget {
+	held, available := j.messageAuditBudget(ctx, int64(len(b)))
+	if !available || j.total+int64(len(b))+held > budget {
 		j.failed = true
 		return "audit_unavailable"
 	}
@@ -476,6 +483,7 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 		j.failed = true
 		return "audit_unavailable"
 	}
+	j.chargeMessageAudit(ctx, int64(len(b)))
 	if j.observeGeneration(r) != nil || j.observeBinding(r) != nil {
 		j.failed = true
 		return "audit_unavailable"

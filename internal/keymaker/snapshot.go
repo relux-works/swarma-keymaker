@@ -10,6 +10,13 @@ import (
 // References are excluded from the committed body to avoid a circular hash.
 // Version, all binding bytes and the next issued number are committed together.
 func (s *Store) contentDigest(version uint64) (string, error) {
+	if s.schema == 2 {
+		body, e := s.messageBody(version)
+		if e != nil {
+			return "", e
+		}
+		return messageHash(body), nil
+	}
 	body := struct {
 		Version  uint64            `json:"version"`
 		Next     uint64            `json:"next_registration_number"`
@@ -58,12 +65,19 @@ func objectMembers(raw []byte, required []string, optional ...string) (map[strin
 // UnmarshalJSON requires every persisted member, including explicit empty
 // records. Typed strict decoding also rejects unknown fields at every level.
 func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records")
+	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records", "schema_version", "messages")
 	if err != nil {
 		return err
 	}
 	if _, ok := fields["records"]; !ok {
 		return failure("missing snapshot records")
+	}
+	_, schema := fields["schema_version"]
+	_, messages := fields["messages"]
+	if schema || messages {
+		if !schema || !messages || string(fields["schema_version"]) != "2" || bytes.Equal(bytes.TrimSpace(fields["messages"]), []byte("null")) {
+			return failure("invalid message schema")
+		}
 	}
 	var requests []json.RawMessage
 	if json.Unmarshal(fields["requests"], &requests) != nil {

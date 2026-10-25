@@ -59,14 +59,20 @@ type Binding struct {
 	RegistryRevision string    `json:"registry_revision"`
 }
 type bindingDisk struct {
-	Next      uint64            `json:"next_registration_number"`
-	Records   []Binding         `json:"records"`
-	Requests  []retainedRequest `json:"requests"`
-	Version   uint64            `json:"version"`
-	AuditSeq  uint64            `json:"audit_seq"`
-	AuditHash string            `json:"audit_hash"`
+	SchemaVersion int               `json:"schema_version,omitempty"`
+	Messages      *messageInventory `json:"messages,omitempty"`
+	Next          uint64            `json:"next_registration_number"`
+	Records       []Binding         `json:"records"`
+	Requests      []retainedRequest `json:"requests"`
+	Version       uint64            `json:"version"`
+	AuditSeq      uint64            `json:"audit_seq"`
+	AuditHash     string            `json:"audit_hash"`
 }
 type Store struct {
+	messageLock  *os.File
+	schema       int
+	messages     *messageInventory
+	messageFault func(string) Code
 	mu           auditGate
 	records      []Binding
 	requests     []retainedRequest
@@ -100,6 +106,10 @@ func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.failed = true
+	if s.messageLock != nil {
+		defer s.messageLock.Close()
+		s.messageLock = nil
+	}
 	if s.journal == nil {
 		return nil
 	}
@@ -111,14 +121,17 @@ func (s *Store) Close() error {
 }
 
 // loadStore validates snapshot syntax/history only; it never grants admission.
-func loadStore(dir *os.File, uid uint32) (*Store, error) {
+func loadStore(dir *os.File, uid uint32) (*Store, error) { return loadStoreMessage(dir, uid, 0, false) }
+func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Store, error) {
 	s := NewStore()
 	fd, pending := syscall.Openat(int(dir.Fd()), "bindings.next", syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC|syscall.O_NONBLOCK, 0)
 	if pending != syscall.ENOENT {
 		if pending == nil {
 			syscall.Close(fd)
 		}
-		return nil, failure("unresolved binding intent")
+		if !recovery {
+			return nil, failure("unresolved binding intent")
+		}
 	}
 	s.dir = dir
 	s.uid = uid
@@ -149,6 +162,9 @@ func loadStore(dir *os.File, uid uint32) (*Store, error) {
 		}
 		// The paired opener will commit bootstrap journal-first. Any artifact
 		// left before that completes fences the next attempt.
+		if floor == 2 {
+			return nil, failure("message schema requires explicit migration")
+		}
 		s.initialized = true
 		return s, nil
 	}
@@ -156,6 +172,10 @@ func loadStore(dir *os.File, uid uint32) (*Store, error) {
 	var disk bindingDisk
 	if StrictJSON(f, &disk) != nil {
 		return nil, failure("invalid binding journal")
+	}
+	s.schema, s.messages = disk.SchemaVersion, disk.Messages
+	if (s.schema == 2 && floor != 2) || (floor == 2 && s.schema != 2 && !recovery) {
+		return nil, failure("message schema floor mismatch")
 	}
 	s.records = disk.Records
 	s.requests = disk.Requests
@@ -169,6 +189,11 @@ func loadStore(dir *os.File, uid uint32) (*Store, error) {
 	}
 	if c := s.validate(); c != "" {
 		return nil, c
+	}
+	if s.schema == 2 && !recovery {
+		if e := s.validateMessages(); e != nil {
+			return nil, e
+		}
 	}
 	return s, nil
 }
@@ -209,6 +234,9 @@ func validateBindings(records []Binding, next uint64) Code {
 }
 func (s *Store) persist() Code { return s.persistContext(context.Background()) }
 func (s *Store) persistContext(ctx context.Context) Code {
+	if s.schema == 2 {
+		return s.persistMessagesContext(ctx)
+	}
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
 	}

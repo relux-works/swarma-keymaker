@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal or message-key controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key or message-state controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -97,6 +97,24 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "message-state" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"message-arbitrary-root-sign", "message_attestation.go", `type messageBinding struct {`, `func(i *messageIssuer) Sign(raw []byte)([]byte,Code){return i.master.withPurpose(i.policy.Path,"root-attestation",func(k ed25519.PrivateKey)[]byte{return ed25519.Sign(k,raw)})}
+type messageBinding struct {`, "^TestMsgV17RootIsolation$", "--- FAIL: TestMsgV17RootIsolation", "arbitrary issuer signing API"},
+			{"message-issuer-purpose-two", "derive.go", `// Internal fixed-body issuer only; public APIs and bindings remain purpose 1.
+		index = 5`, `// Fixture mutation: select the wrong sibling.
+		index = 2`, "^TestMsgV18IssuerAndLifetime$", "--- FAIL: TestMsgV18IssuerAndLifetime", "86400 control"},
+			{"message-lifetime-86401", "message_attestation.go", `i.policy.LifetimeSeconds > 86400`, `i.policy.LifetimeSeconds > 86401`, "^TestMsgV18IssuerAndLifetime$", "--- FAIL: TestMsgV18IssuerAndLifetime", "24-hour bound bypassed"},
+			{"message-truncate-uid", "message_attestation.go", `func (i *messageIssuer) body(b Binding, public []byte, now time.Time) (map[string]any, Code) {`, `func (i *messageIssuer) body(b Binding, public []byte, now time.Time) (map[string]any, Code) {
+	b.UID %= 0xffffffff`, "^TestMsgV23AttestationProfile$/^uid$", "--- FAIL: TestMsgV23AttestationProfile/uid", "profile builder pre-sign bound"},
+			{"message-premature-current", "message_state.go", `tx.Phase = "issued"`, `tx.Phase = "issued"
+		association.Current = &id`, "^TestMsgV26RenewalCommit$", "--- FAIL: TestMsgV26RenewalCommit", "candidate promoted before publication/activation"},
+			{"message-restart-loses-fence", "message_reconcile.go", `s.messageLock = lock`, `s.messageLock = lock
+	for n:=range s.messages.Associations {s.messages.Associations[n].Pending=nil}`, "^TestMsgV27RenewalRestart$/^issued$", "--- FAIL: TestMsgV27RenewalRestart/issued", "restart cleared uncertain fence"},
+			{"message-recovery-sign-capability", "message_reconcile.go", `type messageMaintenance struct {`, `type messageMaintenance struct {
+	issuer *messageIssuer`, "^TestMsgV27RenewalRestart$/^no-signing-capability$", "--- FAIL: TestMsgV27RenewalRestart/no-signing-capability", "reconciliation gained signing capability"},
+		}
+	}
 	if *group == "message-key" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
 			{"message-caller-path", "message_key.go", `if current != selected ||`, `comparison := current
@@ -240,6 +258,9 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		args := []string{"test", "-overlay", overlay}
+		if *group == "message-state" {
+			args = append(args, "-timeout=90s")
+		}
 		if *group == "genjournal" {
 			args = append(args, "-tags", "genjournal_testseam")
 		}

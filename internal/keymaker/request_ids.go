@@ -102,8 +102,8 @@ func (s *Store) fitsState(records []Binding, next uint64, requests []retainedReq
 	if len(requests) > maxRetainedRequests {
 		return false
 	}
-	b, err := json.Marshal(bindingDisk{Next: next, Records: records, Requests: requests, Version: 9007199254740991, AuditSeq: 9007199254740991, AuditHash: string(bytes.Repeat([]byte("0"), 64))})
-	return err == nil && len(b) <= stateBudget
+	b, err := json.Marshal(bindingDisk{Next: next, Records: records, Requests: requests, Version: 9007199254740991, AuditSeq: 9007199254740991, AuditHash: string(bytes.Repeat([]byte("0"), 64)), SchemaVersion: s.schema, Messages: s.messages})
+	return err == nil && len(b) <= stateBudget && (s.schema != 2 || s.messageFits(len(b)))
 }
 func (s *Store) appendRequest(r retainedRequest) {
 	s.requestIndex[requestKey{r.Caller, r.ID}] = len(s.requests)

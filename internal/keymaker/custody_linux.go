@@ -16,7 +16,10 @@ func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, e
 }
 
 func openCustodyStateClock(state *os.File, uid uint32, clock AuditClock) (*Store, *Journal, *os.File, error) {
-	s, err := loadStore(state, uid)
+	return openCustodyStateMessage(state, uid, clock, 0, false)
+}
+func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor int, recovery bool) (*Store, *Journal, *os.File, error) {
+	s, err := loadStoreMessage(state, uid, floor, recovery)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -48,8 +51,16 @@ func openCustodyStateClock(state *os.File, uid uint32, clock AuditClock) (*Store
 			}
 			return nil
 		}
-		if !s.matchesCommit(j.binding) {
+		if !s.matchesCommit(j.binding) && !recovery {
 			return failure("binding journal recovery mismatch")
+		}
+		if s.schema == 2 && !recovery {
+			s.journal = j
+			err := s.validateMessages()
+			s.journal = nil
+			if err != nil {
+				return err
+			}
 		}
 		for _, request := range s.requests {
 			if request.Status == "pending" {

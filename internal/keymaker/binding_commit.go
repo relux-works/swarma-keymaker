@@ -15,6 +15,17 @@ type bindingCommit struct {
 // Internal lifecycle commits use existing typed audit fields, preserving the
 // exact audit schema. The transaction ID is generated here, never client input.
 func (j *Journal) observeBinding(r AuditRecord) error {
+	if e := j.observeMessageEvent(r); e != nil {
+		return e
+	}
+	if r.Operation == "message_state_migrate" {
+		if j.messageHistory || j.binding.Version == 0 || r.Surface != "control" || r.Domain == nil || *r.Domain != "control" || r.RequestID == nil || *r.RequestID != "msg:00000000000000000000000000000000:migrate" || r.PayloadDigest == nil || !validDigest(*r.PayloadDigest) || r.RefusalCode != nil || (r.Result != "success" && r.Result != "unknown") || r.PeerUID != nil || r.Generation != nil || r.Path != nil || r.Epoch != nil {
+			return failure("invalid message migration")
+		}
+		j.messageHistory = true
+		j.messageMigrationDigest = r.PayloadDigest
+		j.messageCommits = map[uint64]bindingCommit{j.binding.Version: j.binding}
+	}
 	if r.Operation != "binding_commit" {
 		return nil
 	}
@@ -26,6 +37,9 @@ func (j *Journal) observeBinding(r AuditRecord) error {
 		return failure("binding commit discontinuity")
 	}
 	j.binding = bindingCommit{Version: version, Digest: *r.PayloadDigest, Seq: r.Seq, Hash: r.Digest}
+	if j.messageHistory {
+		j.messageCommits[version] = j.binding
+	}
 	return nil
 }
 

@@ -47,6 +47,9 @@ func ValidatePath(path, purpose string) Code {
 		index = 1
 	case "host-registration":
 		index = 2
+	case "root-attestation":
+		// Internal fixed-body issuer only; public APIs and bindings remain purpose 1.
+		index = 5
 	case "swarma-msg":
 		// Internal message capability only; public Master APIs stay purpose 1.
 		index = 4

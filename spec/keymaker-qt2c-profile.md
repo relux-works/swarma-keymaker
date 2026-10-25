@@ -15,10 +15,12 @@ and Keymaker's [budgets and audit](keymaker.md#10-process-sockets-and-resource-b
 [G4 preimage/order rules](keymaker-authority-root.md#6-exact-manager-read-set-under-f).
 The revised timing and use rules here are explicit consumer requirements;
 they do not assert that the pinned broker contract already contains this amendment.
-The broker's window-profile schema/template is not yet published. The field-per-row
-tables below are consumer requirements, not invented broker API/wire members;
-align their labels to the published template in a follow-up. Missing mechanisms
-are explicitly implementation gaps, never inferred from a template field.
+The documentation schema is [broker PR #28 at exact unlanded head 7294b7a](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-window-profile.md#profile-schema),
+with its [handoff contract and N1–N3 controls](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-handoff.md)
+and [mandatory macOS binding](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-handoff-macos.md).
+These are source pins for this proposal, not a landed dependency or activation.
+Field-per-row tables below resolve consumer requirements; the schema introduces
+no broker or consumer wire members. Missing mechanisms are implementation gaps.
 
 ## Common admission and timing rule
 
@@ -41,8 +43,12 @@ unknown provider continuity refuse. The admission qualification must exclude
 or invalidate intervening provider authority/hold changes and original deletion;
 a pure copied snapshot cannot detect an unobserved later storage change.
 
-After admission under **every final lock named for the selected window**, the
-adapter performs exactly one fixed qualified suspend-aware monotonic read. It
+Before the sole read, complete initial persistence admission and consuming
+use/CAS admission under **every final lock named for the selected window**;
+select the independently current exact head/epoch and exact unused `QTUse/1`
+revision for that original operation/window/slot. Even nonwaiting initial
+admission after the read is forbidden. With that admission retained, the
+adapter performs exactly one fixed qualified suspend-aware monotonic read m. It
 passes that captured integer to pure `VerifyWindow`; the verifier reads no clock,
 provider, callback, descriptor or ambient state and does no I/O or mutation.
 The read is outside the verifier. There is no `Clock` injection or `time.Now()`
@@ -50,12 +56,16 @@ substitute. Startup/preparation captures are outside this one final-window read.
 If a lock/revision/boot check fails, exit the window; recollection is unlocked.
 An abandoned handoff cannot enter another window, even before a durable burn.
 
-Let `s` be the original receipt's elapsed observation, `c` this final read,
-`D` the preserved exclusive local deadline, `T` the authenticated total remaining
-delay allowance, `f` the enforced maximum from `c` through the window's complete
-durable act/use commit, and `epsilon` the qualified mapping/rate/error allowance.
-Use checked same-boot integer nanoseconds. Require `c >= s`, `f > 0`,
-`c-s+f+epsilon <= T` and **`c+f+epsilon < D`**. Equality at D refuses.
+Use the schema's canonical `s` for the receipt's original elapsed observation
+and `m` for the sole final capture. The former native final symbol `c` maps only
+to m. This Keymaker profile requires no separate pre-lock capture p: set `p=s`;
+do not infer a distinct p from m. `D` is the preserved exclusive local deadline;
+`T` is the finite positive original allowance **from s through the full endpoint**,
+never a newly computed remainder. `f` is the enforced positive bound from m
+through durable act/use commit; `epsilon>=0` is the qualified mapping/rate/error
+allowance. In checked same-boot/domain integer nanoseconds require
+`m>=p>=s`, `T>0`, `f>0`, `m-s+f+epsilon<=T` and **`m+f+epsilon<D`**.
+Equality at D refuses.
 For intersecting deadlines, use the earliest; retain each original start and
 limit independently. A lock acquisition, retry, new receipt or recovery cannot
 restart any of them. `T` is not a second operation budget.
@@ -89,7 +99,7 @@ it cannot serve as a qualified-time fallback for an authorized act.
 | --- | --- |
 | Final locks | `Journal.mu` audit serialization; on generation-authorized calls, the shared source data lock and separate in-process generation gate, `C_Store` (`Store.mu`) and, for enrollment-authorized helper calls, `C_enrollment` (`Authority.mu` read serialization) remain held. The generation reader first [acquires shared data](https://github.com/relux-works/swarma-user-manager/blob/505fb9f55a6d4f3f71db49e5037cd863679a3e41/tools/genjournal/secure_linux.go#L191), [starts the original 250 ms window](https://github.com/relux-works/swarma-user-manager/blob/505fb9f55a6d4f3f71db49e5037cd863679a3e41/tools/genjournal/secure_linux.go#L195), then [releases the shared source gate](https://github.com/relux-works/swarma-user-manager/blob/505fb9f55a6d4f3f71db49e5037cd863679a3e41/tools/genjournal/secure_linux.go#L196), before the callback -> Store -> enrollment -> audit -> F chain. The separate in-process generation gate remains held; do not reacquire or upgrade the shared source gate. For a G4 constituent append, acquire audit before terminal `F_auth` and retain all of them; never take audit beneath F. A standalone health/refusal append takes only its actual journal gate and grants no generation or root authority. |
 | Original budget | The caller's **remaining** original deadline: a generation reader's data/final-handoff limit is at most 250 ms from its original data-window start; a native operation is at most its original `timeout_ms` (1..2000 ms from completed frame), additionally capped by 2 seconds. Audit gets no new 250 ms or 2-second timer. If an enclosing manager operation applies, retain its original 1000 ms writer and send-start+2000 ms observation limits too; this does not permit an under-F daemon RPC. An unbounded background `Append` is not a qualified window. |
-| Read point | After all applicable outer locks and the journal gate (and F for G4) have been admitted, with exact expected audit tail/binding revision and immutable frame/rotation reservation selected, immediately before pure local verification and the serialized use transition. No rotation, write or consumption precedes this read. |
+| Read point | After all applicable outer locks and the journal gate (and F for G4) have been admitted, with initial persistence and consuming use/CAS admission complete and exact protected head/epoch, audit tail/binding revision, immutable frame/rotation reservation and unused `QTUse/1` revision for the operation/window/slot selected before m. Then take m, perform pure local verification and only afterward burn under the retained admission. No rotation, write or consumption precedes this read. |
 | Post-read mechanism | `handoff_unqualified`: today's checked context then blocking `Write`/`Sync` cannot enforce f. Qualification must cover the full append, any sealed rotation/new-segment namespace durability, and use-state commit. |
 | Deadline endpoint | Complete checked frame append and its file durability; required rotation seal, new segment and parent-directory durability; the same transaction's durable A-use state. The already locked tail advances only after these succeed. Admission, buffered bytes and return/acknowledgement are not the endpoint. For a nested G4 append this proves only A; it cannot authorize root publication. |
 | Uncertainty | Original total delta <=1.5 s, narrower policy if set; original U<A and floor predicates still pass. |
@@ -111,8 +121,8 @@ snapshot is not a PC2 root and must not be advertised as one.
 | Property | Publication profile P |
 | --- | --- |
 | Final locks | Source generation gate then data; `C_Store` then `C_enrollment` commit serialization; audit serialization already acquired **before** terminal `F_auth`. On reader entry, acquire shared data, start the original 250 ms window, then release the shared source gate before the callback -> Store -> enrollment -> audit -> F chain, as pinned in A. Keep the separate in-process generation gate held and the shared source gate's no-reacquire/no-upgrade rule. F is distinct from package `F_pkg`; no C/audit acquisition, RPC, provider or implicit locking read beneath F. A root tool must join the same reviewed C/F exclusion protocol; lacking it refuses. |
-| Original budget | Use the original enclosing operation deadline, intersected with any <=250 ms reader data/final-handoff window and native <=2 s/`timeout_ms` deadline. A manager writer's own 1000 ms attempt/append/finish and send-start+2000 ms observation limits stay at their original starts when applicable; they are not generic Keymaker publication timers. There is **no separately specified standalone root-tool timing budget**: until its owning operation supplies and qualifies one, it is `handoff_unqualified`, not assigned 1000 ms by analogy. |
-| Read point | Once the entire C/audit/F chain is held and exact current root, guard, floor, tail and reservations match the unlocked preparation; before any P-use burn/authority intent/live write. Pass the read to the pure check; all necessary final metadata operations remain in the bound f. |
+| Original budget | Use the original enclosing operation deadline, intersected with any <=250 ms reader data/final-handoff window and native <=2 s/`timeout_ms` deadline. A manager writer's own 1000 ms attempt/append/finish and send-start+2000 ms observation limits stay at their original starts when applicable; they are not generic Keymaker publication timers. There is **`undefined` standalone root-tool timing budget** (admission refuses): until its owning operation supplies and qualifies one, it is `handoff_unqualified`, not assigned 1000 ms by analogy. |
+| Read point | Once the entire C/audit/F chain is held and exact current root, guard, floor, tail and reservations match the unlocked preparation; with initial persistence and consuming use/CAS admission complete and the exact unused `QTUse/1` revision for the operation/window/slot selected under protected head/epoch before m; before any P-use burn/authority intent/live write. Take m, pass it to the pure check, then burn under retained admission; all necessary final metadata operations remain in the bound f. |
 | Post-read mechanism | `handoff_unqualified`: neither Linux's nor macOS's ordinary multi-file sync/rename sequence enforces a durable deadline. Must qualify the entire intent/participants/audit/root/use/cleanup span or select a deadline-enforcing transaction primitive. |
 | Deadline endpoint | Checked full intent write, file sync, close, parent sync before live changes; exact participants and audit durable; exact new root file write/sync/close, same-filesystem rename and root directory sync; all linked guards validated; committed P-use outcome durable; exact intent cleanup and its parent directory sync. Only this complete local transaction may open authority. Independent root-link custody remains an additional pre-release obligation, within any still-applicable release deadline. |
 | Uncertainty | Original total delta <=1.5 s and stricter policy; do not reuse A's reserve/evidence for P. Preparing frames does not consume A; an actual nested A and P each have their own challenge/use slot, with their reserved work accounted once and no deadline extension. |
@@ -156,8 +166,9 @@ At most one candidate handoff may be admitted at a time for an operation/window.
 protected owning transaction, its independently checked continuity and current
 exclusion prove no prior use; absence of a file is not unused. The transition is:
 
-1. Under the final locks, compare the exact expected owning revision and local
-   use state, then run the pure check with the single final capture. Pure checks
+1. Under the final locks, complete initial persistence and consuming use/CAS
+   admission and select exact current head/epoch/unused owning revision for the
+   operation/window/slot; only then take m and run the pure check. Pure checks
    may be repeated as computations; their results never become act authority.
 2. Atomically serialize `unused(v) -> burned(v+1, exact original intent)` in the
    **same versioned owning transaction**, making the burn durable before any
@@ -224,8 +235,8 @@ and latency; unsupported or unproven behavior stays `handoff_unqualified`.
 
 | Window | macOS act and use commit | Deadline and parity disposition |
 | --- | --- | --- |
-| A | Exact serialized frame and A-use transaction; full file flush and any rotation seal/new segment/parent namespace barriers; recover exact tail after crash. | Same inherited 250 ms/native/writer/observation intersections as A above, from their original starts. One continuous read after all final locks; pause/suspend after it must prevent a late act. No qualified enforced bound: `handoff_unqualified`. |
-| P | Same intent-before-live-change graph, exact participants/audit, root full flush and same-volume rename with qualified namespace durability; committed P-use state, intent cleanup and parent durability before authority opens. | Same inherited deadlines as P above; no new root-tool budget. One continuous read after the full C/audit/F-equivalent chain; full multi-file endpoint must be on time. Lock/storage/act equivalence and post-read bound unqualified: `handoff_unqualified`. |
+| A | Exact serialized frame and A-use transaction; full file flush and any rotation seal/new segment/parent namespace barriers; recover exact tail after crash. | Same inherited 250 ms/native/writer/observation intersections as A above, from their original starts. Initial persistence/use admission selects the exact protected head/epoch/unused A revision for this operation/slot before the one continuous read m; pure check then burn under retained admission; pause/suspend after it must prevent a late act. No qualified enforced bound: `handoff_unqualified`. |
+| P | Same intent-before-live-change graph, exact participants/audit, root full flush and same-volume rename with qualified namespace durability; committed P-use state, intent cleanup and parent durability before authority opens. | Same inherited deadlines as P above; no new root-tool budget. Initial persistence/use admission selects the exact protected head/epoch/unused P revision for this operation before the one continuous read m under the full C/audit/F-equivalent chain; pure check then burn under retained admission; full multi-file endpoint must be on time. Lock/storage/act equivalence and post-read bound unqualified: `handoff_unqualified`. |
 
 ## Other time consumers
 
@@ -251,6 +262,7 @@ forbidden act/release and exact provider/use/recovery post-state.
 | Proposed named test | Negative and expected invariant | Positive / narrowing control |
 | --- | --- | --- |
 | `QT2cStaleCapture` | Pause after pre-window capture until original D has passed; unchanged packet cannot authorize an act. The final qualified read gives expiry, or an unqualified path refuses `clock_untrusted`. | Same inputs, on-time admission and qualified post-read enforcement may commit once. Remove the final read in a control: the stale-admission assertion must fail. |
+| `QT2cUseAdmissionOrder` | Capture m before initial persistence/use admission or before protected exact head/epoch/unused revision selection; refuse with no burn/act, even if later admission is nonwaiting. | Complete all initial admissions/state selection before m, pure check then burn under retained admission. Move initial admission after m: the order assertion must fail (`HandoffUseAdmissionOrder`). |
 | `QT2cDoubleCheckOneUse` | Run pure verification twice with identical unused snapshot; race serialized consumes and present another H/challenge for the same key. At most one consume/act; burned window refuses every H. | Distinct authorized next operation/window, new evidence and remaining original budget may commit. Remove revision/use comparison: named duplicate-act assertion must fail. |
 | `QT2cTimelyAndLateAct` | Actually pause **after the final read**, before act, past D; qualify that the act is prevented, not merely that the response is suppressed. No late frame/root/use-success commit. | Timely qualified run reaches the full durable endpoint strictly before D. Remove act enforcement while retaining pure arithmetic: the late-act assertion must fail. Without enforcement both timings remain unqualified. |
 | `QT2cAuditPostCaptureCuts` | A: pause at verification-to-burn, burn-to-write, rotation seal/new segment, short frame write, file flush and required parent flush. Pre-act expiry forbids append; possible writes retain burn/hold and forbid release. A blocked sync cannot be called a timely commit. | Same exact tail/slot with every required barrier before D commits once. Omit rotation/parent durability: crash-reopen exact-tail/use assertion must fail. |
@@ -263,9 +275,12 @@ A fake elapsed integer proves arithmetic only. Actual process pause, suspend,
 blocked durability and restore probes need isolated authorized native targets and
 independent exclusion/observation; no production fault injection is authorized
 here. A setup failure, skipped test or un-applied control is not a killed mutant.
-The broker's announced N1 control branches remain an external definition gap
-until their control list is published; do not invent their meaning or claim
-coverage. Align the A/P controls and field labels to that exact source afterward.
+The source [named vectors](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-handoff.md#named-future-controls)
+now define separate `HandoffN1BeforeBurn` and `HandoffN1AfterBurn`: provider W
+survives both, but only the independently current still-unused original window
+may reprepare before burn; no H can revive it after burn. N2 additionally fences
+old/delegated writers after burn, and N3 retires candidates on lock release or
+run/epoch change. These controls remain future requirements, not executed proof.
 
 ## Open ownership and implementation gates
 

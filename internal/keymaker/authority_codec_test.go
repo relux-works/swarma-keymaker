@@ -3,6 +3,7 @@ package keymaker
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/relux-works/waggle/record"
 )
 
 type pc2Golden struct {
@@ -550,6 +553,354 @@ func TestPC2EntryCountAndNestedClosure(t *testing.T) {
 		o["unexpected"] = true
 		if _, e := decodeAuthority(pc2Bytes(t, r), authorityRootKind); authorityCode(e) != "unknown_member" {
 			t.Fatal("nested closure", path, e)
+		}
+	}
+}
+
+const pc2EdKey = "ed25519:11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+const pc2P256Key = "p256:AtvuKbwrlJKTmC1cFKDUv9lAx4xolphryoTXkRZN0Ayl"
+
+// Each of G4's fourteen literal classes passes; neighboring composite names,
+// wrong-owner classes and partial/unknown names must not be substring members.
+func TestPC2CapacityClassesExact(t *testing.T) {
+	for owner, kinds := range map[string][]string{
+		"keymaker": {"installed", "artifacts", "recovery", "staging", "pending_proofs", "policy_history", "root_history", "migration_history", "reservation_metadata"},
+		"manager":  {"attempts", "holds", "recovery", "inventory", "staging"},
+	} {
+		for _, kind := range kinds {
+			o := map[string]any{"version": "keymaker-capacity-inventory/1", "owner": owner, "kind": kind, "objects": []any{}}
+			if _, e := decodeAuthority(pc2Bytes(t, o), "keymaker-capacity-inventory/1"); e != nil {
+				t.Fatal("literal class refused", owner, kind, e)
+			}
+		}
+		for _, kind := range []string{"installed artifacts", "artifacts recovery staging", "attempts holds", "installed ", " installed", "install", "unknown"} {
+			o := map[string]any{"version": "keymaker-capacity-inventory/1", "owner": owner, "kind": kind, "objects": []any{}}
+			if _, e := decodeAuthority(pc2Bytes(t, o), "keymaker-capacity-inventory/1"); authorityCode(e) != "not_aggregate" {
+				t.Fatalf("P-PC2_CLASS_SUBSTRING: %s/%s: %v", owner, kind, e)
+			}
+		}
+	}
+	for _, pair := range [][2]string{{"keymaker", "holds"}, {"manager", "installed"}} {
+		if authorityClass(pair[0], pair[1]) {
+			t.Fatal("wrong owner class", pair)
+		}
+	}
+}
+
+func pc2Original(t *testing.T, kind string) string {
+	t.Helper()
+	body := map[string]any{"type": kind}
+	d := "sha256:" + strings.Repeat("a", 64)
+	switch kind {
+	case "journal-entry/1":
+		body = map[string]any{"type": kind, "registry": pc2EdKey, "owner": "owner", "seq": int64(1), "at": "2026-10-25T00:00:00Z", "prev": nil, "op": "add", "record_type": "attestation/1", "record": d}
+	case "checkpoint/1":
+		body = map[string]any{"type": kind, "registry": pc2EdKey, "owner": "owner", "seq": int64(1), "at": "2026-10-25T00:00:00Z", "head": d, "snapshot": d}
+	case "revocation/1":
+		body = map[string]any{"type": kind, "issuer": pc2EdKey, "issued_at": "2026-10-25T00:00:00Z", "complete": true, "entries": []any{}}
+	}
+	id, e := record.ContentID(kind, body)
+	if e != nil {
+		t.Fatal(e)
+	}
+	env := map[string]any{"version": "swarm-envelope/2", "id": id, "body": body}
+	if kind != "journal-entry/1" {
+		// This is a format control, not a valid signature or provider qualification.
+		env["signatures"] = []any{map[string]any{"role": "author", "key": pc2EdKey, "sig": base64.RawURLEncoding.EncodeToString(make([]byte, 64))}}
+	}
+	return base64.RawURLEncoding.EncodeToString(pc2Bytes(t, env))
+}
+func pc2Publication(t *testing.T) map[string]any {
+	t.Helper()
+	return map[string]any{"transaction": strings.Repeat("1", 32), "content_id": "sha256:" + strings.Repeat("a", 64), "entry": pc2Original(t, "journal-entry/1"), "suffix": []any{pc2Original(t, "journal-entry/1")}, "checkpoint": pc2Original(t, "checkpoint/1"), "conflict": nil, "snapshot": pc2Original(t, "revocation/1"), "validation": map[string]any{"registry_id": pc2EdKey, "owner": "owner", "registry_seq": int64(1), "registry_head": "sha256:" + strings.Repeat("b", 64), "checkpoint_id": "sha256:" + strings.Repeat("c", 64), "previous_checkpoint_id": nil}, "witness": true}
+}
+
+// Known publication fields obey their own exact vocabularies and original-byte
+// bounds, not reflected Go shapes. WC1's unbound inner codec stays unsupported:
+// even a well-shaped record cannot qualify publication; empty inventory passes.
+func TestPC2PublicationFields(t *testing.T) {
+	_, all := pc2Fixtures(t)
+	empty := all["private-payload"]
+	check := func(pub map[string]any) error {
+		p := pc2Object(t, empty)
+		p["messages"].(map[string]any)["publications"] = []any{pub}
+		_, e := decodeAuthority(pc2Bytes(t, p), "keymaker-private/3")
+		return e
+	}
+	cases := []struct {
+		name, field, code string
+		value             any
+	}{
+		{"transaction", "transaction", "field_format", "not-an-id"},
+		{"content-id", "content_id", "field_format", strings.Repeat("a", 64)},
+		{"entry-url", "entry", "publication_original", "https://example.invalid/entry"},
+		{"entry-padding", "entry", "publication_original", pc2Original(t, "journal-entry/1") + "="},
+		{"entry-size", "entry", "publication_original", base64.RawURLEncoding.EncodeToString(make([]byte, 8193))},
+		{"checkpoint-domain", "checkpoint", "publication_original", pc2Original(t, "journal-entry/1")},
+		{"snapshot-domain", "snapshot", "publication_original", pc2Original(t, "checkpoint/1")},
+		{"suffix-count", "suffix", "array_limit", make([]any, 65)},
+		{"suffix-url", "suffix", "publication_original", []any{"https://example.invalid/entry"}},
+		{"validation-boolean", "validation", "wrong_type", true},
+		{"validation-id", "validation", "field_format", map[string]any{"registry_id": pc2EdKey, "owner": "owner", "registry_seq": int64(1), "registry_head": "not-a-digest", "checkpoint_id": "sha256:" + strings.Repeat("c", 64), "previous_checkpoint_id": nil}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			pub := pc2Publication(t)
+			pub[c.field] = c.value
+			if e := check(pub); authorityCode(e) != c.code {
+				t.Fatalf("P-PC2_PUBLICATION_SHAPE: want %s: %v", c.code, e)
+			}
+		})
+	}
+	for _, w := range []any{true, false, nil, "url", map[string]any{"retained_originals": "unbound"}} {
+		pub := pc2Publication(t)
+		pub["witness"] = w
+		if e := check(pub); authorityCode(e) != "publication_witness_codec_pending" {
+			t.Fatalf("P-PC2_PUBLICATION_SHAPE: unsupported WC1 accepted or misclassified: %v", e)
+		}
+	}
+	if _, e := decodeAuthority(empty, "keymaker-private/3"); e != nil {
+		t.Fatal("empty publication control", e)
+	}
+}
+
+// Both normal and recovery mode obey sequence/checkpoint/snapshot continuity;
+// higher-sequence new checkpoints and same-checkpoint retransmission controls pass.
+func TestPC2FreshnessEndpointContinuity(t *testing.T) {
+	_, all := pc2Fixtures(t)
+	for _, mode := range []string{"normal", "reanchor"} {
+		for _, name := range []string{"rollback", "equal-seq-fork", "same-checkpoint-snapshot", "advance", "same-checkpoint"} {
+			t.Run(mode+"/"+name, func(t *testing.T) {
+				o := pc2Object(t, all["freshness-artifact-"+mode])
+				old := o["old_anchor"].(map[string]any)
+				next := o["new_anchor"].(map[string]any)
+				old["registry_seq"] = int64(10)
+				next["registry_seq"] = int64(11)
+				old["checkpoint_id"] = "sha256:" + strings.Repeat("a", 64)
+				next["checkpoint_id"] = "sha256:" + strings.Repeat("b", 64)
+				old["snapshot"] = "sha256:" + strings.Repeat("c", 64)
+				next["snapshot"] = "sha256:" + strings.Repeat("d", 64)
+				switch name {
+				case "rollback":
+					next["registry_seq"] = int64(9)
+				case "equal-seq-fork":
+					next["registry_seq"] = int64(10)
+				case "same-checkpoint-snapshot":
+					next["registry_seq"] = int64(10)
+					next["checkpoint_id"] = old["checkpoint_id"]
+				case "same-checkpoint":
+					next["registry_seq"] = int64(10)
+					next["checkpoint_id"] = old["checkpoint_id"]
+					next["snapshot"] = old["snapshot"]
+				}
+				if a, ok := o["receipt_audit"].(map[string]any); ok {
+					a["checkpoint_id"] = next["checkpoint_id"]
+					a["snapshot_id"] = next["snapshot"]
+					if mode == "reanchor" {
+						a["old_checkpoint_id"] = old["checkpoint_id"]
+					}
+				}
+				if a, ok := o["reanchor"].(map[string]any); ok {
+					a["new_checkpoint_id"] = next["checkpoint_id"]
+					a["old_checkpoint_id"] = old["checkpoint_id"]
+				}
+				_, e := decodeAuthority(pc2Bytes(t, o), "message-freshness/1")
+				if name == "advance" || name == "same-checkpoint" {
+					if e != nil {
+						t.Fatal("valid continuity refused", e)
+					}
+				} else if authorityCode(e) != "freshness_endpoint_continuity" {
+					t.Fatalf("P-PC2_FRESHNESS_ENDPOINT: want continuity refusal: %v", e)
+				}
+			})
+		}
+	}
+}
+
+func pc2Intent() map[string]any {
+	return map[string]any{"version": "keymaker-message-artifact/3", "kind": "intent", "body": map[string]any{"binding": pc2Binding(), "issuer_policy": map[string]any{"path": "m/5'/1'/1'/1'", "key": pc2EdKey, "master_epoch": "epoch", "registry_revision": "registry", "lifetime_seconds": int64(60)}, "key_id": pc2EdKey, "issued_at": "2026-10-25T00:00:00Z", "reserved_bytes": int64(messageProofReserve), "base_version": int64(1), "base_digest": strings.Repeat("a", 64), "previous_current": nil}}
+}
+
+// Message subjects and purpose-5 issuer slots are Ed25519 only; both registry
+// policy keys keep the broader waggle Key domain, including a valid P-256 point.
+func TestPC2MessageKeyDomains(t *testing.T) {
+	for _, slot := range []string{"subject", "issuer", "valid"} {
+		t.Run(slot, func(t *testing.T) {
+			o := pc2Intent()
+			b := o["body"].(map[string]any)
+			if slot == "subject" {
+				b["key_id"] = pc2P256Key
+			}
+			if slot == "issuer" {
+				b["issuer_policy"].(map[string]any)["key"] = pc2P256Key
+			}
+			_, e := decodeAuthority(pc2Bytes(t, o), "keymaker-message-artifact/3")
+			if slot == "valid" {
+				if e != nil {
+					t.Fatal("Ed25519 control", e)
+				}
+			} else if authorityCode(e) != "key_domain" {
+				t.Fatalf("P-PC2_MESSAGE_KEY_DOMAIN: %s: %v", slot, e)
+			}
+		})
+	}
+	_, all := pc2Fixtures(t)
+	p := pc2Object(t, all["message-policy"])
+	for _, k := range []string{"key", "attestation_root"} {
+		p["registry_root"].(map[string]any)[k] = pc2P256Key
+	}
+	if _, e := decodeAuthority(pc2Bytes(t, p), "keymaker-message-policy/1"); e != nil {
+		t.Fatal("P-256 registry control", e)
+	}
+}
+
+// Waggle Owner and retained S2 association strings are nonempty UTF-8 byte
+// strings, including controls. G4 Text remains its distinct control-free type.
+func TestPC2OwnerGrammar(t *testing.T) {
+	_, all := pc2Fixtures(t)
+	for _, owner := range []string{"o", "a\nb", "a\x00b", "a\u0085b", strings.Repeat("é", 127) + "x", "e\u0301"} {
+		p := pc2Object(t, all["message-policy"])
+		p["owner"] = owner
+		raw := pc2Bytes(t, p)
+		o, e := decodeAuthority(raw, "keymaker-message-policy/1")
+		if e != nil {
+			t.Fatalf("P-PC2_OWNER_TEXT: valid owner refused: %v", e)
+		}
+		out, e := encodeAuthority(o, "keymaker-message-policy/1")
+		if e != nil || !bytes.Equal(raw, out) {
+			t.Fatal("owner byte preservation", e)
+		}
+	}
+	for _, owner := range []string{"", strings.Repeat("é", 128)} {
+		p := pc2Object(t, all["message-policy"])
+		p["owner"] = owner
+		if _, e := decodeAuthority(pc2Bytes(t, p), "keymaker-message-policy/1"); authorityCode(e) != "field_limit" {
+			t.Fatal("owner bounds", e)
+		}
+	}
+	if e := arText("a\nb"); authorityCode(e) != "field_limit" {
+		t.Fatal("G4 Text narrowed incorrectly", e)
+	}
+	for _, field := range []string{"owner", "master_epoch", "registry_revision"} {
+		o := pc2Intent()
+		b := o["body"].(map[string]any)
+		b["binding"].(map[string]any)[field] = "a\x00\nb"
+		if field != "owner" {
+			b["issuer_policy"].(map[string]any)[field] = "a\x00\nb"
+		}
+		if _, e := decodeAuthority(pc2Bytes(t, o), "keymaker-message-artifact/3"); e != nil {
+			t.Fatal("retained S2 association text", field, e)
+		}
+	}
+}
+
+// Original-envelope format checks accept bounded owner bytes, including valid
+// whitespace, without treating unsigned fixture signatures as authentication.
+// Invalid enums, IDs, members and decoded-byte bounds refuse at that same gate.
+func TestPC2PublicationOriginalGrammar(t *testing.T) {
+	for _, kind := range []string{"journal-entry/1", "checkpoint/1", "revocation/1"} {
+		rule := authorityOriginalRule(kind, false)
+		encoded := pc2Original(t, kind)
+		if e := rule(encoded); e != nil {
+			t.Fatal("original format control", kind, e)
+		}
+		raw, e := record.DecodeBase64(encoded, -1)
+		if e != nil {
+			t.Fatal(e)
+		}
+		spaced := " \n" + string(raw) + " \n"
+		if e := rule(base64.RawURLEncoding.EncodeToString([]byte(spaced))); e != nil {
+			t.Fatal("owner whitespace control", e)
+		}
+		for _, name := range []string{"unknown", "missing", "id", "type", "registry-key", "enum", "signature", "oversize"} {
+			t.Run(kind+"/"+name, func(t *testing.T) {
+				o := pc2Object(t, raw)
+				b := o["body"].(map[string]any)
+				switch name {
+				case "unknown":
+					b["extra"] = true
+				case "missing":
+					delete(b, "type")
+				case "id":
+					o["id"] = "sha256:" + strings.Repeat("f", 64)
+				case "type":
+					b["type"] = "other/1"
+				case "registry-key":
+					if kind == "revocation/1" {
+						b["issuer"] = "not-a-key"
+					} else {
+						b["registry"] = "not-a-key"
+					}
+				case "enum":
+					if kind == "journal-entry/1" {
+						b["op"] = "add revoke"
+					} else if kind == "revocation/1" {
+						b["entries"] = []any{map[string]any{"kind": "key record", "id": pc2EdKey, "from": "2026-10-25T00:00:00Z"}}
+					} else {
+						o["signatures"].([]any)[0].(map[string]any)["role"] = "author witness"
+					}
+				case "signature":
+					if kind == "journal-entry/1" {
+						o["signatures"] = []any{}
+					} else {
+						o["signatures"].([]any)[0].(map[string]any)["sig"] = "bad"
+					}
+				case "oversize":
+					b["owner"] = strings.Repeat("x", 8193)
+				}
+				// Recompute the ID for body changes so rejection cannot rely solely on
+				// stale identity; unknown domain cannot be assigned a supported tag.
+				if name != "id" {
+					if id, e := record.ContentID(kind, b); e == nil {
+						o["id"] = id
+					}
+				}
+				if e := rule(base64.RawURLEncoding.EncodeToString(pc2Bytes(t, o))); authorityCode(e) != "publication_original" {
+					t.Fatal("invalid original accepted", name, e)
+				}
+			})
+		}
+	}
+	// 64 raw entries is the count boundary, independent of pending WC1 format.
+	pub := pc2Publication(t)
+	entries := make([]any, 64)
+	for i := range entries {
+		entries[i] = pub["entry"]
+	}
+	pub["suffix"] = entries
+	if e := authorityPublicationRule()(pub); authorityCode(e) != "publication_witness_codec_pending" {
+		t.Fatal("64-entry control did not reach pending owner codec", e)
+	}
+}
+
+// The reflection-backed certificate row receives semantic key checks too. A
+// genuine Ed25519 certificate is the adjacent control; P-256 registry keys
+// remain exercised separately by TestPC2MessageKeyDomains.
+func TestPC2RetainedCertificateKeyDomains(t *testing.T) {
+	i, b, public, facts, _ := messageIssuerFixture(t)
+	b.Generation = strings.Repeat("1", 32)
+	mb := messageBindingOf(b)
+	facts.CurrentGenerations = messageEvidence(t, map[string]any{messageTestID(public): map[string]any{"uid": int64(mb.UID), "generation": mb.Generation, "registration_number": int64(mb.Number), "master_epoch": mb.Epoch, "owner": mb.Owner, "path": mb.Path, "active": true}})
+	cert, code := i.prepare(t.Context(), strings.Repeat("1", 32), b, public, facts)
+	if code != "" {
+		t.Fatal("certificate control preparation", code)
+	}
+	raw := pc2Bytes(t, cert)
+	for _, slot := range []string{"valid", "subject", "issuer"} {
+		o := pc2Object(t, raw)
+		if slot == "subject" {
+			o["key_id"] = pc2P256Key
+		}
+		if slot == "issuer" {
+			o["issuer_policy"].(map[string]any)["key"] = pc2P256Key
+		}
+		e := authorityCertificateRule()(o)
+		if slot == "valid" {
+			if e != nil {
+				t.Fatal("certificate control", e)
+			}
+		} else if authorityCode(e) != "key_domain" {
+			t.Fatal("retained certificate key domain", slot, e)
 		}
 	}
 }

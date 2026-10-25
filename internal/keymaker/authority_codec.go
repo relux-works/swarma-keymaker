@@ -4,6 +4,7 @@ package keymaker
 // authority, admission decision or lock calls this code. G4 is its byte contract.
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -721,6 +722,11 @@ func authorityFreshnessRule() authorityRule {
 		if old["registry_id"] != next["registry_id"] || old["owner"] != next["owner"] {
 			return authorityFail("freshness_state_invalid")
 		}
+		if next["registry_seq"].(int64) < old["registry_seq"].(int64) ||
+			next["registry_seq"] == old["registry_seq"] && next["checkpoint_id"] != old["checkpoint_id"] ||
+			next["checkpoint_id"] == old["checkpoint_id"] && (next["snapshot"] != old["snapshot"] || next["registry_seq"] != old["registry_seq"]) {
+			return authorityFail("freshness_endpoint_continuity")
+		}
 		if next["publication_seq"].(int64) <= old["publication_seq"].(int64) || next["issued_at"] == nil || old["issued_at"] != nil && next["issued_at"].(string) <= old["issued_at"].(string) {
 			return authorityFail("freshness_state_invalid")
 		}
@@ -1032,8 +1038,11 @@ func authorityRuleFor(kind authorityKind) authorityRule {
 	}
 }
 func authorityClass(owner, kind string) bool {
-	want := map[string]string{"keymaker": " installed artifacts recovery staging pending_proofs policy_history root_history migration_history reservation_metadata ", "manager": " attempts holds recovery inventory staging "}
-	return strings.Contains(want[owner], " "+kind+" ")
+	switch owner + "/" + kind {
+	case "keymaker/installed", "keymaker/artifacts", "keymaker/recovery", "keymaker/staging", "keymaker/pending_proofs", "keymaker/policy_history", "keymaker/root_history", "keymaker/migration_history", "keymaker/reservation_metadata", "manager/attempts", "manager/holds", "manager/recovery", "manager/inventory", "manager/staging":
+		return true
+	}
+	return false
 }
 func authorityHistoryRule(kind authorityKind) authorityRule {
 	max := 65536
@@ -1101,9 +1110,26 @@ func arKey(v any) error {
 	}
 	return nil
 }
+
+// Owner and retained S2 association strings use waggle's byte-length/UTF-8
+// grammar. G4 Text is a different primitive that additionally bans controls.
 func arOwner(v any) error {
-	if e := arText(v); e != nil {
+	s, ok := v.(string)
+	if !ok {
+		return authorityFail("wrong_type")
+	}
+	if !utf8.ValidString(s) || len(s) < 1 || len(s) > 255 {
+		return authorityFail("field_limit")
+	}
+	return nil
+}
+func arEdKey(v any) error {
+	if e := arKey(v); e != nil {
 		return e
+	}
+	algorithm, _, e := record.KeyBytes(v.(string))
+	if e != nil || algorithm != "ed25519" {
+		return authorityFail("key_domain")
 	}
 	return nil
 }
@@ -1189,7 +1215,7 @@ func authorityPrivateHistory(o map[string]any) error {
 }
 
 func authorityMessageBindingRule() authorityRule {
-	return arWith(arObject(map[string]authorityRule{"uid": arInt(0, 4294967294), "generation": arToken, "registration_number": arN, "master_epoch": arText, "owner": arText, "path": arText}), func(o map[string]any) error {
+	return arWith(arObject(map[string]authorityRule{"uid": arInt(0, 4294967294), "generation": arToken, "registration_number": arN, "master_epoch": arOwner, "owner": arOwner, "path": arText}), func(o map[string]any) error {
 		if ValidatePath(o["path"].(string), "swarma-msg") != "" {
 			return authorityFail("field_format")
 		}
@@ -1202,6 +1228,12 @@ func authorityCertificateRule() authorityRule {
 			return e
 		}
 		if e := arID(o["transaction"]); e != nil {
+			return e
+		}
+		if e := arEdKey(o["key_id"]); e != nil {
+			return e
+		}
+		if e := authorityIssuerRule()(o["issuer_policy"]); e != nil {
 			return e
 		}
 		s, ok := o["envelope"].(string)
@@ -1230,9 +1262,7 @@ func authorityMessagesRule() authorityRule {
 		}
 		return nil
 	})
-	// Publication provider records retain the existing S2 exact wrapper and raw
-	// owner-owned validation/witness bytes. Their authentication is a later slice.
-	publication := arS2(reflect.TypeFor[messagePublication]())
+	publication := authorityPublicationRule()
 	return arWith(arObject(map[string]authorityRule{"certificates": arArray(authorityCertificateRule(), 65536), "associations": arArray(assoc, 65536), "transactions": arArray(tx, 65536), "publications": arArray(publication, 65536)}), func(o map[string]any) error {
 		for _, field := range []string{"certificates", "transactions", "publications"} {
 			seen := map[string]bool{}
@@ -1264,7 +1294,7 @@ func authorityMessagesRule() authorityRule {
 func authorityBindingRule() authorityRule {
 	return arWith(arS2(reflect.TypeFor[Binding]()), func(o map[string]any) error {
 		for _, k := range []string{"path", "owner", "master_epoch", "registry_revision"} {
-			if e := arText(o[k]); e != nil {
+			if e := arOwner(o[k]); e != nil {
 				return e
 			}
 		}
@@ -1291,7 +1321,7 @@ func authorityBindingRule() authorityRule {
 }
 
 func authorityIssuerRule() authorityRule {
-	return arWith(arObject(map[string]authorityRule{"path": arText, "key": arKey, "master_epoch": arText, "registry_revision": arText, "lifetime_seconds": arInt(1, 86400)}), func(o map[string]any) error {
+	return arWith(arObject(map[string]authorityRule{"path": arText, "key": arEdKey, "master_epoch": arOwner, "registry_revision": arOwner, "lifetime_seconds": arInt(1, 86400)}), func(o map[string]any) error {
 		if ValidatePath(o["path"].(string), "root-attestation") != "" {
 			return authorityFail("field_format")
 		}
@@ -1299,11 +1329,111 @@ func authorityIssuerRule() authorityRule {
 	})
 }
 func authorityIntentRule() authorityRule {
-	return arObject(map[string]authorityRule{"binding": authorityBindingRule(), "issuer_policy": authorityIssuerRule(), "key_id": arKey, "issued_at": arStamp, "reserved_bytes": arInt(messageProofReserve, stateBudget), "base_version": arN, "base_digest": arH, "previous_current": arNullable(arID)})
+	return arObject(map[string]authorityRule{"binding": authorityBindingRule(), "issuer_policy": authorityIssuerRule(), "key_id": arEdKey, "issued_at": arStamp, "reserved_bytes": arInt(messageProofReserve, stateBudget), "base_version": arN, "base_digest": arH, "previous_current": arNullable(arID)})
 }
 func authorityCandidateRule() authorityRule {
 	return arObject(map[string]authorityRule{"certificate": authorityCertificateRule(), "intent": arBlob(stateBudget), "effect": arObject(map[string]authorityRule{"binding": authorityMessageBindingRule(), "base_version": arN, "base_digest": arH, "current": arNullable(arID), "pending": arID, "phase": arEnum("issued"), "publication": arNullable(arBlob(stateBudget))})})
 }
 func authorityResolutionRule() authorityRule {
 	return arObject(map[string]authorityRule{"outcome": arEnum("aborted", "issued"), "intent": arBlob(stateBudget), "candidate": arNullable(arBlob(stateBudget)), "version": arN, "digest": arH})
+}
+
+// Original external records keep their owner's bytes and parser, not G4 CCJ
+// recanonicalization. These are bounded format/ID checks, never signature, time,
+// policy, continuity or provider admission. G4 section 7 preserves the S2 slots.
+func authorityOriginalRule(kind string, target bool) authorityRule {
+	return func(v any) error {
+		s, ok := v.(string)
+		if !ok || len(s) > base64.RawURLEncoding.EncodedLen(8192) {
+			return authorityFail("publication_original")
+		}
+		raw, e := record.DecodeBase64(s, -1)
+		if e != nil || len(raw) > 8192 {
+			return authorityFail("publication_original")
+		}
+		parsed, e := record.Parse(raw, 8192, 16)
+		if e != nil {
+			return authorityFail("publication_original")
+		}
+		var body authorityRule
+		switch kind {
+		case "journal-entry/1":
+			body = arWith(arObject(map[string]authorityRule{"type": arEnum(kind), "registry": arKey, "owner": arOwner, "seq": arN, "at": arStamp, "prev": arNullable(arD), "op": arEnum("add", "revoke"), "record_type": arEnum("attestation/1", "grant/1", "revocation/1", "enrollment/1"), "record": arD}), func(b map[string]any) error {
+				if (b["prev"] == nil) != (b["seq"] == int64(1)) || target && (b["op"] != "add" || b["record_type"] != "attestation/1") {
+					return authorityFail("wrong_domain")
+				}
+				return nil
+			})
+		case "checkpoint/1":
+			body = arObject(map[string]authorityRule{"type": arEnum(kind), "registry": arKey, "owner": arOwner, "seq": arN, "at": arStamp, "head": arD, "snapshot": arD})
+		case "revocation/1":
+			revoked := func(v any) error {
+				r := arObject(map[string]authorityRule{"kind": arEnum("key", "record"), "id": func(any) error { return nil }, "from": arStamp})
+				if e := r(v); e != nil {
+					return e
+				}
+				o := v.(map[string]any)
+				if o["kind"] == "key" {
+					return arKey(o["id"])
+				}
+				return arD(o["id"])
+			}
+			body = arObject(map[string]authorityRule{"type": arEnum(kind), "issuer": arKey, "issued_at": arStamp, "complete": arEnumBool(true), "entries": arArray(revoked, 64)})
+		default:
+			return authorityFail("publication_original")
+		}
+		fields := map[string]authorityRule{"version": arEnum("swarm-envelope/2"), "id": arD, "body": body}
+		if kind != "journal-entry/1" {
+			sig := arObject(map[string]authorityRule{"role": arEnum("author"), "key": arKey, "sig": func(v any) error {
+				s, ok := v.(string)
+				if !ok {
+					return authorityFail("wrong_type")
+				}
+				if _, e := record.DecodeBase64(s, 64); e != nil {
+					return authorityFail("field_format")
+				}
+				return nil
+			}})
+			fields["signatures"] = func(v any) error {
+				if e := arArray(sig, 8)(v); e != nil {
+					return e
+				}
+				if len(v.([]any)) < 1 {
+					return authorityFail("array_limit")
+				}
+				return nil
+			}
+		}
+		if e := arObject(fields)(parsed); e != nil {
+			return authorityFail("publication_original")
+		}
+		o := parsed.(map[string]any)
+		id, e := record.ContentID(kind, o["body"].(map[string]any))
+		if e != nil || id != o["id"] {
+			return authorityFail("publication_original")
+		}
+		return nil
+	}
+}
+func arEnumBool(want bool) authorityRule {
+	return func(v any) error {
+		if v != want {
+			return authorityFail("wrong_type")
+		}
+		return nil
+	}
+}
+
+func authorityPublicationRule() authorityRule {
+	return arObject(map[string]authorityRule{
+		"transaction": arID, "content_id": arD, "entry": authorityOriginalRule("journal-entry/1", true),
+		"suffix":     arArray(authorityOriginalRule("journal-entry/1", false), 64),
+		"checkpoint": authorityOriginalRule("checkpoint/1", false), "conflict": arNullable(authorityOriginalRule("checkpoint/1", false)),
+		"snapshot": authorityOriginalRule("revocation/1", false), "validation": arWitness(),
+		// G4 7.2 explicitly leaves provider inner codecs to G5 acceptance; S2 also
+		// refuses populated publications. Do not invent a WC1 carrier or treat any
+		// reflected RawMessage/object/Boolean as the missing codec. Known fields
+		// above remain checked, but every unsupported witness carrier stays closed.
+		"witness": func(any) error { return authorityFail("publication_witness_codec_pending") },
+	})
 }

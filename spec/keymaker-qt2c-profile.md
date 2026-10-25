@@ -149,6 +149,18 @@ unchanged. There is no spare H field in any of them. In particular, the audit
 request ID remains `binding:<revision>` and its payload digest keeps its current
 body preimage; no reinterpretation or hidden filename field is allowed.
 
+The protected, versioned enrollment mapping is exactly native **`QTUse/1` ↔
+broker `transition_version="QTUse:1"`**. The enrolled consumer profile fixes this
+one pair; authenticated preparation and handoff encoding must apply the same
+lookup and require exact equality with that enrollment. On receipt, match the
+exact enrolled value before interpreting the native transition. Never send the
+literal slash spelling, perform generic slash replacement, accept an unknown
+version or fall back to another transition. Changing this mapping requires a
+new reviewed enrollment/version; it does not change native use keys or closed
+consumer records. The broker's [identifier alphabet][r6-alphabet] accepts
+`QTUse:1`, and its [handoff check][r6-encoding] applies that alphabet to
+`transition_version`; alphabet acceptance alone is not enrollment authority.
+
 The following are exact semantic keys, compared as tuples, not new hash recipes:
 
 | Window | Key and expected revision | Consumer-owned durable home in the proposed next transaction version |
@@ -348,11 +360,59 @@ retention of the exact staged result; it is a separate window from R-X.
 | Native operation / expected read set | `sign_registration`, protected `(caller_uid,generation,request_id)`, exact canonical params digest, pinned binding number/path/master epoch, current enrolled record/revision/policy/key/name/audience/window, fixed staged envelope digest/issue/expiry/original A, exact retained-request predecessor and unused R-S slot. Current [stage/persist:179][registration-stage] serializes same-ID retention. | Same independent tuple/args/binding and current enrolled authority, exact retained result and connection proof/original A, current generation and unused R-X release slot. Current release requires retained-result byte equality and matching connection proof ([keymaker/registration.go:219][registration-release]). A fresh H or retry connection alone is not independent authorization for another exposure. |
 | Locks | Generation source data/final reader chain as A, separate in-process generation gate -> `Store.mu` -> `Authority.mu` read, then A audit gate for a nested append ([keymaker/registration.go:109/150/186][registration-stage]). All initial persistence/use admission and exact unused R-S revision selection precede m. No Store/enrollment/audit acquisition below terminal F if a future caller is also under F. | `Native.WithActive` release generation fence -> Store -> enrollment read barrier, then nested audit gate ([native.go:643][native-release], [keymaker/registration.go:239][registration-release]). Same before-m persistence/use admission with exact locked retained-result/epoch/unused R-X revision; retain release exclusion through the endpoint. No unlock/provider/relock inside this final window. |
 | Original budget | Native `timeout_ms` **1..2000 ms from completed frame** ([base:524][native-timeout], [server.go:207/265][native-deadline]); cap by original caller and actual generation read's **250 ms from the original reader-window start**, never a fresh timer ([genjournal:13/191/195][generation-budget]). Require original U<A and key-validity/expiry predicates; 120-second proof lifetime does not extend D. | Same original native D, with this final release entry's actual generation data window intersected from its own original start; preparation/persistence elapsed still consumes native D. Existing socket write deadline is shortened by the fence context ([server.go:384][transport-write]). A fresh final generation entry cannot renew the completed-frame deadline, original proof A or expiry. |
-| Read / enforcement | Prepare/freeze signed bytes, purpose/key, issue/expiry and original grant outside final locks **before H**, avoiding a time/H-dependent signed-preimage cycle. After full initial admission/read-set match take m, pure check, burn R-S then nested audit/result commit. Current Build/provider calls are under outer locks ([keymaker/registration.go:142/162][registration-stage]); moving them is an unresolved implementation change. No enforced m-through-durability bound: `handoff_unqualified`. | Prepare fresh evidence unlocked; after the whole chain and exact unused R-X selection take m, pure check then burn before any response byte. Current `Time`, `Reauthorize`, final `Recheck`, audit and socket paths still sample clocks under locks ([keymaker/registration.go:231/244/253][registration-release], [server.go:389][transport-write]); these are not a conforming final adapter. `SetWriteDeadline` plus post-write checks is not proof of the full use/storage/transport endpoint or exclusion of late delegated writers: `handoff_unqualified`. |
-| Endpoint | Exact audit and retained result fully durable with committed R-S use/outcome, every file/namespace/readback barrier in the owning state transaction, before returning a private release candidate. Today's retention-before-release is [keymaker/registration.go:189][registration-stage]; no current QTUse/1 is present. R-S completion grants no transport use. | Durable R-X burn before transport; bounded actual complete frame write under live authority, then durable committed/held exposure outcome and required readback/cleanup, all strictly before D. Socket delivery is not atomic with local use storage, and remote receipt/HTTP admission is not the local endpoint. Partial write or unknown completion remains burned/held; do not infer delivery from a local intent or durable audit. No current owning transaction realizes this endpoint. |
+| Read / enforcement | Prepare/freeze signed bytes, purpose/key, issue/expiry and original grant outside final locks **before H**, avoiding a time/H-dependent signed-preimage cycle. After full initial admission/read-set match take m, pure check, burn R-S then nested audit/result commit. Current Build/provider calls are under outer locks ([keymaker/registration.go:142/162][registration-stage]); moving them is an unresolved implementation change. No enforced m-through-durability bound: `handoff_unqualified`. | Prepare fresh evidence unlocked; after the whole chain and exact unused R-X selection take m, pure check, durably burn and commit the exact release authorization/use endpoint **before any response byte**. Enforce separate precommit and actual-send bounds as below, retaining the same burned window throughout. Current `Time`, `Reauthorize`, final `Recheck`, audit and socket paths still sample clocks under locks ([keymaker/registration.go:231/244/253][registration-release], [server.go:389][transport-write]); these are not a conforming final adapter. `SetWriteDeadline` plus post-write checks is not proof of the full use/storage/transport endpoint or exclusion of late delegated writers: `handoff_unqualified`. |
+| Endpoint | Exact audit and retained result fully durable with committed R-S use/outcome, every file/namespace/readback barrier in the owning state transaction, before returning a private release candidate. Today's retention-before-release is [keymaker/registration.go:189][registration-stage]; no current QTUse/1 is present. R-S completion grants no transport use. | Before transport, the owning transaction durably commits the R-X burn plus exact one-attempt release authorization, all required outcome/recovery bindings, readback and namespace/intent cleanup with retained burned evidence. Then the still-live admitted executor may send the bound frame once within the separate send bound and original D. No required success binding is deferred until after the frame. Later delivery accounting records observations only, never creates or retracts authorization; its failure cannot undo peer success or permit resend. Socket delivery is not atomic with storage; authorization does not prove delivery. No current owning transaction realizes this endpoint. |
 | Use transition key / retry | Proposed next binding/result transaction: consumer incarnation, native tuple + original args identity, R-S staged-result slot and exact state predecessor. Fixed bytes are a read-set binding, not a replacement operation identity. Existing retained requests deduplicate a nonce; they are not generic handoff-use records. | Proposed next binding/result **exposure** transition: consumer incarnation, original authorized native occurrence + args identity, R-X slot and protected retained-result/use predecessor. Every H for a burned slot refuses. Existing same-ID envelope retry semantics ([base:597][registration-release-rule]) do not supply durable once-only transport use: a reviewed independent re-exposure occurrence/slot and authorization would be required, never one invented per retry/H. Until that contract/format exists admission stays closed. |
-| Existing refusals | Registration helper codes above, current enrollment/generation/binding/custody refusals, `request_conflict`, `state_capacity_exceeded`, `audit_unavailable` for unknown durable result/use; no new wire members or codes. | Preserve same plus `request_expired` and original deadline refusal. After possible bytes, close/contain ambiguous exposure rather than claiming a clean typed no-effect error ([server.go:407][transport-write]). Lost reply recovers exact stored outcome without automatic retransmission of a burned window; any subsequent exposure requires its own authorized window. |
-| macOS | Continuous clock/boot/D, original staged artifact and interval, exact generation/Store/enrollment exclusion, checked full-file and namespace/use durability all required. Linux generation/credential/custody paths and current receipt literal do not qualify Darwin; `handoff_unqualified`. | Same plus native peer/connection binding, write-deadline semantics, partial delivery containment and independent stop/executor exclusion on Darwin. Linux socket behavior supplies no Darwin timing/storage proof; receipt representation and endpoint remain unqualified. |
+| Existing refusals | Registration helper codes above, current enrollment/generation/binding/custody refusals, `request_conflict`, `state_capacity_exceeded`, `audit_unavailable` for unknown durable result/use; no new wire members or codes. | Preserve same plus `request_expired` and original deadline refusal. After possible bytes, close/contain ambiguous exposure rather than claiming a clean typed no-effect error ([server.go:407][transport-write]). Lost reply recovers the exact pre-send authorization and any known delivery observations without retransmission. A missing later delivery record means unknown delivery, never unused credit; any subsequent exposure requires its own independently authorized window. |
+| macOS | Continuous clock/boot/D, original staged artifact and interval, exact generation/Store/enrollment exclusion, checked full-file and namespace/use durability all required. Linux generation/credential/custody paths and current receipt literal do not qualify Darwin; `handoff_unqualified`. | Same pre-send durable authorization, stable burn, separate send bound, post-delivery accounting-failure control and no recovery resend as Linux, plus native peer/connection binding, partial delivery containment and independent stop/executor exclusion on Darwin. Linux socket behavior supplies no Darwin timing/storage proof; receipt representation and endpoint remain unqualified. |
+
+R-X specializes the [broker's durable-success rule][r6-success] without weakening
+peer success. The proposed next owning exposure transition must retain the
+original logical operation/window/slot and unused predecessor, exact encoded
+response frame, retained result, native arguments/binding, current authority and
+peer/connection identity, original boot/run/epoch, interval/A/expiry and D.
+Commit that exact one-attempt authorization with its durable burn, recovery
+bindings and required barriers/readback before the first byte. This is local
+release readiness, not a claim that delivery has occurred. For R-X the durable
+committed outcome is this one-attempt authorization, never a claim of delivery;
+the generic post-act outcome rule must not introduce a required post-send
+durability step. Burn alone or an audit append is insufficient. No new wire
+field or separate use ledger is allocated here; next-format/capacity/custody review remains mandatory.
+
+Reserve positive enforced subbounds `f_release` from m through that durable
+pre-send endpoint and `g_send` for the actual send, including pauses/delegation
+until the last authoritative byte leaves. Require `f_release+g_send<=f` and
+`m-s+f_release+g_send+epsilon<=T`, with
+**`m+f_release+g_send+epsilon<D`**, plus the unchanged authority/expiry predicates.
+The timed R-X endpoint includes precommit and send, not later nonauthoritative
+delivery bookkeeping. Both bounds consume the original allowance; there is no
+extra read, refreshed receipt, start or D after precommit. Continuous final exclusion and qualified
+stop/deadline enforcement cover the executor through send completion. Ordinary
+socket deadlines and a post-send clock check do not establish g_send. If either
+bound, exact peer binding or pre-send durability cannot be qualified, R-X is
+**unavailable (`handoff_unqualified`) on Linux and macOS**.
+
+Only the same still-live admitted call may attempt the send after precommit.
+A crash before the first byte, partial send, lost reply or failed later delivery
+accounting keeps the stable original window burned. Recovery reports retained
+authorization and known/unknown delivery status; it never sends again. A complete
+frame followed by delivery-accounting write, sync or readback failure already
+has its required durable release/use endpoint: retain it, do not report a clean
+no-effect failure, unburn, or require a later record to validate the peer's
+success. If the owner requires a post-send record for success, this protocol
+cannot satisfy that requirement and R-X stays unavailable pending a reviewed
+peer protocol; weakening peer success is an owner decision, not a fallback.
+
+A/P/R-S check: as specified, A advances its admitted tail/reports qualified
+append success only after full frame/use/rotation durability; P opens authority
+only after complete root/use/cleanup and required independent pre-release
+custody; R-S returns a private release candidate only after retained result/use
+is durable and grants no transport authority. None places required durability
+after an authoritative success response. These are proposed admission conditions,
+not proof that today's files are atomically invisible: if an audit reader, root
+reader or result consumer can treat intermediate bytes as authority, its window
+stays unavailable. All three remain `handoff_unqualified`; R-X's later actual
+exposure requires the distinct pre-send endpoint above.
 
 ### Paths that do not yet consume these handoffs
 
@@ -373,6 +433,10 @@ the same on-time authorized case, exact retained state and named narrowing
 control removing the respective budget/issue-bound/invalidation/use/act check.
 Apply the shared admission-order, post-m pause, restart and macOS controls below
 to every consuming profile; no helper-only pass qualifies an endpoint.
+
+[r6-alphabet]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/timeconf/receipt.go#L103
+[r6-encoding]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/timeconf/handoff_linux.go#L158
+[r6-success]: https://github.com/relux-works/swarma-credential-broker/blob/b38aeda82fb563503960836c771bcc94e8103810/docs/time-handoff.md#L148-L155
 
 [command-context]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/cmd/keymaker/main.go#L43-L67
 [enrollment-command-locks]: https://github.com/relux-works/swarma-keymaker/blob/b232f6aec52e9327daffd8e889b52ed0ebd2fd3f/internal/enrollment/reconcile_command_linux.go#L293-L334
@@ -419,6 +483,8 @@ forbidden act/release and exact provider/use/recovery post-state.
 
 | Proposed named test | Negative and expected invariant | Positive / narrowing control |
 | --- | --- | --- |
+| `QT2cTransitionVersionMapping` | Literal enrolled `QTUse/1`, wrong `QTUse:2`, mismatched prepare/encode values or unknown native version refuses before burn/act; generic slash substitution must not admit another native label. | Protected native `QTUse/1` maps exactly to enrolled `QTUse:1` at both preparation and encoding and may pass the alphabet/enrollment predicates. Remove exact version lookup while keeping alphabet validation: the wrong-version assertion must fail. Alphabet-only checks are not native qualification. |
+| `QT2cReleaseDurableBeforeFrame` | On Linux and macOS, deliver the full frame, then fail or crash each delivery-accounting write, sync or readback: the exact pre-send authorization/use endpoint must already be durable; window remains burned and recovery never resends. Also fail each required pre-send barrier: no response byte may leave. | Same authorized frame commits all release/use bindings before the first byte and sends once under f_release/g_send within original D. Move a required success binding after the frame: the crash-reopen durable-authorization assertion must fail. Separate late-send/pause controls must prevent late bytes, not just suppress a local success. |
 | `QT2cStaleCapture` | Pause after pre-window capture until original D has passed; unchanged packet cannot authorize an act. The final qualified read gives expiry, or an unqualified path refuses `clock_untrusted`. | Same inputs, on-time admission and qualified post-read enforcement may commit once. Remove the final read in a control: the stale-admission assertion must fail. |
 | `QT2cUseAdmissionOrder` | Capture m before initial persistence/use admission or before protected exact head/epoch/unused revision selection; refuse with no burn/act, even if later admission is nonwaiting. | Complete all initial admissions/state selection before m, pure check then burn under retained admission. Move initial admission after m: the order assertion must fail (`HandoffUseAdmissionOrder`). |
 | `QT2cDoubleCheckOneUse` | Run pure verification twice with identical unused snapshot; race serialized consumes and present another H/challenge for the same key. At most one consume/act; burned window refuses every H. | Distinct authorized next operation/window, new evidence and remaining original budget may commit. Remove revision/use comparison: named duplicate-act assertion must fail. |

@@ -145,7 +145,7 @@ a caller-supplied digest nor `VerifyReceipt` authenticates them. Preserve the
 original context and deadline across all stages: the broker cannot detect
 replacement of both on an unconsumed request. No cached receipt or callback may
 stand in for the missing final-lock handoff. The [QT-2c profiles](keymaker-qt2c-profile.md)
-follow the [broker schema at unlanded 7294b7a](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-window-profile.md#5-final-admission-durable-use-and-recovery):
+follow the [broker schema at landed 7294b7a](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-window-profile.md#5-final-admission-durable-use-and-recovery):
 complete initial persistence/use-CAS admission and select protected exact
 head/epoch/unused operation-window-slot revision under all final locks before
 exactly one fixed, qualified suspend-aware monotonic read m, outside pure `VerifyWindow`; pass its captured value to

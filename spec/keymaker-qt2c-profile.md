@@ -15,7 +15,7 @@ and Keymaker's [budgets and audit](keymaker.md#10-process-sockets-and-resource-b
 [G4 preimage/order rules](keymaker-authority-root.md#6-exact-manager-read-set-under-f).
 The revised timing and use rules here are explicit consumer requirements;
 they do not assert that the pinned broker contract already contains this amendment.
-The documentation schema is [broker PR #28 at exact unlanded head 7294b7a](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-window-profile.md#profile-schema),
+The documentation schema is [broker PR #28 at exact landed head 7294b7a](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-window-profile.md#profile-schema),
 with its [handoff contract and N1–N3 controls](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-handoff.md)
 and [mandatory macOS binding](https://github.com/relux-works/swarma-credential-broker/blob/7294b7aea68a8e0757437075efa3a6e318a18e51/docs/time-handoff-macos.md).
 These are source pins for this proposal, not a landed dependency or activation.
@@ -248,7 +248,7 @@ version is required; relabeling a Linux receipt cannot qualify it.
 The following profiles distinguish today's provider observations from proposed
 QT-2c consumption. They add no active adapter. Source links in these profiles
 pin Keymaker **b232f6aec52e9327daffd8e889b52ed0ebd2fd3f**; broker requirements
-remain the unlanded 7294b7a pins above. Each consuming row inherits the common
+remain the landed 7294b7a pins above. Each consuming row inherits the common
 admission, interval/reserve, QTUse/1 crash rules, and Linux/macOS requirements;
 its native read set, locks, budget and endpoint below specialize those fields.
 Private-helper rows explicitly exclude use/act fields; a successful helper

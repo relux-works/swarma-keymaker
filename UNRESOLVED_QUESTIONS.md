@@ -296,6 +296,42 @@ failure domain under honest A, and potentially indefinite withdrawal-completion
 blocking. A self-consistent root/verity digest/local anchor supplies no rollback
 protection. No automatic option C or A fallback; WC1–WC5 remain separate.
 
+### S2b authenticated runtime prerequisites
+
+The S1 codecs and isolated S2a fence/capacity primitives do not supply the owner
+inputs needed by a common transaction. At repository base `655f30f`, and with
+user-manager pinned to `505fb9f55a6d` in [go.mod](go.mod), the following runtime
+contracts are absent. This is an implementation dependency finding, not closure
+of any G5 gate or filesystem qualification.
+
+| Required source | Current boundary and missing owner contract |
+| --- | --- |
+| Independently authenticated package-fence identity | [authority_fence_linux.go](internal/keymaker/authority_fence_linux.go) verifies an explicitly supplied F_pkg device/inode pin, but does not authenticate its origin. No package-fence identity provider or protected publication schema is exposed by this repository or its pinned dependency. The package owner must supply its protected location/identity, incarnation, replacement/exclusion rules and a reviewed consumption API. Opening an arbitrary second lock file would not establish F_auth != the actual F_pkg. |
+| Complete cross-owner capacity census and credit lifecycle | [authority_capacity.go](internal/keymaker/authority_capacity.go) accepts complete inventories, carried reservations and qualified bounds. Neither it nor the pinned manager implements the protected census of all manager attempts, holds, recovery, inventory and staging, or the once-only reservation-to-materialized conversion. G4 section 4 requires the G5-B owner API for those inputs. Caller maps, a new directory layout or a locally invented empty manager history cannot establish completeness or credit ownership. |
+| Protected participants and common writer/recovery ownership | [enrollment.Authority](internal/enrollment/authority.go) exposes admission/reload, while its existing high-water Store publishes its own transaction. It has no common-transaction preparation/installation capability covering policy installers, all ten immutable participant roles and manager recovery. Owners must define which participant each writer may prepare/install, durable intent/guard consumption and old/restored-writer exclusion, with terminal F having no hidden lock or provider call. The closed G4 codecs authenticate neither provider ownership nor currentness. |
+| Independently admitted first capacity commit and floor transition | [G4 section 4.1](spec/keymaker-authority-root.md#41-first-independent-capacity-commit) explicitly leaves the C0 authorization/currentness/durability/exclusion API to G2/G5-E. [message_reconcile.go](internal/keymaker/message_reconcile.go) supports the existing protected floor-2 message protocol, not the independent combined floor/continuity provider. Legacy and closed-S2 inputs cannot create M0/R0 or resume a combined migration by inferring bootstrap authority from local files. Unknown C0 recovery remains owner-defined. |
+
+A local audit preparation refactor can address exact bytes and serialization,
+but cannot supply these missing owner authorities. The pinned journal's
+`AppendPrepared(..., guard func() error)` also remains a prewrite validation
+callback, not the journal-owned append-lifetime contract required by G5-A;
+a caller's defer cannot establish the required unlock ordering.
+
+The review split is transaction/crash-walk first (S2b-1), migration second
+(S2b-2). Both remain blocked at the authenticated input boundary. No transaction
+or migration implementation, serving integration, floor raise, substitute
+provenance provider or positive crash-walk/migration qualification is claimed.
+The eight requested omitted-sync/migration/lock-alias plants remain PENDING;
+without the actual engine, an unapplied plant or rejecting stub is not a kill.
+
+To unblock, the Keymaker, manager and root-policy owners must provide reviewed
+provider/consumption contracts and the accepted implementation revisions for the
+sources above, including privilege, continuity, bounded-call and recovery
+semantics. Alternatively, they may scope an independent audit-preparation change
+while those contracts are developed; it would not deliver S2b-1. G6 participant
+immutability, actual filesystem/durability and latency qualification remains a
+separate prerequisite and has not been rerun here.
+
 ## Generation-journal adapter integration gates
 
 The pinned vector source is the public user-manager

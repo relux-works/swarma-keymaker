@@ -600,46 +600,6 @@ func TestReleaseCommandRefusals(t *testing.T) {
 	}
 }
 
-// File-proxy dependencies come from an isolated copy of the exact committed
-// go.sum entries. No tests modify the host's module cache or fetch the network.
-func fixtureModuleCache(t *testing.T) string {
-	t.Helper()
-	cache := os.Getenv("GOMODCACHE")
-	if cache == "" {
-		cmd := exec.Command("go", "env", "GOMODCACHE")
-		cmd.Env = append(os.Environ(), "GOTELEMETRY=off")
-		out, err := cmd.Output()
-		if err != nil {
-			t.Fatal("module cache location", err)
-		}
-		cache = strings.TrimSpace(string(out))
-	}
-	sums, err := os.ReadFile("../../go.sum")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dst := privateTestScratch(t)
-	for _, line := range strings.Split(strings.TrimSpace(string(sums)), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) != 3 || strings.HasSuffix(fields[1], "/go.mod") {
-			continue
-		}
-		for _, ext := range []string{".mod", ".info", ".zip"} {
-			rel := filepath.Join("cache", "download", fields[0], "@v", fields[1]+ext)
-			raw, err := os.ReadFile(filepath.Join(cache, rel))
-			if err != nil {
-				t.Fatal("offline dependency must already be cached", err)
-			}
-			dest := filepath.Join(dst, rel)
-			if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
-				t.Fatal(err)
-			}
-			writeFixture(t, dest, raw)
-		}
-	}
-	return dst
-}
-
 // Missing local dependencies fail closed, clean only the owned target and
 // preserve the empty proxy. Real offline builds above are positive controls.
 func TestReleaseOfflineDependencies(t *testing.T) {

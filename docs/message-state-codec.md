@@ -76,12 +76,14 @@ Capacity refusal leaves the journal and installed state unchanged, and startup
 checks existing inventory without requiring space for another transition.
 Journal control headroom is separately
 earmarked for eight maximum-size audit records; unrelated appends cannot spend
-that ticket. Insufficient capacity never evicts evidence. S4 must qualify the
-actual publication/witness bounds against these reservations and stays closed
+that ticket. Insufficient capacity never evicts evidence. The S4/S5 runtime successor must qualify the
+actual separate journal/freshness/prior/witness bounds against these reservations and stays closed
 when they are insufficient.
 
 PENDING: protected floor deployment and exclusion of older/restored servers,
 root provisioning and multi-UID integration; bounded time authority outside
 generation windows and conservative Now/W mapping; owner-registry/WC1 transport,
-freshness-aware verifier inputs, qualified-T1 renewal and activation. These
+S4/S5 freshness/receipt adapter and explicit successor-codec migration,
+qualified-T1 renewal and activation. The current closed schema-2 reader must
+not accept these new artifact/state shapes by adding optional members. These
 codecs supply no administration CLI or production constructor.

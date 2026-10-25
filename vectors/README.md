@@ -4,7 +4,7 @@ All seeds, names, UIDs and keys here are invented or published test data.
 Never use these seeds or their descendants for an installation.
 
 Run negatives first, then the positive controls. `refusals.json` contains
-70 stable refusal IDs and 70 explicitly paired controls. Each pair differs
+71 stable refusal IDs and 71 explicitly paired controls. Each pair differs
 at exactly one input field (`mutation_path`, a JSON pointer). Frame tests
 change a single `frame_hex` field containing complete wire bytes; they do not
 pretend a protocol packet is one semantic member. Array-valued fields count
@@ -72,3 +72,12 @@ generator compares independently published public keys and chain codes.
 The SSH packet format follows the
 [SSH agent draft](https://www.ietf.org/archive/id/draft-miller-ssh-agent-17.txt)
 and [OpenSSH SSHSIG signed-data layout](https://github.com/openssh/openssh-portable/blob/master/PROTOCOL.sshsig).
+
+## S4 publication adoption fixtures
+
+[waggle-s4](waggle-s4/README.md) retains the exact public pinned
+P-JRN-publish-reissue fixture and six negatives, with byte hashes and MS-S row
+mapping. These imports are separate from the 71 native refusal/control pairs.
+The existing vectors tool does not execute them or evaluate verifier policy;
+byte/provenance checks are documentation validation. Consumer execution and
+MS-S13–MS-S22 remain PENDING in the message-state spec.

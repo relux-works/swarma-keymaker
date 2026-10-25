@@ -462,8 +462,10 @@ owner registry. Until that registry exists, nothing is published and message
 signing is closed. Retain the exact journal entry for T, its nearest covering
 signed checkpoint and WC1 confirmation; only publication-backed activation
 makes T current. The [publication state contract](keymaker-msg-state.md#4-publication-record-and-restart)
-pins landed waggle S3 and specifies durable acknowledgement/restart and bounded
-verification (64 entries, two checkpoints). Private material is never published.
+adopts pinned waggle S4/S5's D39 journal and separate freshness/receipt contracts;
+it specifies durable acknowledgement/restart and independent journal/freshness
+bounds. Runtime dependency/integration remains a later slice. Private material
+is never published.
 Publication/freshness/root continuity remain Q10
 gates. Signing stays closed until runtime implementation and qualification.
 
@@ -475,7 +477,13 @@ plus their scope/purpose and epoch. Root-role overlap refuses before signed
 evidence intake; successful cryptography cannot widen a root's language. It then
 applies waggle §2.6's ordered envelope/header, content-ID/root-signature,
 complete typed profile/current binding/time, and separately authorized signed
-revocation-snapshot checks.
+revocation-snapshot checks. For registry-root snapshot own-age only, the adopted
+[S5 receipt contract](keymaker-msg-state.md#42-s5-process-local-receipt-composition)
+permits VerifyAttestation(agent)/VerifyMessage receiver composition after full F
+admission and atomic retention. It does not extend certificate validity, active
+generation, operator/device or grant evidence. Invalid supplied receipts refuse;
+there is no legacy fallback. Initial VerifyJournal publication still requires
+its own current snapshot, including the real head-change reissue path.
 It additionally checks protected registry lineage, numeric purpose 4 and the
 exact path relationship from §2.1. These protected facts are not invented
 certificate members. Require Ed25519 subject/key-ID correspondence, author

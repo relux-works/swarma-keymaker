@@ -1,0 +1,63 @@
+{
+  "repository": "https://github.com/relux-works/waggle",
+  "commit": "5f4e7435d75697385ff6ce15a7501ac6f31c8ea5",
+  "scope": "Exact public upstream fixture bytes only; no consumer verifier execution or activation claim.",
+  "files": [
+    {
+      "file": "N-JRN-publish-reissue-backward-time.json",
+      "source": "vectors/swarm-envelope-2/0-negative/N-JRN-publish-reissue-backward-time.json",
+      "sha256": "f56b1b02adee2763e940a83f23c1b68c7824d6c6f29c65aebffb0c6dea5bd9e8",
+      "bytes": 11818,
+      "row": "MS-S15",
+      "positive_control": "P-JRN-publish-reissue"
+    },
+    {
+      "file": "N-JRN-publish-reissue-missing-prior.json",
+      "source": "vectors/swarm-envelope-2/0-negative/N-JRN-publish-reissue-missing-prior.json",
+      "sha256": "c650bf3559064843bd582e2079650ae0fe526fb4b4bc378338b56e3afe3330ff",
+      "bytes": 10879,
+      "row": "MS-S13",
+      "positive_control": "P-JRN-publish-reissue"
+    },
+    {
+      "file": "N-JRN-publish-reissue-missing-record.json",
+      "source": "vectors/swarm-envelope-2/0-negative/N-JRN-publish-reissue-missing-record.json",
+      "sha256": "f27750f3b440a801fd82ba632f09133837ddfafc75c7cc88ee4f2fbdbfd63edb",
+      "bytes": 11147,
+      "row": "MS-S12",
+      "positive_control": "P-JRN-publish-reissue"
+    },
+    {
+      "file": "N-JRN-publish-reissue-missing-reissue.json",
+      "source": "vectors/swarm-envelope-2/0-negative/N-JRN-publish-reissue-missing-reissue.json",
+      "sha256": "9d8b78c931515621471bc02d52c9ae5b5bcc0a33ab55d8cd3bba42a05225ace4",
+      "bytes": 11176,
+      "row": "MS-S12",
+      "positive_control": "P-JRN-publish-reissue"
+    },
+    {
+      "file": "N-JRN-publish-reissue-old-snapshot.json",
+      "source": "vectors/swarm-envelope-2/0-negative/N-JRN-publish-reissue-old-snapshot.json",
+      "sha256": "b84e89ae9b2d016f8514949088ebbb97de5618b1afbe3ac0ce71c1f03c63db9f",
+      "bytes": 11811,
+      "row": "MS-S12",
+      "positive_control": "P-JRN-publish-reissue"
+    },
+    {
+      "file": "N-JRN-publish-reissue-wrong-prior.json",
+      "source": "vectors/swarm-envelope-2/0-negative/N-JRN-publish-reissue-wrong-prior.json",
+      "sha256": "efd8586b60ad7f876d8939fa3af4b2ef911368ae5c0b91a7489cab6b8fd19cbc",
+      "bytes": 11810,
+      "row": "MS-S14",
+      "positive_control": "P-JRN-publish-reissue"
+    },
+    {
+      "file": "P-JRN-publish-reissue.json",
+      "source": "vectors/swarm-envelope-2/1-positive/P-JRN-publish-reissue.json",
+      "sha256": "734382ccc3c6d4b22af1eea8e0d2305ee0405e410313ad38c7f665bd7dc31354",
+      "bytes": 11982,
+      "row": "MS-S12",
+      "positive_control": ""
+    }
+  ]
+}

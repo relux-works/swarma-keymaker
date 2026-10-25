@@ -112,6 +112,13 @@ and durable integration are accepted and qualified.** S1 landing alone does
 not open persistent revoke. There is no deployed owner-registry/trust-node
 snapshot service to call. This path is not an emergency-stop mechanism.
 
+S5 registry-root freshness receipts do not extend operator-root device/act
+snapshot age. The [K3 composition](keymaker-msg-state.md#42-s5-process-local-receipt-composition)
+leaves this domain independent: persistent revoke stays closed until its actual
+sources/durable integration and D42 offline-root policy exist. A registry B
+refresh is not operator evidence; registry inactivity alone does not invalidate
+otherwise current independently qualified operator evidence.
+
 Candidate (b), if accepted later: an operator-delivered protected local bundle
 of original operator-root-signed device attestations/snapshots plus separately
 protected current-owner policy. It requires checked owner/mode/no-link paths,

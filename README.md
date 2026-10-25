@@ -300,11 +300,15 @@ Only known pre-issuance transactions may abort; issued candidates retain pending
 PENDING before production: independently enforced reader-floor deployment,
 protected root policy, real multi-UID integration, qualified Now/W and uncertainty
 mapping, provider/audit collection outside generation windows with bounded
-original authority through persistence, and owner-registry/WC1 evidence. S4 must
-recheck publication slots and `VerifyJournal` inputs against its accepted
-freshness profile. S2 rejects nonempty publication slots and current pointers;
+original authority through persistence, and owner-registry/WC1 evidence. The [S4/S5 spec adoption](spec/keymaker-msg-state.md#4-publication-record-and-restart)
+now separates D39 prior-checkpoint custody, live freshness and process-local
+receipts, with [paired byte-only fixtures](vectors/waggle-s4/README.md).
+The later runtime slice must qualify their explicit successor codec and separate
+proof budgets against the existing reservation. S2 rejects nonempty publication slots and current pointers;
 qualified-T1 renewal/activation and message-result release require later slices.
-No S4 module pin or production fake evidence source is introduced.
+No S4/S5 module upgrade or production evidence source is introduced. The adopted
+spec cannot activate the current S3 runtime; all [K3 gates](spec/keymaker-msg-state.md#7-remaining-gates)
+remain closed until implementation and qualification.
 
 | Tool | Exact entry point | Evidence |
 | --- | --- | --- |

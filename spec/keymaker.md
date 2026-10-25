@@ -873,6 +873,15 @@ coordinator may release uncertainty, using open -> resolution -> release-prepare
 bytes alone are insufficient. Preserve S2's independent pending fences and no
 signer/reissue/result-invention rule in offline reconcile.
 
+The [K3 S4/S5 audit adoption](keymaker-msg-state.md#51-retained-freshness-and-re-anchor-artifact)
+specifies `message_freshness_commit` with phase `freshness` or `reanchor`, paired
+with the existing `binding_commit` durability transaction. Existing payload_digest
+binds the retained typed artifact, endpoint identifiers and exact skipped count;
+no new audit members or raw proof/receipt fields are admitted. This operation
+and successor-state migration remain unimplemented activation gates; Q7's
+operator-only optional members are absent on these records. Historical hashes
+and PC2/S2's single-authority recovery/fences remain unchanged.
+
 ### 11.1 Operator-record audit extension
 
 This is the applied Q7 schema contract, **spec only; runtime implementation and

@@ -146,7 +146,7 @@ func (a *Authority) load(ctx context.Context) Code {
 		}
 	}
 	a.stateDir = config.StateDir
-	store := newFileStore(ctx, config.StateDir, a.files)
+	store := newFileStore(ctx, config.StateDir, a.files, "")
 	if a.storeOps != nil {
 		store.ops = a.storeOps
 	}
@@ -164,6 +164,7 @@ func (a *Authority) load(ctx context.Context) Code {
 			a.fence = localCode(err)
 			return a.fence
 		}
+		store.objectFormat = config.ObjectFormat
 		retained, err = store.read()
 		if err != nil {
 			a.fence = localCode(err)
@@ -181,17 +182,18 @@ func (a *Authority) load(ctx context.Context) Code {
 		}
 	}
 
+	store.objectFormat = config.ObjectFormat
 	if err = safeRepository(ctx, a.files, config.Registry); err != nil {
 		a.fence = localCode(err)
 		return a.fence
 	}
-	verifier := newGitVerifier(ctx, config.Registry, config.Revision, config.Maintainers)
+	verifier := newGitVerifier(ctx, config.Registry, config.Revision, config.ObjectFormat, config.Maintainers)
 	entries, err := verifier.entries()
 	if err != nil {
 		a.fence = localCode(err)
 		return a.fence
 	}
-	snapshot, high, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: config.Revision, Entries: entries, Retained: retained, Reconciled: true})
+	snapshot, high, err := (registry.Loader{ObjectFormat: config.ObjectFormat, Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: config.Revision, Entries: entries, Retained: retained, Reconciled: true})
 	if err != nil {
 		a.commitFault = store.failed
 		a.fence = mapDiagnostic(err)

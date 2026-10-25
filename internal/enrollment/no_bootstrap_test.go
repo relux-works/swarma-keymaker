@@ -31,7 +31,7 @@ func TestServiceNeverBootstraps(t *testing.T) {
 			if result != (EnrolledKey{}) {
 				t.Fatal("empty state released authority")
 			}
-			store := newFileStore(context.Background(), f.config.StateDir, f.files)
+			store := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat)
 			if store.Commit(nil, registry.HighWater{}) == nil {
 				t.Fatal("service Store bootstrapped")
 			}
@@ -86,7 +86,7 @@ func TestBootstrapPreIntentCommitFailureRequiresReconciliation(t *testing.T) {
 				files.reached = true
 			}
 			t.Cleanup(func() { _ = os.Chmod(f.config.StateDir, 0700) })
-			err := (initialPublisher{newFileStore(context.Background(), f.config.StateDir, files)}).Commit(nil, registry.HighWater{})
+			err := (initialPublisher{newFileStore(context.Background(), f.config.StateDir, files, f.config.ObjectFormat)}).Commit(nil, registry.HighWater{})
 			if err == nil || !files.reached || !errors.Is(err, os.ErrPermission) {
 				t.Fatalf("intended pre-marker permission failure not reached: %v reached=%t", err, files.reached)
 			}

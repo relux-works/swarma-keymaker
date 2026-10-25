@@ -66,7 +66,7 @@ func approveMode(t *testing.T, f *fixture, digest string, bootstrap bool) {
 func freshApprovalControl(t *testing.T, f *fixture) {
 	t.Helper()
 	removeTestApproval(t, f)
-	h, e := newFileStore(context.Background(), f.config.StateDir, f.files).read()
+	h, e := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat).read()
 	if e != nil {
 		t.Fatal(e)
 	}

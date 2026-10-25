@@ -100,7 +100,7 @@ func TestRegistryRollbackRefusals(t *testing.T) {
 			if result.Key != "" {
 				t.Fatal("rollback returned authority")
 			}
-			store := newFileStore(context.Background(), f.config.StateDir, f.files)
+			store := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat)
 			after, err := store.read()
 			if err != nil || !reflect.DeepEqual(before, after) {
 				t.Fatal("rollback modified high-water state")
@@ -239,15 +239,15 @@ func TestStoreCompareAndSwap(t *testing.T) {
 	before := a.retained.Clone()
 	next := before.Clone()
 	next.Revision = strings.Repeat("f", 40)
-	stale := newFileStore(context.Background(), f.config.StateDir, f.files)
+	stale := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat)
 	if stale.Commit(nil, *next) == nil {
 		t.Fatal("stale CAS succeeded")
 	}
-	current, err := newFileStore(context.Background(), f.config.StateDir, f.files).read()
+	current, err := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat).read()
 	if err != nil || !reflect.DeepEqual(before, current) {
 		t.Fatal("stale CAS changed state")
 	}
-	store := newFileStore(context.Background(), f.config.StateDir, f.files)
+	store := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat)
 	if err = store.Commit(before, *next); err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +300,7 @@ func TestInterruptedWriteFencesUntilRestart(t *testing.T) {
 			expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
 			noEvidence := New(f.configPath, f.files, nil)
 			expectCode(t, EnrollmentUnverified, noEvidence.Reload(context.Background()))
-			disk, err := newFileStore(context.Background(), f.config.StateDir, f.files).read()
+			disk, err := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat).read()
 			if err != nil {
 				t.Fatal(err)
 			}

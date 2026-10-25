@@ -291,8 +291,9 @@ func enrollmentInput(t *testing.T) []byte {
 	blob = append(blob, n...)
 	blob = append(blob, public...)
 	raw, err := json.Marshal(map[string]any{
-		"maintainers": []string{"ssh-ed25519 " + base64.StdEncoding.EncodeToString(blob)},
-		"revision":    strings.Repeat("a", 40), "publisher": "ed25519:" + base64.RawURLEncoding.EncodeToString(public),
+		"object_format": "sha1",
+		"maintainers":   []string{"ssh-ed25519 " + base64.StdEncoding.EncodeToString(blob)},
+		"revision":      strings.Repeat("a", 40), "publisher": "ed25519:" + base64.RawURLEncoding.EncodeToString(public),
 		"audience": "example.invalid", "registry": "/registry.git", "state_dir": "/enrollment-state",
 		"stations": map[string]bool{"sample": true}, "generations": map[string]string{"30001": strings.Repeat("1", 32)}, "service_uid": 30001,
 	})

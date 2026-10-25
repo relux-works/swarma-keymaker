@@ -66,16 +66,19 @@ func (diskOps) SyncDir(path string) error {
 }
 
 type fileStore struct {
-	ctx    context.Context
-	dir    string
-	files  Files
-	ops    durableOps
-	failed bool
-	owner  uint32
+	ctx          context.Context
+	dir          string
+	files        Files
+	ops          durableOps
+	failed       bool
+	owner        uint32
+	objectFormat string
 }
 
-func newFileStore(ctx context.Context, dir string, files Files) *fileStore {
-	return &fileStore{ctx: ctx, dir: dir, files: files, ops: diskOps{}, owner: uint32(os.Geteuid())}
+// Lock/ownership operations can precede protected scalar decoding. An empty
+// format grants no read authority; install the validated pin before state reads.
+func newFileStore(ctx context.Context, dir string, files Files, objectFormat string) *fileStore {
+	return &fileStore{ctx: ctx, dir: dir, files: files, objectFormat: objectFormat, ops: diskOps{}, owner: uint32(os.Geteuid())}
 }
 
 // Service reads and commits open only the lock created by operator publication.
@@ -170,7 +173,7 @@ func (s *fileStore) readLocked() (*registry.HighWater, error) {
 		return nil, err
 	}
 	var record stateRecord
-	if strictJSON(b, &record) != nil || record.Version != 1 || record.High == nil || !revisionPattern.MatchString(record.High.Revision) || record.High.Hosts == nil {
+	if strictJSON(b, &record) != nil || record.Version != 1 || record.High == nil || !validObjectID(s.objectFormat, record.High.Revision) || record.High.Hosts == nil {
 		return nil, errTrust
 	}
 	return record.High.Clone(), nil

@@ -39,20 +39,45 @@ type Files interface {
 // absolute Git directory (a bare repository or an explicitly selected .git).
 // Stations classifies every host independently of its signed enrollment.
 type PinConfig struct {
-	TimePolicy  *timeconf.Policy  `json:"time_policy,omitempty"`
-	Maintainers []string          `json:"maintainers"`
-	Revision    string            `json:"revision"`
-	Publisher   string            `json:"publisher"`
-	Audience    string            `json:"audience"`
-	Registry    string            `json:"registry"`
-	StateDir    string            `json:"state_dir"`
-	Stations    map[string]bool   `json:"stations"`
-	Generations map[string]string `json:"generations"`
-	ServiceUID  *uint32           `json:"service_uid,omitempty"`
+	ObjectFormat string            `json:"object_format"`
+	TimePolicy   *timeconf.Policy  `json:"time_policy,omitempty"`
+	Maintainers  []string          `json:"maintainers"`
+	Revision     string            `json:"revision"`
+	Publisher    string            `json:"publisher"`
+	Audience     string            `json:"audience"`
+	Registry     string            `json:"registry"`
+	StateDir     string            `json:"state_dir"`
+	Stations     map[string]bool   `json:"stations"`
+	Generations  map[string]string `json:"generations"`
+	ServiceUID   *uint32           `json:"service_uid,omitempty"`
 }
 
 var errTrust = errors.New("unverified local trust")
-var revisionPattern = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`)
+
+// Object IDs are interpreted only under the protected repository format.
+func objectIDBytes(objectFormat string) int {
+	switch objectFormat {
+	case "sha1":
+		return 20
+	case "sha256":
+		return 32
+	default:
+		return 0
+	}
+}
+func validObjectID(objectFormat, oid string) bool {
+	width := objectIDBytes(objectFormat) * 2
+	if width == 0 || len(oid) != width {
+		return false
+	}
+	for _, c := range []byte(oid) {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 var generationPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var hostPattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
 
@@ -295,7 +320,7 @@ func loadConfig(path string, files Files) (PinConfig, *format.Policy, error) {
 }
 
 func validateConfig(c PinConfig) (*format.Policy, error) {
-	if !revisionPattern.MatchString(c.Revision) || !absolute(c.Registry) || !absolute(c.StateDir) || len(c.Maintainers) == 0 || !canonicalAudience(c.Audience) || len(c.Stations) == 0 {
+	if !validObjectID(c.ObjectFormat, c.Revision) || !absolute(c.Registry) || !absolute(c.StateDir) || len(c.Maintainers) == 0 || !canonicalAudience(c.Audience) || len(c.Stations) == 0 {
 		return nil, errTrust
 	}
 	if c.ServiceUID != nil && (*c.ServiceUID == 0 || *c.ServiceUID == 4294967295) {

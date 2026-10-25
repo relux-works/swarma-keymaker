@@ -185,7 +185,7 @@ func prepareConsumedLedger(c PinConfig, files Files, ops durableOps) (string, er
 	}
 	f = os.NewFile(uintptr(fd), path)
 	defer f.Close()
-	store := newFileStore(context.Background(), c.StateDir, files)
+	store := newFileStore(context.Background(), c.StateDir, files, c.ObjectFormat)
 	store.owner = *c.ServiceUID
 	if err = store.setOwner(f); err != nil {
 		return "", err

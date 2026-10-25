@@ -46,6 +46,7 @@ type registryVector struct {
 			PreviousPublisher               string `json:"previous_publisher_key"`
 			Revision                        string
 			PreviousRevision                string `json:"previous_revision"`
+			ObjectFormat                    string `json:"object_format"`
 			Files                           []vectorFile
 			PreviousFiles                   []vectorFile `json:"previous_files"`
 			Stations                        []string     `json:"station_hosts"`
@@ -122,8 +123,11 @@ func pinnedModuleDirectory(t *testing.T) string {
 	if err != nil {
 		t.Fatal("pinned module unavailable locally; conformance unrun:", err)
 	}
-	var module struct{ Dir, Version string }
-	if err = json.Unmarshal(b, &module); err != nil || !filepath.IsAbs(module.Dir) || module.Version == "" {
+	var module struct {
+		Dir, Version string
+		Replace      any
+	}
+	if err = json.Unmarshal(b, &module); err != nil || !filepath.IsAbs(module.Dir) || module.Version != "v0.0.0-20261025040811-264660e5dabb" || module.Replace != nil {
 		t.Fatal("missing pinned module directory")
 	}
 	return module.Dir
@@ -173,7 +177,7 @@ func TestRegistrarEnrollmentConformance(t *testing.T) {
 			t.Fatal(err)
 		}
 		allowed := map[string]bool{}
-		for _, field := range []string{"approved", "available", "commit_signature_valid", "descendant", "files", "persist_available", "pin_is_exact", "previous_files", "previous_revision", "publisher_key", "previous_publisher_key", "revision", "rollback_state_available", "station_hosts", "nonstation_hosts", "first_use"} {
+		for _, field := range []string{"approved", "available", "commit_signature_valid", "descendant", "files", "persist_available", "pin_is_exact", "previous_files", "previous_revision", "publisher_key", "previous_publisher_key", "revision", "rollback_state_available", "station_hosts", "nonstation_hosts", "first_use", "object_format"} {
 			allowed[field] = true
 		}
 		for field := range raw.Fixture.Registry {
@@ -266,8 +270,16 @@ func highIDs(high *registry.HighWater) []string {
 }
 func runRegistryVector(t *testing.T, v registryVector) {
 	t.Helper()
-	f := newFixture(t)
 	r := v.Fixture.Registry
+	// Invalid-profile vectors still need concrete object storage. This fixture
+	// repository uses sha1, but its missing/unknown protected pin is passed to the
+	// Loader unchanged and must refuse before inspecting the repository.
+	repositoryFormat := r.ObjectFormat
+	if objectIDBytes(repositoryFormat) == 0 {
+		repositoryFormat = "sha1"
+	}
+	f := newFixtureWithFormat(t, repositoryFormat)
+	f.config.ObjectFormat = r.ObjectFormat
 	stations := map[string]bool{}
 	for _, host := range r.Stations {
 		stations[host] = true
@@ -295,7 +307,7 @@ func runRegistryVector(t *testing.T, v registryVector) {
 	f.writeConfig()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	store := conformanceStore{newFileStore(ctx, f.config.StateDir, f.files)}
+	store := conformanceStore{newFileStore(ctx, f.config.StateDir, f.files, f.config.ObjectFormat)}
 	var previous *registry.HighWater
 	if len(previousEntries) > 0 {
 		publisher := r.PreviousPublisher
@@ -306,8 +318,8 @@ func runRegistryVector(t *testing.T, v registryVector) {
 		if err != nil {
 			t.Fatal("invalid previous policy:", err)
 		}
-		verifier := newGitVerifier(ctx, f.repo, previousRevision, []string{f.public})
-		_, previous, err = (registry.Loader{Policy: previousPolicy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: previousRevision, Entries: previousEntries, FirstUse: true})
+		verifier := newGitVerifier(ctx, f.repo, previousRevision, f.config.ObjectFormat, []string{f.public})
+		_, previous, err = (registry.Loader{ObjectFormat: f.config.ObjectFormat, Policy: previousPolicy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: previousRevision, Entries: previousEntries, FirstUse: true})
 		if err != nil {
 			t.Fatal("previous authority fixture rejected:", err)
 		}
@@ -321,12 +333,14 @@ func runRegistryVector(t *testing.T, v registryVector) {
 			approved = strings.Repeat("0", 40)
 		}
 	}
-	verifier := newGitVerifier(ctx, f.repo, approved, []string{f.public})
+	verifier := newGitVerifier(ctx, f.repo, approved, f.config.ObjectFormat, []string{f.public})
 	if !r.Available {
 		verifier.dir = filepath.Join(f.base, "missing.git")
 	}
 	inputRevision := candidateRevision
-	if !r.Exact {
+	// Instantiate symbolic revision labels only when they satisfy the protected
+	// grammar. Malformed and cross-format IDs must reach the Loader verbatim.
+	if !r.Exact || !validObjectID(r.ObjectFormat, r.Revision) {
 		inputRevision = r.Revision
 	}
 	if !r.Persist {
@@ -338,7 +352,7 @@ func runRegistryVector(t *testing.T, v registryVector) {
 	if r.FirstUse != nil {
 		firstUse = *r.FirstUse
 	}
-	snapshot, high, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: inputRevision, Entries: entries, Retained: previous, FirstUse: firstUse, Reconciled: r.RollbackAvailable})
+	snapshot, high, err := (registry.Loader{ObjectFormat: f.config.ObjectFormat, Policy: policy, Verifier: verifier, Store: store}).Load(registry.Input{Revision: inputRevision, Entries: entries, Retained: previous, FirstUse: firstUse, Reconciled: r.RollbackAvailable})
 	if code := registrarCode(t, err); code != v.Expected.Code {
 		t.Fatalf("registrar code=%s want=%s", code, v.Expected.Code)
 	}

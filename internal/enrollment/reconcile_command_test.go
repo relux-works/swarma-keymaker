@@ -349,7 +349,7 @@ func TestReconcileCommandLiveAuthority(t *testing.T) {
 	_, code := authorize(a)
 	expectCode(t, EnrollmentUnverified, code)
 	expectCode(t, EnrollmentUnverified, a.Reload(context.Background()))
-	store := newFileStore(context.Background(), f.config.StateDir, f.files)
+	store := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat)
 	lock, err := store.lock()
 	if err != nil {
 		t.Fatal(err)

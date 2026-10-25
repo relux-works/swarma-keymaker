@@ -327,9 +327,15 @@ remain closed until implementation and qualification.
 The registration proof format, enrollment schema, publisher verification,
 registry snapshot loader and name rules belong to
 `github.com/relux-works/swarma-registrar`. The dependency is pinned
-to reviewed main revision `5f44ebf3f788`
-(`v0.0.0-20261023164451-5f44ebf3f788`). Keymaker supplies caller-side trust,
+to reviewed main revision `264660e5dabb`
+(`v0.0.0-20261025040811-264660e5dabb`). Keymaker supplies caller-side trust,
 persistence and local authorization; it does not maintain a second loader.
+Enrollment pins require root-owned `object_format`, exactly `sha1` or `sha256`,
+with no default. Revision, retained state and Git object IDs must match that
+single lowercase hex width. Existing pin files must explicitly add this member
+before use; see the [protected configuration](internal/enrollment/README.md#protected-configuration).
+The shared CCJ, enrollment, envelope and registration packages are unchanged by
+this repin; the registry Loader now requires the protected format explicitly.
 
 Any registrar API or behavior change requires a separate reviewed pull request
 there and must land on its main first. Raise this dependency only in an explicit

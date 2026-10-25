@@ -87,6 +87,10 @@ func public(seed byte) string {
 }
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
+	return newFixtureWithFormat(t, "sha1")
+}
+func newFixtureWithFormat(t *testing.T, objectFormat string) *fixture {
+	t.Helper()
 	base := t.TempDir()
 	if err := os.Chmod(base, 0700); err != nil {
 		t.Fatal(err)
@@ -99,7 +103,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f.public = strings.TrimSpace(string(pub))
-	f.run("/usr/bin/git", nil, "init", "--bare", "--quiet", f.repo)
+	f.run("/usr/bin/git", nil, "init", "--bare", "--quiet", "--object-format="+objectFormat, f.repo)
 	if err := os.Chmod(f.repo, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +111,7 @@ func newFixture(t *testing.T) *fixture {
 	if err = os.Mkdir(state, 0700); err != nil {
 		t.Fatal(err)
 	}
-	f.config = PinConfig{Maintainers: []string{f.public}, Publisher: public(1), Audience: testAudience, Registry: f.repo, StateDir: state, Stations: map[string]bool{"sample": true}, Generations: map[string]string{"30001": testGeneration}}
+	f.config = PinConfig{ObjectFormat: objectFormat, Maintainers: []string{f.public}, Publisher: public(1), Audience: testAudience, Registry: f.repo, StateDir: state, Stations: map[string]bool{"sample": true}, Generations: map[string]string{"30001": testGeneration}}
 	return f
 }
 func (f *fixture) run(program string, input []byte, args ...string) []byte {
@@ -180,14 +184,14 @@ func bootstrapFixture(ctx context.Context, path string, files Files, ops durable
 	if err = safeRepository(ctx, files, c.Registry); err != nil {
 		return nil, err
 	}
-	v := newGitVerifier(ctx, c.Registry, c.Revision, c.Maintainers)
+	v := newGitVerifier(ctx, c.Registry, c.Revision, c.ObjectFormat, c.Maintainers)
 	entries, err := v.entries()
 	if err != nil {
 		return nil, err
 	}
-	s := newFileStore(ctx, c.StateDir, files)
+	s := newFileStore(ctx, c.StateDir, files, c.ObjectFormat)
 	s.ops = ops
-	_, high, err := (registry.Loader{Policy: policy, Verifier: v, Store: initialPublisher{s}}).Load(registry.Input{Revision: c.Revision, Entries: entries, FirstUse: true})
+	_, high, err := (registry.Loader{ObjectFormat: c.ObjectFormat, Policy: policy, Verifier: v, Store: initialPublisher{s}}).Load(registry.Input{Revision: c.Revision, Entries: entries, FirstUse: true})
 	return high, err
 }
 

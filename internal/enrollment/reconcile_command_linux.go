@@ -175,7 +175,7 @@ func inspectReconciliation(ctx context.Context, configPath string, c PinConfig, 
 		r.Evidence = append(r.Evidence, "consumed_approvals_invalid")
 		interrupted = true
 	}
-	store := newFileStore(ctx, c.StateDir, files)
+	store := newFileStore(ctx, c.StateDir, files, c.ObjectFormat)
 	store.owner = *c.ServiceUID
 	high, err := store.readLocked() // Directory lease already excludes all writers.
 	if err != nil || high == nil {
@@ -201,7 +201,7 @@ func inspectReconciliation(ctx context.Context, configPath string, c PinConfig, 
 		r.Reason = "registry_unavailable"
 		return r, high, err
 	}
-	verifier := newGitVerifier(ctx, c.Registry, c.Revision, c.Maintainers)
+	verifier := newGitVerifier(ctx, c.Registry, c.Revision, c.ObjectFormat, c.Maintainers)
 	snapshotEntries, err := verifier.entries()
 	if err != nil {
 		r.Reason = "snapshot_unverified"
@@ -210,7 +210,7 @@ func inspectReconciliation(ctx context.Context, configPath string, c PinConfig, 
 	// An isolated fresh preview derives state solely from the approved registry.
 	// FirstUse here selects the registrar's validation mode, not local bootstrap:
 	// actual accepted state is mandatory above and no persistent Store is passed.
-	_, candidate, err := (registry.Loader{Policy: policy, Verifier: verifier, Store: &previewStore{}}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, FirstUse: true})
+	_, candidate, err := (registry.Loader{ObjectFormat: c.ObjectFormat, Policy: policy, Verifier: verifier, Store: &previewStore{}}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, FirstUse: true})
 	if err != nil {
 		r.Reason = "snapshot_rejected: " + err.Error()
 		return r, high, errTrust
@@ -219,7 +219,7 @@ func inspectReconciliation(ctx context.Context, configPath string, c PinConfig, 
 	// Independently retain the production ancestry/history checks against the
 	// real local state. Fresh preview cannot waive a monotonicity refusal.
 	capture := &previewStore{before: high.Clone()}
-	_, proposed, validationErr := (registry.Loader{Policy: policy, Verifier: verifier, Store: capture}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, Retained: high.Clone(), Reconciled: true})
+	_, proposed, validationErr := (registry.Loader{ObjectFormat: c.ObjectFormat, Policy: policy, Verifier: verifier, Store: capture}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, Retained: high.Clone(), Reconciled: true})
 	same := reflect.DeepEqual(high, candidate)
 	r.Match = validationErr == nil && same && reflect.DeepEqual(high, proposed)
 	if validationErr != nil {
@@ -400,7 +400,7 @@ func reconcileCommandMode(ctx context.Context, configPath, confirm string, input
 	}
 	publish := func() error { return publishCommandApproval(ctx, configPath, c, approval, source, files, ops, output) }
 	if bootstrap {
-		store := newFileStore(ctx, c.StateDir, files)
+		store := newFileStore(ctx, c.StateDir, files, c.ObjectFormat)
 		store.owner = *c.ServiceUID
 		store.ops = ops
 		if err = (initialPublisher{store}).publish(*high, publish); err != nil {
@@ -565,7 +565,7 @@ func (r *commandReconciler) startup(ctx context.Context, location configLocation
 		ops = diskOps{}
 	}
 	consuming := filepath.Join(location.stateDir, consumingName)
-	store := newFileStore(ctx, location.stateDir, r.files)
+	store := newFileStore(ctx, location.stateDir, r.files, "")
 	lock, err := store.lock()
 	if err != nil {
 		return startupResult{}, err
@@ -592,6 +592,7 @@ func (r *commandReconciler) startup(ctx context.Context, location configLocation
 	if err = ctx.Err(); err != nil {
 		return startupResult{}, err
 	}
+	store.objectFormat = c.ObjectFormat
 	high, err := store.readLocked()
 	if err != nil {
 		return startupResult{}, err
@@ -723,13 +724,13 @@ func inspectBootstrap(ctx context.Context, configPath string, c PinConfig, files
 		r.Reason = "registry_unavailable"
 		return r, nil, err
 	}
-	v := newGitVerifier(ctx, c.Registry, c.Revision, c.Maintainers)
+	v := newGitVerifier(ctx, c.Registry, c.Revision, c.ObjectFormat, c.Maintainers)
 	snapshotEntries, err := v.entries()
 	if err != nil {
 		r.Reason = "snapshot_unverified"
 		return r, nil, err
 	}
-	_, high, err := (registry.Loader{Policy: policy, Verifier: v, Store: &previewStore{}}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, FirstUse: true})
+	_, high, err := (registry.Loader{ObjectFormat: c.ObjectFormat, Policy: policy, Verifier: v, Store: &previewStore{}}).Load(registry.Input{Revision: c.Revision, Entries: snapshotEntries, FirstUse: true})
 	if err != nil {
 		r.Reason = "snapshot_rejected: " + err.Error()
 		return r, nil, errTrust

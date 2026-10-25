@@ -89,7 +89,7 @@ func TestApprovalAttemptClockRefusalRetry(t *testing.T) {
 // Only that rename may change the image; removing the injected problem cannot
 // revive consent. Explicit fixture recovery plus NEW confirmation admits.
 func TestApprovalAttemptPostLockRefusals(t *testing.T) {
-	cases := []string{"malformed", "wrong-digest", "wrong-pin", "wrong-config", "other-boot", "expired", "untrusted", "boot-unreadable", "clock-backward", "clock-step", "ledger-missing", "ledger-malformed", "ledger-generation", "ledger-used-id", "pin-policy", "pin-member-type", "unknown-config-member", "retained-state", "pending", "unknown-evidence"}
+	cases := []string{"malformed", "wrong-digest", "wrong-pin", "wrong-config", "other-boot", "expired", "untrusted", "boot-unreadable", "clock-backward", "clock-step", "ledger-missing", "ledger-malformed", "ledger-generation", "ledger-used-id", "pin-policy", "pin-member-type", "object-format-absent", "object-format-empty", "object-format-unknown", "unknown-config-member", "retained-state", "pending", "unknown-evidence"}
 	for _, bootstrap := range []bool{false, true} {
 		for _, kind := range cases {
 			t.Run(stringMode(bootstrap)+"/"+kind, func(t *testing.T) {
@@ -162,6 +162,32 @@ func TestApprovalAttemptPostLockRefusals(t *testing.T) {
 						t.Fatal("config type plant not applied")
 					}
 					if e = os.WriteFile(f.configPath, []byte(bad), 0600); e != nil {
+						t.Fatal(e)
+					}
+				// Format validation remains post-rename, including an omitted
+				// member. Repairing the pin alone must not revive consent.
+				case "object-format-absent", "object-format-empty", "object-format-unknown":
+					b, e := os.ReadFile(f.configPath)
+					if e != nil {
+						t.Fatal(e)
+					}
+					var document map[string]any
+					if e = json.Unmarshal(b, &document); e != nil {
+						t.Fatal(e)
+					}
+					switch kind {
+					case "object-format-absent":
+						delete(document, "object_format")
+					case "object-format-empty":
+						document["object_format"] = ""
+					case "object-format-unknown":
+						document["object_format"] = "sha512"
+					}
+					b, e = json.Marshal(document)
+					if e != nil {
+						t.Fatal(e)
+					}
+					if e = os.WriteFile(f.configPath, b, 0600); e != nil {
 						t.Fatal(e)
 					}
 				case "unknown-config-member":
@@ -343,7 +369,7 @@ func TestApprovalAttemptPreLockRefusals(t *testing.T) {
 					ctx, cancel = context.WithCancel(ctx)
 					cancel()
 				case "lock-wait-canceled":
-					lock, e := newFileStore(ctx, f.config.StateDir, f.files).lock()
+					lock, e := newFileStore(ctx, f.config.StateDir, f.files, f.config.ObjectFormat).lock()
 					if e != nil {
 						t.Fatal(e)
 					}

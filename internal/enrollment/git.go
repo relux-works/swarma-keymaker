@@ -150,6 +150,7 @@ func (b *boundedOutput) Bytes() []byte { return b.data.Bytes() }
 
 type gitVerifier struct {
 	ctx           context.Context
+	objectFormat  string
 	dir, revision string
 	pins          []string
 	commit        []byte
@@ -157,8 +158,8 @@ type gitVerifier struct {
 	ready         bool
 }
 
-func newGitVerifier(ctx context.Context, dir, revision string, pins []string) *gitVerifier {
-	return &gitVerifier{ctx: ctx, dir: dir, revision: revision, pins: append([]string(nil), pins...)}
+func newGitVerifier(ctx context.Context, dir, revision, objectFormat string, pins []string) *gitVerifier {
+	return &gitVerifier{ctx: ctx, dir: dir, revision: revision, objectFormat: objectFormat, pins: append([]string(nil), pins...)}
 }
 func (v *gitVerifier) command(limit int, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(v.ctx, 3*time.Second)
@@ -179,7 +180,7 @@ func (v *gitVerifier) command(limit int, args ...string) ([]byte, error) {
 	return out.Bytes(), nil
 }
 func (v *gitVerifier) object(kind, oid string, limit int) ([]byte, error) {
-	if !revisionPattern.MatchString(oid) || len(oid) != len(v.revision) {
+	if !validObjectID(v.objectFormat, oid) {
 		return nil, errTrust
 	}
 	b, err := v.command(limit, "cat-file", kind, oid)
@@ -187,7 +188,7 @@ func (v *gitVerifier) object(kind, oid string, limit int) ([]byte, error) {
 		return nil, errTrust
 	}
 	var h hash.Hash
-	if len(oid) == 40 {
+	if v.objectFormat == "sha1" {
 		h = sha1.New()
 	} else {
 		h = sha256.New()
@@ -203,6 +204,9 @@ func (v *gitVerifier) object(kind, oid string, limit int) ([]byte, error) {
 type treeEntry struct{ mode, name, oid string }
 
 func parseTree(b []byte, oidBytes int) ([]treeEntry, error) {
+	if oidBytes != 20 && oidBytes != 32 {
+		return nil, errTrust
+	}
 	var entries []treeEntry
 	seen := map[string]bool{}
 	for len(b) > 0 {
@@ -221,7 +225,10 @@ func parseTree(b []byte, oidBytes int) ([]treeEntry, error) {
 	}
 	return entries, nil
 }
-func commitParts(raw []byte) (tree string, unsigned, signature []byte, err error) {
+func commitParts(raw []byte, objectFormat string) (tree string, unsigned, signature []byte, err error) {
+	if objectIDBytes(objectFormat) == 0 {
+		return "", nil, nil, errTrust
+	}
 	end := bytes.Index(raw, []byte("\n\n"))
 	if end < 0 {
 		return "", nil, nil, errTrust
@@ -240,8 +247,11 @@ func commitParts(raw []byte) (tree string, unsigned, signature []byte, err error
 			}
 			tree = strings.TrimSuffix(string(line[5:]), "\n")
 		}
+		if bytes.HasPrefix(line, []byte("parent ")) && !validObjectID(objectFormat, strings.TrimSuffix(string(line[7:]), "\n")) {
+			return "", nil, nil, errTrust
+		}
 		signatureHeader := "gpgsig "
-		if len(tree) == 64 {
+		if objectFormat == "sha256" {
 			signatureHeader = "gpgsig-sha256 "
 		}
 		if bytes.HasPrefix(line, []byte("gpgsig ")) || bytes.HasPrefix(line, []byte("gpgsig-sha256 ")) {
@@ -262,20 +272,20 @@ func commitParts(raw []byte) (tree string, unsigned, signature []byte, err error
 		out.Write(line)
 	}
 	out.Write(raw[end+1:])
-	if !revisionPattern.MatchString(tree) {
+	if !validObjectID(objectFormat, tree) {
 		return "", nil, nil, errTrust
 	}
 	return tree, out.Bytes(), signature, nil
 }
 func (v *gitVerifier) entries() ([]registry.Entry, error) {
-	if !revisionPattern.MatchString(v.revision) {
+	if !validObjectID(v.objectFormat, v.revision) {
 		return nil, errTrust
 	}
 	commit, err := v.object("commit", v.revision, 1<<20)
 	if err != nil {
 		return nil, err
 	}
-	root, _, _, err := commitParts(commit)
+	root, _, _, err := commitParts(commit, v.objectFormat)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +293,7 @@ func (v *gitVerifier) entries() ([]registry.Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	roots, err := parseTree(tree, len(v.revision)/2)
+	roots, err := parseTree(tree, objectIDBytes(v.objectFormat))
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +307,7 @@ func (v *gitVerifier) entries() ([]registry.Entry, error) {
 			if err != nil {
 				return nil, err
 			}
-			children, err := parseTree(tree, len(v.revision)/2)
+			children, err := parseTree(tree, objectIDBytes(v.objectFormat))
 			if err != nil {
 				return nil, err
 			}
@@ -351,14 +361,14 @@ func (v *gitVerifier) Verify(revision string, entries []registry.Entry) error {
 	if revision != v.revision || !reflect.DeepEqual(entries, v.selected) {
 		return errTrust
 	}
-	_, unsigned, signature, err := commitParts(v.commit)
+	_, unsigned, signature, err := commitParts(v.commit, v.objectFormat)
 	if err != nil {
 		return err
 	}
 	return verifySSHSig(signature, unsigned, v.pins)
 }
 func (v *gitVerifier) Descends(candidate, previous string) (bool, error) {
-	if candidate != v.revision || !revisionPattern.MatchString(previous) || len(candidate) != len(previous) {
+	if candidate != v.revision || !validObjectID(v.objectFormat, candidate) || !validObjectID(v.objectFormat, previous) {
 		return false, errTrust
 	}
 	if candidate == previous {

@@ -169,7 +169,7 @@ func newHelperTrust(t *testing.T, f *nativeFixture, body map[string]any, admitte
 	}
 	state := filepath.Join(base, "state")
 	os.Mkdir(state, 0700)
-	config := enrollment.PinConfig{Maintainers: []string{strings.TrimSpace(string(pin))}, Revision: revision, Publisher: publisherPublic, Audience: helperAudience, Registry: repo, StateDir: state, Stations: map[string]bool{"sample": true}, Generations: admitted}
+	config := enrollment.PinConfig{ObjectFormat: "sha1", Maintainers: []string{strings.TrimSpace(string(pin))}, Revision: revision, Publisher: publisherPublic, Audience: helperAudience, Registry: repo, StateDir: state, Stations: map[string]bool{"sample": true}, Generations: admitted}
 	path := filepath.Join(base, "pins.json")
 	write := func(p string, b []byte) {
 		t.Helper()

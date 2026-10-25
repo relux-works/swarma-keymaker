@@ -42,6 +42,7 @@ are refused. This shape shows placeholders, not deployable verification keys:
 ```json
 {
   "maintainers": ["ssh-ed25519 <canonical-base64-SSH-public-key>"],
+  "object_format": "sha1",
   "revision": "<approved-full-lowercase-commit-id>",
   "publisher": "ed25519:<canonical-unpadded-base64url-public-key>",
   "audience": "carrier.example.invalid",
@@ -55,8 +56,15 @@ are refused. This shape shows placeholders, not deployable verification keys:
 
 The config is a regular nonsymlink root-owned file without group/world write;
 all ancestors must be protected root-owned directories. Reads use `O_NOFOLLOW`
-and check the opened inode. The approved revision is an exact 40- or 64-digit
-commit ID, never a ref. The local registry is the explicit absolute Git directory
+and check the opened inode. The required protected `object_format` is exactly
+`sha1` or `sha256`, with no default, trimming or inference from an ID's length.
+Missing, empty, unknown or nonstring values refuse as `enrollment_unverified`.
+The approved revision, retained revision, commit parents and all tree/blob IDs
+must be exactly 40 lowercase hex digits for `sha1`, or exactly 64 for `sha256`,
+never a ref. The protected pin must match the registry's Git object format.
+Every registrar Loader receives that same pin; a missing/unknown format or
+cross-format revision refuses as `registry_unavailable` upstream. The local
+registry is the explicit absolute Git directory
 of a root-managed bare repository or `.git` directory. Its files and directories
 must also be root-owned, nonsymlinked and not writable by group/others. External
 object alternates are refused. Working-tree bytes never provide authority.
@@ -384,11 +392,14 @@ current-only keys, failed reloads, generation re-admission, rollback history,
 tombstones, CAS, corrupt/restored state, interrupted writes and restart fencing.
 `TestRegistrarEnrollmentConformance` discovers all enrollment rows in the local
 pinned module directory obtained with `go list -m -json`. Test-time module fetch
-is disabled. All 114 negative and 25 positive published rows run, with no deferred
-conformance rows. The ten codec controls use the public codec; the 129 registry
+is disabled. All 130 negative and 27 positive published rows run, with no deferred
+conformance rows. The ten codec controls use the public codec; the 147 registry
 rows use the production Git verifier, ancestry and CAS store. Fixture revision
-labels are instantiated with real signed Git object IDs while preserving the
-specified equality/ancestry/approval relationships. Signed enrollment bytes and
+labels satisfying the protected grammar are instantiated with real signed Git
+object IDs while preserving the specified equality/ancestry/approval
+relationships. Invalid and cross-format IDs are passed unchanged; both
+protected formats use real signed repositories in their positive controls.
+Signed enrollment bytes and
 expected record IDs are unchanged. Aggregate repeats expand actual bytes under
 distinct paths. Exact registrar codes, diagnostic-to-helper-code mappings,
 installed/current high-water state, retained history and readiness are asserted

@@ -22,7 +22,7 @@ func TestSignedGitFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configuration: %v", err)
 	}
-	v := newGitVerifier(context.Background(), f.repo, f.config.Revision, f.config.Maintainers)
+	v := newGitVerifier(context.Background(), f.repo, f.config.Revision, f.config.ObjectFormat, f.config.Maintainers)
 	entries, err := v.entries()
 	if err != nil {
 		t.Fatalf("entries: %v", err)
@@ -30,8 +30,8 @@ func TestSignedGitFixture(t *testing.T) {
 	if err = v.Verify(f.config.Revision, entries); err != nil {
 		t.Fatalf("signature: %v", err)
 	}
-	store := newFileStore(context.Background(), f.config.StateDir, f.files)
-	_, _, err = (registry.Loader{Policy: policy, Verifier: v, Store: initialPublisher{store}}).Load(registry.Input{Revision: f.config.Revision, Entries: entries, FirstUse: true})
+	store := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat)
+	_, _, err = (registry.Loader{ObjectFormat: f.config.ObjectFormat, Policy: policy, Verifier: v, Store: initialPublisher{store}}).Load(registry.Input{Revision: f.config.Revision, Entries: entries, FirstUse: true})
 	if err != nil {
 		t.Fatalf("loader: %v store_failed=%t", err, store.failed)
 	}
@@ -67,7 +67,7 @@ func TestSignedCommitRefusals(t *testing.T) {
 				}
 				f.config.Revision = f.commit(entries, "", true)
 			default:
-				v := newGitVerifier(context.Background(), f.repo, revision, f.config.Maintainers)
+				v := newGitVerifier(context.Background(), f.repo, revision, f.config.ObjectFormat, f.config.Maintainers)
 				bound, err := v.entries()
 				if err != nil {
 					t.Fatal(err)
@@ -258,12 +258,13 @@ func TestUnreadableGitEvidence(t *testing.T) {
 	expectCode(t, OK, code)
 }
 
-// Full SHA-256 object IDs must bind signatures/trees/blobs as SHA-1 IDs do;
+// An explicit protected sha256 pin binds full signatures/trees/blobs;
 // approval of a different 64-digit ID still refuses instead of following a ref.
 func TestSHA256PinnedGit(t *testing.T) {
 	f := newFixture(t)
 	f.repo = filepath.Join(f.base, "registry-sha256.git")
 	f.config.Registry = f.repo
+	f.config.ObjectFormat = "sha256"
 	f.run("/usr/bin/git", nil, "init", "--bare", "--quiet", "--object-format=sha256", f.repo)
 	f.config.Revision = f.commit(f.valid(), "", true)
 	if len(f.config.Revision) != 64 {

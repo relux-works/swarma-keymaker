@@ -189,6 +189,20 @@ is allowed to obtain the binding or confirmations.
 `{"<canonical decimal UID>":"<one nonzero 32-hex generation>"}` in protected
 local pin config ([implementation shape](../internal/enrollment/config.go)).
 Replace that UID's old token with the reviewed new token; it cannot admit both.
+
+The same root-owned enrollment configuration requires `object_format`, exactly
+`sha1` or `sha256`. Omission, empty/unknown values and nonstrings refuse with
+`enrollment_unverified`; no default or inference from the revision is allowed.
+The approved revision, retained revision, commit parents and tree/blob object
+IDs must all be exactly 40 lowercase hex characters under `sha1` or exactly 64
+under `sha256`, matching the protected repository format. Uppercase,
+abbreviations, the other format's width, adjacent lengths and branch names
+are refused. All registry Loader calls, including reconciliation previews and
+operator bootstrap, receive this exact pin. A missing/unknown Loader format
+refuses upstream with `registry_unavailable` before verification or persistence.
+Configuration validation retains the existing startup order: only the state
+location is decoded before receipt invalidation; scalar policy checks follow it.
+
 No new registrar enrollment/1 member, host key, registry revision or signed
 registrar document is required solely for a generation change. Changes to
 host key, uid_map names or registrar trust retain their ordinary review flow.

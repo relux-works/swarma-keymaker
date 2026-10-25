@@ -192,7 +192,7 @@ func TestReconcileBootstrapOneStartup(t *testing.T) {
 	if err != nil || len(reports) != 2 || !reports[1].Approved {
 		t.Fatalf("interactive bootstrap refused: %v %#v", err, reports)
 	}
-	high, err := newFileStore(context.Background(), f.config.StateDir, f.files).read()
+	high, err := newFileStore(context.Background(), f.config.StateDir, f.files, f.config.ObjectFormat).read()
 	if err != nil || StateDigest(high) != r.StateSHA256 {
 		t.Fatal("published a different state", err)
 	}

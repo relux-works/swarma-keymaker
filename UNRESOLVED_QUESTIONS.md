@@ -329,7 +329,9 @@ nil-option tests require refusal before callbacks or source/local persistence.
   an unactivated separate witness proposal as stated in section 3.1; no dummy
   restore-success callback is present. Local continuity cannot detect complete
   joint restoration of the old anchor and audit pair.
-- Go MVS selects registrar `5f44ebf3f788` and x/sys0.37.0. The exact conformance
-  pin and explicit HTTP-only exclusions are updated; ccj, registration,
-  enrollment and registry tree-equality evidence is beside the assertion.
+- Go MVS selects registrar `264660e5dabb` and x/sys0.38.0. The exact conformance
+  pin and explicit HTTP-only exclusions are updated. CCJ, registration,
+  enrollment and envelope are unchanged by this repin; registry now requires
+  a protected `object_format` of exactly `sha1` or `sha256`. Local enrollment
+  config, Git verification, state reads and Loader calls enforce that pin.
   No module replacement directive is used.

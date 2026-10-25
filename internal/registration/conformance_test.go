@@ -58,6 +58,8 @@ func decodeFixture(t *testing.T, s string) []byte {
 // c17d73b2d6ffd5dfc042d3e0d8fc63972c95e00a (git rev-parse commit:path).
 // The five added rows R138/R139/PR31-33 concern HTTP Content-Type only;
 // vector-coverage.json explicitly excludes that receiver boundary.
+// The 264660e5dabb repin preserves ccj, registration, enrollment and envelope
+// byte-for-byte against 5f44ebf3f788; registry now requires ObjectFormat.
 func localModule(t *testing.T) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -74,7 +76,7 @@ func localModule(t *testing.T) string {
 		t.Fatal("local pinned registrar unavailable; conformance unrun", err)
 	}
 	var m struct{ Dir, Version string }
-	if json.Unmarshal(out, &m) != nil || !filepath.IsAbs(m.Dir) || m.Version != "v0.0.0-20261023164451-5f44ebf3f788" {
+	if json.Unmarshal(out, &m) != nil || !filepath.IsAbs(m.Dir) || m.Version != "v0.0.0-20261025040811-264660e5dabb" {
 		t.Fatal("conformance requires exact local registrar pin")
 	}
 	return m.Dir

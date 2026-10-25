@@ -168,12 +168,19 @@ func TestMsgV17RootIsolation(t *testing.T) {
 	if _, ok := typ.MethodByName("Sign"); ok {
 		t.Fatal("arbitrary issuer signing API")
 	}
-	for _, path := range []string{"m/1'/1'/1'/1'", "m/2'/1'/1'/1'", "m/3'/1'/1'/1'", "m/4'/1'/1'/1'", "m/5/1'/1'/1'"} {
+	for _, path := range []string{"m/1'/1'/1'/1'", "m/2'/1'/1'/1'", "m/3'/1'/1'/1'", "m/4'/1'/1'/1'", "m/5/1'/1'/1'", "m/5'/1'/1'"} {
 		i, b, p, f, _ := messageIssuerFixture(t)
 		i.policy.Path = path
 		c, code := i.prepare(t.Context(), strings.Repeat("1", 32), b, p, f)
-		if code == "" || c.Envelope != "" {
-			t.Fatal("wrong-purpose issuer admitted", path)
+		want := Code("purpose_unknown")
+		if path == "m/5/1'/1'/1'" {
+			want = "path_not_hardened"
+		}
+		if path == "m/5'/1'/1'" {
+			want = "path_invalid"
+		}
+		if code != want || c.Envelope != "" {
+			t.Fatal("wrong-purpose issuer refusal", path, code, want)
 		}
 	}
 	i, b, p, f, _ := messageIssuerFixture(t)

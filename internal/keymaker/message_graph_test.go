@@ -314,3 +314,42 @@ func TestMsgMigrationEligibility(t *testing.T) {
 		})
 	}
 }
+
+// Aborted internal IDs remain permanently consumed. Repeating entropy refuses
+// the exact collision without writing; independent fresh entropy admits a new
+// candidate after the fully evidenced pre-issuance abort.
+func TestMsgCertificationIDReuse(t *testing.T) {
+	f := messageStateSetup(t)
+	f.store.messageFault = func(point string) Code {
+		if point == "signed" {
+			return "audit_unavailable"
+		}
+		return ""
+	}
+	if _, c := f.service.issue(t.Context(), f.binding); c != "audit_unavailable" {
+		t.Fatal("intent interruption", c)
+	}
+	tx := f.store.messages.Transactions[0]
+	m := messageMaintenanceFixture(t, f)
+	if c := m.reconcile(t.Context(), messageExpected(tx, "abort")); c != "" {
+		t.Fatal("known abort control", c)
+	}
+	if e := m.Close(); e != nil {
+		t.Fatal(e)
+	}
+	f.reopen(t)
+	before := recoveryFiles(t, f.path)
+	if _, c := f.service.issue(t.Context(), f.binding); c != "request_conflict" {
+		t.Fatal("consumed certification ID reused", c)
+	}
+	if !equalMessageFiles(before, recoveryFiles(t, f.path)) {
+		t.Fatal("ID collision changed evidence")
+	}
+	f.service.entropy = bytes.NewReader(bytes.Repeat([]byte{0x33}, 32))
+	if id, c := f.service.issue(t.Context(), f.binding); c != "" || id == tx.ID {
+		t.Fatal("fresh internal ID control", id, c)
+	}
+	if len(f.store.messages.Transactions) != 2 || len(f.store.messages.Certificates) != 1 {
+		t.Fatal("ID history lost or duplicate candidate")
+	}
+}

@@ -72,6 +72,7 @@ normal create keeps register-after-active. No new method is enabled.
 | Path | Contents |
 | --- | --- |
 | `spec/keymaker-operator-record.md` | Proposed S1 operator-record integration, fact sources, durable replay and audit delta; no runtime activation |
+| `spec/keymaker-time-adapter.md` | Qualified-time tightening, clause/path/slice map and external continuity/receipt/activation gates |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
 | `spec/witness-service.md` | Proposed shared typed witness protocol, registry intent/resolution inclusion, server durability and paired text vectors; no implementation or activation |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
@@ -151,6 +152,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | --- | --- | --- |
 | GitHub Actions | Linux CI on pull requests and pushes to main: `.github/workflows/linux-ci.yml`, Ubuntu 26.04, Go 1.26.0; `go mod verify`, `go mod tidy -diff`, `go mod download`, `go build ./...`, `go vet ./...`, `bash -eo pipefail .github/scripts/check-format.sh`, `python3 .github/scripts/check-hygiene.py`, `bash -eo pipefail .github/scripts/check-controls.sh`, `bash -eo pipefail .github/scripts/check-pending-controls.sh`, `go test ./... -count=1 -timeout=25m -v` | Actions logs and private temporary fixtures; controls require stale-checksum, vet and format refusals (including broken Windows-only syntax), and four generic attribution refusals. Full checkout history preserves parent-tree provenance tests. `go vet -tags multiuid ./internal/keymaker` and `bash -eo pipefail .github/scripts/report-pending.sh` compile and dynamically list all multiuid-tagged TestMultiUID* rows as PENDING, without executing their bodies; the separate provisioned window qualifies them. Inventory controls reject empty lists and untagged leaks, and preserve command failures; no runtime test gate or name-based skip |
 | Go | Reproduce offline release fixtures: `go mod download`, then `go test ./tools/release-bundle -count=1` (set `GOMODCACHE` to a fresh private directory to check cache independence) | Isolated copies of the selected module graph, not historical checksum versions; no test-time network fetch. Missing module artifacts name the dependency and request `go mod download`; bundle refusal tests retain empty-proxy controls |
+| Go | Qualified-time slice A: `go test ./internal/timeconfidence ./internal/enrollment -count=1`; `go test ./internal/registration ./internal/keymaker -run '^(TestQualifiedTime\|TestTimeConfidence)' -count=1` | Private TMPDIR logs; exact authority/uncertainty and rounding pairs, provider preservation and retained-grant checks; no native qualification |
+| Go | Pending qualified-time gates: `go test -tags qualifiedtime ./internal/enrollment ./internal/registration ./internal/keymaker -run '^TestQualifiedTimePending' -count=1 -v` | Expected nonzero PENDING for four missing durable issue-bound, provider continuity, pre-window audit and K3 receipt inputs; no skip and no activation |
 | Go | Trusted time integration: `go test ./cmd/keymaker ./internal/keymaker ./internal/registration ./internal/enrollment ./internal/control -run '^(TestTimeConfidence\|TestCollectorEntryFirst)' -count=1 -v` | Provider age/uncertainty/hold boundaries, missing-policy refusal, final audit recheck, approval invalidation, null audit time and production collector/pin isolation; private TMPDIR fixtures |
 | Go | Verify copied generation-vector provenance and bounded drift controls: `go test ./internal/keymaker -run '^TestGenerationVector(Provenance\|DriftControl)$' -count=1 -v` | Exact public source hashes and 67-case inventory; this does not run adapter verdicts |
 | Go | Check terminal generation refusal handling: `GOMAXPROCS=2 GOFLAGS=-p=2 GORACE=atexit_sleep_ms=0 go test -race ./internal/control ./internal/keymaker -run '^Test(GenerationSourceFencedContract\|NativeGenerationAdmissionRefusal\|ResponseRefusals\|RetryableAllowlist)$' -count=1 -v` | Nonretryable typed refusals, one admission audit and no effects, paired active controls; private test sockets under TMPDIR |
@@ -429,6 +432,14 @@ checks current enrollment without renewing that grant.
 Missing audit confidence retains section11's null-time/unknown behavior. Request
 budgets, rate limiting and the independent CLOCK_BOOTTIME approval TTL use elapsed
 time; they never establish UTC confidence.
+
+The [qualified-time slice plan](spec/keymaker-time-adapter.md) tightens the local
+shape check to `U=O+delta < A` with checked nanosecond arithmetic. Enrollment
+retains current delta/A in memory and uses U; its persisted issue point is
+unchanged. Registration also checks U against the retained original authority.
+Conservative second projection is arithmetic only; no receipt integration or
+durable continuity is supplied. Audit still samples under outer/final locks, a
+known contract gap. Activation stays closed pending the plan's external inputs.
 
 Real host provider, NTS inventory, collector isolation and storage latency
 qualification remain PENDING. Durable decision-bound/hold continuity across process

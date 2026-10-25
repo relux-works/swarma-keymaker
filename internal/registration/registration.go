@@ -132,7 +132,7 @@ func (p *Proof) validAt(v timeconf.Sample) Code {
 	if !now.Add(v.Uncertainty).Before(p.expires) {
 		return RequestExpired
 	}
-	if !now.Before(p.authorityUntil) {
+	if !now.Add(v.Uncertainty).Before(p.authorityUntil) {
 		return ClockUntrusted
 	}
 	return OK

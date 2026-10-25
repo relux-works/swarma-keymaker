@@ -25,7 +25,7 @@ type fixedApprovalSource struct {
 
 func (s *fixedApprovalSource) sample() (approvalInstant, error) { return s.instant, s.err }
 func approvalTestClock(f *fixture) *fixedApprovalSource {
-	s := &fixedApprovalSource{instant: approvalInstant{"test-boot", testNow.UnixNano(), int64(time.Hour), true}}
+	s := &fixedApprovalSource{instant: approvalInstant{bootID: "test-boot", utc: testNow.UnixNano(), boot: int64(time.Hour), trusted: true, authorityUntil: testNow.Add(time.Hour)}}
 	f.files.approvalClock = s
 	return s
 }

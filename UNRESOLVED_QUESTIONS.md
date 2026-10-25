@@ -371,3 +371,12 @@ nil-option tests require refusal before callbacks or source/local persistence.
   a protected `object_format` of exactly `sha1` or `sha256`. Local enrollment
   config, Git verification, state reads and Loader calls enforce that pin.
   No module replacement directive is used.
+
+## Qualified-time adapter activation
+
+The [slice plan](spec/keymaker-time-adapter.md) records the external provider
+continuity/witness, native operation profile, durable enrollment issue-bound,
+pre-window audit handoff and K3 receipt inputs. The rollback CAS backend and
+restore exclusions remain owner decisions. Current audit collection under
+Store/generation/journal locks and point-only persisted enrollment issuance
+remain known contract gaps; slice A does not activate them or change codecs.

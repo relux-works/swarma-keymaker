@@ -25,9 +25,11 @@ const approvalTTL = 10 * time.Minute
 const ledgerPrefix = "consumed-approvals/1 "
 
 type approvalInstant struct {
-	bootID    string
-	utc, boot int64
-	trusted   bool
+	bootID         string
+	utc, boot      int64
+	trusted        bool
+	uncertainty    time.Duration
+	authorityUntil time.Time
 }
 type approvalSource interface {
 	sample() (approvalInstant, error)
@@ -53,7 +55,7 @@ func (s linuxApprovalSource) sample() (approvalInstant, error) {
 	if unix.ClockGettime(unix.CLOCK_BOOTTIME, &boot) != nil {
 		return approvalInstant{}, fmt.Errorf("clock_untrusted")
 	}
-	return approvalInstant{v.Boot, v.Now.UnixNano(), boot.Nano(), true}, nil
+	return approvalInstant{bootID: v.Boot, utc: v.Now.UnixNano(), boot: boot.Nano(), trusted: true, uncertainty: v.Uncertainty, authorityUntil: v.AuthorityUntil}, nil
 }
 
 // Fixture substitution is package-private; policy is always decoded from the
@@ -83,22 +85,29 @@ func validApprovalID(id string) bool {
 	return err == nil && len(b) == 32 && hex.EncodeToString(b) == id
 }
 func newCommandApproval(path string, c PinConfig, digest string, source approvalSource) (commandApproval, error) {
+	if source == nil {
+		return commandApproval{}, fmt.Errorf("clock_untrusted")
+	}
 	i, err := source.sample()
 	if err != nil {
 		return commandApproval{}, err
 	}
-	if !i.trusted || i.utc <= 0 || i.boot <= 0 || i.bootID == "" {
+	if _, ok := approvalUpper(i); !ok {
 		return commandApproval{}, fmt.Errorf("clock_untrusted")
 	}
 	id, err := randomApprovalID()
 	return commandApproval{Version: 1, ConfigPathSHA256: digestBytes([]byte(path)), PinSHA256: pinDigest(c), StateSHA256: digest, ID: id, BootID: i.bootID, ConfirmedUTC: i.utc, ConfirmedBoot: i.boot}, err
 }
 func approvalValid(a commandApproval, source approvalSource) error {
+	if source == nil {
+		return errTrust
+	}
 	now, err := source.sample()
 	if err != nil {
 		return err
 	}
-	if !validApprovalID(a.ID) || !validApprovalID(a.LedgerID) || !now.trusted || a.ConfirmedUTC <= 0 || a.ConfirmedBoot <= 0 {
+	upper, ok := approvalUpper(now)
+	if !validApprovalID(a.ID) || !validApprovalID(a.LedgerID) || !ok || a.ConfirmedUTC <= 0 || a.ConfirmedBoot <= 0 {
 		return errTrust
 	}
 	if now.bootID == "" || now.bootID != a.BootID {
@@ -109,7 +118,7 @@ func approvalValid(a commandApproval, source approvalSource) error {
 		return fmt.Errorf("approval_clock_rollback")
 	}
 	wallAge, bootAge := now.utc-a.ConfirmedUTC, now.boot-a.ConfirmedBoot
-	if wallAge >= int64(approvalTTL) || bootAge >= int64(approvalTTL) {
+	if upper-a.ConfirmedUTC >= int64(approvalTTL) || bootAge >= int64(approvalTTL) {
 		return fmt.Errorf("approval_expired")
 	}
 	// NTP slewing/sampling may change the UTC/boot offset slightly; a clock step
@@ -118,6 +127,20 @@ func approvalValid(a commandApproval, source approvalSource) error {
 		return fmt.Errorf("approval_clock_discontinuity")
 	}
 	return nil
+}
+
+// Current provider facts remain in memory, unchanged. The persisted issue point
+// is still O_issue: retaining L_issue/deadline/receipt requires the later codec
+// review. This tightening alone does not qualify the full 600-second contract.
+func approvalUpper(i approvalInstant) (int64, bool) {
+	if i.utc <= 0 || i.boot <= 0 {
+		return 0, false
+	}
+	_, u, ok := timeconfidence.Bounds(timeconf.Sample{Now: time.Unix(0, i.utc), Boot: i.bootID, Trusted: i.trusted, Fresh: true, Uncertainty: i.uncertainty, AuthorityUntil: i.authorityUntil})
+	if !ok {
+		return 0, false
+	}
+	return u.UnixNano(), true
 }
 
 // The ledger is created by the operator, never by startup. The service only

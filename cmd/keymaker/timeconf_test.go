@@ -82,7 +82,7 @@ func TestTimeConfidenceProductionBuild(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if !strings.Contains(string(meta), "github.com/relux-works/swarma-credential-broker\tv0.0.0-20261024191028-3924ab6e811b") || strings.Contains(string(meta), "=>") {
+	if !strings.Contains(string(meta), "github.com/relux-works/swarma-credential-broker\tv0.0.0-20261025133248-8cdea829b261") || strings.Contains(string(meta), "=>") {
 		t.Fatalf("provider pin/replacement: %s", meta)
 	}
 	symbols, e := exec.Command("go", "tool", "nm", path).CombinedOutput()

@@ -23,7 +23,9 @@ also passes under D39. The wrong-prior case uses genuinely signed wrong bytes,
 not merely invalid JSON. Do not substitute conflict for the prior.
 
 These bytes and [paired MS-S rows](../../spec/keymaker-msg-state.md#6-paired-negative-text-vectors)
-are conformance inputs, not passing Keymaker runtime tests. The existing
+are exercised by the in-memory `TestMsgS4ImportedJournal` adapter test with
+exact decisions and positive plans. The existing
 `go run ./tools/vectors/main.go -check` covers its original native/derivation
-fixtures, not these imported verifier cases. Consumer execution, current
-publication/freshness/receipt integration and all activation gates remain PENDING.
+fixtures, not these imported verifier cases. Production publication/freshness/
+receipt integration, real publisher/WC1/time qualification and all activation
+gates remain PENDING.

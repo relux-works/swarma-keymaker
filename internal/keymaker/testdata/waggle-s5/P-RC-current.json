@@ -1,0 +1,177 @@
+{
+  "id": "P-RC-current",
+  "claim": "A receipt also accepts a current bound snapshot.",
+  "positive_control": "",
+  "mode": "receipt",
+  "input": {
+    "attach": true,
+    "consume": {
+      "input": {
+        "ids": [],
+        "key": "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM",
+        "keys": [
+          "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM"
+        ],
+        "reference": "sha256:df7ef0124f5af8a7ec38c32027259d0db6a7d3bd3845ebf159e2556a2378c841",
+        "root": "ed25519:2dJ3Im2a_cYnF0y9xP2zc5XitBT0maSzUxgZgNKq9f4"
+      },
+      "mode": "attestation"
+    },
+    "margin": 0,
+    "mint": {
+      "input": {
+        "chain": [
+          "eyJib2R5Ijp7ImNoZWNrcG9pbnRfaWQiOiJzaGEyNTY6NDc0ZjlmNjQ0MDNkMjhlYTNiMmEzYzE2Y2E5MTEwNmQ1ZmYzMjY0ZmFlODA5NDZjYWVhNWMxZDczZDBiOTY4ZiIsImlzc3VlZF9hdCI6IjIwMjYtMDEtMDFUMDA6MDM6MDBaIiwib3duZXIiOiJvd25lci1hIiwicHJldiI6bnVsbCwicHVibGljYXRpb25fc2VxIjoyLCJyZWdpc3RyeSI6ImVkMjU1MTk6MmRKM0ltMmFfY1luRjB5OXhQMnpjNVhpdEJUMG1hU3pVeGdaZ05LcTlmNCIsInJlZ2lzdHJ5X3NlcSI6Mywic25hcHNob3QiOiJzaGEyNTY6M2U0NmNhNDRiODM3NDY5MzNmOGFiMTIwY2U5MjcyY2U2ZGNjZDJjOTliN2EzMWI0ZDkzNzA5NGE2MWMyNTNlZSIsInR5cGUiOiJmcmVzaG5lc3MvMSJ9LCJpZCI6InNoYTI1Njo4ZDg1NGNmODgyMTZlYzdmMzhmZmFjNDMzNDU0MDljMzM0MWYwNjU4OWJiNjQ4NzI2Yzg4OWU3MTZkNmFjYThlIiwic2lnbmF0dXJlcyI6W3sia2V5IjoiZWQyNTUxOToyZEozSW0yYV9jWW5GMHk5eFAyemM1WGl0QlQwbWFTelV4Z1pnTktxOWY0Iiwicm9sZSI6ImF1dGhvciIsInNpZyI6InhuTEdBRGhKT1dzeFdxMkRDekpkV3JUYTY2R1l2T3lXX2lWOU5jVlNpWWpKTzdqeFhIbFdDV0J1VE5BUlhaNGxqaXk1SldBRkY4cVF3Um5WRFNPYURRIn1dLCJ2ZXJzaW9uIjoic3dhcm0tZW52ZWxvcGUvMiJ9"
+        ],
+        "checkpoint": "eyJib2R5Ijp7ImF0IjoiMjAyNi0wMS0wMVQwMDowMzowMFoiLCJoZWFkIjoic2hhMjU2OmFmYWIwNjkwZDI0NjQ2YzQ5MTYwMjJlMmM2ODAwMzViMzdmMTYwMDE4MWQ4OTVjYTZhZTM0MThmZjAzZjdkN2EiLCJvd25lciI6Im93bmVyLWEiLCJyZWdpc3RyeSI6ImVkMjU1MTk6MmRKM0ltMmFfY1luRjB5OXhQMnpjNVhpdEJUMG1hU3pVeGdaZ05LcTlmNCIsInNlcSI6Mywic25hcHNob3QiOiJzaGEyNTY6M2U0NmNhNDRiODM3NDY5MzNmOGFiMTIwY2U5MjcyY2U2ZGNjZDJjOTliN2EzMWI0ZDkzNzA5NGE2MWMyNTNlZSIsInR5cGUiOiJjaGVja3BvaW50LzEifSwiaWQiOiJzaGEyNTY6NDc0ZjlmNjQ0MDNkMjhlYTNiMmEzYzE2Y2E5MTEwNmQ1ZmYzMjY0ZmFlODA5NDZjYWVhNWMxZDczZDBiOTY4ZiIsInNpZ25hdHVyZXMiOlt7ImtleSI6ImVkMjU1MTk6MmRKM0ltMmFfY1luRjB5OXhQMnpjNVhpdEJUMG1hU3pVeGdaZ05LcTlmNCIsInJvbGUiOiJhdXRob3IiLCJzaWciOiJiR2djYWdxNktPNDYwSWNlNGhTTkxReUpzOXNzRlE2RFlpeHI1QmhMQy1vMC1OdGJrWklTSWpfQXRuRFM2dDRkeUt6Q2pFSXlJOG9zdlotakw5QjJCZyJ9XSwidmVyc2lvbiI6InN3YXJtLWVudmVsb3BlLzIifQ",
+        "ids": [],
+        "keys": [
+          "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM"
+        ]
+      },
+      "mode": "freshness"
+    },
+    "renew_evidence": false,
+    "require": true,
+    "use": {}
+  },
+  "fixture": {
+    "active_generations": {
+      "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM": {
+        "active": true,
+        "generation": "generation-2",
+        "master_epoch": "epoch-1",
+        "owner": "owner-a",
+        "path": "message/agent-2",
+        "registration_number": 3,
+        "uid": 1002
+      }
+    },
+    "agent_attestation_ids": {
+      "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM": "sha256:df7ef0124f5af8a7ec38c32027259d0db6a7d3bd3845ebf159e2556a2378c841"
+    },
+    "agent_revocation_root": {
+      "attestation_root": "ed25519:b2CdQco2XmEi01K78Tg0l7-24Eu5_wHLHlSvQE3mj1M",
+      "key": "ed25519:2dJ3Im2a_cYnF0y9xP2zc5XitBT0maSzUxgZgNKq9f4",
+      "purpose": "registry-revocation"
+    },
+    "assurance": {
+      "level": "A1",
+      "presence": false
+    },
+    "attestations": {
+      "sha256:df7ef0124f5af8a7ec38c32027259d0db6a7d3bd3845ebf159e2556a2378c841": "eyJib2R5Ijp7ImFjdGlvbnMiOlsibWVzc2FnZS5zaWduIl0sImJpbmRpbmciOnsiZ2VuZXJhdGlvbiI6ImdlbmVyYXRpb24tMiIsIm1hc3Rlcl9lcG9jaCI6ImVwb2NoLTEiLCJvd25lciI6Im93bmVyLWEiLCJwYXRoIjoibWVzc2FnZS9hZ2VudC0yIiwicmVnaXN0cmF0aW9uX251bWJlciI6MywidWlkIjoxMDAyfSwiZXhwIjoiMjAyNi0wMS0wMlQwMDowMDowMFoiLCJpYXQiOiIyMDI2LTAxLTAxVDAwOjAwOjAwWiIsImlzc3VlciI6ImVkMjU1MTk6YjJDZFFjbzJYbUVpMDFLNzhUZzBsNy0yNEV1NV93SExIbFN2UUUzbWoxTSIsImtleV9jbGFzcyI6ImFnZW50IiwicHVycG9zZSI6InN3YXJtYS1tc2ciLCJyb2xlcyI6WyJhdXRob3IiXSwic3ViamVjdCI6eyJhbGdvcml0aG0iOiJFZDI1NTE5Iiwia2V5X2lkIjoiZWQyNTUxOTo5RE5QbmZ0NmNWVUlxYXB6aDlNUm5lNjZGc1NvaDQ5dTVqd3pfMngwaFBNIiwicHVibGljX2J5dGVzIjoiOUROUG5mdDZjVlVJcWFwemg5TVJuZTY2RnNTb2g0OXU1and6XzJ4MGhQTSJ9LCJ0eXBlIjoiYXR0ZXN0YXRpb24vMSJ9LCJpZCI6InNoYTI1NjpkZjdlZjAxMjRmNWFmOGE3ZWMzOGMzMjAyNzI1OWQwZGI2YTdkM2JkMzg0NWViZjE1OWUyNTU2YTIzNzhjODQxIiwic2lnbmF0dXJlcyI6W3sia2V5IjoiZWQyNTUxOTpiMkNkUWNvMlhtRWkwMUs3OFRnMGw3LTI0RXU1X3dITEhsU3ZRRTNtajFNIiwicm9sZSI6ImF1dGhvciIsInNpZyI6InQ5c0FVZ3BxOUFTWHVPNFhwR2lvTG1vX3FKVmlDZ3RwMmJBSkdmYUswdDVFN3BIVzFVUi04UEtjb3NBNUQxZ2dEaC1mNVoxMnlkLW1WdElfeW5EdUN3In1dLCJ2ZXJzaW9uIjoic3dhcm0tZW52ZWxvcGUvMiJ9"
+    },
+    "audience": "service-a",
+    "binding": {
+      "arguments": {
+        "mode": "operator",
+        "registration_number": 1
+      },
+      "epoch": "epoch-1",
+      "operation": "revoke",
+      "owner": "owner-a",
+      "target": {
+        "id": 1,
+        "kind": "registration"
+      }
+    },
+    "commit_signing_key": "ed25519:a1Ysm40lgtZTrkSKBPD20n4gJWSYJkwIw2fJYgi8834",
+    "delivery": {
+      "room": "!room:test.invalid",
+      "text": "aGVsbG8",
+      "to": "@recipient:test.invalid"
+    },
+    "enrollment_publisher": "ed25519:IUj_CVABHAaYiUFvd6OplZ6sq6L0khQW_GIOF-PhTJo",
+    "freshness_anchor": {
+      "checkpoint_id": "sha256:df086428bf63cf49063c581a0a7e1701e0afc967a485dca63c7213fd786fe5d7",
+      "freshness_id": "sha256:44d14fbda3e7726d602f05a45beb99a7816fc05293a3c1d055405874a6c5d0a1",
+      "issued_at": "2026-01-01T00:01:00Z",
+      "owner": "owner-a",
+      "publication_seq": 1,
+      "registry_id": "ed25519:2dJ3Im2a_cYnF0y9xP2zc5XitBT0maSzUxgZgNKq9f4",
+      "registry_seq": 2,
+      "snapshot": "sha256:d5d27ce33aedf75a4754ac72fc0f4a05732e52b686f8fbcd068e7dfeeba94f82"
+    },
+    "id_journal_available": true,
+    "journal_witness": {
+      "checkpoint_id": "sha256:474f9f64403d28ea3b2a3c16ca91106d5ff3264fae80946caea5c1d73d0b968f",
+      "owner": "owner-a",
+      "previous_checkpoint_id": "sha256:df086428bf63cf49063c581a0a7e1701e0afc967a485dca63c7213fd786fe5d7",
+      "registry_head": "sha256:afab0690d24646c4916022e2c680035b37f1600181d895ca6ae3418ff03f7d7a",
+      "registry_id": "ed25519:2dJ3Im2a_cYnF0y9xP2zc5XitBT0maSzUxgZgNKq9f4",
+      "registry_seq": 3
+    },
+    "known_keys": [
+      "ed25519:wue2t1GJeLZTqzYudkzRIhyY11lAzyPXDjsTXgXoIrk",
+      "ed25519:a1Ysm40lgtZTrkSKBPD20n4gJWSYJkwIw2fJYgi8834",
+      "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM",
+      "p256:AtvuKbwrlJKTmC1cFKDUv9lAx4xolphryoTXkRZN0Ayl"
+    ],
+    "now": "2026-01-01T00:03:00Z",
+    "operator_attestations": {
+      "p256:AtvuKbwrlJKTmC1cFKDUv9lAx4xolphryoTXkRZN0Ayl": "eyJib2R5Ijp7ImFjdGlvbnMiOlsiYWN0LnNpZ24iLCJncmFudC5zaWduIiwibWVzc2FnZS5hcHByb3ZlIl0sImJpbmRpbmciOnsib3duZXIiOiJvd25lci1hIn0sImV4cCI6IjIwMjYtMDEtMDJUMDA6MDA6MDBaIiwiaWF0IjoiMjAyNi0wMS0wMVQwMDowMDowMFoiLCJpc3N1ZXIiOiJlZDI1NTE5OkhCTk9WWm5QN2g5RFdZM1NoR1gwa1E4TnNFd0FVakVaUDExOU5GX1o0eW8iLCJrZXlfY2xhc3MiOiJvcGVyYXRvci1kZXZpY2UiLCJwdXJwb3NlIjoib3BlcmF0b3ItZGV2aWNlIiwicm9sZXMiOlsiYWN0IiwiYXBwcm92ZXIiXSwic3ViamVjdCI6eyJhbGdvcml0aG0iOiJQLTI1NiIsImtleV9pZCI6InAyNTY6QXR2dUtid3JsSktUbUMxY0ZLRFV2OWxBeDR4b2xwaHJ5b1RYa1JaTjBBeWwiLCJwdWJsaWNfYnl0ZXMiOiJBdHZ1S2J3cmxKS1RtQzFjRktEVXY5bEF4NHhvbHBocnlvVFhrUlpOMEF5bCJ9LCJ0eXBlIjoiYXR0ZXN0YXRpb24vMSJ9LCJpZCI6InNoYTI1NjphYzRhNTRmNzA5ZTZjNzVlODQ3NzcyYmIzMDFiMTViNmM1MGVhODIzZWRjYjdkOTI5ZGJjZjhhNmM1NzdlZjUwIiwic2lnbmF0dXJlcyI6W3sia2V5IjoiZWQyNTUxOTpIQk5PVlpuUDdoOURXWTNTaEdYMGtROE5zRXdBVWpFWlAxMTlORl9aNHlvIiwicm9sZSI6ImF1dGhvciIsInNpZyI6InpESHg3Z0xPVmRwdTloNkpYbjNTVDJUQzdGeEstYkdjMEd3VDByalA4ZExsWmEzOERCVkZVRk1oa0I0YXRGeU16NGNlUWVZUS1FdUdWdXUza2tNSUR3In1dLCJ2ZXJzaW9uIjoic3dhcm0tZW52ZWxvcGUvMiJ9"
+    },
+    "operator_owner": "owner-a",
+    "operator_root": "ed25519:HBNOVZnP7h9DWY3ShGX0kQ8NsEwAUjEZP119NF_Z4yo",
+    "registry_owner": "owner-a",
+    "replay_available": true,
+    "request": {
+      "action": "credential.lease",
+      "key": "ed25519:9DNPnft6cVUIqapzh9MRne66FsSoh49u5jwz_2x0hPM",
+      "target": {
+        "harness": "model-cli",
+        "id": "team/member",
+        "kind": "credential",
+        "profile": "dev"
+      }
+    },
+    "required_roles": [
+      "author"
+    ],
+    "revocations": {
+      "ed25519:2dJ3Im2a_cYnF0y9xP2zc5XitBT0maSzUxgZgNKq9f4": {
+        "availability": "available",
+        "max_age": 60,
+        "rollback_safe": true,
+        "snapshot": "eyJib2R5Ijp7ImNvbXBsZXRlIjp0cnVlLCJlbnRyaWVzIjpbXSwiaXNzdWVkX2F0IjoiMjAyNi0wMS0wMVQwMDowMzowMFoiLCJpc3N1ZXIiOiJlZDI1NTE5OjJkSjNJbTJhX2NZbkYweTl4UDJ6YzVYaXRCVDBtYVN6VXhnWmdOS3E5ZjQiLCJ0eXBlIjoicmV2b2NhdGlvbi8xIn0sImlkIjoic2hhMjU2OjNlNDZjYTQ0YjgzNzQ2OTMzZjhhYjEyMGNlOTI3MmNlNmRjY2QyYzk5YjdhMzFiNGQ5MzcwOTRhNjFjMjUzZWUiLCJzaWduYXR1cmVzIjpbeyJrZXkiOiJlZDI1NTE5OjJkSjNJbTJhX2NZbkYweTl4UDJ6YzVYaXRCVDBtYVN6VXhnWmdOS3E5ZjQiLCJyb2xlIjoiYXV0aG9yIiwic2lnIjoiWUYtamRQY2FPY0xRRmxuQjdkMFFrQzk5QTJrWFFsUVRwQmppdmZLdTFudmNjQjFfNm5Ic2xJaG1rbXQ3cW1ORUpQZG9kMzc1SDZOcEJ0WlZHM0pzRHcifV0sInZlcnNpb24iOiJzd2FybS1lbnZlbG9wZS8yIn0"
+      },
+      "ed25519:HBNOVZnP7h9DWY3ShGX0kQ8NsEwAUjEZP119NF_Z4yo": {
+        "availability": "available",
+        "max_age": 60,
+        "rollback_safe": true,
+        "snapshot": "eyJib2R5Ijp7ImNvbXBsZXRlIjp0cnVlLCJlbnRyaWVzIjpbXSwiaXNzdWVkX2F0IjoiMjAyNi0wMS0wMVQwMDowMzowMFoiLCJpc3N1ZXIiOiJlZDI1NTE5OkhCTk9WWm5QN2g5RFdZM1NoR1gwa1E4TnNFd0FVakVaUDExOU5GX1o0eW8iLCJ0eXBlIjoicmV2b2NhdGlvbi8xIn0sImlkIjoic2hhMjU2OjhmYWMxMWViOTkwYmQzNDE4MGIxNDAzZDIyN2QyNWU5Mjk2NWE1MDVhMjQyNzkwYWVhNzVlNjRmZWU4ZmRhNGMiLCJzaWduYXR1cmVzIjpbeyJrZXkiOiJlZDI1NTE5OkhCTk9WWm5QN2g5RFdZM1NoR1gwa1E4TnNFd0FVakVaUDExOU5GX1o0eW8iLCJyb2xlIjoiYXV0aG9yIiwic2lnIjoiRkZDMmxTcGJBNy1JY29OTFl6cHhUb3Z0UjZnTVVIUElSZlZmMzFsV3pTdW9UT0Y5OWJWeHdZUnpKTDhLbjhldjRHdDhKMDAzbHQ3SVZZblZJM2d3QncifV0sInZlcnNpb24iOiJzd2FybS1lbnZlbG9wZS8yIn0"
+      },
+      "ed25519:wue2t1GJeLZTqzYudkzRIhyY11lAzyPXDjsTXgXoIrk": {
+        "availability": "available",
+        "max_age": 60,
+        "rollback_safe": true,
+        "snapshot": "eyJib2R5Ijp7ImNvbXBsZXRlIjp0cnVlLCJlbnRyaWVzIjpbXSwiaXNzdWVkX2F0IjoiMjAyNi0wMS0wMVQwMDowMzowMFoiLCJpc3N1ZXIiOiJlZDI1NTE5Ond1ZTJ0MUdKZUxaVHF6WXVka3pSSWh5WTExbEF6eVBYRGpzVFhnWG9JcmsiLCJ0eXBlIjoicmV2b2NhdGlvbi8xIn0sImlkIjoic2hhMjU2OjgwODJlYmQ4NjAxYzgwZGY0ZmMwZjkzYjQ4MDc2NTJhYWIwYjE5MjUzODYwOTU1ZThmOWYyNzc0NjA0Y2Q2MGYiLCJzaWduYXR1cmVzIjpbeyJrZXkiOiJlZDI1NTE5Ond1ZTJ0MUdKZUxaVHF6WXVka3pSSWh5WTExbEF6eVBYRGpzVFhnWG9JcmsiLCJyb2xlIjoiYXV0aG9yIiwic2lnIjoiQWM0NkN3Q1JlRzhYaDFMYmpnRmppLUNFbjRVMDdKVTh6Sk1jTXEwd3ZWS3d0MTBhd3JwRlZoUEtOMTBkRUtOT0h0X0tnQ2UzMGRVeUcwckxaWm12Q2cifV0sInZlcnNpb24iOiJzd2FybS1lbnZlbG9wZS8yIn0"
+      }
+    },
+    "root": "ed25519:wue2t1GJeLZTqzYudkzRIhyY11lAzyPXDjsTXgXoIrk",
+    "seen": {},
+    "service_root": {
+      "key": "ed25519:b2CdQco2XmEi01K78Tg0l7-24Eu5_wHLHlSvQE3mj1M",
+      "purpose": 5
+    },
+    "signer_facts": {
+      "current": true,
+      "presence": true,
+      "presence_current": true
+    },
+    "time": {
+      "authority_until": "2026-01-01T00:06:00Z",
+      "fresh": true,
+      "trusted": true
+    },
+    "used_actions": [],
+    "watermark": "2026-01-01T00:03:00Z",
+    "watermark_available": true,
+    "witness_read_at": "2026-01-01T00:03:00Z"
+  },
+  "expected": {
+    "code": "accept",
+    "plan": {}
+  }
+}

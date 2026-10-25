@@ -13,9 +13,9 @@ The adopted spec contracts are pinned to waggle S4+S5
 [D39 journal §2.7](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#27-identity-journal-and-checkpoints),
 [D38 B freshness §2.9](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#29-signed-snapshot-freshness-d38-b),
 and [S5 receipts §2.10](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#210-process-local-freshness-receipts-d41-composition).
-This is spec adoption, not a module upgrade: the internal runtime remains on its
-published S3 pin, refuses populated publication state and supplies no S4/S5
-adapter or receiver. It does not replace the message supplement's S0 profile.
+The module and internal in-memory verifier adapters now use this pin; §7 records
+the implemented boundary and remaining qualification. The runtime still refuses
+populated publication state. This does not replace the message supplement's S0 profile.
 WC1 below means the separately reviewed state-witness service's registry stream:
 independent checkpoint observer, intent and matching committed resolution,
 original receipts, authenticated fresh head and continuity/control evidence.
@@ -637,9 +637,22 @@ fixture expectations, not a claim that Keymaker executes this verifier today.
 **K3 activation stays closed.** The following conjunctive gates, not a library
 accept or this spec adoption alone, permit enabling it:
 
+Implemented in memory: `TestMsgS4ImportedJournal` executes the unchanged MS-S12
+positive and six imported MS-S12–15 negatives with exact codes/zero refusal plans;
+`TestMsgS4EqualCheckpointTime` covers equal-time admission. `TestMsgS45Caps`
+covers MS-S23–25 size gates, including original context/prior/snapshot/control
+encoding and the whole WC1 wrapper including LF. Padding is only a size-gate
+control, not real WC1 or maximal full-proof qualification. `TestMsgS5ReceiptConsumers`,
+`TestMsgS5OperatorOwnAge`, `TestMsgS5ReceiptNotPersistable` and
+`TestMsgS5ReanchorAudit` cover portions of MS-S17–22 at the library boundary:
+one Evidence lifetime, own-age restrictions, restart non-serialization and
+normal/explicit skip endpoint metadata. No retained proof, anchor/W, durable audit
+or release transition is implemented by these pure calls. The rows requiring
+actual publisher, WC1, time or atomic recovery remain PENDING below.
+
 | Gate | Required integration/qualification before activation |
 | --- | --- |
-| K3-G1 exact adapter/version | Reviewed S4/S5 dependency upgrade and receiver/live-status adapters, explicit successor state/artifact codecs, protected floor and quiesced migration/recovery retaining every S2 history/result/fence; current production still rejects populated publication state. PC2 combined-root/preimage/restore acceptance remains required wherever PC2 participates; no second commit point or implicit C switch. |
+| K3-G1 exact adapter/version | Implemented in memory: waggle `5f4e743`, journal/freshness/explicit-reanchor and receipt-aware attestation/message adapters, exact prior checkpoint custody inputs, endpoint/skip origin audit and separate outer size gates. PENDING: review and production integration; explicit successor state/artifact codecs, protected floor and quiesced migration/recovery retaining every S2 history/result/fence. Current production still rejects populated publication state. PC2 combined-root/preimage/restore acceptance remains required wherever PC2 participates; no second commit point or implicit C switch. |
 | K3-G2 actual authority | Qualified protected root/owner/lineage/epoch policy, purpose-5 scope and <=24h lifetime, exact active-generation/binding/T/current-status checks and qualified-T1 renewal; native signing/retry/actual-release implementation. Existing kernel/generation/enrollment deadlines and gates remain. |
 | K3-G3 publication custody | Real owner-registry publisher boundary, D39 raw anchor and exact prior IDJournal custody, current head-change reissue/inclusion proof, complete signed records/retention and independent WC1 committed pairing/head/control/transport/custodian. No client URL, extra egress or fake witness. |
 | K3-G4 time and cumulative premises | Qualified timeconf collection/uncertainty/hold/continuity and safe margin mapping within existing deadlines, durable W bootstrap/advancement/restore continuity, real authenticated witness read and independently qualified cumulative rollback_safe. No W=Now, old-clock or complete=true substitutes. |
@@ -651,6 +664,7 @@ Q7 persistent revoke remains independently closed pending its sources, durable
 integration and D42 offline-root policy; S5 registry composition neither opens
 nor substitutes that operator-domain gate. All base root-custody/generation and
 owner recovery requirements remain. No supplied formal catalog surface table
-(brief gap); no requested spec row is excluded. Runtime code/tests, pin changes,
-deployment, publisher/receiver transport and real authority qualification are
-outside this spec-only slice and remain PENDING, not implementation claims.
+(brief gap); no requested row is excluded. The in-memory tests above do not
+qualify deployment, publisher/receiver transport, real authority or durable
+commit/recovery. K3-G1's successor codec/floor/migration and K3-G2–G7 remain
+PENDING; production activation stays unavailable.

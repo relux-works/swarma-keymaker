@@ -4,7 +4,7 @@ github.com/relux-works/swarma-registrar v0.0.0-20261025040811-264660e5dabb h1:Bw
 github.com/relux-works/swarma-registrar v0.0.0-20261025040811-264660e5dabb/go.mod h1:4bnxh4kC6jNAovfx5i8t1OdnhytaM/ZeD/zXoQQTKwA=
 github.com/relux-works/swarma-user-manager v0.0.0-20261024191358-505fb9f55a6d h1:uCwxr2ALn8F9cYh4jr3zD2S9ylgPhJMfanNuG6zV+pg=
 github.com/relux-works/swarma-user-manager v0.0.0-20261024191358-505fb9f55a6d/go.mod h1:jSLVCLamJhaNjWDXZ3OEa4FBQFarjVmWYUvQqwjbuzg=
-github.com/relux-works/waggle v0.0.0-20261024213811-9b42338b8a57 h1:1N04goTpT+VNbaDDJs5ZCDZ8LbPfWSkNz0lxtQB72Go=
-github.com/relux-works/waggle v0.0.0-20261024213811-9b42338b8a57/go.mod h1:EMhIu0XTUSinbT5fD1NXV9LZX52R/vZGVIFnGrHzBnE=
+github.com/relux-works/waggle v0.0.0-20261025015329-5f4e7435d756 h1:WOaH0U9lOx7w7jpjZWtbpWEalM/HBxvDqvEqYIyLyjM=
+github.com/relux-works/waggle v0.0.0-20261025015329-5f4e7435d756/go.mod h1:EMhIu0XTUSinbT5fD1NXV9LZX52R/vZGVIFnGrHzBnE=
 golang.org/x/sys v0.38.0 h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=
 golang.org/x/sys v0.38.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=

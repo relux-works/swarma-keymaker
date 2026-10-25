@@ -316,17 +316,27 @@ protected root policy, real multi-UID integration, qualified Now/W and uncertain
 mapping, provider/audit collection outside generation windows with bounded
 original authority through persistence, and owner-registry/WC1 evidence. The [S4/S5 spec adoption](spec/keymaker-msg-state.md#4-publication-record-and-restart)
 now separates D39 prior-checkpoint custody, live freshness and process-local
-receipts, with [paired byte-only fixtures](vectors/waggle-s4/README.md).
-The later runtime slice must qualify their explicit successor codec and separate
-proof budgets against the existing reservation. S2 rejects nonempty publication slots and current pointers;
-qualified-T1 renewal/activation and message-result release require later slices.
-No S4/S5 module upgrade or production evidence source is introduced. The adopted
-spec cannot activate the current S3 runtime; all [K3 gates](spec/keymaker-msg-state.md#7-remaining-gates)
-remain closed until implementation and qualification.
+receipts, with [paired imported fixtures](vectors/waggle-s4/README.md).
+The module now pins waggle S4/S5 `5f4e743`. Internal in-memory adapters verify
+journal publication proofs with the raw anchor and exact authenticated prior,
+normal freshness and explicit re-anchor with endpoint/skip audit metadata, and
+receipt-aware attestations/messages using one immutable Evidence lifetime.
+They enforce separate 512 KiB intake, 2 MiB complete encoded proof and 8192-byte
+WC1-wrapper (including LF) size gates before verifier calls. Tests exercise the
+seven shared journal fixtures, three exact public S5 fixtures, receipt custody,
+own-age refusals and those size boundaries; wrapper padding tests qualify size
+accounting only, not real WC1 evidence.
+
+The successor state/artifact codecs, protected floor and PC2 migration remain
+PENDING. S2 still rejects nonempty publication slots and current pointers; no
+adapter persists a receipt, commits proof/anchor/W or supplies release authority.
+Qualified-T1 renewal/activation, real publisher/WC1/time sources, atomic recovery
+and message-result release remain later integration and qualification work.
+All [K3 gates](spec/keymaker-msg-state.md#7-remaining-gates) remain closed.
 
 | Tool | Exact entry point | Evidence |
 | --- | --- | --- |
-| Go | `go test ./internal/keymaker -run '^TestMsg' -count=1 -timeout=120s` | Issuer/profile/status refusals, original key controls, migration, graph/budget checks and real-store recovery |
+| Go | `go test ./internal/keymaker -run 'TestMsg|TestK3' -count=1` | Issuer/profile/status refusals, original key controls, migration, graph/budget checks, real-store recovery and in-memory S4/S5 adapters/fixtures/caps |
 | Go | `go test ./internal/keymaker -run '^TestMsg(NativeCapacityCommitAfterRefusal|CapacityCommitAfterRefusal)$' -count=1 -timeout=120s` | Real 256 MiB retained-history boundary, last-fitting positive controls, unchanged journal on refusal and clean restart; native accounting covers the intent/effect persistence pair |
 | Go race detector | `go test -race ./internal/keymaker -run '^TestMsg(ConcurrentCertification|V27RenewalRestart|CrashMatrix|JournalUncertainty)$' -count=1 -timeout=120s` | Deterministic barriers and injected process/journal interruptions; does not simulate hardware power loss |
 | Mutation tool | `go run ./tools/mutations/main.go -group message-state -scratch "$SCRATCH"` | Eight named expected-red controls, child exits/PIDs and overlay logs under private scratch; reconciliation control checks signer dependency exclusion |

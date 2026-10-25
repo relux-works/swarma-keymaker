@@ -15,7 +15,7 @@ no binding/enrollment mutations, apart from permitted bounded audit writes.
 | --- | --- |
 | `refusals.json` | Foreign peer, inactive/reused generations, unavailable source, open-connection revoke/retire races at release and next request, hardened paths and purposes, SSHSIG restrictions and rejected agent mutations, concrete native malformed frames, operator register/revoke authority, mandatory registrar-array uid_map and pinned enrollment, revoked/missing helper binding, executable-qualified refusal, registrar name bounds, domain separation, private-material request rejection and audit failure |
 | `slip0010-ed25519.json` | Public SLIP-0010 Ed25519 test vectors 1 and 2: all six nodes each, expected chain code and SLIP-encoded public key; source URL and source SHA-256 retained |
-| `authority-root.json`, `authority-root/` | G4 draft: 82 byte goldens, 45 adjacent negative/positive pairs and 29 preimage links; integrity only, PC2 consumer rejection/runtime qualification PENDING |
+| `authority-root.json`, `authority-root/` | G4 draft: 84 byte goldens, 46 adjacent negative/positive pairs and 31 preimage links; integrity and hold-origin domain check, full PC2 reader/runtime qualification PENDING |
 | `keymaker-paths.json` | Fixed public 32-byte seed, explicit scoped registry and five name → path → Ed25519/SSH public-key examples; purpose and ancestor separation |
 
 `evaluation` names the future harness layer. Binding checks may directly
@@ -87,7 +87,7 @@ MS-S13–MS-S22 remain PENDING in the message-state spec.
 
 The [G4 draft](../spec/keymaker-authority-root.md) is content for architect,
 reviewer and curator acceptance before PC2 S1 code. `authority-root.json` lists
-82 canonical JSON goldens and 45 named adjacent negative/control groups. Each
+84 canonical JSON goldens and 46 named adjacent negative/control groups. Each
 group carries its own claim. Inputs, UIDs, inode metadata, provider digests and
 verity measurements are **invented harness inputs**, not an installed policy,
 valid signed provider document, measured file or independent custody proof.
@@ -101,16 +101,18 @@ existing-schema-2 entry), attempt/hold and domain preimages. The maximal root is
 losslessly gzip-compressed; its expected decompressed SHA256/length are in the
 manifest. Expansion is bounded in the checker. Source JSON bytes have no newline.
 
-Twenty-nine links pin root/binding/facts/participants/candidate/attempt/hold hashes,
+Thirty-one links pin root/binding/facts/participants/candidate/attempt/hold hashes,
 including populated freshness-payload/root and freshness-policy preimages. The
 checker materializes each negative mutation, checks its exact SHA256/length and
 unchanged positive-control selection, then checks that control's declaration. It
-does **not** implement the expected reader rejection, active append, recovery,
-fs-verity, cross-process exclusion, current restore custody or latency. All such
-verdicts remain PENDING. expected_rejection values are fixture categories,
+additionally checks every hold golden's origin link against its kind-specific A2
+preimage domain/member set and executes the authority-hold-origin-domain
+negative with its adjacent valid control. It does **not** implement full reader
+rejection, active append, recovery, fs-verity, cross-process exclusion, current
+restore custody or latency. All such verdicts remain PENDING. expected_rejection values are fixture categories,
 not new public refusal codes. Changing a rejection label cannot establish a runtime
 claim; later consumer tests must actually decode/refuse each named input before
-reporting a kill. Unknown/duplicate/alias, domain, truncation, field/total size,
+reporting a kill. Unknown/duplicate/alias, other domain, truncation, field/total size,
 floor/old-root, provenance read-set and aggregate-reservation pairs remain
 executable fixture-integrity checks only.
 
@@ -138,8 +140,20 @@ Nearby controls use zero/one/max-safe integers, depth16 and valid literal U+00E9
 The closed depth/UTF8 wrapper is a fixture-only generic CCJ context; it is not
 accepted as a Root. Genesis-authority references and capacity/provider metadata
 remain invented external fixture inputs, not actual independent admission or
-capacity/verity qualification. C0 alone is never serving authority. All reader
+capacity/verity qualification. C0 alone is never serving authority. Full reader
 rejections remain PENDING; the tool checks exact planted bytes and pair hashes.
+
+Rework 2 adds exact journal-genesis-candidate and journal-genesis-transaction
+preimages. The authority hold's origin is the latter's A2 transaction ID, with
+base_root_digest=null and the zero-journal root's revision and candidate. Only
+that hold and the recovery record retaining its digest change among earlier
+goldens. The new authority-hold-origin-domain pair substitutes the C0 digest and
+is rejected by the offline domain predicate; the transaction-origin control
+passes. Every authority-kind hold must link to keymaker-authority-tx/1, every
+activation-kind hold to the immutable pc2-activation-attempt/1 identity preimage,
+excluding attempt_id, disposition and evidence_digest. This bounded check does
+not admit a real attempt/transaction or resolve unknown outcomes. C0-specific
+recovery semantics remain the G5-E owner gate.
 
 Run `go run ./tools/vectors/main.go -check` from the repository root. `-write`
 still rewrites **only** keymaker-paths.json; it must not regenerate golden expected

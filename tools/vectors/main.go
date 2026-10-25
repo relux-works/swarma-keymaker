@@ -326,8 +326,8 @@ func main() {
 	}
 }
 
-// These fixture checks prove byte/hash/domain and mutation-pair integrity only.
-// They do not implement a PC2 reader or evaluate the expected rejection verdicts.
+// These fixture checks prove byte/hash/domain and mutation-pair integrity.
+// Only hold-origin domain rejection is evaluated; this is not a PC2 reader.
 type authorityGolden struct {
 	ID       string `json:"id"`
 	Path     string `json:"path"`
@@ -472,6 +472,50 @@ func authorityMutate(control []byte, m authorityMutation) []byte {
 	return authorityBytes(obj)
 }
 
+// This bounded predicate checks A2 identity domains and exact preimage member
+// sets, not transaction/attempt admission, signature verification or recovery.
+func authorityHoldOriginDomain(hold map[string]any, preimage []byte) bool {
+	if len(preimage) == 0 || hold["type"] != "pc2-hold/1" || len(hold) != 3 || hold["origin_id"] != "sha256:"+authorityHash(preimage) {
+		return false
+	}
+	origin := authorityObject(preimage)
+	var fields []string
+	switch hold["kind"] {
+	case "authority":
+		if origin["type"] != "keymaker-authority-tx/1" {
+			return false
+		}
+		fields = []string{"type", "base_root_digest", "next_revision", "candidate_root_digest"}
+	case "activation":
+		if origin["version"] != "pc2-activation-attempt/1" {
+			return false
+		}
+		// A2 excludes exactly these mutable/derived fields from the attempt ID:
+		// attempt_id, disposition and evidence_digest. A full record is not its ID preimage.
+		fields = []string{"version", "manager_id", "effect_digest", "target", "owner", "provision_effect", "ordinal", "source", "prepared_tail", "active_record_hash", "boot_id", "instance_id"}
+	default:
+		return false
+	}
+	if len(origin) != len(fields) {
+		return false
+	}
+	for _, field := range fields {
+		if _, ok := origin[field]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func authorityHoldOriginResolved(hold map[string]any, goldens map[string][]byte) bool {
+	for _, raw := range goldens {
+		if hold["origin_id"] == "sha256:"+authorityHash(raw) {
+			return authorityHoldOriginDomain(hold, raw)
+		}
+	}
+	return false
+}
+
 func checkAuthorityVectors() {
 	var f authorityFixtures
 	read("vectors/authority-root.json", &f)
@@ -506,10 +550,27 @@ func checkAuthorityVectors() {
 		require(fmt.Sprint(domain) == g.Domain && g.Domain != "", "authority golden domain: "+g.ID)
 		goldens[g.ID] = raw
 	}
+	// Check every hold golden, even if a future manifest omits its origin link.
+	// Hash consistency alone accepts a coherently substituted wrong-domain origin.
+	for id, raw := range goldens {
+		hold := authorityObject(raw)
+		if hold["type"] != "pc2-hold/1" {
+			continue
+		}
+		origins := 0
+		for _, link := range f.Links {
+			if link.Object == id && link.Member == "origin_id" {
+				origins++
+				require(link.Prefix == "sha256:" && authorityHoldOriginDomain(hold, goldens[link.Preimage]), "authority hold origin domain: "+id)
+			}
+		}
+		require(origins == 1, "authority hold origin link: "+id)
+	}
 	seen := map[string]bool{}
 	// Each negative is materialized before its nearby positive is checked.
-	// Only the exact planted bytes, length, digest and pairing are asserted;
-	// expected_rejection is an unrun consumer obligation, never a green verdict.
+	// Exact planted bytes, length, digest and pairing are asserted for all groups.
+	// Only authority-hold-origin-domain additionally exercises a rejection rule;
+	// all full-reader verdicts remain unrun consumer obligations.
 	for _, group := range f.Groups {
 		n := group.Negative
 		require(group.ID != "" && !seen[group.ID] && group.Claim != "", "authority pair id/claim")
@@ -519,6 +580,13 @@ func checkAuthorityVectors() {
 		bad := authorityMutate(control, n.Mutation)
 		require(!bytes.Equal(bad, control) && len(bad) == n.Bytes && authorityHash(bad) == n.SHA256, "authority negative bytes/hash: "+group.ID)
 		require(group.Positive.Expected == "format-control-only", "authority vector overclaims runtime result")
+		if group.ID == "authority-hold-origin-domain" {
+			// The C0 substitution must fail this particular predicate, while the
+			// adjacent transaction-origin control passes it; rejecting all fails.
+			require(n.Rejection == "authority_hold_origin_domain", "authority hold rejection category")
+			require(!authorityHoldOriginResolved(authorityObject(bad), goldens), "authority hold origin domain negative")
+			require(authorityHoldOriginResolved(authorityObject(control), goldens), "authority hold origin domain control")
+		}
 	}
 	for _, link := range f.Links {
 		obj, ok := goldens[link.Object]
@@ -530,6 +598,7 @@ func checkAuthorityVectors() {
 		}
 		require(selected == link.Prefix+authorityHash(preimage), "authority linked digest: "+link.Object+"/"+link.Member)
 	}
+	require(seen["authority-hold-origin-domain"], "authority hold origin negative missing")
 	max := f.Maximal
 	raw, ok := goldens[max.ID]
 	require(ok && max.Bytes == 1048576 && len(raw) == max.Bytes && max.Claim != "", "authority maximal root cap")
@@ -539,9 +608,9 @@ func checkAuthorityVectors() {
 		e := item.(map[string]any)
 		require(e["registration_number"] == json.Number(strconv.Itoa(i+1)) && len(e["owner"].(string)) <= 255, "authority maximal root field bounds")
 	}
-	require(len(f.Goldens) == 82 && len(f.Groups) == 45 && len(f.Links) == 29, "authority vector inventory")
+	require(len(f.Goldens) == 84 && len(f.Groups) == 46 && len(f.Links) == 31, "authority vector inventory")
 	for _, phase := range []string{"legacy_validated", "s2_staged", "s2_committed", "combined_staged", "combined_committed", "released"} {
 		require(goldens["migration-"+phase] != nil, "authority migration vector missing")
 	}
-	fmt.Printf("authority-root fixture integrity: %d goldens, %d negative/control pairs, %d preimage links; reader verdicts NOT RUN\n", len(f.Goldens), len(f.Groups), len(f.Links))
+	fmt.Printf("authority-root fixture integrity: %d goldens, %d negative/control pairs, %d preimage links; hold-origin domains checked; full reader verdicts NOT RUN\n", len(f.Goldens), len(f.Groups), len(f.Links))
 }

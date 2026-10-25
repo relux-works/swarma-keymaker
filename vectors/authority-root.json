@@ -559,7 +559,7 @@
       "path": "vectors/authority-root/journal-genesis-recovery.json",
       "encoding": "identity",
       "bytes": 431,
-      "sha256": "050c370c828a42d40c60703042693fee5a52c8c96061dea9edb800f03438101d",
+      "sha256": "d81036d01be8282b5dc74ed644e675f4744cfd3a6cc7cbd527c77ef047578a46",
       "domain": "pc2-recovery-record/1"
     },
     {
@@ -635,11 +635,27 @@
       "domain": "keymaker-migration/1"
     },
     {
+      "id": "journal-genesis-candidate",
+      "path": "vectors/authority-root/journal-genesis-candidate.json",
+      "encoding": "identity",
+      "bytes": 129,
+      "sha256": "18576d084615332a4a9ff2bdf09654f6e15ea6fc3364abee4f99ecee50c6f1b5",
+      "domain": "keymaker-authority-candidate/1"
+    },
+    {
+      "id": "journal-genesis-transaction",
+      "path": "vectors/authority-root/journal-genesis-transaction.json",
+      "encoding": "identity",
+      "bytes": 174,
+      "sha256": "b650690d92474ed0194e803f2e51122fef582905d25d9bb94c2db28812dd2945",
+      "domain": "keymaker-authority-tx/1"
+    },
+    {
       "id": "journal-genesis-authority-hold",
       "path": "vectors/authority-root/journal-genesis-authority-hold.json",
       "encoding": "identity",
       "bytes": 126,
-      "sha256": "233e08fdf8af80be2de99b0b3655423c18ba384a3444624421b19846a0dc55ca",
+      "sha256": "31d7720d6ab1a8416a78e5052f81a9bafe544159896b29409db066b38b28b2f4",
       "domain": "pc2-hold/1"
     },
     {
@@ -817,9 +833,21 @@
       "prefix": "sha256:"
     },
     {
+      "object": "journal-genesis-candidate",
+      "member": "body_digest",
+      "preimage": "journal-genesis-body",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "journal-genesis-transaction",
+      "member": "candidate_root_digest",
+      "preimage": "journal-genesis-candidate",
+      "prefix": "sha256:"
+    },
+    {
       "object": "journal-genesis-authority-hold",
       "member": "origin_id",
-      "preimage": "capacity-genesis-commit",
+      "preimage": "journal-genesis-transaction",
       "prefix": "sha256:"
     },
     {
@@ -1561,6 +1589,25 @@
       },
       "positive": {
         "golden": "freshness-artifact-normal",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "authority-hold-origin-domain",
+      "claim": "A C0 digest is not an authority transaction ID. Offline origin-domain rejection runs against the adjacent exact transaction-origin hold; full reader admission is not exercised. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-genesis-authority-hold",
+        "mutation": {
+          "kind": "set",
+          "member": "origin_id",
+          "value": "sha256:e242983dfbceab824d8797c3f16da89bdb273b87998711c85b6c0cbaf5d1e7f7"
+        },
+        "bytes": 126,
+        "sha256": "233e08fdf8af80be2de99b0b3655423c18ba384a3444624421b19846a0dc55ca",
+        "expected_rejection": "authority_hold_origin_domain"
+      },
+      "positive": {
+        "golden": "journal-genesis-authority-hold",
         "expected": "format-control-only"
       }
     },

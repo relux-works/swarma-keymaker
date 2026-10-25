@@ -245,6 +245,18 @@ Domain separation is in the required version/type member, not a hidden prefix.
 | Hold | CCJ({type:"pc2-hold/1",kind:"activation"|"authority",origin_id:D}); unchanged A2 recipe |
 | Logical root link | CCJ({type:"keymaker-authority-link/1",root_digest:D,transaction_revision:N,authority_incarnation:Token,withdrawal_counter:N,journal:{seq:Z,hash:H},guard_digest:D,minimum_reader_schema:3,floor_epoch:N}) |
 
+For the hold recipe, kind=authority requires origin_id=transaction_id from the
+exact keymaker-authority-tx/1 preimage above; kind=activation requires
+origin_id=attempt_id from the immutable pc2-activation-attempt/1 preimage.
+This is the unchanged owner [A2 identity rule](https://github.com/relux-works/swarma-user-manager/blob/f7fa65b/spec/activation-order.md#attempt-and-hold-identities-a2).
+A hash of C0 (keymaker-capacity-genesis/1), a candidate, a final root, or a full
+mutable attempt record is never a substitute origin. Check the preimage's
+required domain and member set before accepting its digest. Genesis uses the
+same authority transaction recipe with base_root_digest=null, next_revision
+matching R0.transaction_revision, and candidate_root_digest binding the candidate
+of R0's exact combined body. Its hold retains that transaction ID through
+recovery, including when R0.journal is the admitted zero checkpoint.
+
 The binding body's H is binding_commit.digest. Prepare exact audit frames/tail
 under audit serialization **before F**, with provider evidence obtained before
 short locks. Binding_commit carries the reserved audit pair; its audit record
@@ -382,10 +394,13 @@ Validate the independent C0 proof unlocked with the immutable migration/manager
 participants; §6 adds no F-time C0 open or provider call.
 
 Exclude old/restored/serving writers for this same migration graph. Unknown C0
-commit outcome stays closed and resumes the exact Q0/C0, never initializes a
-replacement. Confirmed C0 without R0 is retained non-serving initialization;
-no floor downgrade or root fallback. C0 is admitted once per installation,
-never used to reset a previously active journal or lost manager history.
+commit outcome stays closed; it never authorizes replacement initialization,
+floor downgrade or root fallback. C0 is admitted once per installation, never
+used to reset a previously active journal or lost manager history. C0-specific
+recovery and unknown-outcome semantics remain the G5-E owner acceptance gate;
+this draft does not define a C0 recovery protocol. C0 is not an authority
+transaction and cannot originate a pc2-hold/1. The zero-journal recovery fixture
+instead retains the hold of the exact R0 authority transaction defined in §3.
 
 ## 5. Attempts, holds and root-owned recovery guard
 
@@ -409,7 +424,9 @@ tail and exact proposed active-record hash are immutable; source instance is
 not a new attempt identity. New ordinal only after conclusive resolution of the
 previous attempt, never another generation or OS mutation. Hold is exactly
 `{type:"pc2-hold/1",kind:"activation"|"authority",origin_id:D}`; its digest is
-stable through death/recovery. Disposition updates append linked retained records,
+stable through death/recovery. The kind/origin mapping and preimage-domain
+checks in §3 apply equally to guard hold rows and retained recovery references;
+non-transaction C0 origins refuse. Disposition updates append linked retained records,
 not a changed immutable identity. Boot/RPC instance/durable incarnation differ.
 
 The root-owned **guard is an authoritative veto/consumption endpoint**, not an
@@ -804,7 +821,8 @@ fs-verity availability, sync semantics, independent restore or a no-back-edge gr
 preimages, expected digest/length and adjacent negative/positive control groups.
 The offline [vector tool](../tools/vectors/main.go) checks these through
 `go run ./tools/vectors/main.go -check`. Claims are scoped to fixture integrity:
-no daemon/manager reader exists here, and expected negative verdicts are future
+the tool executes the bounded hold-origin domain rejection/control rule, but
+no daemon/manager reader exists here. Full reader negative verdicts are future
 consumer conformance obligations rather than passing runtime tests.
 
 Two fixture-only closed contexts make the additional boundaries explicit;

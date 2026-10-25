@@ -17,7 +17,9 @@ import (
 // not a fabricated artifact-byte counter or a reduced production budget.
 func TestMsgCapacityCommitAfterRefusal(t *testing.T) {
 	f := messageStateSetup(t)
-	for n := 0; n < 2000; n++ {
+	filled := seedMessageCapacity(t, f, false, -1)
+	f.reopen(t) // Validate every fixture artifact and journal digest before use.
+	for n := filled; n < 2000; n++ {
 		b := fixtureBinding(uint32(100000 + n))
 		b.Path = fmt.Sprintf("m/1'/1'/%d'/1'", 100000+n)
 		b.Owner = strings.Repeat("o", 512)
@@ -70,7 +72,7 @@ func TestMsgCapacityCommitAfterRefusal(t *testing.T) {
 			t.Logf("serving_restart_error=%v", err)
 			t.Fatalf("capacity refusal appended an unmatched binding_commit: %d -> %d", priorCommit.Version, afterVersion)
 		}
-		if n == 0 {
+		if n == filled {
 			t.Fatal("last-fitting positive control never ran")
 		}
 		if f.store.failed || len(f.store.records) != n+1 || f.store.next != proposed.Number {
@@ -102,8 +104,10 @@ func TestMsgCapacityCommitAfterRefusal(t *testing.T) {
 // effect, recovery file or journal version, even when one commit alone fits.
 func TestMsgNativeCapacityCommitAfterRefusal(t *testing.T) {
 	f := messageStateSetup(t)
-	accepted := 0
-	for n := 0; n < 2000; n++ {
+	accepted := seedMessageCapacity(t, f, true, -1)
+	filled := accepted
+	f.reopen(t) // Validate complete retained intent/effect history before use.
+	for n := accepted; n < 2000; n++ {
 		s := f.store
 		b := fixtureBinding(uint32(200000 + n))
 		b.Path = fmt.Sprintf("m/1'/1'/%d'/1'", 200000+n)
@@ -125,7 +129,7 @@ func TestMsgNativeCapacityCommitAfterRefusal(t *testing.T) {
 			t.Fatal(e)
 		}
 		if !s.fitsState(records, s.next+1, prospective) {
-			if accepted == 0 {
+			if accepted == filled {
 				t.Fatal("no native pair positive control")
 			}
 			// The single-snapshot bound cannot stand in for this two-commit admission.

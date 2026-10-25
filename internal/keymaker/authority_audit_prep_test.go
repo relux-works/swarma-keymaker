@@ -3,9 +3,12 @@ package keymaker
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"math"
 	"os"
 	"path/filepath"
@@ -79,6 +82,9 @@ func TestPC2AuditPrepareRefusals(t *testing.T) {
 			in.Rotation.SegmentLimit, in.Rotation.SegmentBytes = 1, 0
 			in.Rotation.FirstSeq = in.Tail.Seq + 1
 		}},
+		{"instance-upper", "field_format", func(in *authorityAuditInput) { in.Instance = strings.Repeat("A", 32) }},
+		{"instance-short", "field_format", func(in *authorityAuditInput) { in.Instance = strings.Repeat("a", 31) }},
+		{"instance-long", "field_format", func(in *authorityAuditInput) { in.Instance = strings.Repeat("a", 33) }},
 		{"bad-time", "field_format", func(in *authorityAuditInput) { *in.Timestamp = "2026-10-25T00:00:00.1Z" }},
 		{"body-intake-limit", "total_limit", func(in *authorityAuditInput) { in.Body = bytes.Repeat([]byte{' '}, 2*authorityRootLimit+1) }},
 	} {
@@ -179,45 +185,17 @@ func TestPC2AuditPrepareBounds(t *testing.T) {
 }
 
 // This bounded construction check excludes ambient time, providers, locks and
-// I/O from the preparer file: no global variables, only strconv and a reviewed
-// pure-helper call set. Input types contain values, not callbacks/capabilities.
+// I/O from the preparer file: no globals, only strconv, and calls resolved to
+// exact reviewed declarations. Helper bodies/transitive callees are trusted,
+// not proved here. Input types contain values, not callbacks/capabilities.
 func TestPC2AuditPreparationPurity(t *testing.T) {
-	f, e := parser.ParseFile(token.NewFileSet(), "authority_audit_prep.go", nil, 0)
+	source, e := os.ReadFile("authority_audit_prep.go")
 	if e != nil {
 		t.Fatal(e)
 	}
-	for _, imp := range f.Imports {
-		if imp.Path.Value != `"strconv"` {
-			t.Fatal("preparer clock/I/O import", imp.Path.Value)
-		}
+	if e := pc2AuditPurityGuard(source); e != nil {
+		t.Fatal(e)
 	}
-	allowed := strings.Fields("prepareAuthorityAudit len int64 uint64 append authorityFail validDigest arID arStamp decodeAuthority authorityCandidate authorityTransaction encodeAuthority authorityDigest authorityCopy sealAuthorityRoot canonical auditDigest")
-	for _, decl := range f.Decls {
-		if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.VAR {
-			t.Fatal("preparer ambient state")
-		}
-	}
-	ast.Inspect(f, func(n ast.Node) bool {
-		if call, ok := n.(*ast.CallExpr); ok {
-			if id, ok := call.Fun.(*ast.Ident); ok {
-				for _, name := range allowed {
-					if name == id.Name {
-						return true
-					}
-				}
-				t.Fatal("preparer non-pure call", id.Name)
-			}
-			sel, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || sel.Sel.Name != "FormatUint" {
-				t.Fatal("preparer indirect call")
-			}
-			id, ok := sel.X.(*ast.Ident)
-			if !ok || id.Name != "strconv" {
-				t.Fatal("preparer capability call")
-			}
-		}
-		return true
-	})
 	var valuesOnly func(reflect.Type)
 	valuesOnly = func(typ reflect.Type) {
 		switch typ.Kind() {
@@ -307,4 +285,194 @@ func TestPC2AuditEncoderGoldenParity(t *testing.T) {
 			})
 		}
 	}
+}
+
+// The original preparer is the adjacent control. The reviewer's local alias
+// must fail the construction guard even when its spelling is an allowed helper.
+func TestPC2AuditPurityNameShadowing(t *testing.T) {
+	source, e := os.ReadFile("authority_audit_prep.go")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e := pc2AuditPurityGuard(source); e != nil {
+		t.Fatal("valid control", e)
+	}
+	entry := "func prepareAuthorityAudit(in authorityAuditInput) (authorityPreparedAudit, error) {"
+	for _, tc := range []struct{ name, insert, suffix, want string }{
+		{"reviewer-function-variable", "auditDigest := reviewAmbientAuditDigest", "", "preparer callable alias: auditDigest"},
+		{"allowed-function-variable", "auditDigest := auditDigest", "", "preparer callable alias: auditDigest"},
+		{"closure", "auditDigest := func(r AuditRecord)(string,error){return \"\",nil}", "", "preparer closure"},
+		{"method-value", "auditDigest := pc2AuditMethod{}.digest", "\ntype pc2AuditMethod struct{}\nfunc(pc2AuditMethod) digest(r AuditRecord)(string,error){return \"\",nil}", "preparer unreviewed function declaration"},
+		{"package-variable", "", "\nvar ambientAuditDigest = auditDigest", "preparer ambient state"},
+		{"package-clock-alias", "", "\nvar ambientNow = time.Now", "preparer ambient state"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			planted := strings.Replace(string(source), entry, entry+"\n"+tc.insert, 1) + tc.suffix
+			e := pc2AuditPurityGuard([]byte(planted))
+			if e == nil || !strings.Contains(e.Error(), tc.want) {
+				t.Fatalf("P-PC2_AUDIT_PURITY_NAME_SHADOWING: want %s, got %v", tc.want, e)
+			}
+		})
+	}
+}
+
+// The envelope uses the actual declarations (including source positions) of
+// this explicit reviewed boundary. Bodies/transitive callees of these helpers
+// are trusted, not proved pure here. No function-valued variable is trusted.
+func pc2AuditPurityGuard(source []byte) error {
+	fset := token.NewFileSet()
+	f, e := parser.ParseFile(fset, "authority_audit_prep.go", source, 0)
+	if e != nil {
+		return e
+	}
+	for _, imp := range f.Imports {
+		if imp.Path.Value != `"strconv"` {
+			return fmt.Errorf("preparer clock/I/O import: %s", imp.Path.Value)
+		}
+	}
+	for _, decl := range f.Decls {
+		if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.VAR {
+			return fmt.Errorf("preparer ambient state")
+		}
+		if d, ok := decl.(*ast.FuncDecl); ok && (d.Recv != nil || d.Name.Name != "prepareAuthorityAudit") {
+			return fmt.Errorf("preparer unreviewed function declaration: %s", d.Name.Name)
+		}
+	}
+	helpers := map[string][]string{
+		"authority_codec.go":    {"authorityFail", "arStamp", "decodeAuthority", "encodeAuthority"},
+		"authority_identity.go": {"authorityCandidate", "authorityTransaction", "authorityDigest", "authorityCopy", "sealAuthorityRoot"},
+		"snapshot.go":           {"validDigest"},
+		"audit.go":              {"canonical", "auditDigest"},
+	}
+	values := map[string][]string{
+		"authority_codec.go": {"authorityKind", "authorityRootLimit", "authoritySafeInteger"},
+		"audit.go":           {"AuditRecord", "auditSeal"},
+		"binding_commit.go":  {"bindingCommit"},
+		"message_audit.go":   {"messageAuditReserve"},
+		"code.go":            {"Code"},
+		"custody_reason.go":  {"custodyCause"},
+	}
+	files := []*ast.File{f}
+	trusted := map[string]token.Pos{}
+	for file := range helpers {
+		values[file] = append(values[file], helpers[file]...)
+	}
+	for file, names := range values {
+		parsed, e := parser.ParseFile(fset, file, nil, 0)
+		if e != nil {
+			return e
+		}
+		selected := &ast.File{Name: parsed.Name}
+		found := map[string]bool{}
+		for _, decl := range parsed.Decls {
+			switch d := decl.(type) {
+			case *ast.FuncDecl:
+				for _, name := range helpers[file] {
+					if d.Name.Name == name && d.Recv == nil {
+						signature := *d
+						signature.Body = nil
+						selected.Decls = append(selected.Decls, &signature)
+						trusted[name], found[name] = d.Name.Pos(), true
+					}
+				}
+			case *ast.GenDecl:
+				if d.Tok != token.TYPE && d.Tok != token.CONST {
+					continue
+				}
+				for _, spec := range d.Specs {
+					var name string
+					switch v := spec.(type) {
+					case *ast.TypeSpec:
+						name = v.Name.Name
+					case *ast.ValueSpec:
+						if len(v.Names) == 1 {
+							name = v.Names[0].Name
+						}
+					}
+					for _, want := range names {
+						if name == want {
+							selected.Decls = append(selected.Decls, &ast.GenDecl{TokPos: d.TokPos, Tok: d.Tok, Specs: []ast.Spec{spec}})
+							found[name] = true
+						}
+					}
+				}
+			}
+		}
+		for _, name := range names {
+			if !found[name] {
+				return fmt.Errorf("preparer reviewed declaration missing: %s:%s", file, name)
+			}
+		}
+		files = append(files, selected)
+	}
+	info := &types.Info{Uses: map[*ast.Ident]types.Object{}, Defs: map[*ast.Ident]types.Object{}, Types: map[ast.Expr]types.TypeAndValue{}}
+	var typeErrors []error
+	cfg := types.Config{Importer: importer.ForCompiler(fset, "source", nil), Error: func(e error) { typeErrors = append(typeErrors, e) }}
+	pkg, checkErr := cfg.Check("keymaker-purity", fset, files, info)
+	allowed := map[types.Object]bool{}
+	if pkg != nil {
+		for name, pos := range trusted {
+			obj, ok := pkg.Scope().Lookup(name).(*types.Func)
+			if !ok || obj.Pos() != pos {
+				return fmt.Errorf("preparer reviewed declaration changed: %s", name)
+			}
+			allowed[obj] = true
+		}
+		allowed[pkg.Scope().Lookup("prepareAuthorityAudit")] = true
+		for _, imported := range pkg.Imports() {
+			if imported.Path() == "strconv" {
+				allowed[imported.Scope().Lookup("FormatUint")] = true
+			}
+		}
+	}
+	for _, name := range []string{"len", "append", "int64", "uint64"} {
+		allowed[types.Universe.Lookup(name)] = true
+	}
+	var violation error
+	// Resolve call targets before returning type errors, so an alias whose RHS
+	// is outside the reviewed envelope still reports the alias declaration.
+	ast.Inspect(f, func(n ast.Node) bool {
+		if violation != nil {
+			return false
+		}
+		if _, ok := n.(*ast.FuncLit); ok {
+			violation = fmt.Errorf("preparer closure")
+			return false
+		}
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		var obj types.Object
+		switch fun := call.Fun.(type) {
+		case *ast.Ident:
+			obj = info.Uses[fun]
+		case *ast.SelectorExpr:
+			obj = info.Uses[fun.Sel]
+		}
+		if v, ok := obj.(*types.Var); ok {
+			violation = fmt.Errorf("preparer callable alias: %s", v.Name())
+			return false
+		}
+		if obj == nil || !allowed[obj] {
+			violation = fmt.Errorf("preparer unreviewed call: %s", fset.Position(call.Pos()))
+			return false
+		}
+		return true
+	})
+	if violation != nil {
+		return violation
+	}
+	if checkErr != nil {
+		return fmt.Errorf("preparer declaration check: %w", typeErrors[0])
+	}
+	// Also refuse capturing function/method values, even before a later call.
+	for id, obj := range info.Defs {
+		if v, ok := obj.(*types.Var); ok {
+			if _, ok := v.Type().Underlying().(*types.Signature); ok {
+				return fmt.Errorf("preparer function value: %s", id.Name)
+			}
+		}
+	}
+	return nil
 }

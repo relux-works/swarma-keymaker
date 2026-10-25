@@ -91,8 +91,15 @@ func prepareAuthorityAudit(in authorityAuditInput) (authorityPreparedAudit, erro
 	if len(in.Instance) > 8192 {
 		return authorityPreparedAudit{}, authorityFail("audit_frame_limit")
 	}
-	if e := arID(in.Instance); e != nil {
-		return authorityPreparedAudit{}, e
+	// Keep this fixed-width lowercase-hex check direct: arID is a function
+	// variable, which the construction guard deliberately forbids calling.
+	if len(in.Instance) != 32 {
+		return authorityPreparedAudit{}, authorityFail("field_format")
+	}
+	for _, c := range in.Instance {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return authorityPreparedAudit{}, authorityFail("field_format")
+		}
 	}
 	if in.Timestamp != nil {
 		if e := arStamp(*in.Timestamp); e != nil {

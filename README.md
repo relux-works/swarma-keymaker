@@ -118,6 +118,20 @@ explicit message/rotation reservations, then derives exact audit bytes, C and R
 without I/O, locks or collecting time. It has no serving caller and does not
 reserve live capacity or change the existing audit writer.
 
+Its construction guard uses `go/types` to resolve calls to the actual reviewed
+helper declarations, rather than matching names. The trusted boundary is
+`authorityFail`, `arStamp`, `decodeAuthority`, `encodeAuthority` in
+`authority_codec.go`; `authorityCandidate`, `authorityTransaction`,
+`authorityDigest`, `authorityCopy`, `sealAuthorityRoot` in
+`authority_identity.go`; `validDigest` in `snapshot.go`; and `canonical`,
+`auditDigest` in `audit.go`. It also permits the preparer itself,
+`strconv.FormatUint`, builtins `len`/`append` and conversions `int64`/`uint64`.
+Actual supporting type/constant declarations are selected explicitly in the
+test. Function-variable aliases, closures, method values, package globals and
+unresolved calls are refused. Helper bodies and their transitive callees remain
+reviewed trust: this guard bounds construction of the preparer, and does not
+prove whole-program purity or establish runtime authority.
+
 ## Tools
 
 Linux and Go 1.26 are required. Enrollment validation uses the pinned registrar

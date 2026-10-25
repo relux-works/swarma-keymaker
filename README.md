@@ -113,6 +113,11 @@ snapshots, their staging copies, the logical root, metadata, proof tickets and
 one manager slot. Foreign-owner fence tests remain PENDING in the existing
 multi-UID window; transaction ordering, migration and fs-verity remain later gates.
 
+A pure PC2 audit preparer now checks the supplied transaction/body/tail and
+explicit message/rotation reservations, then derives exact audit bytes, C and R
+without I/O, locks or collecting time. It has no serving caller and does not
+reserve live capacity or change the existing audit writer.
+
 ## Tools
 
 Linux and Go 1.26 are required. Enrollment validation uses the pinned registrar
@@ -184,6 +189,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Twelve named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all twelve are killed, logs/PIDs in scratch |
 | Go | PC2 S1 codec/identity and isolated S2a fence/capacity checks: `go test ./internal/keymaker -run 'TestPC2' -count=1` | G4 byte oracles, real unprivileged OFD checks and pure aggregate preflight; no serving integration or platform qualification |
+| Go | PC2 audit preparation and existing audit regression checks: `go test ./internal/keymaker -run 'TestPC2\|TestAudit' -count=1` | Tail/reservation and cyclic-input refusals, independent frame/C/R bytes and unchanged journal append/rotation parity; pure value checks, no live transaction authority |
 | Go | Check published controls, G4 byte/preimage pairs and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |

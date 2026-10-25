@@ -143,8 +143,16 @@ consumption must never fall back to the ordinary provider. Independently bind
 the actual operation, enrollment, challenge, boot and original deadline; neither
 a caller-supplied digest nor `VerifyReceipt` authenticates them. Preserve the
 original context and deadline across all stages: the broker cannot detect
-replacement of both on an unconsumed request. No cached receipt, callback or
-clock substitution may stand in for the missing final-lock handoff.
+replacement of both on an unconsumed request. No cached receipt or callback may
+stand in for the missing final-lock handoff. The [QT-2c profiles](keymaker-qt2c-profile.md)
+allow exactly one fixed, qualified suspend-aware monotonic read after admission
+under all final locks, outside pure `VerifyWindow`; pass its captured value to
+that check. No provider call, `Clock` callback, `time.Now()` or other clock read
+is allowed there. Preserve original boot/start/deadline, uncertainty bounds and
+reserve: D/T/reserve cannot grow or be spent twice. The read-to-act span through
+durable local commit of the act together with use state requires an independently
+enforced bound or an act that itself honors the original deadline; otherwise
+the handoff remains `handoff_unqualified` and activation stays closed.
 
 Proposed tests `TestQualifiedTimeGateClosed` and
 `TestQualifiedTimeFixtureRequestBinding` pair default typed refusal/current-path
@@ -165,7 +173,7 @@ Update dynamic PENDING inventories only to describe the actual remaining gaps.
 | --- | --- | --- |
 | `TestQualifiedTimePendingRegistrationContinuity` | B-1c: real consumer settlement and codec, original proof grant, replay and lost-response W retention; mandatory J=140, O=200/delta=1 -> W=201, [170,172] refuses, [210,212] passes as a time control. | Independent durable rollback witness, provisioning/recovery and old-instance exclusions; accepted native registration profile and authenticated receipt mapping. Fixture files plus an in-memory witness do not qualify restore protection. |
 | `TestQualifiedTimePendingEnrollmentIssueBound` | B-1d, conditional on codec acceptance: retain receipt-derived L_issue and D, reload the approval, enforce D<=L_issue+600 and U_current<D without renewing the bound. | Accepted approval encoding/migration and protected receipt/original retention; native enrollment identity/deadline mapping and authentication; qualified provider restart/rollback behavior. |
-| `TestQualifiedTimePendingAuditPreWindow` | B-1b can check the closed gate and request construction; no final-window positive qualification test is available. | QT-2c authenticated one-use handoff, checked locally without provider/clock calls under every outer/final lock, with original deadline and bounded remaining allowance. |
+| `TestQualifiedTimePendingAuditPreWindow` | B-1b can check the closed gate and request construction; no final-window positive qualification test is available. | QT-2c authenticated one-use handoff: pure local verification without provider/clock calls; exactly one qualified suspend-aware read outside that check after all final locks, preserving original deadline/reserve and an enforced read-to-durable-act bound as specified in the QT-2c profiles. |
 | `TestQualifiedTimePendingK3Receipt` | B-1b can round-trip the real receipt codec and reject malformed/domain-mismatched fixtures; this does not exercise a K3 receipt. | Slice C: authenticated receipt/original-evidence validator and protected profiles, current-boot/continuity checks, accepted interval-preserving G4/K3 mapping and unchanged closed journal formats. |
 
 **B-1c: registration settlement fixtures**, after B-1b. Proposed

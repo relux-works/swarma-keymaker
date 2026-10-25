@@ -47,12 +47,14 @@ jobs:
         run: bash --noprofile --norc -eo pipefail .github/scripts/check-format.sh
       - name: Check public hygiene
         run: python3 .github/scripts/check-hygiene.py
-      - name: Verify vet and formatting controls
-        run: bash --noprofile --norc -eo pipefail .github/scripts/check-controls.sh
+      - name: Verify CI controls
+        run: |
+          bash --noprofile --norc -eo pipefail .github/scripts/check-controls.sh
+          bash --noprofile --norc -eo pipefail .github/scripts/check-pending-controls.sh
       # Compilation is not privileged qualification. No tagged tests execute here.
       - name: Compile privileged rows and report PENDING
         run: |
           go vet -tags multiuid ./internal/keymaker
-          printf '%s\n' 'PENDING: TestMultiUID, TestMultiUIDControl, TestMultiUIDHelper require the provisioned multi-UID test window; compile-only in CI. Use cmd/keymaker-window (make test-multiuid); runner exit 3 means PENDING.'
+          bash --noprofile --norc -eo pipefail .github/scripts/report-pending.sh
       - name: Test
         run: go test ./... -count=1 -timeout=25m -v

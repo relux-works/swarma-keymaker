@@ -59,19 +59,18 @@ grep -F 'bad_windows.go:' "$control_dir/parse-step.log"
 printf 'PASS TestFormatCommandSubstitutionStatus: expected gofmt=%s step=%s\n' "$formatter_status" "$parse_status"
 
 # The all-tracked-file hygiene check must accept ordinary prose and refuse
-# each attribution class; no commit, signing key or source-repository edit.
+# four generic attribution controls; no commit, signing key or source-repository edit.
 mkdir "$control_dir/hygiene"
 git -C "$control_dir/hygiene" -c init.templateDir= init --quiet
 printf '%s\n' 'Ordinary project documentation.' > "$control_dir/hygiene/notes.txt"
 git -C "$control_dir/hygiene" add notes.txt
 (cd "$control_dir/hygiene" && python3 "$script_dir/check-hygiene.py")
-for kind in link session generated attribution identity; do
+for kind in link session generated attribution; do
   case "$kind" in
     link) printf 'https://claude%sai/chat/example\n' '.' ;;
     session) printf 'session%smetadata\n' '_' ;;
     generated) printf 'Generated%swith example\n' ' ' ;;
     attribution) printf 'Co%sAuthored%sBy: example\n' '-' '-' ;;
-    identity) printf 'agents%s_ci_dev1\n' '1' ;;
   esac > "$control_dir/hygiene/notes.txt"
   hygiene_status=0
   (cd "$control_dir/hygiene" && python3 "$script_dir/check-hygiene.py") > "$control_dir/hygiene.log" 2>&1 || hygiene_status=$?

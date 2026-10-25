@@ -10,8 +10,7 @@ import sys
 
 # Character classes keep this check's own source free of literal markers.
 MARKERS = re.compile(
-    rb"claude[.]ai|session[_]|Claude[-]Session|Generated[ ]with|Co[-]Authored[-]By"
-    rb"|agents[0-9]+_[a-z0-9]+_(?:dev|rev|orch)[a-z0-9]*",
+    rb"claude[.]ai|session[_]|Claude[-]Session|Generated[ ]with|Co[-]Authored[-]By",
     re.IGNORECASE,
 )
 

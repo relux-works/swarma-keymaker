@@ -1,1 +1,1 @@
-{"message_dispatch":[],"messages":{"associations":[],"certificates":[],"publications":[],"transactions":[]},"next_registration_number":1,"records":[],"requests":[],"transaction_revision":2,"version":"keymaker-private/3"}
+{"message_authority":{"freshness":[],"journals":[],"scopes":[],"version":"keymaker-message-authority/1","watermark":null},"message_dispatch":[],"messages":{"associations":[],"certificates":[],"publications":[],"transactions":[]},"next_registration_number":1,"records":[],"requests":[],"transaction_revision":2,"version":"keymaker-private/3"}

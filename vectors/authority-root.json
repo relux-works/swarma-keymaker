@@ -22,8 +22,8 @@
       "id": "private-payload",
       "path": "vectors/authority-root/private-payload.json",
       "encoding": "identity",
-      "bytes": 220,
-      "sha256": "240228959b52da2912b59871e2c349ee404de95c5bad9939b5c4af30efbf60e4",
+      "bytes": 341,
+      "sha256": "d59c732036ace5357ee64fbe2b1d4e1c0c870620937f1d0c1b990a0c1cd270c6",
       "domain": "keymaker-private/3"
     },
     {
@@ -31,7 +31,7 @@
       "path": "vectors/authority-root/combined-snapshot.json",
       "encoding": "identity",
       "bytes": 2352,
-      "sha256": "7ae376f81b2ab8560f5d69605490c5e4b4349c1b8d271869ad5c8ea0607a1916",
+      "sha256": "662f16e7f228fc7f0638679ebd7ec6313134c43634fa8b403b9a705ff69f97ef",
       "domain": "schema-3"
     },
     {
@@ -39,7 +39,7 @@
       "path": "vectors/authority-root/text-boundary-root.json",
       "encoding": "identity",
       "bytes": 2144,
-      "sha256": "f91b15c4f161967beb814e72364ef11dc54cfcb3208eeb91834e64db071f49aa",
+      "sha256": "70185533ad855cd1c7f6b62cad3a3442f68c53fd82ecd561779edf92c9bb30c7",
       "domain": "keymaker-authority/2"
     },
     {
@@ -47,7 +47,7 @@
       "path": "vectors/authority-root/read-context.json",
       "encoding": "identity",
       "bytes": 2507,
-      "sha256": "72a21be99f3bcda9fab04decf7d2d7295f523cecccf73f399a2d636c9253e494",
+      "sha256": "bcde10259f8dd337b20f8950d8df1cec51cca6014b4049ab3a35de1a475c9a1f",
       "domain": "keymaker-manager-read-fixture/1"
     },
     {
@@ -55,7 +55,7 @@
       "path": "vectors/authority-root/minimal-root.json",
       "encoding": "identity",
       "bytes": 1890,
-      "sha256": "5962f9f289235b14c13dea98d5cd809c9235bcc78dce409ea4ccfa1791e48335",
+      "sha256": "f7beff57f82ea494bb3706d5d63c5e1ab1908c58ebcf44311f41e199a0d1c333",
       "domain": "keymaker-authority/2"
     },
     {
@@ -63,7 +63,7 @@
       "path": "vectors/authority-root/maximal-root.json.gz",
       "encoding": "gzip",
       "bytes": 1048576,
-      "sha256": "c47f9cd8a09e0e3c45ab9e959bea4744ef262d9baa323b4971a5f963e4a2a6cb",
+      "sha256": "0856c5575859a73fa4f4f75e837d9433229c05ca57618f19edc372bbc050b1c1",
       "domain": "keymaker-authority/2"
     },
     {
@@ -71,7 +71,7 @@
       "path": "vectors/authority-root/successor-root.json",
       "encoding": "identity",
       "bytes": 1890,
-      "sha256": "b6d672539b82eaa6019c69ddde5c53b0f57b3b153b60df93faec37be6d682d40",
+      "sha256": "3f4d52c93378a3a4224e8003952a967a20ff8458408c5a1fe8515c3ac5191de8",
       "domain": "keymaker-authority/2"
     },
     {
@@ -79,7 +79,7 @@
       "path": "vectors/authority-root/minimal-root-preimage.json",
       "encoding": "identity",
       "bytes": 1802,
-      "sha256": "84e7bb49d32315da019b94be67a6f2dc722de54084b3c90aba4c0a8b201f2415",
+      "sha256": "2e41094421bf9616b2126f441a268d4e34b7c1b4e92290a959daefce692fec71",
       "domain": "keymaker-authority/2"
     },
     {
@@ -95,7 +95,7 @@
       "path": "vectors/authority-root/participants.json",
       "encoding": "identity",
       "bytes": 3393,
-      "sha256": "376c04d83f249991e3f61ddb9a09e380e12031b8542bef462b833184905b6beb",
+      "sha256": "2ea49a6a59499bec5e138116d40350f7a08ef82d6cbf5091e94d4deecc81d84b",
       "domain": "keymaker-participants/1"
     },
     {
@@ -103,7 +103,7 @@
       "path": "vectors/authority-root/provenance.json",
       "encoding": "identity",
       "bytes": 407,
-      "sha256": "b712a130b987337fcfddf977e27cc6538d81b80e0591d8b8609ca470d2255547",
+      "sha256": "a1766fc8017928038e4ea8675c18b59312c605d09f87e5f1c30187892940fcd4",
       "domain": "keymaker-provenance/1"
     },
     {
@@ -119,7 +119,7 @@
       "path": "vectors/authority-root/binding-body.json",
       "encoding": "identity",
       "bytes": 2003,
-      "sha256": "aa7f48fe45faf28a922da8c93088ac1bd4c4d8a15c3053c79f8897a7c8e46c1a",
+      "sha256": "4a88e584c4e2cc47b7e072c8458d1c33f1a581a68ba680dcf53cf88a2a29e6bf",
       "domain": "keymaker-combined-body/3"
     },
     {
@@ -127,7 +127,7 @@
       "path": "vectors/authority-root/candidate.json",
       "encoding": "identity",
       "bytes": 129,
-      "sha256": "2a7b555585c9e24b2ab3c5338fd9f3c54d5bc337fe6eda6a0a765e06b31ca25e",
+      "sha256": "39858b4af0c9252a105b08ec40384a00445e6159e5bce1a7823fb5f72f083a19",
       "domain": "keymaker-authority-candidate/1"
     },
     {
@@ -135,7 +135,7 @@
       "path": "vectors/authority-root/transaction.json",
       "encoding": "identity",
       "bytes": 243,
-      "sha256": "51f95898c953f73b54f6f3ad78858997466a94411751a28933ccb97cefdf6c66",
+      "sha256": "ca605968290d62605131c574f35565c6ee4a2fe468800d489f400c48cf3d2c99",
       "domain": "keymaker-authority-tx/1"
     },
     {
@@ -143,7 +143,7 @@
       "path": "vectors/authority-root/attempt.json",
       "encoding": "identity",
       "bytes": 1136,
-      "sha256": "cd58b9972acef75f6aa3131a17854b48c35b8e2ffa3c527bd1cd8c47c28530f3",
+      "sha256": "2d01eba6c1a3cb37aeaa9b492a38c593dbba5e037a0e9e20519b97fbcaf9c93f",
       "domain": "pc2-activation-attempt/1"
     },
     {
@@ -151,7 +151,7 @@
       "path": "vectors/authority-root/attempt-preimage.json",
       "encoding": "identity",
       "bytes": 1002,
-      "sha256": "fa43534c67ccd447b21b339698d7f48a968098866586893e9f37246850704a44",
+      "sha256": "217b02fb222d97d6967bdf72e639b465dd1f200e0523f287476961cabac6301b",
       "domain": "pc2-activation-attempt/1"
     },
     {
@@ -159,7 +159,7 @@
       "path": "vectors/authority-root/hold.json",
       "encoding": "identity",
       "bytes": 127,
-      "sha256": "daaccb668564e2b25c5a703935d36eaa17a563da59d3be80983e6fe66a0af7c8",
+      "sha256": "12c46af7531737a3e0af0777fa0ce08faeccd30f2add74cee426662313dcc3fe",
       "domain": "pc2-hold/1"
     },
     {
@@ -167,7 +167,7 @@
       "path": "vectors/authority-root/logical-link.json",
       "encoding": "identity",
       "bytes": 456,
-      "sha256": "8bde0673bd08258e7bec39080808ea6d4a9154c0d5af7e13988527cc533ae71e",
+      "sha256": "3a11e5440fb22081db2887648fc2ad412dce2a195f2232fc5a0053aa457dd297",
       "domain": "keymaker-authority-link/1"
     },
     {
@@ -175,7 +175,7 @@
       "path": "vectors/authority-root/floor.json",
       "encoding": "identity",
       "bytes": 550,
-      "sha256": "189775cba3b1aaea79a00160e989eac90c4841e84e09e30216de6e1333d66927",
+      "sha256": "22b1ca753228fdafa4f88dbf1222bd7670bc832d22f8935c79cfef5bccfe639f",
       "domain": "keymaker-authority-floor/1"
     },
     {
@@ -191,7 +191,7 @@
       "path": "vectors/authority-root/guard-clear.json",
       "encoding": "identity",
       "bytes": 408,
-      "sha256": "f00ab6e6d4e146dbacc4388ab083c298c85cfd365e9d05b6db4ded37b64be815",
+      "sha256": "f40b3d6e76d345dcec0c23eb138dafadafaa84e1f84f18fbc31d0602ab43ea5b",
       "domain": "pc2-recovery-guard/1"
     },
     {
@@ -199,7 +199,7 @@
       "path": "vectors/authority-root/intent-clear.json",
       "encoding": "identity",
       "bytes": 150,
-      "sha256": "9722f775b0a8552b26d9a84479de479cad084b1a256f45cd00a0418648fe2903",
+      "sha256": "044ea242f14f74dc89d7ef6ab177a9e2e9b7e4215232d01b0ea84065e73e045d",
       "domain": "keymaker-authority-intent/1"
     },
     {
@@ -207,7 +207,7 @@
       "path": "vectors/authority-root/intent-pending.json",
       "encoding": "identity",
       "bytes": 642,
-      "sha256": "533c8267f8a61e772098479db7a56d18711400312fde5238c5e8906b0e453cdd",
+      "sha256": "fa4a64a36605ff90c0d176ae9477dd919058f2eea89890e380ed4e77ef7ae542",
       "domain": "keymaker-authority-intent/1"
     },
     {
@@ -215,7 +215,7 @@
       "path": "vectors/authority-root/recovery-open.json",
       "encoding": "identity",
       "bytes": 431,
-      "sha256": "eba47643aa0b21d7210fa14d710ac45d19fad0370e0a73b6cba7c50d318f5ba0",
+      "sha256": "a9953d22dd6544fb7752bb10f10a80f499335fa6aa9fb34201c051981c6a913a",
       "domain": "pc2-recovery-record/1"
     },
     {
@@ -223,7 +223,7 @@
       "path": "vectors/authority-root/recovery-resolved.json",
       "encoding": "identity",
       "bytes": 572,
-      "sha256": "09d3506a772ee4481241d3953677fd43f41d9b94d2018ea47cbd44997f46b078",
+      "sha256": "23cfd2db5d2d1218a329f16b80550ed0b50fb523ef5213d5278e33ce629ac8f4",
       "domain": "pc2-recovery-record/1"
     },
     {
@@ -231,7 +231,7 @@
       "path": "vectors/authority-root/recovery-release-prepared.json",
       "encoding": "identity",
       "bytes": 580,
-      "sha256": "982339c168c17e460b1a2391fb5ce1d61bb78593de89ccd568e74fe5e3da4f3d",
+      "sha256": "54513791777dd21e20ff1401252f7f1d2d471cebe2ada4145f0d79186bea5fc8",
       "domain": "pc2-recovery-record/1"
     },
     {
@@ -239,7 +239,7 @@
       "path": "vectors/authority-root/recovery-released.json",
       "encoding": "identity",
       "bytes": 572,
-      "sha256": "492d41e842d6851bd2cdcad989a2961cc7be5832d681680bde9934b3119278ce",
+      "sha256": "cb19fb448b99504e951ae65f53e146c528499578e8db7df2358f41816511e8cd",
       "domain": "pc2-recovery-record/1"
     },
     {
@@ -279,7 +279,7 @@
       "path": "vectors/authority-root/migration-combined_staged.json",
       "encoding": "identity",
       "bytes": 519,
-      "sha256": "985349e2038ec10028c8e9e80bffb16208190414f5d8135f019758765cd6371a",
+      "sha256": "97fac79c5bf5e7342b242bd3805fbd620368bbb0e0d3d30afd9970ae7c14b600",
       "domain": "keymaker-migration/1"
     },
     {
@@ -287,7 +287,7 @@
       "path": "vectors/authority-root/migration-combined_committed.json",
       "encoding": "identity",
       "bytes": 522,
-      "sha256": "fc5050e1b6d455f633ec8b3e316d807d49f6c94973b0342b45a1abe9deb20faf",
+      "sha256": "84ff8e4ce18e2680c53b4369a6ced2b213159ab9e70b6d705b1349fdfb3fd28a",
       "domain": "keymaker-migration/1"
     },
     {
@@ -295,7 +295,7 @@
       "path": "vectors/authority-root/migration-released.json",
       "encoding": "identity",
       "bytes": 512,
-      "sha256": "421ae8e235bae98b7f4093e92a62bdb96aa885e0c69b02e59b9dac63564c1dc1",
+      "sha256": "dc7a7eb51b2230c0406d4da2efaf831ce68c2ef64aa163ea1c3c8d7b2868ffb7",
       "domain": "keymaker-migration/1"
     },
     {
@@ -305,6 +305,142 @@
       "bytes": 447,
       "sha256": "1bee459fc127ef200de50c2e8343c0d8040e12755b24df347dc087d5e90641ca",
       "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "message-authority-empty",
+      "path": "vectors/authority-root/message-authority-empty.json",
+      "encoding": "identity",
+      "bytes": 100,
+      "sha256": "439d88145c62a5015e3b01fc3de9fef4834a5434dcf4b2e8edfa4684c27760d6",
+      "domain": "keymaker-message-authority/1"
+    },
+    {
+      "id": "message-authority-retained",
+      "path": "vectors/authority-root/message-authority-retained.json",
+      "encoding": "identity",
+      "bytes": 1115,
+      "sha256": "0928c3dcb6e579d540da1607fe22f3706bd98defabbf210084c10954f8f760dc",
+      "domain": "keymaker-message-authority/1"
+    },
+    {
+      "id": "freshness-genesis-context",
+      "path": "vectors/authority-root/freshness-genesis-context.json",
+      "encoding": "identity",
+      "bytes": 379,
+      "sha256": "691de1c1e989168ccb92923d999377308f0bf42e6ad4e80d4392d9b6ec9a6a9a",
+      "domain": "keymaker-anchor-fixture/1"
+    },
+    {
+      "id": "freshness-anchor-context",
+      "path": "vectors/authority-root/freshness-anchor-context.json",
+      "encoding": "identity",
+      "bytes": 466,
+      "sha256": "c56126308059c0f1023416d45069ebbd0e2bffb306de821ea8ba617861334e91",
+      "domain": "keymaker-anchor-fixture/1"
+    },
+    {
+      "id": "freshness-artifact-normal",
+      "path": "vectors/authority-root/freshness-artifact-normal.json",
+      "encoding": "identity",
+      "bytes": 2683,
+      "sha256": "8c610b3d0ffc52afb633e77bdce99bfe7388f9128439f4993544a6a1cd2bfc3c",
+      "domain": "message-freshness/1"
+    },
+    {
+      "id": "freshness-artifact-reanchor",
+      "path": "vectors/authority-root/freshness-artifact-reanchor.json",
+      "encoding": "identity",
+      "bytes": 3236,
+      "sha256": "904e6bbd602b736e9bf420b30f8fcf4e19327903ba482554a1b02b7e45610c15",
+      "domain": "message-freshness/1"
+    },
+    {
+      "id": "freshness-artifact-reanchor-zero",
+      "path": "vectors/authority-root/freshness-artifact-reanchor-zero.json",
+      "encoding": "identity",
+      "bytes": 3236,
+      "sha256": "7387e47107c905d94b9066477260a811260982dfb137777196d76a219c5c69bd",
+      "domain": "message-freshness/1"
+    },
+    {
+      "id": "message-policy",
+      "path": "vectors/authority-root/message-policy.json",
+      "encoding": "identity",
+      "bytes": 695,
+      "sha256": "92ff5aa7d35cff3b238648a3a9ca51fd0224490d852700a2f48c5345bf7dba39",
+      "domain": "keymaker-message-policy/1"
+    },
+    {
+      "id": "message-recovery-policy",
+      "path": "vectors/authority-root/message-recovery-policy.json",
+      "encoding": "identity",
+      "bytes": 779,
+      "sha256": "37d66121c2efc6cb2f95a5b74b77de9ad8c4c89a77d70843bbf115774a1c2216",
+      "domain": "keymaker-message-policy/1"
+    },
+    {
+      "id": "journal-evidence",
+      "path": "vectors/authority-root/journal-evidence.json",
+      "encoding": "identity",
+      "bytes": 1171,
+      "sha256": "e85e8154a0b44f88794812a192d4e1aff303f09f044241cef397f15692d78585",
+      "domain": "keymaker-journal-fixture/1"
+    },
+    {
+      "id": "freshness-payload",
+      "path": "vectors/authority-root/freshness-payload.json",
+      "encoding": "identity",
+      "bytes": 1436,
+      "sha256": "6bc53647a4ad1129ac4c7dada0049d99c29d123038cbace1336b3e7cd2669942",
+      "domain": "keymaker-private/3"
+    },
+    {
+      "id": "freshness-root",
+      "path": "vectors/authority-root/freshness-root.json",
+      "encoding": "identity",
+      "bytes": 1891,
+      "sha256": "b745a784d27101ce873dbcd5fc041a51c7a9d3589435941bfdd46c6bae30b041",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "freshness-binding-body",
+      "path": "vectors/authority-root/freshness-binding-body.json",
+      "encoding": "identity",
+      "bytes": 2005,
+      "sha256": "68ec117c39bf6a47f78e39fead67cb6f295475c05e973eb693f899e83b91cb3d",
+      "domain": "keymaker-combined-body/3"
+    },
+    {
+      "id": "freshness-root-preimage",
+      "path": "vectors/authority-root/freshness-root-preimage.json",
+      "encoding": "identity",
+      "bytes": 1803,
+      "sha256": "e9ee6d074470bb3fd2e05899c9ae7e61734df94d5fd761a9ccc9873c31599fad",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "freshness-participants",
+      "path": "vectors/authority-root/freshness-participants.json",
+      "encoding": "identity",
+      "bytes": 3394,
+      "sha256": "0c6cc7953c61bd3d9c1b866a92731e4439a75a94dd9d7f6dfad58432fd0da4bd",
+      "domain": "keymaker-participants/1"
+    },
+    {
+      "id": "freshness-provenance",
+      "path": "vectors/authority-root/freshness-provenance.json",
+      "encoding": "identity",
+      "bytes": 407,
+      "sha256": "7ac7ea452109023e2fd2b0e354d5f5f448b7e31c664b3d10962d2db36eb2586d",
+      "domain": "keymaker-provenance/1"
+    },
+    {
+      "id": "freshness-facts",
+      "path": "vectors/authority-root/freshness-facts.json",
+      "encoding": "identity",
+      "bytes": 554,
+      "sha256": "45ccbae04f0cedefc0c0edcc98f2d67a36db66299a32e2632b61f312ea3bfd23",
+      "domain": "keymaker-authority-facts/1"
     }
   ],
   "links": [
@@ -361,6 +497,36 @@
       "member": "binding_commit.digest",
       "preimage": "binding-body",
       "prefix": ""
+    },
+    {
+      "object": "freshness-root",
+      "member": "payload.digest",
+      "preimage": "freshness-payload",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "freshness-root",
+      "member": "root_digest",
+      "preimage": "freshness-root-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "freshness-root",
+      "member": "binding_commit.digest",
+      "preimage": "freshness-binding-body",
+      "prefix": ""
+    },
+    {
+      "object": "freshness-artifact-normal",
+      "member": "policy.hash",
+      "preimage": "message-policy",
+      "prefix": ""
+    },
+    {
+      "object": "freshness-artifact-reanchor",
+      "member": "policy.hash",
+      "preimage": "message-recovery-policy",
+      "prefix": ""
     }
   ],
   "groups": [
@@ -375,7 +541,7 @@
           "value": true
         },
         "bytes": 1905,
-        "sha256": "0d23b3c7130ea66b4a1351eb7c4485a910eff4f5524d9d0c04ee090e06ec3971",
+        "sha256": "a5107a9e55720e1ab66ff383f940cf8685f96e7e1698f3df4acc66566828a7aa",
         "expected_rejection": "unknown_member"
       },
       "positive": {
@@ -392,7 +558,7 @@
           "kind": "duplicate"
         },
         "bytes": 1923,
-        "sha256": "641a9dd9da00cab04feccf52a39fa4831daf4600d6941f9fcf973ec34aa34d31",
+        "sha256": "f67b26b95d158e9a4372ec705b80afc2aefbad40af678b7de26c91ed03030324",
         "expected_rejection": "duplicate_member"
       },
       "positive": {
@@ -411,7 +577,7 @@
           "value": "RootDigest"
         },
         "bytes": 1889,
-        "sha256": "751f54f7e3b535b2af970c7a144730e9bd60c8dd4e003e174f4f7c4e9f2908a6",
+        "sha256": "85688d9ade3686b8ce02e4be7426c9d829a84e040a6c6c76576878ce7689a0d7",
         "expected_rejection": "alias_member"
       },
       "positive": {
@@ -429,7 +595,7 @@
           "member": "entries"
         },
         "bytes": 1877,
-        "sha256": "9b0998e510f6bd6631eb3994001d4211d9f2f6cfd2e5f92a78e6aac299790c78",
+        "sha256": "c71af597d7ffc762441ac1feb85341c02d0465dd4e60c2ab5842c2ee8f50219d",
         "expected_rejection": "missing_member"
       },
       "positive": {
@@ -448,7 +614,7 @@
           "value": null
         },
         "bytes": 1892,
-        "sha256": "b19ce129ba7f2256273409cbe5d5d60c81bcb61e9e13d4e0c6123c73a440e528",
+        "sha256": "32ad32c2af65aa73452b686ad507ebc4eee9f90c824c1e1ec752b104e56ed6bd",
         "expected_rejection": "null_member"
       },
       "positive": {
@@ -467,7 +633,7 @@
           "value": "keymaker-authority/1"
         },
         "bytes": 1890,
-        "sha256": "3c78dfd30e84477c6644c021b60fdd3c04d2861aed5f0c5efd19141843cf4a98",
+        "sha256": "194e187dfc9ac9b4a8b98fa3779041b9f8ae00ff153934f299502d3bba12e83a",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
@@ -484,7 +650,7 @@
           "kind": "truncate"
         },
         "bytes": 1889,
-        "sha256": "99506341f7e389b5a7f6e2c415f7be22b7681fd279a3b13b4b617e472cc81a5e",
+        "sha256": "21cea67a11e49bdd4645d2e0c8b2a9a19889a80d73e6e25cb1f8823da05e1cc3",
         "expected_rejection": "truncated"
       },
       "positive": {
@@ -503,7 +669,7 @@
           "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
         },
         "bytes": 2145,
-        "sha256": "4ffb31c4c07a64d53f9eea85c54fe830504ae008de8ace71ea8d036740cdea5d",
+        "sha256": "edbc07a12f5f729fc22ba902d93c33ae4bf1dd0e7e05a10e35e50d1d5790d54c",
         "expected_rejection": "field_limit"
       },
       "positive": {
@@ -520,7 +686,7 @@
           "kind": "grow_total"
         },
         "bytes": 1048577,
-        "sha256": "308dee77d4debf42c9c172587c30d85e3981cb7582820182a4709fb33b1991f5",
+        "sha256": "48bc980a4eb519fbe847e98f0717a769d96bdaa4f8e7a63e7bd3a500ec670e44",
         "expected_rejection": "total_limit"
       },
       "positive": {
@@ -539,7 +705,7 @@
           "value": 2
         },
         "bytes": 550,
-        "sha256": "2e892fa741984daeaf64d70df9b8c61094e712b8e863ff8633aa254195b8a483",
+        "sha256": "33089a547bc7362c49cb61e90a07a5e34bb2668e1d0ecc037513293c6011baeb",
         "expected_rejection": "floor_rollback"
       },
       "positive": {
@@ -559,9 +725,9 @@
             "version": "keymaker-authority-floor/1",
             "minimum_reader_schema": 3,
             "epoch": 1,
-            "root_digest": "sha256:582f40c4566b4c561709e92f02d5dc7c9b06de4a7050d07a50986fa2efbe559a",
-            "logical_link_digest": "sha256:ee25f96c653e36db63672333af63475feda2456c47df9c92fc52f56ce9f3e6ac",
-            "guard_digest": "sha256:f00ab6e6d4e146dbacc4388ab083c298c85cfd365e9d05b6db4ded37b64be815",
+            "root_digest": "sha256:c5aa964e1d521a6000a60744beb47587de37e9b1e660a1c47ca9f323ddd4604f",
+            "logical_link_digest": "sha256:eb9c386cdbcff14a200980b04171c2c2f7eb02a99b1e9f8662774e85fff347ab",
+            "guard_digest": "sha256:f40b3d6e76d345dcec0c23eb138dafadafaa84e1f84f18fbc31d0602ab43ea5b",
             "authority_incarnation": "11111111111111111111111111111111",
             "transaction_revision": 3,
             "withdrawal_counter": 3,
@@ -572,7 +738,7 @@
           }
         },
         "bytes": 2507,
-        "sha256": "c54fc60ae07ca6ae3815fcaadb35762a578033449be72e51c8f1a0cde2c8fbe0",
+        "sha256": "cf05b4f46284355a9c4254ac00c0e373b6119b67199d1f1b0486a0f9a5e1abe9",
         "expected_rejection": "old_root_replay"
       },
       "positive": {
@@ -590,8 +756,8 @@
           "value": {
             "role": "external_state",
             "codec": "keymaker-private/3",
-            "digest": "sha256:240228959b52da2912b59871e2c349ee404de95c5bad9939b5c4af30efbf60e4",
-            "bytes": 220,
+            "digest": "sha256:d59c732036ace5357ee64fbe2b1d4e1c0c870620937f1d0c1b990a0c1cd270c6",
+            "bytes": 341,
             "verity_digest": "fsverity-sha256:43e17723f7211a004f8bb4d7bc2d59059221e1fe04d986e98fa26f64d3851c86",
             "device": {
               "major": 0,
@@ -603,7 +769,7 @@
           }
         },
         "bytes": 3725,
-        "sha256": "05ec7cbfd26e6a8cfea011577923f54071d876b7c0f66f0fa9dd6848e47fefd2",
+        "sha256": "dd14b1ab4f847c35846400870ab4933491b9e9e673c4c062ef211fae33b63c69",
         "expected_rejection": "outside_read_set"
       },
       "positive": {
@@ -639,7 +805,7 @@
           "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
         },
         "bytes": 1890,
-        "sha256": "8e54af63f330b6175722a351cf6a6cf5253bd51f852e0f29db7c7a14ddb0abf5",
+        "sha256": "f572c8e2aefa7c3ea880de63bb06b391472c72b1620b6a010fdad6cbf60dd523",
         "expected_rejection": "digest_mismatch"
       },
       "positive": {
@@ -658,7 +824,7 @@
           "value": "pc2-activation-attempt/2"
         },
         "bytes": 1002,
-        "sha256": "b57c58aa264928872fb7c7382ff208c6bcacefd5ac613a2ce549dd8012e158e1",
+        "sha256": "9d45a136db1b1ea68d35f58c6f8f4baaf1cef2273fb814f1902ffe5169030932",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
@@ -677,7 +843,7 @@
           "value": "pc2-hold/2"
         },
         "bytes": 127,
-        "sha256": "8d3fa5b587a52f15b72b500d90999fd79e83c7a73732c31924340809985f6861",
+        "sha256": "d2ea48fe37a5bc1b5e100d7f3056fff47d94d93f846852a9388318d2e9202ecf",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
@@ -715,7 +881,7 @@
           "value": "keymaker-provenance/2"
         },
         "bytes": 407,
-        "sha256": "777af8e7ac67669d6e3c85f1f7513723bad3dfea2fd59ebccd3b05292db5c35c",
+        "sha256": "aeffd2288ce567df55b35abc78f645084c0dc312b93f204a6cba91a4b1bb59b5",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
@@ -734,7 +900,7 @@
           "value": "keymaker-authority-link/2"
         },
         "bytes": 456,
-        "sha256": "ef38017bff07e851c6c8e3f4ead00ea03aa8733b81e2498df14b7e6a4ade0fb2",
+        "sha256": "57f352951031d11801e40a1061c61ed9497a119711c814253188740f47dab221",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
@@ -753,7 +919,7 @@
           "value": "keymaker-combined-body/2"
         },
         "bytes": 2003,
-        "sha256": "41030fabb29f6833891584b46863ba0593a138e534323d90f5723c7ed891aa52",
+        "sha256": "42c72b4d351fd100ac2341d5212fc30a1f891966294566c901088bd6d51a500f",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
@@ -772,11 +938,323 @@
           "value": "keymaker-authority-candidate/2"
         },
         "bytes": 129,
-        "sha256": "d52bad089153643abfb05d69fc2b865143c2e92fe2b7e2d0d2084ba04bc0a081",
+        "sha256": "73dee272f68ff0ecd5f955e34e3948efb1953f9d3d7aa86b86ce7017d644cd39",
         "expected_rejection": "wrong_domain"
       },
       "positive": {
         "golden": "candidate",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "persisted-receipt",
+      "claim": "Process-local receipt/private state is forbidden in durable payload; the paired payload retains only signed-input references and detached metadata. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-payload",
+        "mutation": {
+          "kind": "set",
+          "member": "FreshnessReceipt",
+          "value": {
+            "verified": true
+          }
+        },
+        "bytes": 1473,
+        "sha256": "c96d7029da361fcd4f043f404a4a4f70a6de66f25e49be8d45839df1f64fb388",
+        "expected_rejection": "unknown_member"
+      },
+      "positive": {
+        "golden": "freshness-payload",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "absent-freshness-inventory",
+      "claim": "Combined codec requires explicit freshness inventory, even empty; missing state never bootstraps. Reader verdict PENDING.",
+      "negative": {
+        "control": "private-payload",
+        "mutation": {
+          "kind": "delete",
+          "member": "message_authority"
+        },
+        "bytes": 220,
+        "sha256": "240228959b52da2912b59871e2c349ee404de95c5bad9939b5c4af30efbf60e4",
+        "expected_rejection": "missing_member"
+      },
+      "positive": {
+        "golden": "private-payload",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "positive-anchor-null-id",
+      "claim": "Positive publication requires real freshness ID/time; paired positive anchor has both. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-anchor-context",
+        "mutation": {
+          "kind": "set",
+          "member": "anchor",
+          "value": {
+            "registry_id": "ed25519:11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+            "owner": "o",
+            "publication_seq": 1,
+            "freshness_id": null,
+            "issued_at": "2026-10-25T00:00:00Z",
+            "snapshot": "sha256:16a0eeb0791b6c92451fd284dd9f599e0a7dbe7f6ebea6e2d2d06c7f74aec112",
+            "registry_seq": 1,
+            "checkpoint_id": "sha256:47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef"
+          }
+        },
+        "bytes": 397,
+        "sha256": "01a255fc4dcda1bdb4ef146f98c290e559154b97fb010f56933e7b18916042dd",
+        "expected_rejection": "freshness_state_invalid"
+      },
+      "positive": {
+        "golden": "freshness-anchor-context",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "missing-exact-prior",
+      "claim": "Advancing journal proof requires separate exact prior, not a current/fork slot; paired manifest retains prior. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-evidence",
+        "mutation": {
+          "kind": "set",
+          "member": "journal",
+          "value": {
+            "transaction": "77777777777777777777777777777777",
+            "inputs": {
+              "entries": [
+                {
+                  "hash": "72540304542508e6ee83cdcd0968a46b2f040653014e9e7d278f452c82173cc7",
+                  "bytes": 1024
+                },
+                {
+                  "hash": "d686b2e829a80da90fd71f59e7bf0563d90ff661c470c27961bbad849876910d",
+                  "bytes": 1024
+                }
+              ],
+              "checkpoints": [
+                {
+                  "hash": "d435fb0070f5c126fa747426f26afb5068d3b885af3ccd48464626b8944b6ba2",
+                  "bytes": 1024
+                }
+              ],
+              "snapshot": {
+                "hash": "52f5c0f1cb93ce2e2f91d15839c68936ffe6732fe1b4b2ad29c6fb46a55fa89c",
+                "bytes": 1024
+              },
+              "witness": {
+                "registry_id": "ed25519:11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+                "owner": "o",
+                "registry_seq": 1,
+                "registry_head": "sha256:b414193425ff71a255a4a10f8258805fd957f7c195001ae55fecdd5f5e1a69a3",
+                "checkpoint_id": "sha256:47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef",
+                "previous_checkpoint_id": null
+              }
+            },
+            "prior_checkpoint": null,
+            "policy": {
+              "hash": "92ff5aa7d35cff3b238648a3a9ca51fd0224490d852700a2f48c5345bf7dba39",
+              "bytes": 695
+            },
+            "read_evidence": {
+              "hash": "c0403aec54d2b48fee60274c5509c554acc2a3779b161db8e40d5e1661053a75",
+              "bytes": 1024
+            },
+            "watermark": "2026-10-25T00:00:01Z"
+          }
+        },
+        "bytes": 1087,
+        "sha256": "c20297cc86a8a10db0473327262609e567210bc6da7ea20f844e23f1c4be4ccc",
+        "expected_rejection": "journal_unavailable"
+      },
+      "positive": {
+        "golden": "journal-evidence",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "oversized-independent-prior",
+      "claim": "Prior bound is independently <=8192 and cannot borrow aggregate or conflict credit; paired prior is in bound. Reader verdict PENDING.",
+      "negative": {
+        "control": "journal-evidence",
+        "mutation": {
+          "kind": "set",
+          "member": "journal",
+          "value": {
+            "transaction": "77777777777777777777777777777777",
+            "inputs": {
+              "entries": [
+                {
+                  "hash": "72540304542508e6ee83cdcd0968a46b2f040653014e9e7d278f452c82173cc7",
+                  "bytes": 1024
+                },
+                {
+                  "hash": "d686b2e829a80da90fd71f59e7bf0563d90ff661c470c27961bbad849876910d",
+                  "bytes": 1024
+                }
+              ],
+              "checkpoints": [
+                {
+                  "hash": "d435fb0070f5c126fa747426f26afb5068d3b885af3ccd48464626b8944b6ba2",
+                  "bytes": 1024
+                }
+              ],
+              "snapshot": {
+                "hash": "52f5c0f1cb93ce2e2f91d15839c68936ffe6732fe1b4b2ad29c6fb46a55fa89c",
+                "bytes": 1024
+              },
+              "witness": {
+                "registry_id": "ed25519:11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+                "owner": "o",
+                "registry_seq": 1,
+                "registry_head": "sha256:b414193425ff71a255a4a10f8258805fd957f7c195001ae55fecdd5f5e1a69a3",
+                "checkpoint_id": "sha256:47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef",
+                "previous_checkpoint_id": null
+              }
+            },
+            "prior_checkpoint": {
+              "hash": "fd6c76576ebf6d140d4ba979259af9a3b6213b982cda72e5cbf7092b7061b220",
+              "bytes": 8193
+            },
+            "policy": {
+              "hash": "92ff5aa7d35cff3b238648a3a9ca51fd0224490d852700a2f48c5345bf7dba39",
+              "bytes": 695
+            },
+            "read_evidence": {
+              "hash": "c0403aec54d2b48fee60274c5509c554acc2a3779b161db8e40d5e1661053a75",
+              "bytes": 1024
+            },
+            "watermark": "2026-10-25T00:00:01Z"
+          }
+        },
+        "bytes": 1171,
+        "sha256": "f38a7237945c888cea5117fb28e5ba626fae827772e198cd826e7d41f387085f",
+        "expected_rejection": "prior_limit"
+      },
+      "positive": {
+        "golden": "journal-evidence",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "freshness-watermark-rollback",
+      "claim": "New anchor/W cannot commit with lower W; paired watermark advances using qualified input. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-artifact-normal",
+        "mutation": {
+          "kind": "set",
+          "member": "watermark_after",
+          "value": "2026-10-24T23:59:59Z"
+        },
+        "bytes": 2683,
+        "sha256": "33476545e1ec0b5229da99021bf2a09a786bdd20e2399bd5b65ec52193f6b249",
+        "expected_rejection": "watermark_rollback"
+      },
+      "positive": {
+        "golden": "freshness-artifact-normal",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "reanchor-skip-mismatch",
+      "claim": "Skip is exactly new-old-1, not an owner-selected count; paired reanchor records two. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-artifact-reanchor",
+        "mutation": {
+          "kind": "set",
+          "member": "reanchor",
+          "value": {
+            "reanchored": true,
+            "skipped_publications": 1,
+            "old_freshness_id": "sha256:aac0ca9a659a276dabd5430344e94b8363e8b2d0d8839f218e6b4b7fb251ff3f",
+            "new_freshness_id": "sha256:7c2f351238e7d058acc1322a39b7f7a3a972aed29ccfc30e277eb70272866330",
+            "old_checkpoint_id": "sha256:47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef",
+            "new_checkpoint_id": "sha256:47320987f9a49d5b00119b960f247a956773f57543982b8bfcb6da5bb3afd9ef"
+          }
+        },
+        "bytes": 3236,
+        "sha256": "791ad32ada9597219695045022700e198da679a92a180c95dcccb2bd300887a8",
+        "expected_rejection": "skip_mismatch"
+      },
+      "positive": {
+        "golden": "freshness-artifact-reanchor",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "receipt-audit-boolean",
+      "claim": "Detached typed identifiers cannot be replaced by an admitted boolean; paired artifact has exact metadata only. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-artifact-normal",
+        "mutation": {
+          "kind": "set",
+          "member": "receipt_audit",
+          "value": true
+        },
+        "bytes": 2271,
+        "sha256": "6fc5177bb2efe20523467f8e94e199dc4caa6bb510fc55e08e7eecbcb7057ac5",
+        "expected_rejection": "wrong_type"
+      },
+      "positive": {
+        "golden": "freshness-artifact-normal",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "non-genesis-missing-endpoint",
+      "claim": "Positive old anchor requires retained original endpoint, not null/genesis; paired artifact keeps it. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-artifact-normal",
+        "mutation": {
+          "kind": "set",
+          "member": "endpoints",
+          "value": {
+            "old": {
+              "freshness": null,
+              "checkpoint": {
+                "hash": "fd6c76576ebf6d140d4ba979259af9a3b6213b982cda72e5cbf7092b7061b220",
+                "bytes": 1024
+              }
+            },
+            "new": {
+              "freshness": {
+                "hash": "04714d80ea0790a7b69007e57859430f8670efe45efe886dd1ab975485065be2",
+                "bytes": 1024
+              },
+              "checkpoint": {
+                "hash": "fd6c76576ebf6d140d4ba979259af9a3b6213b982cda72e5cbf7092b7061b220",
+                "bytes": 1024
+              }
+            }
+          }
+        },
+        "bytes": 2599,
+        "sha256": "be5c53942287372fc5479803d0b1c7aaa68975bd81fb3d5905147a7246aa6860",
+        "expected_rejection": "endpoint_missing"
+      },
+      "positive": {
+        "golden": "freshness-artifact-normal",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-freshness-artifact",
+      "claim": "Artifact kind is part of its canonical preimage; paired exact version is message-freshness/1. Reader verdict PENDING.",
+      "negative": {
+        "control": "freshness-artifact-normal",
+        "mutation": {
+          "kind": "set",
+          "member": "kind",
+          "value": "message-freshness/2"
+        },
+        "bytes": 2683,
+        "sha256": "c229746ecb50451b648a8ee12129a4b63d258236b526e502e7777e9228dbefa6",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "freshness-artifact-normal",
         "expected": "format-control-only"
       }
     }

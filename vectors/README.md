@@ -15,7 +15,7 @@ no binding/enrollment mutations, apart from permitted bounded audit writes.
 | --- | --- |
 | `refusals.json` | Foreign peer, inactive/reused generations, unavailable source, open-connection revoke/retire races at release and next request, hardened paths and purposes, SSHSIG restrictions and rejected agent mutations, concrete native malformed frames, operator register/revoke authority, mandatory registrar-array uid_map and pinned enrollment, revoked/missing helper binding, executable-qualified refusal, registrar name bounds, domain separation, private-material request rejection and audit failure |
 | `slip0010-ed25519.json` | Public SLIP-0010 Ed25519 test vectors 1 and 2: all six nodes each, expected chain code and SLIP-encoded public key; source URL and source SHA-256 retained |
-| `authority-root.json`, `authority-root/` | G4 draft: 38 byte goldens, 21 adjacent negative/positive pairs and nine preimage links; integrity only, PC2 consumer rejection/runtime qualification PENDING |
+| `authority-root.json`, `authority-root/` | G4 draft: 55 byte goldens, 31 adjacent negative/positive pairs and 14 preimage links; integrity only, PC2 consumer rejection/runtime qualification PENDING |
 | `keymaker-paths.json` | Fixed public 32-byte seed, explicit scoped registry and five name → path → Ed25519/SSH public-key examples; purpose and ancestor separation |
 
 `evaluation` names the future harness layer. Binding checks may directly
@@ -87,7 +87,7 @@ MS-S13–MS-S22 remain PENDING in the message-state spec.
 
 The [G4 draft](../spec/keymaker-authority-root.md) is content for architect,
 reviewer and curator acceptance before PC2 S1 code. `authority-root.json` lists
-38 canonical JSON goldens and 21 named adjacent negative/control groups. Each
+55 canonical JSON goldens and 31 named adjacent negative/control groups. Each
 group carries its own claim. Inputs, UIDs, inode metadata, provider digests and
 verity measurements are **invented harness inputs**, not an installed policy,
 valid signed provider document, measured file or independent custody proof.
@@ -101,7 +101,8 @@ existing-schema-2 entry), attempt/hold and domain preimages. The maximal root is
 losslessly gzip-compressed; its expected decompressed SHA256/length are in the
 manifest. Expansion is bounded in the checker. Source JSON bytes have no newline.
 
-Nine links pin root/binding/facts/participants/candidate/attempt/hold hashes. The
+Fourteen links pin root/binding/facts/participants/candidate/attempt/hold hashes,
+including populated freshness-payload/root and freshness-policy preimages. The
 checker materializes each negative mutation, checks its exact SHA256/length and
 unchanged positive-control selection, then checks that control's declaration. It
 does **not** implement the expected reader rejection, active append, recovery,
@@ -112,6 +113,17 @@ claim; later consumer tests must actually decode/refuse each named input before
 reporting a kill. Unknown/duplicate/alias, domain, truncation, field/total size,
 floor/old-root, provenance read-set and aggregate-reservation pairs remain
 executable fixture-integrity checks only.
+
+Seventeen additional goldens cover the single combined codec's empty/retained
+message authority, eight-field genesis/positive anchors, normal freshness and
+same-head reanchor artifacts (two skipped positions and zero), exact journal
+prior reference, normal/recovery policy and a populated payload/root/preimage
+chain. Their external signed-input references are invented format inputs, just
+like participant measurements; they are not signed-producer accepts or receipts.
+Ten new negative/control pairs cover receipt persistence, missing inventory,
+positive-anchor null ID, missing/oversized independent prior, W rollback, skip
+count, boolean audit substitution, missing endpoint and wrong artifact domain.
+Actual signed S4/S5 verification remains a separate consumer qualification gate.
 
 Run `go run ./tools/vectors/main.go -check` from the repository root. `-write`
 still rewrites **only** keymaker-paths.json; it must not regenerate golden expected

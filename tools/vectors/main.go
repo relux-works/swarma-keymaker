@@ -479,6 +479,9 @@ func checkAuthorityVectors() {
 			domain = obj["type"]
 		}
 		if domain == nil {
+			domain = obj["kind"]
+		}
+		if domain == nil {
 			domain = "schema-" + fmt.Sprint(obj["schema_version"])
 		}
 		require(fmt.Sprint(domain) == g.Domain && g.Domain != "", "authority golden domain: "+g.ID)
@@ -517,7 +520,7 @@ func checkAuthorityVectors() {
 		e := item.(map[string]any)
 		require(e["registration_number"] == json.Number(strconv.Itoa(i+1)) && len(e["owner"].(string)) <= 255, "authority maximal root field bounds")
 	}
-	require(len(f.Goldens) == 38 && len(f.Groups) == 21 && len(f.Links) == 9, "authority vector inventory")
+	require(len(f.Goldens) == 55 && len(f.Groups) == 31 && len(f.Links) == 14, "authority vector inventory")
 	for _, phase := range []string{"legacy_validated", "s2_staged", "s2_committed", "combined_staged", "combined_committed", "released"} {
 		require(goldens["migration-"+phase] != nil, "authority migration vector missing")
 	}

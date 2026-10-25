@@ -68,7 +68,8 @@ serving format or optional authority sidecar):
 ```text
 {version:"keymaker-private/3",next_registration_number:N,records:[Binding],
  requests:[RetainedRequest],transaction_revision:N,messages:Messages2,
- message_dispatch:[{transaction:ID,codec:MessageCodec}]}
+ message_dispatch:[{transaction:ID,codec:MessageCodec}],
+ message_authority:MessageAuthority}
 ```
 
 Binding, RetainedRequest and Messages2 retain the complete closed structures
@@ -133,7 +134,8 @@ implementation/lifecycle and provider bindings, not invent optional members):
 
 HistoryRef is exactly {kind:HistoryKind,id:Text,digest:D,bytes:N}. HistoryKind is
 legacy_snapshot, s2_snapshot, combined_payload, message2, message3, approval,
-policy, migration, attempt, hold or recovery; bytes <=256 MiB, IDs unique within
+freshness, signed_input, message_policy, policy, migration, attempt, hold or
+recovery; bytes <=256 MiB, IDs unique within
 kind, sorted by (kind,id). The role/ID selects a protected owner-defined retained
 object, not a manager-supplied path. Full preparation resolves and validates every
 original object under its exact codec; all copies contribute to capacity. Old
@@ -464,7 +466,8 @@ no other holder bypasses pending because its hashes match.
 
 ## 7. Artifact dispatch and pending predicates
 
-MessageCodec is exactly keymaker-msg-state/2 or keymaker-message-artifact/3.
+MessageCodec is exactly keymaker-msg-state/2, keymaker-message-artifact/3 or
+message-freshness/1.
 message_dispatch has one sorted row per retained transaction, no missing,
 duplicate or unrelated ID. Codec 2 dispatches **original** S2 bytes and hash
 recipes, including original snapshot/migration decision, with no rewrapping or
@@ -484,6 +487,193 @@ A message-only offline reconciler cannot release a global hold. No bool/null
 shortcut turns unknown into an empty inventory. Existing implementation only
 accepts its S2 subset; future phases need their separate content/runtime gates.
 
+### 7.1 Retained S4/S5 inventory in this same codec
+
+This draft incorporates the retained-state contract from
+[landed main b045dd6](https://github.com/relux-works/swarma-keymaker/blob/b045dd66a06bd5c4be6839375001c89ee0aadeb4/spec/keymaker-msg-state.md#51-retained-freshness-and-re-anchor-artifact).
+Its waggle S4/S5 source is
+[5f4e743](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#29-signed-snapshot-freshness-d38-b).
+This is composition for content review, not a module upgrade or receipt adapter.
+The mandatory MessageAuthority member, even when empty, is exactly:
+
+```text
+{version:"keymaker-message-authority/1",watermark:Stamp|null,
+ scopes:[{anchor:Anchor,policy:BlobRef,checkpoint:BlobRef,snapshot:BlobRef,
+          artifact:BlobRef|null}],
+ journals:[{transaction:ID,inputs:{entries:[BlobRef],checkpoints:[BlobRef],
+          snapshot:BlobRef,witness:Witness},prior_checkpoint:BlobRef|null,
+          policy:BlobRef,read_evidence:BlobRef,watermark:Stamp}],
+ freshness:[{transaction:ID,phase:"prepared"|"committed"|"aborted"|"unknown",
+             artifact:BlobRef}]}
+Anchor = {registry_id:Key,owner:Owner,publication_seq:Z,freshness_id:D|null,
+          issued_at:Stamp|null,snapshot:D,registry_seq:N,checkpoint_id:D}
+Witness = {registry_id:Key,owner:Owner,registry_seq:N,registry_head:D,
+           checkpoint_id:D,previous_checkpoint_id:D|null}
+BlobRef = {hash:H,bytes:N}
+```
+
+Stamp is exactly 20 ASCII bytes YYYY-MM-DDTHH:MM:SSZ, real Gregorian date,
+years 1970..9999, no offsets/fractions/leap seconds. Key is the pinned waggle
+ed25519: or p256: canonical unpadded base64url public-key ID (51 or 49 ASCII
+bytes respectively), with that profile's point checks. Owner is 1..255 UTF-8
+bytes under the pinned owner grammar, never an alias. BlobRef hashes complete
+original immutable bytes, not an envelope body ID; bytes is positive, <=256 MiB
+and subject to the tighter type caps below. Referenced originals must already
+be synced, retained, resolvable and fully verified under their owner codec.
+
+Each array has <=65536 rows; scopes are unique/sorted by (registry_id,owner),
+journals and freshness by transaction. IDs share installation-wide uniqueness;
+freshness transactions also have exactly one message_dispatch row with codec
+message-freshness/1. Existing issue/renew transactions retain their old dispatch.
+Scope.anchor is the latest committed endpoint, not a pending proposal. Its
+checkpoint/snapshot refs resolve to exactly anchor.checkpoint_id/snapshot.
+artifact points to the committed artifact that admitted it. Only independently
+authorized normal genesis has artifact=null, publication_seq=0 and both
+freshness_id/issued_at=null; registry_seq remains positive and original signed
+checkpoint/snapshot and protected genesis policy are still mandatory. For every
+positive publication position both fields are non-null. Missing/corrupt state
+never means genesis. The sole null watermark is the never-admitted empty
+inventory (all three arrays empty). Nonempty state requires independently
+continuous durable W. The retained watermark is the common transaction's
+qualified W copy; no per-scope rollback, guessed W=Now or second clock exists.
+Each successful candidate stores the exact Plan.Watermark and cannot lower W;
+any later common W advance still requires the same protected provider.
+
+Journal rows supplement, rather than change, original closed S2 publication
+rows. inputs retains the exact oldest-first unsigned journal envelopes including
+the authenticated raw anchor, one candidate checkpoint and at most one fully
+admitted second current fork checkpoint, the exact signed complete snapshot
+and protected six-field witness. Match the original S2 publication by transaction
+and verify its target independently. For every advancing proof prior_checkpoint
+is the exact original signed C(n-1) at IDJournal[witness.checkpoint_id], with
+IDJournalAvailable=true; authenticate signature/scope/id/seq/head and retain it
+atomically with anchor/W. Null is allowed only for exact non-advancing checkpoint
+retransmission. The fork checkpoint is NEVER the prior slot. Candidate checkpoint
+time >= authenticated prior time (equal passes); backward time refuses. Historical
+prior age is not present authority. read_evidence retains authenticated WC1
+intent/resolution/receipts/head/control/continuity, never a cached admitted flag.
+
+### 7.2 Freshness artifacts, preimages and independent bounds
+
+The message-freshness/1 dispatch is this exact closed artifact, hashed in full
+as H(CCJ(artifact)); kind is its domain tag, checked before hashing:
+
+```text
+{kind:"message-freshness/1",transaction:ID,mode:"normal"|"reanchor",
+ policy:BlobRef,old_anchor:Anchor,new_anchor:Anchor,
+ watermark_before:Stamp,watermark_after:Stamp,witness:Witness,
+ witness_read_at:Stamp,proof:[BlobRef],checkpoint:BlobRef,snapshot:BlobRef,
+ endpoints:{old:{freshness:BlobRef|null,checkpoint:BlobRef},
+            new:{freshness:BlobRef,checkpoint:BlobRef}},
+ receipt_audit:ReceiptAudit|null,reanchor:Reanchor|null}
+ReceiptAudit = {registry_id:Key,owner:Owner,snapshot_id:D,checkpoint_id:D,
+ freshness_id:D,reanchored:boolean,old_freshness_id:D|null,
+ old_checkpoint_id:D|null}
+Reanchor = {reanchored:true,skipped_publications:Z,old_freshness_id:D,
+ new_freshness_id:D,old_checkpoint_id:D,new_checkpoint_id:D}
+```
+
+ReceiptAudit is an explicit persisted mapping of the pinned verifier's detached
+FreshnessAudit fields RegistryID, Owner, SnapshotID, CheckpointID, FreshnessID,
+Reanchored, OldFreshnessID and OldCheckpointID. Empty Go old-ID strings map to
+null only in normal mode; reanchor requires both original IDs. These identifiers
+prove no currency. Accepted producer commit requires authentic Audit() origin
+and non-null matching identifiers; null is retained unsuccessful-attempt evidence
+only, with no anchor/W advance. No receipt-origin boolean is persisted as authority.
+Normal mode has reanchor=null. Reanchor has positive old publication position,
+strictly advancing publication_seq and issued_at, and exact skipped_publications
+= new publication_seq - old publication_seq - 1 (including zero). Policy must
+authorize that exact installation/endpoints and skipped-fork cost; missing
+continuity never silently selects recovery. Same-head reanchor is allowed only
+with identical checkpoint ID/head/snapshot and equal registry_seq. Equal-position
+conflict or lower seq refuses; skipped positions lose intervening fork detection.
+All endpoint IDs recompute from retained signed originals and match both anchors;
+new snapshot/checkpoint/proof/tip/witness and detached audit must agree.
+
+The referenced policy object is exactly
+`{version:"keymaker-message-policy/1",registry_root:{key:Key,
+ purpose:"registry-revocation",attestation_root:Key},owner:Owner,max_age:N,
+ freshness_margin_seconds:Z,scope:BlobRef,cumulative:BlobRef,restore:BlobRef,
+ time:BlobRef,reanchor_approval:BlobRef|null}`; <=65536 bytes, max_age<=60,
+margin<=60. Each qualification reference resolves to original independently
+protected provider evidence, not a newly invented claim of rollback_safe.
+Reanchor approval is non-null only for explicit approved recovery. Provider
+inner codecs, trust/continuity and privilege interfaces require G5 owner
+acceptance; this format cannot supply missing deployment evidence. The policy's
+version tag separates its H preimage; signed originals keep their owner domains.
+Freshness artifacts <=65536 bytes; journal row <=65536 bytes; every wrapper and
+referenced object obeys depth<=16 and the aggregate, including retained originals.
+
+Independent intake limits compose
+[message §2.3](keymaker-msg-state.md#23-capacity-and-history), including the
+transport clarification landed as 7a2262c.
+
+| Input set | Independent count / byte caps, checked before allocation |
+| --- | --- |
+| Journal call | <=64 entries, <=2 current checkpoints, each <=8192 bytes; sum <=540672 bytes; raw anchor consumes an entry slot, leaving <=63 new entries |
+| Journal original prior C(n-1) | <=8192 bytes separately; cannot borrow the optional fork-checkpoint slot or be hidden in the journal aggregate |
+| Freshness call | 1..64 original signed publications, one checkpoint, each <=8192 bytes; sum <=532480 bytes |
+| Exact signed snapshot | <=8192 bytes per the message intake profile, inherited <=64 entries/8192-byte strings and owner limits; referenced original not a snapshot reconstructed from IDs |
+| Registry transport | <=524288 bytes (512 KiB) total intake/evidence; separate full-proof route <=2097152 bytes (2 MiB) aggregate received bundle, including context, protected prior, current snapshot, witness/control evidence and transport encoding |
+| WC1 checkpoint wrapper | <=8192 bytes including LF for the entire encoded real-head wrapper; independent of both registry routes and raw verifier limits |
+| Authenticated read/cumulative/restore/time/scope evidence | Each <=256 MiB under the ONE aggregate and owner-specific tighter caps; whole received bundle/witness wrapper caps remain independently mandatory |
+| Query IDs / keys | Each list <=64, exact actual dependent query, no empty-list coverage inference; not a grant carried by this artifact |
+
+Original journal/freshness envelopes are external owner bytes, not recanonicalized
+G4 objects. The registry full-proof route carries publication proofs; its 2 MiB
+limit never enlarges the raw journal/freshness/prior limits or guarantees a
+maximal proof fits WC1. Preflight every applicable route and the complete
+encoded real-head WC1 wrapper, including prior bytes, before intent. Overflow
+refuses before intent with no truncation, skipped evidence, ad hoc splitting or
+pagination; state/sequences/anchors remain unchanged, apart from bounded refusal
+telemetry. Equality passes only that size gate, subject to all other checks.
+The verifier's wrapper and provider-specific tighter limits remain mandatory,
+not an excuse to read their maximum inside F. All originals, exact
+prior/endpoints, old/new bodies, manifests, prepared/unknown artifact histories
+and recovery/staging duplicates are listed in message_inventory under freshness,
+signed_input or message_policy and charged to existing installed/artifacts/
+recovery/staging/pending_proofs/reservation_metadata classes. There is no extra
+participant role, capacity row, budget, serving format or migration graph.
+Reservation occurs before any writes, includes both native intent/effect copies
+and paired audit headroom, and preserves actual installed S2 bytes without eviction.
+
+The prospective message_freshness_commit operation is an **explicit base delta
+specified by landed main b045dd6**, paired with binding_commit, request ID
+msg:<transaction>:freshness or :reanchor and payload_digest=H(CCJ(artifact)).
+It adds no audit member, result enum or hash algorithm; Q7's closed-optional rule
+still forbids operator-only members on message events. Anchor/W/artifact refs,
+exact prior/endpoints/provenance, successful event and binding commit become
+eligible together only under final common-root durability AND intent cleanup.
+The payload Ref binds the entire MessageAuthority inventory into the existing
+acyclic body/candidate/audit/root preimage DAG; artifact contains no own hash,
+future audit/root hash or resulting snapshot reference. Unknown outcomes retain
+the exact candidate/old/new/hold and phase, never recalculate a skip waiver.
+
+The opaque FreshnessReceipt pointer, its private fields and the same-lifetime
+immutable SignedSnapshots Evidence OBJECT identity **MUST NOT be persisted**.
+Only original signed bytes/provenance and detached audit identifiers are durable.
+After successful common-root commit, the original in-memory receipt may be used
+only with its admitted new anchor and the same immutable Evidence object for its
+entire lifetime. Byte-identical reconstruction/ABA invalidates it. Restart must
+revalidate originals and perform new full VerifyFreshness; recovery cannot mint
+a receipt, and persisted Audit identifiers cannot recreate one. Initial
+VerifyJournal is outside receipt mode and requires current checkpoint/snapshot
+own-age under real qualified Now/W. Receipt use cannot relax operator/service
+policy, bind an effect permit or renew a deadline. Fresh authenticated WC1/status/
+revocation and serialized current authority checks remain required at release.
+Receipt expiry is E=min(tip.issued_at+A, issuing WitnessReadAt+A), A<=60;
+use requires max(Now,W)<E-margin, 0<=margin<=60 from qualified protected policy.
+A later read cannot extend E; read is >=tip time, <=min(Now,W), age<=A.
+Normal chains retain every oldest-first publication position with strict time,
+same-head prev and head-change null-prev rules; cumulative future-effective
+revocations remain present. Snapshot-own-age waiver never proves cumulative
+rollback safety or relaxes certificate/binding validity and query coverage.
+
+These additions change no manager read under F in §6. Full message/proof/provider
+validation happens unlocked against the exact immutable payload/inventory;
+the manager rechecks the same prepared root and fixed participant measurements.
+No proof scan, provider refresh, receipt check or implicit lock is introduced there.
+
 ## 8. One migration graph and atomic crash walk
 
 The S1/S2 migration ordering is implemented only after content review:
@@ -492,6 +682,11 @@ Existing valid schema 2 joins the same edge. One offline coordinator, one parent
 intent and raised protected floor own the graph; no direct 1->3 skip, independent
 second migration or intermediate authority. Preserve exact old/intermediate/new
 bodies, decisions, message artifacts/results/pins/high-water/floors/obligations.
+MessageAuthority starts as its explicit never-admitted empty inventory only when
+the validated input genuinely has no such state; a lost populated history cannot
+be migrated as empty. Any previously accepted signed originals, prior checkpoints,
+anchors/W and endpoint histories must be retained exactly, never reissued or
+reset. S4/S5 composition uses this same combined-3 edge and protected floor 3.
 Unknown prior commits reconcile under their original protocol first. All audit
 readers/recovery must support Q7's exact closed-optional schemas before serving;
 floor 3 is not a reason to skip unknown audit members or rewrite old records. Stable

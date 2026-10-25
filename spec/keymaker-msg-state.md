@@ -167,6 +167,24 @@ prior checkpoint is at most8192 bytes and accounted separately from the journal
 explicit-argument aggregate, never hidden in its optional conflict slot. Exact
 snapshot, publication/freshness endpoints, cumulative-policy evidence, witness
 proof pages and total artifacts also consume reserved state bytes; transport-specific caps cannot enlarge them.
+
+The registry service's [pinned transport contract](https://github.com/relux-works/swarma-owner-registry/blob/fa6e3d95dc2af90e3acfe1aa090cea60b5cde736/design/owner-registry.md#3-accept-api-and-verification-boundary)
+adds independent outer byte gates: **512 KiB (524288 bytes) total intake/evidence**
+and a **separate 2 MiB (2097152 bytes) aggregate received full proof bundle**.
+Use the separate full-proof route for publication proofs; count all context,
+protected C(n-1), current snapshot, witness/control evidence and transport
+encoding in its aggregate. Neither route enlarges the S3 journal64/2/540672
+or S4 freshness64/1/532480 raw verifier limits or the shared state budget.
+The **8192-byte WC1 window, including the LF**, is another independent gate
+on the whole encoded checkpoint wrapper. The 2 MiB route does not promise that
+any maximal proof fits the WC1 window. Preflight every applicable route and
+the complete real-head WC1 wrapper, including prior bytes, **before intent**;
+an overflow refuses before the intent, with no truncation, skipped evidence
+or ad hoc splitting/pagination. Existing state, sequences and anchors remain
+unchanged; bounded refusal telemetry is permitted. Exact byte boundaries pass
+only their respective size gate, subject to every other validity and capacity
+check; they do not establish publication or activate K3.
+
 Capacity or history overflow refuses `state_capacity_exceeded` before a new
 transition, leaves existing evidence intact and supplies no message success.
 A pending transition whose reserved proof space proves insufficient stays fenced;
@@ -289,9 +307,15 @@ rewrite C_n. With the owner-registry bundle's raw anchor at n-1, the anchor, E_n
 and E_(n+1) occupy three of the journal's 64 total entry slots. An anchor leaves at most
 63 new entries, including any reissue. Supply one candidate checkpoint; the
 optional second is fully admitted fork evidence, never a previous/next
-checkpoint slot. Keep the per-record, 540672-byte journal aggregate, received-bundle
-and whole-witness-wrapper caps independently. If complete inclusion or
-continuity does not fit, fail closed; never skip an entry or truncate. Advance
+checkpoint slot. Keep the per-record, 540672-byte journal aggregate and separate
+532480-byte freshness aggregate independent of the registry's 512 KiB intake
+and separate 2 MiB full-proof received-bundle caps. The full bundle includes
+context, C(n-1), snapshot, witness/control evidence and transport encoding;
+its 2 MiB cap does not promise that any maximal proof fits the separate
+8192-byte WC1 window, including the LF. Preflight the complete encoded
+real-head wrapper before intent. If complete inclusion or continuity exceeds
+an applicable cap, refuse before the intent, with no truncation or skipped
+entry; do not split away completeness. Advance
 anchors only through separately verified current bounded steps, persisting each
 accepted anchor; expired intermediate checkpoints require another qualified
 path, not an old time sample.
@@ -597,13 +621,16 @@ fixture expectations, not a claim that Keymaker executes this verifier today.
 | MS-S13 missing prior | N-JRN-publish-reissue-missing-prior: exact prior unavailable despite complete suffix -> journal_unavailable/empty plan, anchors unchanged. | P-JRN-publish-reissue retains C(n-1) at the protected IDJournal key and IDJournalAvailable=true. |
 | MS-S14 wrong prior | N-JRN-publish-reissue-wrong-prior: wrong genuinely signed prior bytes at that key -> checkpoint_invalid/empty plan; conflict slot cannot substitute. | Same positive with exact authenticated prior content ID/registry/owner/seq/head. |
 | MS-S15 prior time | N-JRN-publish-reissue-backward-time: candidate time before prior -> journal_rollback/empty plan, even if candidate/snapshot otherwise current. | Same positive's forward time; a separate equal candidate/prior time control accepts with every other predicate valid. |
-| MS-S16 separate bounds | 65 freshness publications, 2 freshness checkpoints or532481 bytes refuses without anchor/W advance; journal65/3/540673 remains a distinct refusal. Over8192-byte protected prior or unreserved expanded state refuses. | Complete <=64/1/532480 freshness proof and <=64/2/540672 journal proof each meet their own bounds, separately reserved prior/evidence and shared256MiB; maxima need not coexist. |
+| MS-S16 separate bounds | 65 freshness publications, 2 freshness checkpoints or532481 bytes refuses without anchor/W advance; journal65/3/540673 remains a distinct refusal. Over8192-byte protected prior or unreserved expanded state refuses. | Complete <=64/1/532480 freshness proof and <=64/2/540672 journal proof each meet their own bounds, separately reserved prior/evidence and shared256MiB; maxima need not coexist. Independent 512 KiB intake, 2 MiB full-proof bundle and 8192-byte WC1-including-LF boundaries are paired in MS-S23–MS-S25; overflow refuses before intent. |
 | MS-S17 full F facts | Missing/malformed eight-field anchor, unauthenticated/future/stale read or head, gapped/forked publications, mismatched snapshot, uncovered queried ID/key or unqualified rollback_safe refuses, no authority advance. | Full F with exact six-field head, real Now/W, signed complete chain/snapshot, authenticated read and independently qualified cumulative evidence accepts a candidate; future-effective entries still revoke when effective. |
 | MS-S18 receipt premises | Rebuild identical Evidence, copy/serialize/forge receipt, change root/owner/anchor/witness/read/snapshot or cumulative premise (even change-and-return), or reuse after restart -> refuse/fence; no legacy fallback. | Original opaque pointer with one immutable Evidence, admitted new anchor and fresh current facts passes only after atomic producer commit; restart runs full F anew. |
 | MS-S19 expiry/margin | At max(Now,W)>=E-margin, negative/unsupported margin, missing timeconf mapping or newer read used to extend E -> refuse; inclusive F boundary is not consumer acceptance. | Real qualified margin0..60, max(Now,W)<E-margin and non-future/read-not-before-mint pass; increasing margin can only reduce admission. |
 | MS-S20 API scope | Supplied invalid receipt refuses in every consumer/validate-only path even with current own-age; required absence refuses. Receipt cannot refresh operator/grant evidence or current-generation authority. | Valid bound aged registry snapshot works only in applicable receiver/status paths. Optional absence uses current own-age; VerifyJournal/F independently ignore receipt fields and require full proofs; device/operator remain own-age bound. |
 | MS-S21 re-anchor selection | Automatic normal-error fallback, zero/missing old publication, backward tip time/sequence, lower registry head or equal-seq different checkpoint/snapshot -> refuse with unchanged state. | Explicit approved sibling with positive old anchor, strictly newer publication/time, exact fresh evidence and qualified cumulative premise accepts SAME identical registry head or a valid advance. |
 | MS-S22 audited skip | Missing flag, wrong skipped count/endpoints, unresolved original bytes, new audit members or uncertain sync -> fence/no release, retain exact evidence and unknown transaction. | Exact count including zero, reanchored=true, both endpoint freshness/checkpoint IDs and retained bytes, atomic artifact/new-anchor/W/audit commit preserve evidence; approved skipped-fork-detection loss remains explicit. |
+| MS-S23 intake boundary | 524289 bytes (512 KiB+1) total intake/evidence refuses before the intent; no truncation or change to records, sequences, anchors or W. | Exactly 524288 bytes (512 KiB) passes the intake size gate with all per-record, encoding, state and other applicable limits valid; this is not the separate full-proof route. |
+| MS-S24 full-proof boundary | 2097153 bytes (2 MiB+1) aggregate received full proof bundle, including context, C(n-1), snapshot, witness/control evidence and encoding, refuses before the intent; no truncation, splitting away completeness or authority change. | Exactly 2097152 bytes (2 MiB), including the same complete inventory, passes only the full-proof size gate with all J/F, per-record and state limits valid and the complete WC1 wrapper independently fitting its 8192-byte window including LF; no promise that any maximal proof fits WC1. |
+| MS-S25 WC1 boundary | Complete encoded real-head checkpoint wrapper of 8193 bytes including LF refuses before the intent even if the bundle fits 2 MiB; no truncation, pagination, intent, sequence or anchor/W advance. | Exactly 8192 bytes including LF passes the WC1 window size gate with otherwise valid complete prior/head/control evidence and every other applicable limit satisfied; passing a larger outer route alone never satisfies this gate. |
 
 ## 7. Remaining gates
 
@@ -618,7 +645,7 @@ accept or this spec adoption alone, permit enabling it:
 | K3-G4 time and cumulative premises | Qualified timeconf collection/uncertainty/hold/continuity and safe margin mapping within existing deadlines, durable W bootstrap/advancement/restore continuity, real authenticated witness read and independently qualified cumulative rollback_safe. No W=Now, old-clock or complete=true substitutes. |
 | K3-G5 receipt and live B | Atomic retained F proof/new-anchor/W before use; original in-memory pointer/one Evidence lifetime, full current queries and R checks at release/restart, no old-base initial publication via receipt, no operator-root extension. |
 | K3-G6 bounded recovery/audit | Reviewed explicit owner re-anchor policy/runbook, retained endpoint/skip artifact and atomic audit/root transaction, independent no-hidden-revocation premise and declared skipped-fork-detection cost; exact unknown-outcome handling, capacity/archive and old-instance exclusion. Without re-anchor approval only bounded normal catch-up is usable and over-bound outage stays closed. |
-| K3-G7 executable evidence | Execute paired MS-S01–MS-S22 and imported positive/six negatives, actual crash/sync/restart/restore/replay/receipt/margin/expiry and negative-control evidence, live multi-UID/native release and real storage/provider/publisher/WC1/capacity qualification. Text rows and upstream byte equality are not these passes. |
+| K3-G7 executable evidence | Execute paired MS-S01–MS-S25 and imported positive/six negatives, actual crash/sync/restart/restore/replay/receipt/margin/expiry and negative-control evidence, live multi-UID/native release and real storage/provider/publisher/WC1/capacity qualification. Text rows and upstream byte equality are not these passes. |
 
 Q7 persistent revoke remains independently closed pending its sources, durable
 integration and D42 offline-root policy; S5 registry composition neither opens

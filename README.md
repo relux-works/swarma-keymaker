@@ -77,6 +77,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |
 | `spec/keymaker-pc2.md` | Normative candidate PC2 root/intent, terminal authority fence, exact-attempt recovery and paired KR/KI/KP qualification; combined S2 storage and three joint gates remain open, production bump closed |
+| `spec/keymaker-authority-root.md` | G4 combined schema/floor-3 format draft, version-2 logical root, manager read set and golden byte vectors; mandatory architect/reviewer/curator content gates, no implementation |
 | `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |
 | `spec/keymaker-msg-state.md` | Proposed K3 schema, exact-outcome recovery, issuance audit and durable registry/WC1 publication proof; no runtime activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
@@ -93,7 +94,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `tools/mutations/` | Bounded authorization, recovery and refusal control plants using Go overlays |
 | `packaging/` | Exact specification unit and real daemon example config; [fields, bundle contract and dependency gates](packaging/README.md) |
 | `tools/release-bundle/` | Offline clean-commit binary, validated inputs and SHA256SUMS assembly; no installation |
-| `tools/vectors/` | Reproducible derivation generator and fixture checks |
+| `tools/vectors/` | Reproducible derivation generator and offline fixture checks, including G4 byte/preimage/pair integrity; no PC2 reader implementation |
 | `tools/runbook-check/` | Offline specification shell-guard checks using stubs |
 | `UNRESOLVED_QUESTIONS.md` | Specification decisions and activation gates |
 
@@ -170,7 +171,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Run only native narrowing controls: `go run ./tools/mutations/main.go -group native -scratch "$SCRATCH"` | Ten native plants from the default core group; wrapper 0 only when all are killed |
 | Go | Run proof narrowing controls: `go run ./tools/mutations/main.go -group registration -scratch "$SCRATCH"` | Five named plants; child logs/PIDs in scratch, wrapper 0 only when all are killed |
 | Go | Packaging control plants: `go run ./tools/mutations/main.go -group packaging -scratch "$SCRATCH"` | Twelve named tests must fail with exit 1 and the intended witness; wrapper exits 0 only when all twelve are killed, logs/PIDs in scratch |
-| Go | Check published controls and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
+| Go | Check published controls, G4 byte/preimage pairs and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |
 | Go + Bash + visudo | Plant lookup/path bypasses, unsupported `requiretty` and validation-after-allocation in memory: `go run ./tools/runbook-check/main.go -plant` | Expected exit 1 naming guard, `TestRunbookWindowSudoersCompatibility` and `TestRunbookWindowValidationBeforeMutation` failures; missing parser is SKIPPED; production files unchanged |

@@ -1,0 +1,790 @@
+{
+  "format": "keymaker-authority-vectors/1",
+  "claim": "Offline CCJ bytes, SHA256/domain preimages and adjacent negative/control pairing only; no service/manager, fs-verity or restore qualification. All reader rejection verdicts PENDING. Ref contents and measurements are invented harness inputs, not provider documents or actual verity measurements.",
+  "goldens": [
+    {
+      "id": "legacy-snapshot",
+      "path": "vectors/authority-root/legacy-snapshot.json",
+      "encoding": "identity",
+      "bytes": 163,
+      "sha256": "3dd66d622e2d29258367a632ba942fb5c5ed0c8af17c1972f3eaedbdebe46253",
+      "domain": "1"
+    },
+    {
+      "id": "schema2-snapshot",
+      "path": "vectors/authority-root/schema2-snapshot.json",
+      "encoding": "identity",
+      "bytes": 267,
+      "sha256": "2f85d0aaa3356658b971a9e165fa99cc4180686fe1fc36e1c658dbf20ccbefd6",
+      "domain": "1"
+    },
+    {
+      "id": "private-payload",
+      "path": "vectors/authority-root/private-payload.json",
+      "encoding": "identity",
+      "bytes": 220,
+      "sha256": "240228959b52da2912b59871e2c349ee404de95c5bad9939b5c4af30efbf60e4",
+      "domain": "keymaker-private/3"
+    },
+    {
+      "id": "combined-snapshot",
+      "path": "vectors/authority-root/combined-snapshot.json",
+      "encoding": "identity",
+      "bytes": 2352,
+      "sha256": "7ae376f81b2ab8560f5d69605490c5e4b4349c1b8d271869ad5c8ea0607a1916",
+      "domain": "schema-3"
+    },
+    {
+      "id": "text-boundary-root",
+      "path": "vectors/authority-root/text-boundary-root.json",
+      "encoding": "identity",
+      "bytes": 2144,
+      "sha256": "f91b15c4f161967beb814e72364ef11dc54cfcb3208eeb91834e64db071f49aa",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "read-context",
+      "path": "vectors/authority-root/read-context.json",
+      "encoding": "identity",
+      "bytes": 2507,
+      "sha256": "72a21be99f3bcda9fab04decf7d2d7295f523cecccf73f399a2d636c9253e494",
+      "domain": "keymaker-manager-read-fixture/1"
+    },
+    {
+      "id": "minimal-root",
+      "path": "vectors/authority-root/minimal-root.json",
+      "encoding": "identity",
+      "bytes": 1890,
+      "sha256": "5962f9f289235b14c13dea98d5cd809c9235bcc78dce409ea4ccfa1791e48335",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "maximal-root",
+      "path": "vectors/authority-root/maximal-root.json.gz",
+      "encoding": "gzip",
+      "bytes": 1048576,
+      "sha256": "c47f9cd8a09e0e3c45ab9e959bea4744ef262d9baa323b4971a5f963e4a2a6cb",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "successor-root",
+      "path": "vectors/authority-root/successor-root.json",
+      "encoding": "identity",
+      "bytes": 1890,
+      "sha256": "b6d672539b82eaa6019c69ddde5c53b0f57b3b153b60df93faec37be6d682d40",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "minimal-root-preimage",
+      "path": "vectors/authority-root/minimal-root-preimage.json",
+      "encoding": "identity",
+      "bytes": 1802,
+      "sha256": "84e7bb49d32315da019b94be67a6f2dc722de54084b3c90aba4c0a8b201f2415",
+      "domain": "keymaker-authority/2"
+    },
+    {
+      "id": "facts",
+      "path": "vectors/authority-root/facts.json",
+      "encoding": "identity",
+      "bytes": 554,
+      "sha256": "8015461b4ddcebdbd3c055d093264524ad2fe77344dd36aaafa67404784e6e5e",
+      "domain": "keymaker-authority-facts/1"
+    },
+    {
+      "id": "participants",
+      "path": "vectors/authority-root/participants.json",
+      "encoding": "identity",
+      "bytes": 3393,
+      "sha256": "376c04d83f249991e3f61ddb9a09e380e12031b8542bef462b833184905b6beb",
+      "domain": "keymaker-participants/1"
+    },
+    {
+      "id": "provenance",
+      "path": "vectors/authority-root/provenance.json",
+      "encoding": "identity",
+      "bytes": 407,
+      "sha256": "b712a130b987337fcfddf977e27cc6538d81b80e0591d8b8609ca470d2255547",
+      "domain": "keymaker-provenance/1"
+    },
+    {
+      "id": "reservation",
+      "path": "vectors/authority-root/reservation.json",
+      "encoding": "identity",
+      "bytes": 3322,
+      "sha256": "fd5edfe065ea89bb552de9359b116b66c90e5ff7ecca1e107d390433c08225b7",
+      "domain": "keymaker-reservation/1"
+    },
+    {
+      "id": "binding-body",
+      "path": "vectors/authority-root/binding-body.json",
+      "encoding": "identity",
+      "bytes": 2003,
+      "sha256": "aa7f48fe45faf28a922da8c93088ac1bd4c4d8a15c3053c79f8897a7c8e46c1a",
+      "domain": "keymaker-combined-body/3"
+    },
+    {
+      "id": "candidate",
+      "path": "vectors/authority-root/candidate.json",
+      "encoding": "identity",
+      "bytes": 129,
+      "sha256": "2a7b555585c9e24b2ab3c5338fd9f3c54d5bc337fe6eda6a0a765e06b31ca25e",
+      "domain": "keymaker-authority-candidate/1"
+    },
+    {
+      "id": "transaction",
+      "path": "vectors/authority-root/transaction.json",
+      "encoding": "identity",
+      "bytes": 243,
+      "sha256": "51f95898c953f73b54f6f3ad78858997466a94411751a28933ccb97cefdf6c66",
+      "domain": "keymaker-authority-tx/1"
+    },
+    {
+      "id": "attempt",
+      "path": "vectors/authority-root/attempt.json",
+      "encoding": "identity",
+      "bytes": 1136,
+      "sha256": "cd58b9972acef75f6aa3131a17854b48c35b8e2ffa3c527bd1cd8c47c28530f3",
+      "domain": "pc2-activation-attempt/1"
+    },
+    {
+      "id": "attempt-preimage",
+      "path": "vectors/authority-root/attempt-preimage.json",
+      "encoding": "identity",
+      "bytes": 1002,
+      "sha256": "fa43534c67ccd447b21b339698d7f48a968098866586893e9f37246850704a44",
+      "domain": "pc2-activation-attempt/1"
+    },
+    {
+      "id": "hold",
+      "path": "vectors/authority-root/hold.json",
+      "encoding": "identity",
+      "bytes": 127,
+      "sha256": "daaccb668564e2b25c5a703935d36eaa17a563da59d3be80983e6fe66a0af7c8",
+      "domain": "pc2-hold/1"
+    },
+    {
+      "id": "logical-link",
+      "path": "vectors/authority-root/logical-link.json",
+      "encoding": "identity",
+      "bytes": 456,
+      "sha256": "8bde0673bd08258e7bec39080808ea6d4a9154c0d5af7e13988527cc533ae71e",
+      "domain": "keymaker-authority-link/1"
+    },
+    {
+      "id": "floor",
+      "path": "vectors/authority-root/floor.json",
+      "encoding": "identity",
+      "bytes": 550,
+      "sha256": "189775cba3b1aaea79a00160e989eac90c4841e84e09e30216de6e1333d66927",
+      "domain": "keymaker-authority-floor/1"
+    },
+    {
+      "id": "manager-inventory",
+      "path": "vectors/authority-root/manager-inventory.json",
+      "encoding": "identity",
+      "bytes": 474,
+      "sha256": "432c699e90b1f11198a61545278f5fe01168e37feadb0e86816df94449b98f84",
+      "domain": "pc2-manager-inventory/1"
+    },
+    {
+      "id": "guard-clear",
+      "path": "vectors/authority-root/guard-clear.json",
+      "encoding": "identity",
+      "bytes": 408,
+      "sha256": "f00ab6e6d4e146dbacc4388ab083c298c85cfd365e9d05b6db4ded37b64be815",
+      "domain": "pc2-recovery-guard/1"
+    },
+    {
+      "id": "intent-clear",
+      "path": "vectors/authority-root/intent-clear.json",
+      "encoding": "identity",
+      "bytes": 150,
+      "sha256": "9722f775b0a8552b26d9a84479de479cad084b1a256f45cd00a0418648fe2903",
+      "domain": "keymaker-authority-intent/1"
+    },
+    {
+      "id": "intent-pending",
+      "path": "vectors/authority-root/intent-pending.json",
+      "encoding": "identity",
+      "bytes": 642,
+      "sha256": "533c8267f8a61e772098479db7a56d18711400312fde5238c5e8906b0e453cdd",
+      "domain": "keymaker-authority-intent/1"
+    },
+    {
+      "id": "recovery-open",
+      "path": "vectors/authority-root/recovery-open.json",
+      "encoding": "identity",
+      "bytes": 431,
+      "sha256": "eba47643aa0b21d7210fa14d710ac45d19fad0370e0a73b6cba7c50d318f5ba0",
+      "domain": "pc2-recovery-record/1"
+    },
+    {
+      "id": "recovery-resolved",
+      "path": "vectors/authority-root/recovery-resolved.json",
+      "encoding": "identity",
+      "bytes": 572,
+      "sha256": "09d3506a772ee4481241d3953677fd43f41d9b94d2018ea47cbd44997f46b078",
+      "domain": "pc2-recovery-record/1"
+    },
+    {
+      "id": "recovery-release-prepared",
+      "path": "vectors/authority-root/recovery-release-prepared.json",
+      "encoding": "identity",
+      "bytes": 580,
+      "sha256": "982339c168c17e460b1a2391fb5ce1d61bb78593de89ccd568e74fe5e3da4f3d",
+      "domain": "pc2-recovery-record/1"
+    },
+    {
+      "id": "recovery-released",
+      "path": "vectors/authority-root/recovery-released.json",
+      "encoding": "identity",
+      "bytes": 572,
+      "sha256": "492d41e842d6851bd2cdcad989a2961cc7be5832d681680bde9934b3119278ce",
+      "domain": "pc2-recovery-record/1"
+    },
+    {
+      "id": "capacity-inventory-empty",
+      "path": "vectors/authority-root/capacity-inventory-empty.json",
+      "encoding": "identity",
+      "bytes": 94,
+      "sha256": "193d9bd22fd8cf133a5989c647532f08799d13efb589c41a5f9deab4eb0294ad",
+      "domain": "keymaker-capacity-inventory/1"
+    },
+    {
+      "id": "migration-legacy_validated",
+      "path": "vectors/authority-root/migration-legacy_validated.json",
+      "encoding": "identity",
+      "bytes": 451,
+      "sha256": "7a062c2ed8a2df6d6f038430f69742b11054307393936b553960e958bb128257",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "migration-s2_staged",
+      "path": "vectors/authority-root/migration-s2_staged.json",
+      "encoding": "identity",
+      "bytes": 444,
+      "sha256": "ac29d7329ffda141896fd2db21da24cc37829701043e2c78e2456b6cc8898b53",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "migration-s2_committed",
+      "path": "vectors/authority-root/migration-s2_committed.json",
+      "encoding": "identity",
+      "bytes": 447,
+      "sha256": "f5c002faa4462ab7b360f32071cca38744f7158c0cead1be8908deb8e3ada882",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "migration-combined_staged",
+      "path": "vectors/authority-root/migration-combined_staged.json",
+      "encoding": "identity",
+      "bytes": 519,
+      "sha256": "985349e2038ec10028c8e9e80bffb16208190414f5d8135f019758765cd6371a",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "migration-combined_committed",
+      "path": "vectors/authority-root/migration-combined_committed.json",
+      "encoding": "identity",
+      "bytes": 522,
+      "sha256": "fc5050e1b6d455f633ec8b3e316d807d49f6c94973b0342b45a1abe9deb20faf",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "migration-released",
+      "path": "vectors/authority-root/migration-released.json",
+      "encoding": "identity",
+      "bytes": 512,
+      "sha256": "421ae8e235bae98b7f4093e92a62bdb96aa885e0c69b02e59b9dac63564c1dc1",
+      "domain": "keymaker-migration/1"
+    },
+    {
+      "id": "migration-existing-s2",
+      "path": "vectors/authority-root/migration-existing-s2.json",
+      "encoding": "identity",
+      "bytes": 447,
+      "sha256": "1bee459fc127ef200de50c2e8343c0d8040e12755b24df347dc087d5e90641ca",
+      "domain": "keymaker-migration/1"
+    }
+  ],
+  "links": [
+    {
+      "object": "minimal-root",
+      "member": "root_digest",
+      "preimage": "minimal-root-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "provenance",
+      "member": "facts_digest",
+      "preimage": "facts",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "provenance",
+      "member": "participants_digest",
+      "preimage": "participants",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "candidate",
+      "member": "body_digest",
+      "preimage": "binding-body",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "transaction",
+      "member": "candidate_root_digest",
+      "preimage": "candidate",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "attempt",
+      "member": "attempt_id",
+      "preimage": "attempt-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "hold",
+      "member": "origin_id",
+      "preimage": "attempt-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "logical-link",
+      "member": "root_digest",
+      "preimage": "minimal-root-preimage",
+      "prefix": "sha256:"
+    },
+    {
+      "object": "minimal-root",
+      "member": "binding_commit.digest",
+      "preimage": "binding-body",
+      "prefix": ""
+    }
+  ],
+  "groups": [
+    {
+      "id": "unknown-member",
+      "claim": "Closed root does not acquire extension members; paired root uses the exact member set. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "set",
+          "member": "unknown",
+          "value": true
+        },
+        "bytes": 1905,
+        "sha256": "0d23b3c7130ea66b4a1351eb7c4485a910eff4f5524d9d0c04ee090e06ec3971",
+        "expected_rejection": "unknown_member"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "duplicate-member",
+      "claim": "Duplicate decoded names cannot be collapsed into a map; paired canonical root has one version. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "duplicate"
+        },
+        "bytes": 1923,
+        "sha256": "641a9dd9da00cab04feccf52a39fa4831daf4600d6941f9fcf973ec34aa34d31",
+        "expected_rejection": "duplicate_member"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "alias-member",
+      "claim": "Case aliases do not replace required root_digest; paired spelling is exact. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "rename",
+          "member": "root_digest",
+          "value": "RootDigest"
+        },
+        "bytes": 1889,
+        "sha256": "751f54f7e3b535b2af970c7a144730e9bd60c8dd4e003e174f4f7c4e9f2908a6",
+        "expected_rejection": "alias_member"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "absent-required",
+      "claim": "Missing retained entries is not an empty array; paired empty inventory is explicit. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "delete",
+          "member": "entries"
+        },
+        "bytes": 1877,
+        "sha256": "9b0998e510f6bd6631eb3994001d4211d9f2f6cfd2e5f92a78e6aac299790c78",
+        "expected_rejection": "missing_member"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "null-required",
+      "claim": "Null is not an empty retained inventory; paired inventory is []. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "set",
+          "member": "entries",
+          "value": null
+        },
+        "bytes": 1892,
+        "sha256": "b19ce129ba7f2256273409cbe5d5d60c81bcb61e9e13d4e0c6123c73a440e528",
+        "expected_rejection": "null_member"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-root-domain",
+      "claim": "Version 1 cannot carry combined-root fields; paired version-2 bytes have a distinct preimage. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "set",
+          "member": "version",
+          "value": "keymaker-authority/1"
+        },
+        "bytes": 1890,
+        "sha256": "3c78dfd30e84477c6644c021b60fdd3c04d2861aed5f0c5efd19141843cf4a98",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "truncated",
+      "claim": "EOF before final object delimiter is malformed, not an empty state or timeout. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "truncate"
+        },
+        "bytes": 1889,
+        "sha256": "99506341f7e389b5a7f6e2c415f7be22b7681fd279a3b13b4b617e472cc81a5e",
+        "expected_rejection": "truncated"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "oversized-field",
+      "claim": "256-byte epoch exceeds Text; paired 255-byte epoch is exactly at the field cap. Reader verdict PENDING.",
+      "negative": {
+        "control": "text-boundary-root",
+        "mutation": {
+          "kind": "set",
+          "member": "master_epoch",
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "bytes": 2145,
+        "sha256": "4ffb31c4c07a64d53f9eea85c54fe830504ae008de8ace71ea8d036740cdea5d",
+        "expected_rejection": "field_limit"
+      },
+      "positive": {
+        "golden": "text-boundary-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "oversized-total",
+      "claim": "One legal owner byte beyond exactly 1 MiB fails total before hashing/allocation; paired maximal root is exactly at cap. Reader verdict PENDING.",
+      "negative": {
+        "control": "maximal-root",
+        "mutation": {
+          "kind": "grow_total"
+        },
+        "bytes": 1048577,
+        "sha256": "308dee77d4debf42c9c172587c30d85e3981cb7582820182a4709fb33b1991f5",
+        "expected_rejection": "total_limit"
+      },
+      "positive": {
+        "golden": "maximal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "floor-rollback",
+      "claim": "A floor-3 continuity context cannot be replaced by floor 2; paired floor is 3. Reader verdict PENDING.",
+      "negative": {
+        "control": "floor",
+        "mutation": {
+          "kind": "set",
+          "member": "minimum_reader_schema",
+          "value": 2
+        },
+        "bytes": 550,
+        "sha256": "2e892fa741984daeaf64d70df9b8c61094e712b8e863ff8633aa254195b8a483",
+        "expected_rejection": "floor_rollback"
+      },
+      "positive": {
+        "golden": "floor",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "old-root-replay",
+      "claim": "Same older root bytes against the independently advanced expected root must refuse; paired anchor matches the root. Context is a fixture, not a custody provider. Reader verdict PENDING.",
+      "negative": {
+        "control": "read-context",
+        "mutation": {
+          "kind": "set",
+          "member": "continuity",
+          "value": {
+            "version": "keymaker-authority-floor/1",
+            "minimum_reader_schema": 3,
+            "epoch": 1,
+            "root_digest": "sha256:582f40c4566b4c561709e92f02d5dc7c9b06de4a7050d07a50986fa2efbe559a",
+            "logical_link_digest": "sha256:ee25f96c653e36db63672333af63475feda2456c47df9c92fc52f56ce9f3e6ac",
+            "guard_digest": "sha256:f00ab6e6d4e146dbacc4388ab083c298c85cfd365e9d05b6db4ded37b64be815",
+            "authority_incarnation": "11111111111111111111111111111111",
+            "transaction_revision": 3,
+            "withdrawal_counter": 3,
+            "journal": {
+              "seq": 1,
+              "hash": "81dd6b775afcccb6dbb8a25a58ea844271bbefaeea7cb1d91c1687d7450f850c"
+            }
+          }
+        },
+        "bytes": 2507,
+        "sha256": "c54fc60ae07ca6ae3815fcaadb35762a578033449be72e51c8f1a0cde2c8fbe0",
+        "expected_rejection": "old_root_replay"
+      },
+      "positive": {
+        "golden": "read-context",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "provenance-outside-read-set",
+      "claim": "Unlisted eleventh role cannot trigger a scan/open; paired provenance has exactly the ten roles. Reader verdict PENDING.",
+      "negative": {
+        "control": "participants",
+        "mutation": {
+          "kind": "append_role",
+          "value": {
+            "role": "external_state",
+            "codec": "keymaker-private/3",
+            "digest": "sha256:240228959b52da2912b59871e2c349ee404de95c5bad9939b5c4af30efbf60e4",
+            "bytes": 220,
+            "verity_digest": "fsverity-sha256:43e17723f7211a004f8bb4d7bc2d59059221e1fe04d986e98fa26f64d3851c86",
+            "device": {
+              "major": 0,
+              "minor": 1
+            },
+            "inode": "0000000000000008",
+            "uid": 1000,
+            "mode": "0600"
+          }
+        },
+        "bytes": 3725,
+        "sha256": "05ec7cbfd26e6a8cfea011577923f54071d876b7c0f66f0fa9dd6848e47fefd2",
+        "expected_rejection": "outside_read_set"
+      },
+      "positive": {
+        "golden": "participants",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "nonaggregate-reservation",
+      "claim": "Omitting manager hold inventory cannot pass as a service-only reservation; paired reservation lists all fourteen owner/classes. Reader verdict PENDING.",
+      "negative": {
+        "control": "reservation",
+        "mutation": {
+          "kind": "remove_group"
+        },
+        "bytes": 3114,
+        "sha256": "820e26ba69379182285122d9d2052c87e87ed9590fa8cb6e716516029a07f9fc",
+        "expected_rejection": "not_aggregate"
+      },
+      "positive": {
+        "golden": "reservation",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "corrupt-root-digest",
+      "claim": "Readable root with corrupt self digest cannot authorize; paired hash is computed over exact root preimage. Reader verdict PENDING.",
+      "negative": {
+        "control": "minimal-root",
+        "mutation": {
+          "kind": "set",
+          "member": "root_digest",
+          "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "bytes": 1890,
+        "sha256": "8e54af63f330b6175722a351cf6a6cf5253bd51f852e0f29db7c7a14ddb0abf5",
+        "expected_rejection": "digest_mismatch"
+      },
+      "positive": {
+        "golden": "minimal-root",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-attempt-preimage",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "attempt-preimage",
+        "mutation": {
+          "kind": "set",
+          "member": "version",
+          "value": "pc2-activation-attempt/2"
+        },
+        "bytes": 1002,
+        "sha256": "b57c58aa264928872fb7c7382ff208c6bcacefd5ac613a2ce549dd8012e158e1",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "attempt-preimage",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-hold",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "hold",
+        "mutation": {
+          "kind": "set",
+          "member": "type",
+          "value": "pc2-hold/2"
+        },
+        "bytes": 127,
+        "sha256": "8d3fa5b587a52f15b72b500d90999fd79e83c7a73732c31924340809985f6861",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "hold",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-reservation",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "reservation",
+        "mutation": {
+          "kind": "set",
+          "member": "version",
+          "value": "keymaker-reservation/2"
+        },
+        "bytes": 3322,
+        "sha256": "2fedf0216164ec948255470edc2511e8c1a6a153252db7fbcb088c36e43527fe",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "reservation",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-provenance",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "provenance",
+        "mutation": {
+          "kind": "set",
+          "member": "version",
+          "value": "keymaker-provenance/2"
+        },
+        "bytes": 407,
+        "sha256": "777af8e7ac67669d6e3c85f1f7513723bad3dfea2fd59ebccd3b05292db5c35c",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "provenance",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-logical-link",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "logical-link",
+        "mutation": {
+          "kind": "set",
+          "member": "type",
+          "value": "keymaker-authority-link/2"
+        },
+        "bytes": 456,
+        "sha256": "ef38017bff07e851c6c8e3f4ead00ea03aa8733b81e2498df14b7e6a4ade0fb2",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "logical-link",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-binding-body",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "binding-body",
+        "mutation": {
+          "kind": "set",
+          "member": "type",
+          "value": "keymaker-combined-body/2"
+        },
+        "bytes": 2003,
+        "sha256": "41030fabb29f6833891584b46863ba0593a138e534323d90f5723c7ed891aa52",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "binding-body",
+        "expected": "format-control-only"
+      }
+    },
+    {
+      "id": "wrong-domain-candidate",
+      "claim": "Domain substitution changes the exact preimage; paired version/type is the specified domain. Reader verdict PENDING.",
+      "negative": {
+        "control": "candidate",
+        "mutation": {
+          "kind": "set",
+          "member": "type",
+          "value": "keymaker-authority-candidate/2"
+        },
+        "bytes": 129,
+        "sha256": "d52bad089153643abfb05d69fc2b865143c2e92fe2b7e2d0d2084ba04bc0a081",
+        "expected_rejection": "wrong_domain"
+      },
+      "positive": {
+        "golden": "candidate",
+        "expected": "format-control-only"
+      }
+    }
+  ],
+  "maximal": {
+    "id": "maximal-root",
+    "entries": 1300,
+    "bytes": 1048576,
+    "claim": "All owner fields <=255 bytes, sorted unique registrations and exactly the total byte cap. Independent field maxima need not fit simultaneously."
+  }
+}

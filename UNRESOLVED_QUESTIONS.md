@@ -266,6 +266,32 @@ and real separate-process/platform evidence remain qualification gates. Existing
 PC1 observer/bootstrap, shared provider/watermark and WC1–WC5 gates remain; no
 purpose, credential, public error or capability is enabled by this document.
 
+## PC2 combined format G4 draft
+
+The [separate G4 draft](spec/keymaker-authority-root.md) and
+[golden fixture manifest](vectors/authority-root.json) propose combined schema
+and protected reader/authority floor 3, logical root keymaker-authority/2,
+versioned preimages, one migration graph and an exact bounded manager read set.
+They **do not close** PC2-S2-1..4 or enable PC2 S1 code. Content gates are ordered:
+author draft -> architect co-authorship and mandatory acceptance of everything
+read under F -> reviewer acceptance -> curator content approval -> S1 code.
+No architect co-authorship/acceptance is claimed by the producer draft.
+
+| Open item | Required decision/evidence |
+| --- | --- |
+| G4-A: closed codecs and domains | Architect accepts logical version 2 as an explicit delta to the closed version-1 proposal; combined schema/floor 3, payload partition, complete root/member unions, digest tags, acyclic body/audit/root/link ordering, immutable participant/reference dispatch and every migration state. Existing S2 and Q7 closed-optional audit semantics remain unchanged. |
+| G4-B: bounded provenance primitive | The draft specifically proposes fs-verity-backed fully validated immutable participants, distinct plain/verity digests and no inode-only/cache/full-scan fallback. Architect/platform owners must accept it and qualify actual filesystem, verity metadata/staging capacity, inode lifecycle, permissions and bounded measure/open/sync. No feature support or deployment change is assumed. Unsupported means PC2 closed, not a fixture stub or weaker alternative. |
+| G4-C: manager read set and recovery | Architect accepts every root/provenance/reservation/guard/attempt/recovery/floor/intent byte, the 2 MiB read/24-file ceiling, ten immutable measurements, exact phase/null unions, prepared full-validation provenance and bounded current guard ancestry. No C/Store/enrollment/audit/RPC or second 256 MiB budget; F_pkg differs from F_auth. Golden checks are byte/pair integrity only; reader verdicts and all real-process PC2 cases remain PENDING. |
+| G5-A: upstream/lifetime and coordinator | Owner supplies a reviewed journal-owned append-lifetime API (the current prewrite callback is insufficient), root recovery coordinator and old-serving/restored-writer exclusion. The original attempt identity and recovery ledger survive all marker-cleanup/directory-sync boundaries. No message-only reconciler may clear global uncertainty. |
+| G5-B: all-writer and aggregate ownership | Owners accept complete per-class retained inventory codecs, root-policy/pin installers and fully validated provider-byte identities, cross-owner reservation/credit consumption and materialized history accounting. The proposed one-manager-slot cap and immutable inventory lifecycle require review. All installed/old/new/staging/recovery/native-intent/effect copies and verity metadata use the same 256 MiB peak; current installed bounds cannot size future copies. |
+| G5-C: methods and platform | Real operator/observer authentication and metadata-only creating target guard, root/service permissions, qualified read-only EX flock/sync, full callgraph/no-back-edge proof and unchanged original deadlines remain implementation/qualification prerequisites. |
+
+The three joint gates remain OPEN: observation absorption versus RPC correlation,
+independently current every-transaction restore custody outside the restored
+failure domain under honest A, and potentially indefinite withdrawal-completion
+blocking. A self-consistent root/verity digest/local anchor supplies no rollback
+protection. No automatic option C or A fallback; WC1–WC5 remain separate.
+
 ## Generation-journal adapter integration gates
 
 The pinned vector source is the public user-manager

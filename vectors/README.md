@@ -15,6 +15,7 @@ no binding/enrollment mutations, apart from permitted bounded audit writes.
 | --- | --- |
 | `refusals.json` | Foreign peer, inactive/reused generations, unavailable source, open-connection revoke/retire races at release and next request, hardened paths and purposes, SSHSIG restrictions and rejected agent mutations, concrete native malformed frames, operator register/revoke authority, mandatory registrar-array uid_map and pinned enrollment, revoked/missing helper binding, executable-qualified refusal, registrar name bounds, domain separation, private-material request rejection and audit failure |
 | `slip0010-ed25519.json` | Public SLIP-0010 Ed25519 test vectors 1 and 2: all six nodes each, expected chain code and SLIP-encoded public key; source URL and source SHA-256 retained |
+| `authority-root.json`, `authority-root/` | G4 draft: 38 byte goldens, 21 adjacent negative/positive pairs and nine preimage links; integrity only, PC2 consumer rejection/runtime qualification PENDING |
 | `keymaker-paths.json` | Fixed public 32-byte seed, explicit scoped registry and five name → path → Ed25519/SSH public-key examples; purpose and ancestor separation |
 
 `evaluation` names the future harness layer. Binding checks may directly
@@ -81,3 +82,37 @@ mapping. These imports are separate from the 71 native refusal/control pairs.
 The existing vectors tool does not execute them or evaluate verifier policy;
 byte/provenance checks are documentation validation. Consumer execution and
 MS-S13–MS-S22 remain PENDING in the message-state spec.
+
+## Combined authority-root draft fixtures
+
+The [G4 draft](../spec/keymaker-authority-root.md) is content for architect,
+reviewer and curator acceptance before PC2 S1 code. `authority-root.json` lists
+38 canonical JSON goldens and 21 named adjacent negative/control groups. Each
+group carries its own claim. Inputs, UIDs, inode metadata, provider digests and
+verity measurements are **invented harness inputs**, not an installed policy,
+valid signed provider document, measured file or independent custody proof.
+A format control grants no eligibility: the minimal root has no entries and
+custody_ready=false; the maximal root contains withdrawn history.
+
+The goldens include untagged legacy, closed schema 2 and combined schema 3
+snapshots, private payload, minimal and 255-byte-text roots, an exactly 1048576-byte
+root with 1300 sorted entries, seven migration records (all six phases and
+existing-schema-2 entry), attempt/hold and domain preimages. The maximal root is
+losslessly gzip-compressed; its expected decompressed SHA256/length are in the
+manifest. Expansion is bounded in the checker. Source JSON bytes have no newline.
+
+Nine links pin root/binding/facts/participants/candidate/attempt/hold hashes. The
+checker materializes each negative mutation, checks its exact SHA256/length and
+unchanged positive-control selection, then checks that control's declaration. It
+does **not** implement the expected reader rejection, active append, recovery,
+fs-verity, cross-process exclusion, current restore custody or latency. All such
+verdicts remain PENDING. expected_rejection values are fixture categories,
+not new public refusal codes. Changing a rejection label cannot establish a runtime
+claim; later consumer tests must actually decode/refuse each named input before
+reporting a kill. Unknown/duplicate/alias, domain, truncation, field/total size,
+floor/old-root, provenance read-set and aggregate-reservation pairs remain
+executable fixture-integrity checks only.
+
+Run `go run ./tools/vectors/main.go -check` from the repository root. `-write`
+still rewrites **only** keymaker-paths.json; it must not regenerate golden expected
+PC2 hashes. No daemon or service-state file is read by this tool.

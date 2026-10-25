@@ -152,8 +152,12 @@ body hash excluding only its own audit references. These are **not interchangeab
 hash recipes**. The combined codec, artifact references, preimage and migration
 are an explicit unresolved composition gate, not permission to add fields to
 schema 2, weaken its closed reader or implement the logical inventory verbatim
-under an existing schema tag. Preserve complete `messages`, original native-ID
-namespace/results and S2's retained artifacts in the eventual combined model.
+under an existing schema tag. The separate [G4 format draft](keymaker-authority-root.md)
+proposes combined schema/floor 3 and logical root version 2, with explicit
+preimages, bounded immutable provenance and paired golden fixtures. It requires
+architect co-authorship/acceptance, reviewer acceptance and curator approval;
+it does not replace this version-1 inventory or authorize S1/runtime code.
+Preserve complete `messages`, original native-ID namespace/results and S2's retained artifacts in the eventual combined model.
 
 Advance transaction revision on every root commit. Advance the global withdrawal
 counter on **every eligibility-affecting event**, including equal reload,

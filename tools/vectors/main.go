@@ -3,8 +3,10 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/hmac"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
 	"encoding/binary"
@@ -283,6 +285,7 @@ func main() {
 	require(*check != *write && flag.NArg() == 0, "use exactly one of -check or -write from repository root")
 	checkPublished()
 	checkPairs()
+	checkAuthorityVectors()
 	var p Paths
 	original := read("vectors/keymaker-paths.json", &p)
 	require(p.Format == "keymaker-paths/1" && len(p.Vectors) > 0, "path fixture format")
@@ -321,4 +324,202 @@ func main() {
 		require(bytes.Equal(original, b), "Keymaker path fixtures differ; inspect before -write")
 		fmt.Printf("Keymaker path controls: %d exact matches\n", len(p.Vectors))
 	}
+}
+
+// These fixture checks prove byte/hash/domain and mutation-pair integrity only.
+// They do not implement a PC2 reader or evaluate the expected rejection verdicts.
+type authorityGolden struct {
+	ID       string `json:"id"`
+	Path     string `json:"path"`
+	Encoding string `json:"encoding"`
+	Bytes    int    `json:"bytes"`
+	SHA256   string `json:"sha256"`
+	Domain   string `json:"domain"`
+}
+type authorityMutation struct {
+	Kind   string          `json:"kind"`
+	Member string          `json:"member,omitempty"`
+	Value  json.RawMessage `json:"value,omitempty"`
+}
+type authorityFixtures struct {
+	Format  string            `json:"format"`
+	Claim   string            `json:"claim"`
+	Goldens []authorityGolden `json:"goldens"`
+	Links   []struct {
+		Object   string `json:"object"`
+		Member   string `json:"member"`
+		Preimage string `json:"preimage"`
+		Prefix   string `json:"prefix"`
+	} `json:"links"`
+	Groups []struct {
+		ID       string `json:"id"`
+		Claim    string `json:"claim"`
+		Negative struct {
+			Control   string            `json:"control"`
+			Mutation  authorityMutation `json:"mutation"`
+			Bytes     int               `json:"bytes"`
+			SHA256    string            `json:"sha256"`
+			Rejection string            `json:"expected_rejection"`
+		} `json:"negative"`
+		Positive struct {
+			Golden   string `json:"golden"`
+			Expected string `json:"expected"`
+		} `json:"positive"`
+	} `json:"groups"`
+	Maximal struct {
+		ID      string `json:"id"`
+		Entries int    `json:"entries"`
+		Bytes   int    `json:"bytes"`
+		Claim   string `json:"claim"`
+	} `json:"maximal"`
+}
+
+func authorityHash(b []byte) string {
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])
+}
+func authorityObject(b []byte) map[string]any {
+	d := json.NewDecoder(bytes.NewReader(b))
+	d.UseNumber()
+	var v map[string]any
+	fail(d.Decode(&v))
+	var extra any
+	require(d.Decode(&extra) == io.EOF, "authority fixture trailing data")
+	return v
+}
+func authorityBytes(v any) []byte {
+	// The fixtures use ASCII strings and integer json.Number values; this is
+	// fixture serialization, not the production CCJ-1 Unicode/schema reader.
+	var b bytes.Buffer
+	e := json.NewEncoder(&b)
+	e.SetEscapeHTML(false)
+	fail(e.Encode(v))
+	return bytes.TrimSuffix(b.Bytes(), []byte{'\n'})
+}
+func authorityMutate(control []byte, m authorityMutation) []byte {
+	if m.Kind == "truncate" {
+		require(len(control) > 0, "empty truncate control")
+		return control[:len(control)-1]
+	}
+	if m.Kind == "duplicate" {
+		return append([]byte(`{"version":"keymaker-authority/2",`), control[1:]...)
+	}
+	obj := authorityObject(control)
+	var value any
+	if len(m.Value) != 0 {
+		d := json.NewDecoder(bytes.NewReader(m.Value))
+		d.UseNumber()
+		fail(d.Decode(&value))
+	}
+	switch m.Kind {
+	case "set":
+		obj[m.Member] = value
+	case "delete":
+		_, ok := obj[m.Member]
+		require(ok, "delete plant missed")
+		delete(obj, m.Member)
+	case "rename":
+		v, ok := obj[m.Member]
+		require(ok, "rename plant missed")
+		delete(obj, m.Member)
+		obj[value.(string)] = v
+	case "append_role":
+		obj["files"] = append(obj["files"].([]any), value)
+	case "remove_group":
+		var groups []any
+		for _, item := range obj["groups"].([]any) {
+			g := item.(map[string]any)
+			if g["owner"] != "manager" || g["kind"] != "holds" {
+				groups = append(groups, g)
+			}
+		}
+		obj["groups"] = groups
+	case "grow_total":
+		entries := obj["entries"].([]any)
+		applied := false
+		for i := len(entries) - 1; i >= 0; i-- {
+			e := entries[i].(map[string]any)
+			s := e["owner"].(string)
+			if len(s) < 255 {
+				e["owner"] = s + "x"
+				applied = true
+				break
+			}
+		}
+		require(applied, "total plant missed")
+	default:
+		fail(fmt.Errorf("unknown authority fixture mutation: %s", m.Kind))
+	}
+	return authorityBytes(obj)
+}
+
+func checkAuthorityVectors() {
+	var f authorityFixtures
+	read("vectors/authority-root.json", &f)
+	require(f.Format == "keymaker-authority-vectors/1" && f.Claim != "", "authority fixture format")
+	goldens := map[string][]byte{}
+	for _, g := range f.Goldens {
+		require(g.ID != "" && goldens[g.ID] == nil && strings.HasPrefix(g.Path, "vectors/authority-root/") && !strings.Contains(g.Path, ".."), "authority fixture path/id")
+		raw, e := os.ReadFile(g.Path)
+		fail(e)
+		if g.Encoding == "gzip" {
+			z, e := gzip.NewReader(bytes.NewReader(raw))
+			fail(e)
+			raw, e = io.ReadAll(io.LimitReader(z, 2097153))
+			fail(e)
+			fail(z.Close())
+		} else {
+			require(g.Encoding == "identity", "authority fixture encoding")
+		}
+		require(len(raw) <= 2097152 && len(raw) == g.Bytes && authorityHash(raw) == g.SHA256, "authority golden bytes/hash: "+g.ID)
+		obj := authorityObject(raw)
+		require(bytes.Equal(raw, authorityBytes(obj)), "authority golden canonical bytes: "+g.ID)
+		domain, ok := obj["version"]
+		if !ok {
+			domain = obj["type"]
+		}
+		if domain == nil {
+			domain = "schema-" + fmt.Sprint(obj["schema_version"])
+		}
+		require(fmt.Sprint(domain) == g.Domain && g.Domain != "", "authority golden domain: "+g.ID)
+		goldens[g.ID] = raw
+	}
+	seen := map[string]bool{}
+	// Each negative is materialized before its nearby positive is checked.
+	// Only the exact planted bytes, length, digest and pairing are asserted;
+	// expected_rejection is an unrun consumer obligation, never a green verdict.
+	for _, group := range f.Groups {
+		n := group.Negative
+		require(group.ID != "" && !seen[group.ID] && group.Claim != "", "authority pair id/claim")
+		seen[group.ID] = true
+		control, ok := goldens[n.Control]
+		require(ok && n.Control == group.Positive.Golden && n.Rejection != "", "authority pair control")
+		bad := authorityMutate(control, n.Mutation)
+		require(!bytes.Equal(bad, control) && len(bad) == n.Bytes && authorityHash(bad) == n.SHA256, "authority negative bytes/hash: "+group.ID)
+		require(group.Positive.Expected == "format-control-only", "authority vector overclaims runtime result")
+	}
+	for _, link := range f.Links {
+		obj, ok := goldens[link.Object]
+		preimage, exists := goldens[link.Preimage]
+		require(ok && exists && (link.Prefix == "sha256:" || link.Prefix == ""), "authority preimage link")
+		var selected any = authorityObject(obj)
+		for _, member := range strings.Split(link.Member, ".") {
+			selected = selected.(map[string]any)[member]
+		}
+		require(selected == link.Prefix+authorityHash(preimage), "authority linked digest: "+link.Object+"/"+link.Member)
+	}
+	max := f.Maximal
+	raw, ok := goldens[max.ID]
+	require(ok && max.Bytes == 1048576 && len(raw) == max.Bytes && max.Claim != "", "authority maximal root cap")
+	entries := authorityObject(raw)["entries"].([]any)
+	require(len(entries) == max.Entries && len(entries) <= 4096, "authority maximal root rows")
+	for i, item := range entries {
+		e := item.(map[string]any)
+		require(e["registration_number"] == json.Number(strconv.Itoa(i+1)) && len(e["owner"].(string)) <= 255, "authority maximal root field bounds")
+	}
+	require(len(f.Goldens) == 38 && len(f.Groups) == 21 && len(f.Links) == 9, "authority vector inventory")
+	for _, phase := range []string{"legacy_validated", "s2_staged", "s2_committed", "combined_staged", "combined_committed", "released"} {
+		require(goldens["migration-"+phase] != nil, "authority migration vector missing")
+	}
+	fmt.Printf("authority-root fixture integrity: %d goldens, %d negative/control pairs, %d preimage links; reader verdicts NOT RUN\n", len(f.Goldens), len(f.Groups), len(f.Links))
 }

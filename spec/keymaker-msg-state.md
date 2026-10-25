@@ -302,7 +302,9 @@ a future lease, complete upstream publication or permission to ignore revocation
 ## 5. Audit mapping and explicit base deltas
 
 Use the existing closed [base §11](keymaker.md#11-audit-and-fail-closed-recovery)
-record, with no new members. Internal transition rows have `surface:control`,
+record, with no new members from this message slice. The Q7 operator-only members
+MUST be absent on issuance, transition and `sign_message` records. Internal
+transition rows have `surface:control`,
 `domain:control`, service-generated `request_id:msg:<transaction>:<phase>` (not
 an attributable client attempt), resolved peer_uid/generation/path/master_epoch
 from the protected binding, and SHA-256 `payload_digest` of the exact canonical

@@ -218,16 +218,18 @@ handling retain their existing outer codes/fences; do not blanket-map unrelated
 native errors. A failed/uncertain commit cannot yield success even if verification
 was accept. Preserve the original fine S1 reason locally, never on the wire.
 
-Proposed explicit delta to [§11's closed audit schema](keymaker.md#11-audit-and-fail-closed-recovery):
-for this path `payload_digest` is `record.Digest(rawAct)` when bounded act bytes
-are available (null when no such bytes are known), and add optional typed
-`operator_action_id` and `operator_reason`. The former is null until a bounded
-canonical action ID is known; the latter is the exact S1 stable decision code
-(or `state_unavailable` for adapter unavailability), drawn from the pinned
-verifier's code inventory, never an error string. `refusal_code` keeps the coarse
-native outcome. These fields are absent on unrelated records; old journal
-bytes/hashes stay intact and recovery must not synthesize metadata. Audit-schema
-acceptance and historical recovery tests are required before implementation.
+Base §11 now defines the [closed optional operator audit extension](keymaker.md#111-operator-record-audit-extension):
+`payload_digest` is `record.Digest(rawAct)` for bounded available act bytes, else
+null; the complete optional `operator_action_id`/`operator_reason` pair is emitted
+only on new operator-record path records, with nulls until the corresponding
+bounded value/verdict is known. Action IDs use the signed canonical16-byte
+base64url representation. Reasons use only the pinned S1 stable inventory or
+adapter `state_unavailable`, never error strings; `refusal_code` stays coarse.
+Other paths omit both members. Historical records/hashes are preserved without
+backfill; old readers refuse the new members. The exact types, scope, closed
+member rules and [Q7-A01–Q7-A09 acceptance rows](keymaker.md#112-q7-historical-recovery-acceptance-rows)
+are in base §11. They remain PENDING runtime implementation/qualification; this
+applied spec delta does not activate the adapter or qualify its fact sources.
 
 Operator evidence in audit is **digest and action ID only**, plus the typed
 fine verdict and existing attribution/result metadata. Never log act/attestation/

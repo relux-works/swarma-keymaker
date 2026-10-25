@@ -18,7 +18,10 @@ rollback, fork, stale writers and reserve incidents fence without automatic
 recovery. The real root-owned journal remains an activation qualification gate.
 No fixture authority is compiled into normal production builds.
 Persistent operator revocation remains closed pending signed-act integration
-and qualified fact sources.
+and qualified fact sources. The [Q7 audit schema](spec/keymaker.md#111-operator-record-audit-extension)
+specifies a closed operator-only extension with unchanged historical bytes;
+[historical-recovery acceptance](spec/keymaker.md#112-q7-historical-recovery-acceptance-rows)
+is PENDING implementation and qualification.
 `sign_registration` builds registrar proofs with a separate purpose-2 key,
 current binding/enrollment authority and durable same-ID recovery. The curator-approved
 `custody_unavailable` refusal uses one response for every custody cause; only the

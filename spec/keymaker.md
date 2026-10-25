@@ -788,9 +788,13 @@ windows where applicable. No retry, external call or F queue renews them.
 
 The exact record schema is `{seq,time,instance,surface,request_id,peer_uid,
 generation,path,master_epoch,operation,domain,payload_digest,result,
-refusal_code,[custody_cause],previous_digest,record_digest}` (`[custody_cause]`
-denotes the optional extension below); other unknown optional values are null,
-not omitted. `domain` is the SSHSIG namespace (`git`), registrar domain, or
+refusal_code,[custody_cause],[operator_action_id,operator_reason],previous_digest,
+record_digest}`. Brackets denote only the conditional extensions specified here,
+not arbitrary optional members. Every other member, duplicate decoded name or case alias MUST refuse.
+Required base members with unknown values are null, not omitted. The chosen
+compatibility rule is a **closed optional-member rule**, with no audit `schema_version` member;
+this does not change any snapshot schema version. `domain` is the SSHSIG
+namespace (`git`), registrar domain, or
 `control`; result is `success`, `refused` or `unknown`. Time is whole-second UTC
 or null with result `unknown` when trustworthy time cannot be established.
 
@@ -868,6 +872,89 @@ coordinator may release uncertainty, using open -> resolution -> release-prepare
 -> owning cleanup/parent sync -> released/final directory sync. Readable release
 bytes alone are insufficient. Preserve S2's independent pending fences and no
 signer/reissue/result-invention rule in offline reconcile.
+
+### 11.1 Operator-record audit extension
+
+This is the applied Q7 schema contract, **spec only; runtime implementation and
+qualification remain gates**. It changes no public response, operation literal,
+result enum or audit hash algorithm. The
+[operator-record supplement §5](keymaker-operator-record.md#5-public-codes-and-audit-delta)
+keeps its two coarse native refusal codes and separate durable action/result
+transaction; audit alone grants no effect or replay authority.
+
+The extension is only for the native persistent-revoke operator-record path:
+`mode:operator`, with `surface:control,operation:revoke,domain:control`. Both append
+APIs MUST require the two operator members together on new records for that
+path, including explicit nulls for values not yet known; a partial pair MUST refuse.
+Both members MUST be absent on unrelated records, including self-revoke, lookup,
+message issuance/transition/signing, and `binding_commit`. Append validation MUST
+use trusted handler context to establish mode, not a client-supplied audit flag.
+Recovery MUST reject operator members outside the stated surface/operation/domain
+scope and any conflict with a retained request's mode. Historical audit alone
+cannot reconstruct a missing mode or prove verification; absence is not accept.
+
+| Member | Closed type and meaning on this path |
+| --- | --- |
+| `payload_digest` (existing) | `record.Digest(rawAct)` over the exact received act bytes, when bounded act bytes are available: at most 8192 received bytes under §5's act bound. Format is `sha256:` followed by 64 lowercase hex digits. Otherwise null. Do not hash the enclosing native params, decoded/re-encoded body or signatures separately. Bounded malformed act bytes can have a digest; that is not verification success. Historical records without the pair retain their original digest meaning; other paths are unchanged. |
+| `operator_action_id` | Null until a bounded canonical action ID is known; otherwise the exact canonical unpadded base64url encoding of exactly 16 bytes (22 characters), as in the signed act. Reject padding, alphabet/length aliases and nonzero unused bits. Syntactic availability is not proof of accepted authority or consumed action; never substitute the native request ID or a nonce. |
+| `operator_reason` | Null if operator verification has not been reached and no adapter-unavailability verdict exists; otherwise the exact nonempty S1 stable decision code for this attempt, including `accept` for an accepted candidate plan, or `state_unavailable` for adapter unavailability. The allowed strings are the closed stable decision-code inventory of the pinned S1 verifier and its §6 table, never an error string. Reject empty strings, unknown/future codes, case aliases and coercions. No arbitrary string prefix or generic diagnostic is an extension mechanism. |
+| `refusal_code` (existing) | `refusal_code` keeps the coarse native outcome, or null where the existing result rules require it. A fine `accept` means only verifier acceptance, never proof of effect commit; subsequent native failure/unknown still fences and uses its existing code/result. |
+
+The type/decision owner is pinned waggle S1
+[`98c9cfd`](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/verifier/types.go),
+with the [§6 decision inventory](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/spec/swarm-envelope-2.md#6-future-verifier-contract-and-refusal-order)
+and [record digest/base64 encoding](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/record/record.go).
+A new upstream pin or code requires explicit schema review; it cannot silently
+widen this allowlist. An absent verifier result maps to adapter
+`state_unavailable`, never an empty-string audit reason or default `accept`.
+
+Operator evidence in audit is a **digest and an action ID only**, plus this
+bounded fine decision and existing typed attribution/result metadata.
+Never log act, attestation or snapshot bytes, keys, signatures, nonces
+or free-form errors, whether as new members, existing string fields or diagnostics
+embedded in a reason. The separate protected transaction storage keeps required
+original act/ID/result evidence; this paragraph neither erases it nor copies it
+into audit. Existing audit-before-release and failure fencing remain mandatory.
+
+**Historical readers and recovery.** Recovery MUST accept otherwise valid old
+records without either operator member, including historical operator attempts;
+it MUST NOT require a backfill to admit them. New readers MUST validate new
+records and mixed journals using each record's actual closed member set,
+including all present metadata in its existing canonical record-hash preimage.
+Old journal bytes and hashes stay intact. Recovery MUST NOT synthesize operator metadata
+from retained acts, a current verifier run, native codes or inferred success,
+rewrite old records, strip new fields, or repair/recompute stored hashes.
+Custody's separate historical exception remains unchanged. A new append cannot
+claim the recovery-only missing-pair exception to omit required metadata.
+
+Old readers MUST refuse new records containing either operator member and fence
+admission while preserving the journal. They cannot skip a record/segment or
+ignore an unknown member. Upgrade and qualify all serving/recovery readers
+before enabling new operator records; exclude old binaries from serving that
+journal. No downgrade, metadata stripping or journal reset is permitted to make
+an old reader accept it. This closed extension adds no journal migration or
+historical hash rewrite, and does not implement the separate durable Q7 state
+migration or PC2/S2 combined-format/restore obligations.
+
+### 11.2 Q7 historical-recovery acceptance rows
+
+All rows below are **PENDING** implementation and execution; these are paired
+acceptance requirements, not executed runtime evidence. For refusals, require
+no append/partial rewrite, no released success and preserved original evidence;
+existing permitted bounded refusal telemetry is not a journal repair. Repeat
+applicable rows through both append APIs and startup/segment/recovery readers.
+
+| ID / claim | Negative or forbidden outcome | Positive control / required acceptance | Status |
+| --- | --- | --- | --- |
+| Q7-A01 historical bytes | Adding even null metadata to a historical operator record, rewriting its digest or rejecting it solely for the absent pair is forbidden. | Verify a retained pre-extension journal, including old custody refusals without cause and operator records without the pair; exact original bytes, sequence, digests and seals survive reopen. | PENDING |
+| Q7-A02 new records | Reject wrong member types, malformed action ID/digest, empty/unknown/case-aliased reason and a partial pair; no append. | New operator rows with the complete pair validate: both null before verification, known canonical ID plus exact S1 reason, or adapter state_unavailable; digest/null follows byte availability, coarse outcome unchanged. | PENDING |
+| Q7-A03 mixed chain | Reject skipped/duplicated/reordered records, a broken cross-segment link or stripped operator metadata. | Old then new then old-format unrelated records verify unchanged across segment rotation/restart; present operator members participate in the original hash algorithm and no historical bytes change. | PENDING |
+| Q7-A04 reason text | Reject an error string such as a file-open diagnostic in operator_reason, even if bounded; do not publish it through another audit member. | Exact pinned S1 code or adapter state_unavailable validates; null only at the specified pre-verdict boundary. | PENDING |
+| Q7-A05 unrelated scope | Reject the pair, including null-valued members, on lookup, self-revoke, message issuance/signing, binding_commit or another surface/domain; trusted append context/retained request must not be contradicted. | The same unrelated records omit both members and validate; a genuine operator attempt in its defined scope can carry the pair. | PENDING |
+| Q7-A06 no synthesis | Refuse recovery that backfills metadata from retained acts/current verification, invents a cause or repairs stored hashes; no persisted rewrite. | Read-only validation of historical/mixed records returns exact recorded metadata, including absence, and original bytes/hashes; recovery cannot infer act acceptance. | PENDING |
+| Q7-A07 disclosure | Reject act/attestation/snapshot bytes, key/signature/nonce material or free-form errors placed in audit, including attempted use of existing string fields; no partial append. | Digest and bounded action ID/reason with typed attribution only validate; original protected transaction evidence remains separate. | PENDING |
+| Q7-A08 strict closure | Reject an unknown member, duplicate decoded name, case alias, schema_version tag or omitted required base member; no coercion/drop. | Exact closed base plus only the applicable complete operator pair/custody cause validate; unknown required base values stay explicit null. | PENDING |
+| Q7-A09 reader compatibility | An old reader encountering either operator member refuses and fences without skipping, stripping, resetting or rewriting the journal. | A qualified new reader reopens the identical old/new/mixed bytes; an old reader still accepts an otherwise valid journal containing only its understood schema. | PENDING |
 
 ## 12. Privileged Linux step: operator handoff
 

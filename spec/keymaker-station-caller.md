@@ -272,23 +272,26 @@ other leases are active is therefore forbidden; this is an operator precondition
 not a claim that the daemon rejects every such reload. There is no broker
 allowlist-installation or confirmation API.
 
-A published and qualified **exact station-UID positive control** must verify the
-current installed policy generation before B0. Absence of a reload error alone
-is not positive evidence. `lease.request` creates a real worker-owned lease and
-its debt; it is not a read-only acknowledgement. Prefer a published read-only
-control if available; otherwise explicitly account for that real lease and its
-debt, with its disposition proven before B0, and preserve the no-active-lease
-condition for any policy replacement. No such control or read-only API is
-assigned here. Unknown verification or lease disposition keeps admission closed.
+The selected **exact station-UID positive control** is broker v0's existing
+peer-scoped `status` call from that station UID: it must return the expected new
+`policy_generation` and the required account in its allowed-account list, with
+no lease payload. Pair it with a **foreign-UID negative control** that returns an
+empty or denied result. Absence of a reload error alone is not positive evidence;
+a wrong generation/account or failed negative control cannot satisfy setup.
+`lease.request` is **forbidden as a precondition probe**: it delivers a real vendor
+token that lease release cannot revoke. The selected `status` control still needs
+qualification; unknown verification or missing qualification keeps admission
+closed. Both controls run within the setup's own unassigned budget below, never
+inside B0–B5.
 The evidence's validity/currentness through activation must be accepted jointly;
 a policy change invalidates it and cannot be silently adopted by B0–B5.
 
 Broker setup and its positive-control evidence have their **own one-time setup
 budget**, outside t_B/D_B and with **no share of the bootstrap clock**. Its finite
-time, human work, bytes/calls, retries and lease-debt disposition bounds remain
+time, human work, bytes/calls, retries and control/evidence bounds remain
 joint inputs to be confirmed by broker/operator owners, not invented numbers or
-borrowed B4 allowance. This separation does not make setup or a control lease
-free, unbounded or authority to activate. Missing accepted setup evidence closes
+borrowed B4 allowance. This separation does not make setup or its controls
+unbounded or authority to activate. Missing accepted setup evidence closes
 B0 admission.
 
 **Original occurrence and retention.** Before deriving, the owning Keymaker
@@ -699,8 +702,8 @@ station output; its bootstrap-completion case cannot make B2 depend on B5.
 | `SCBootstrapRecreateFences` | Change generation, revoke, stop or change tuple between stage and release: no cached/late output/start, no silent policy/allowlist adoption. | Explicit new association/policy installation for the new accepted generation, with separately verified current broker setup and any required replacement only while no lease is active, can activate. | Reuse equal-key old association; `SCBootstrapRecreateFences`. |
 | `SCBootstrapRetentionAndReaders` | Exhaust reserved capacity, downgrade to an old reader or restore unknown history: precise capacity/audit/source refusal, retained original evidence, no reset/prune/reissue. | Qualified supported reader recovers bounded exact state/audit without altering historical bytes. | Reset unknown occurrence to pristine; `SCBootstrapRetentionAndReaders`. |
 | `SCBootstrapCancelAfterPolicyExpiry` | After policy expiry/revocation, new dispatch refuses `station_caller_unqualified`; revoked association refuses cancel with that code (earlier precise key/generation refusals still apply). Cancel for a non-admitted, foreign or confirmed-stopped run, including cached replay after stop, refuses `station_caller_plan_invalid`, with no signature/onward effect or renewed authority. | With policy expired or revoked, the same qualified current caller signs only reduce-only cancel for its exact admitted, not-confirmed-stopped run; dispatcher may stop it under retained consent. Automatic P7 stop still progresses when signer revocation closes cancel. | Blanket-deny expired policy must fail the positive cancel assertion; admit dispatch on retained consent, skip signer revocation, or omit run admission/stop checks must fail the corresponding denial in `SCBootstrapCancelAfterPolicyExpiry`. |
-| `SCBootstrapAllowlistActiveLeases` | Attempt allowlist replacement while any lease is active: operator setup forbids the operation, so it is not performed; B0 cannot use the attempted setup as evidence. Do not assert daemon rejection: successful Replace would invalidate every old-generation lease. | With admission closed and no active lease, operator replacement and a qualified exact-UID control establish the separately bounded precondition before B0. | Permit setup with active leases; `SCBootstrapAllowlistActiveLeases`. |
-| `SCBootstrapAllowlistPositiveEvidence` | Reload with no error, stale/wrong-UID evidence or unaccounted `lease.request` debt cannot satisfy setup or admit B0; preserve actual control-lease debt and closed admission. | Published qualified exact station-UID/current-generation control verifies setup; a read-only control creates no lease, or a real control lease's debt and pre-B0 disposition are explicitly accounted. | Treat no reload error as confirmation or a real control lease as read-only; `SCBootstrapAllowlistPositiveEvidence`. |
+| `SCBootstrapAllowlistActiveLeases` | Attempt allowlist replacement while any lease is active: operator setup forbids the operation, so it is not performed; B0 cannot use the attempted setup as evidence. Do not assert daemon rejection: successful Replace would invalidate every old-generation lease. | With admission closed and no active lease, operator replacement and qualified exact-UID `status` establish the separately bounded precondition before B0. | Permit setup with active leases; `SCBootstrapAllowlistActiveLeases`. |
+| `SCBootstrapAllowlistPositiveEvidence` | Reload with no error, `status` with a stale/wrong `policy_generation` or missing required account, wrong peer UID, or a foreign-UID negative control returning allowed accounts cannot satisfy setup or admit B0. Any `lease.request` precondition probe is forbidden; no token/lease is issued by these controls, and failed qualification keeps admission closed. | Qualified peer-scoped `status` from the exact station UID returns the expected new `policy_generation` and required account, with no lease payload; the paired foreign UID gets empty or denied. Both fit the separate setup budget before B0. | Accept wrong generation/account, skip foreign-UID control, treat no reload error as evidence or permit `lease.request` probing; `SCBootstrapAllowlistPositiveEvidence`. |
 | `SCBootstrapBudgetTimelyLate` | Exhaust B0 entry-to-completion time, any step cutoff or shorter caller bound; B5 outcome/audit/opening at equality or later cannot activate. | Same workload completes every step, full durability and all final openings strictly within the original bounds; subsequent notification may be lost without repeating activation. | Reset t_B at reservation/step entry, transfer unused allowance, or omit final opening; `SCBootstrapBudgetTimelyLate`. |
 | `SCBootstrapBudgetUnknownCeiling` | Lose install/activation acknowledgement or custody/audit durability at a cutoff/D_B: retain exact held evidence and closed authority, no assumed rollback or no-effect result; a late ack cannot reopen. | Within the original bound, authenticated exact-outcome reconciliation proves complete durability/currentness before the same occurrence's sole activation. | Treat missing ack as no effect or accept late ack as activation; `SCBootstrapBudgetUnknownCeiling`. |
 | `SCBootstrapBudgetRetryCeiling` | Retry, lookup or recovery after the original phase cutoff/D_B, including a new ID/Run/epoch or fresh receipt: no renewed install/activation or refunded debt. | An accepted bounded exact retry/status lookup fits the same original cutoff and returns only its original proven outcome, without another effect. | Give reconnect/reconciliation a fresh timer or occurrence; `SCBootstrapBudgetRetryCeiling`. |

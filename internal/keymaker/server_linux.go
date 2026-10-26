@@ -36,6 +36,21 @@ type Server struct {
 	wg                          sync.WaitGroup
 }
 
+// Each handler owns this view; Server.Close retains the raw connections so it
+// can close them without recursion. Audit failure must close both listeners
+// before any handler (including the control wire) exposes terminal EOF.
+type serverConnection struct {
+	*net.UnixConn
+	server *Server
+}
+
+func (c *serverConnection) Close() error {
+	if c.server.Engine.closed.Load() {
+		c.server.Close()
+	}
+	return c.UnixConn.Close()
+}
+
 func LockState(dir *os.File, uid uint32) (*os.File, error) {
 	// Lock the directory inode without creating evidence in a virgin state
 	// directory. Open a separate fd so Close releases exactly this lock.
@@ -181,9 +196,10 @@ func (s *Server) accept(ctx context.Context, listener *net.UnixListener, native 
 		s.mu.Unlock()
 		s.wg.Add(1)
 		go func() {
+			conn := &serverConnection{UnixConn: c, server: s}
 			defer s.wg.Done()
 			defer func() {
-				c.Close()
+				conn.Close()
 				s.mu.Lock()
 				delete(s.connections, c)
 				s.counts[peer.UID]--
@@ -193,14 +209,14 @@ func (s *Server) accept(ctx context.Context, listener *net.UnixListener, native 
 				s.mu.Unlock()
 			}()
 			if native {
-				s.handleControl(ctx, c, peer, code)
+				s.handleControl(ctx, conn, peer, code)
 			} else {
-				s.handle(ctx, c, peer, code)
+				s.handle(ctx, conn, peer, code)
 			}
 		}()
 	}
 }
-func writeResponse(c *net.UnixConn, b []byte) error {
+func writeResponse(c net.Conn, b []byte) error {
 	for len(b) > 0 {
 		n, e := c.Write(b)
 		if e != nil {
@@ -220,7 +236,7 @@ func fatalCode(c Code) bool {
 	}
 	return false
 }
-func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peerCode Code) {
+func (s *Server) handle(parent context.Context, c net.Conn, peer Peer, peerCode Code) {
 	session := Session{Admission: peerCode}
 	if peerCode == "" {
 		ctx, cancel := context.WithTimeout(parent, 2*time.Second)
@@ -299,7 +315,7 @@ func (s *Server) handle(parent context.Context, c *net.UnixConn, peer Peer, peer
 
 // The watcher closes idle control connections too. It only revokes access;
 // Identify and the final WithActive still establish request/release authority.
-func (s *Server) handleControl(ctx context.Context, c *net.UnixConn, p Peer, code Code) {
+func (s *Server) handleControl(ctx context.Context, c net.Conn, p Peer, code Code) {
 	if code != "" {
 		c.Close()
 		return

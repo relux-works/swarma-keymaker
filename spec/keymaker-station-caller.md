@@ -176,7 +176,9 @@ peer UID. None is activated by this proposal.
 
 ## 4. Enrollment, publication and external dependencies
 
-Resolve the public purpose-6 sibling only for the qualified own active binding.
+The station-facing public method resolves the purpose-6 sibling only for the
+qualified own active binding. The proposed protected operator installation in
+[§4.1](#41-m0-operator-bootstrap-transaction) returns no public metadata to a station.
 No private value leaves custody during enrollment, proof or rotation. Proposed
 `station_caller_pubkey` exposes public metadata, not a registrar registration or
 caller grant. Its protected publication must bind the public key to the full
@@ -216,6 +218,153 @@ Do not call a hypothetical method or accept an unsigned registry row as evidence
 | Qualification/activation, protected profile and stop/revocation | Independent qualification authority, operator and launcher/session-host owners | Exact tuple acceptance, joint activation, immediate fences and bounded confirmed disposition |
 | Authority time/currentness | Shared time-policy owner and each consumer | Qualified current evidence and continuity; no caller wall-clock or receipt-only substitute |
 
+### 4.1 M0 operator bootstrap transaction
+
+Status: **proposed transaction; not implemented, qualified or activated**.
+M0 uses ordering A: once before dispatch, the operator performs ordinary
+`user.create` -> durable `active` -> authorized purpose-1 `register`, then this
+purpose-6 installation, broker v0 allowlist installation and the protected M0
+launch policy pinned to that existing UID/generation. Dispatch starts only that
+existing active generation. Ordinary create remains
+[register-after-active](keymaker-provision.md#6-failure-recovery-and-create);
+this is not bump's `provision`/`confirm_provision`, an early-active workaround,
+a PC2 credit exemption or registrar purpose-2 enrollment. The broker v0 lease
+supplies no caller grant. The proposed M0 scope is only `dispatcher-request/1`,
+with `dispatch`
+and owned-run `cancel`; requester delegation and federation remain later work.
+The dispatcher must publish the matching minimal authority/request contract;
+the Keymaker request signature authenticates a caller and never supplies launch
+authority.
+
+**Admission and staging boundary.** An exact active purpose-1 binding, current
+protected generation/admission policy, approved name-index registry, master epoch
+and healthy custody are prerequisites. Purpose 6 must have been explicitly
+allocated following §1; this text does not allocate it. Installation additionally
+requires independent acceptance of the exact Linux operator-bootstrap entry,
+its storage/recovery, both versioned adapters and their invalidation protocol,
+and explicit operator authorization of that qualified installation scope.
+The operator entry enforces method/role and active caller generation; root UID
+by itself is no exemption from those checks.
+Missing implementation, acceptance, authority or evidence refuses before
+production derivation or public staging. Native macOS bootstrap remains closed.
+
+The operator workflow is a protected service/installer transaction, **not** a
+third station native method, a call to the station's `station_caller_pubkey` while
+unready, or a new challenge/signing profile. It may stage only public metadata
+inside the qualified protected installation path; it returns no key to a station.
+This resolves the installation dependency without treating the not-yet-installed
+association or launch policy as authority for their own creation. The separately
+qualified operator entry and its authorization are independent inputs, never
+purpose-6 signatures or broker credentials. Its concrete entry/closed storage
+format and joint interfaces still require review before implementation. No
+operator service root or private material is installed in a station.
+
+**Original occurrence and retention.** Before deriving, the owning Keymaker
+transaction reserves one operator-scoped occurrence, using the base request-ID
+domain and full canonical argument comparison. Retain the original authenticated
+operator UID/generation and ID, exact target UID/generation, purpose-1 registration,
+master epoch, resolved purpose-6 path/public key, intended dispatcher and scope,
+immutable adapter/qualification/policy identities, predecessor versions, completed
+steps and their durable evidence. These are required protected transaction
+properties, not dispatcher field names or new native params. Reserve the next
+closed, versioned transaction/result format and all staging/history within the
+single existing 256 MiB state budget (§6); no implicit side journal, pruning or
+second allowance. Missing format/capacity closes admission before work.
+Same ID with different arguments is `request_conflict`. Recovery references the
+original occurrence, even under a separately authorized recovery operator; it
+cannot change the original identity or mint a replacement occurrence to clear debt.
+
+| Step | Operator-only action and durable order | Crash / unknown outcome |
+|---|---|---|
+| B0 — reserve closed installation | Authenticate the operator and exact active target; capture approved full tuple, current revisions and original deadline. Durably reserve the original intent/result capacity before derivation. Keep station disclosure/signing and new dispatch for this scope closed. | No reservation before a proven no-effect refusal; possible reservation retains the exact occurrence and hold. Missing local evidence never means pristine state. |
+| B1 — derive and stage | Keymaker resolves the purpose-6 sibling from the existing master/name-index, derives only inside custody, and stages its public key, purpose-6 path, purpose-1 registration number and master epoch bound to the target generation and intended dispatcher. Commit protected stage/result and successful audit before any public metadata leaves Keymaker for installation. Discard transient private child material; no station file/export. | Recover only the original committed public stage after current checks. Partial stage/audit is held and reconciled; never generate another key, registration or epoch, or silently repeat derivation to replace unknown evidence. |
+| B2 — install inert dispatcher association | The authenticated operator installs exactly B1's public metadata and full target/scope provenance at the dispatcher. Dispatcher owns its protected format, predecessor checks, durable idempotent install and acknowledgement. Association installation is separate from authority activation and grants no launch. Retain its exact committed identity/version in Keymaker's original transaction. | Lost acknowledgement requires authenticated lookup/reconciliation of that same install. Same bytes with unknown history are not proof; no reassociation, overwriting another predecessor or blind retry as a new install. |
+| B3 — establish joint currentness and audit | Both owners verify that their protected current records identify the same installed public key/path/registration/epoch, target UID/generation, receiver/scope and immutable installation occurrence. Bind exact current revisions, not key equality alone. Durably retain the verified association and audit checkpoint before proceeding. | Missing, mismatched, stale or unknown evidence leaves the scope held. A late acknowledgement cannot reopen it. Resume only the original step after proving the actual outcome and current authority. |
+| B4 — install allowlist, then M0 policy | Through broker-owned operator control, install the exact station UID's v0 allowlist entry; then install dispatcher-owned limited M0 policy bound to that association, exact UID/generation, allowed plan/operations, expiry and currency rule. Keep dependent new issue/start/release authority closed through installation using the jointly accepted admission protocol; an installed entry alone is not activation. | Retain partial installations and original evidence; no launch or compensating grant/key/policy. If v0 controls cannot provide the required scoped closure, this tuple is unqualified; do not invent a broker field or assume a disabled-entry feature. |
+| B5 — verify and activate accepted scope | Revalidate B0–B4 and all §5 terms, durably audit/checkpoint the original installation outcome and exact operator activation, then admit only the accepted request scope. Keymaker and dispatcher independently consume current installation/activation facts; dispatcher rechecks its M0 policy at prepare and start. Broker retains its own current issue/renewal gates. | Unknown completion or one-sided activation stays closed for affected signing/new effects. Recover the original outcome and reconcile all owners before reopening; a readable success marker is insufficient. No atomic cross-service commit is claimed. |
+
+**Joint currentness and exclusion.** Keymaker owns custody, derivation, local
+intent/result retention, audit and its final release check. Dispatcher owns its
+association/policy storage and encoding, install/replay transaction and actual
+prepare/start authorization. Broker owns the v0 allowlist and lease admission.
+Propose a close -> install -> verify -> activate protocol. Every participating
+writer first durably closes its affected scope under its own final release/effect
+exclusion, drains or contains earlier admitted work and acknowledges that original
+occurrence. Collect all required closure acknowledgements outside locks **before**
+changing a live association, generation-policy link or activation decision. No
+writer bypasses this barrier, including installer, revoke, restore and recovery.
+Generation changes additionally retain user-manager's authoritative final fence.
+For every Keymaker stage/result disclosure, including recovery, the final bounded
+verified generation window checks both operator and target active; target binding,
+policy and custody checks, owning state/audit and actual handoff remain ordered
+against retirement. An operator-only generation check is insufficient. Dispatcher
+likewise rechecks the target generation at its actual install/start boundary.
+Then install only against the retained exact predecessor, verify the same complete
+committed association at both owners, and durably publish the operator's activation
+decision bound to that occurrence and the accepted tuple. Each service consumes
+that same protected decision plus its own matching current records under local
+exclusion; it must not require another service's open bit to open its own scope.
+The next mutation repeats the closure barrier before replacing those records.
+
+Joint publication must bind authenticated delivery/acknowledgement, exact current
+record identities and nonregressing versions to this protocol, specify competing
+installer serialization and restore/old-writer exclusion, and qualify each final
+local check. The concrete dispatcher storage/encoding remains dispatcher-owned;
+no acknowledgement schema or field is assigned here. A saved acknowledgement,
+polling interval, matching key or time-to-live alone cannot supply currentness.
+Missing closure participation or unknown currency keeps admission closed. External
+delivery/queries run outside short state/generation locks; re-enter local exclusion
+and revalidate the same attempt before commit/release.
+No Keymaker lock is held waiting for dispatcher/broker. Original deadlines are
+not restarted; the operator entry's finite original budget and its time/custody
+qualification must be supplied, not borrowed from a native two-second timer or
+an enrollment approval's lifetime. Undefined timing keeps the entry closed.
+
+The acyclic installation dependencies are independent operator/qualification
+inputs -> active purpose-1 binding -> B0/B1 protected public stage -> B2/B3 inert
+current association -> B4 allowlist then M0 policy -> B5 full activation. No
+step needs a station signature, launch or lease produced by a later step. The
+mechanism maintaining closure during partial installation is a joint acceptance
+gate, not an assertion that present v0 services implement it. Inert staged records
+cannot satisfy §5's runtime readiness conjunction by themselves. All normal
+station public-key/signing calls still require the complete conjunction.
+
+**Audit and refusal.** Use §6's proposed `station_caller_pubkey` operation and
+`control` domain for the operator's public-metadata stage/installation outcome,
+with actual authenticated operator attribution in existing UID/generation fields;
+the target's full association and step/outcome correlation belong in protected
+transaction evidence linked to the audit sequence/hash. Never attribute the
+operator as the target peer or invent a canonical native frame for an internal
+step: `payload_digest` is null when no canonical native request was accepted.
+This use needs the explicit writer/reader/attribution review under SC-Q6; no new
+audit member, operation literal, public method or dispatcher field is allocated.
+Audit success alone neither proves dispatcher installation nor opens authority.
+Every outward successful bootstrap result requires durable owning state/audit;
+audit failure is `audit_unavailable` and retains any possible remote effects.
+
+Preserve earlier precise base refusals (§2.2). Missing allocation, qualified
+operator entry/adapter/tuple/activation scope is `station_caller_unqualified`.
+Unavailable complete protected stage/association/current-authority evidence uses
+`station_caller_plan_unavailable`; complete but inconsistent target, predecessor,
+association, policy source or scope uses `station_caller_plan_invalid`. Here the
+existing proposed plan codes also describe protected bootstrap evidence; neither
+admits a new station-supplied plan/body. They remain `retryable=false`: operator
+reconciliation of the same occurrence is not a transparent retry. Unknown writes
+retain a hold and actual evidence, never a claim of no effect. No new code is
+needed. No signing challenge or purpose-2 proof substitutes for operator authority.
+
+**Invalidation.** A generation change/retirement, purpose-1 or caller-key
+revocation, epoch/association/policy change, stop or qualification-tuple change
+closes affected readiness before a new signature/public disclosure or dependent
+start/release, including retained results and asynchronous completions (§6).
+Recreate requires a new association installation, new M0 policy and new operator
+allowlist installation for the exact new generation; retained identical public
+bytes never reactivate the old association. A UID-only v0 entry does not attest
+a generation: its owner must invalidate the old admission and require explicit
+reinstallation, with the generation binding enforced by the protected M0 policy
+and joint currentness protocol. No implicit UID reuse, bump or rotation is enabled.
+Authorized stop/recovery retains its own prerequisites and original stop deadline.
+
 ## 5. Disabled until qualified
 
 Define the proposed protected gate **`station_caller_ready`**, initially and on
@@ -245,6 +394,9 @@ Keymaker/adapters enforce it. Documentation, fixture success, a support label or
 operator enrollment alone cannot open the gate. All questions in §8 affecting a
 profile must close first. Public-key enrollment, operator-enrolled bootstrap and
 recursive delegation remain closed while their integration is unqualified.
+Section 4.1 distinguishes independently qualified, operator-authorized inert
+staging from completed bootstrap/runtime activation. Staging is not station
+readiness, and no part of the conjunction is waived for station output.
 The separate protected **operator service root stays independently usable** under
 its own authority and recovery prerequisites; it is never restored into a station.
 
@@ -312,7 +464,7 @@ none has been executed here.
 | SC-V1 wrong purpose | Register 6 through purpose-1 API: `purpose_unknown`; verify purpose-1/2/3/4/5 signatures cannot authenticate caller 6 | Active own 6 public metadata and permitted request signature verify only as the registered caller | Allow cross-purpose association; SC-V1 WrongPurposeDenied |
 | SC-V2 arbitrary bytes | Add `bytes`, `namespace`, body or identity selector to native params: `request_malformed`; plant opaque/unknown plan member: `station_caller_plan_invalid` | Same admitted complete typed plan constructs the exact domain + LF + CCJ-1 bytes and signature verifies | Accept opaque payload or ignore nested unknown field; SC-V2 ArbitraryBytesDenied |
 | SC-V3 wrong peer | A second real UID references the first station's valid plan: `peer_binding_mismatch`; guest-provided UID supplies no authority | Same endpoint, own active UID/generation/profile plan signs and reaches only its permitted receiver operation | Remove only peer/association comparison; SC-V3 WrongPeerDenied |
-| SC-V4 disabled gate | Independently missing purpose, either adapter, qualification or activation: `station_caller_unqualified`, for public key, bootstrap and delegation separately | Exact accepted tuple activates and each path actually obtains only its allowed output; protected operator service root remains usable while station gate is closed | Bypass one readiness term; SC-V4 StationCallerPurposeDenied / DW-30 |
+| SC-V4 disabled gate | Independently missing purpose, either adapter, qualification or activation: `station_caller_unqualified`, for public key, bootstrap completion and delegation separately | Exact accepted tuple activates and each path actually obtains only its allowed output; protected operator service root remains usable while station gate is closed | Bypass one readiness term; SC-V4 StationCallerPurposeDenied / DW-30 |
 | SC-V5 replay/freshness | Changed same native ID: `request_conflict`; retired generation: `generation_inactive`; expired retained result: `request_expired`. No nonce format exists to replay yet | Same ID/arguments with current authority returns original result, receiver deduplicates original effect; fresh plan uses its own receiver identity | Skip generation check before cache or receiver replay binding; SC-V5 StationCallerGenerationDenied / ReplayDenied |
 | SC-V6 Git namespace | SSHSIG bytes/`git` namespace injected on B: `request_malformed` or resolved-plan `station_caller_plan_invalid`; 6 on A: `sign_key_mismatch` | Ordinary purpose-1 Git succeeds on A, purpose-6 typed request succeeds on B; neither cross-verifies | Add interim Git/arbitrary signer fallback; SC-V6 StationCallerFallbackDenied |
 | SC-V7 delegation attenuation | Root/null parent, credential `agent:` leaf, widened scope or unrelated registered subject: `station_caller_plan_invalid` | Registered descendant key gets a strictly attenuated current requester-signed delegation; dispatcher never substitutes itself as issuer | Drop one attenuation/subject check; SC-V7 DelegationScopeDenied |
@@ -327,6 +479,28 @@ SC-V5 must separately exercise same stable key with a stale generation associati
 and stale execution/profile; those variants cannot be hidden by missing readiness.
 If challenge-based bootstrap is later published, add reused/expired/wrong-subject
 challenge negatives and a consumed-once valid positive before activating it.
+
+### 7.1 M0 bootstrap paired qualification requirements
+
+All rows are **PENDING / NOT RUN**, including native Linux and macOS. Each
+claim applies to the protected operator entry and affected production receiver,
+not just codec fixtures. After possible effects, retain the actual attempt/hold;
+only clean pre-effect refusals assert no mutation. Test permitted audit separately
+from forbidden disclosure, association replacement, issue or start. SC-V4 still
+requires independently qualified/authorized staging and full activation before
+station output; its bootstrap-completion case cannot make B2 depend on B5.
+
+| Named test / claim | Negative and required state | Nearby positive | Narrowing control / intended failing test |
+|---|---|---|---|
+| `SCBootstrapAdmissionClosed` | Missing allocation, qualified operator entry or either adapter refuses `station_caller_unqualified` before derivation/staging; no station output. | Independently accepted/authorized installation scope may stage inert public metadata while station readiness remains false. | Bypass staging qualification; `SCBootstrapAdmissionClosed`. |
+| `SCBootstrapExactBinding` | Inactive operator, wrong/retired target, foreign registration/epoch/path or lost custody refuses the precise base code or `station_caller_plan_invalid`; no substituted binding/key. | Exact active purpose-1 target derives/stages only its purpose-6 sibling. | Drop target/generation comparison; `SCBootstrapExactBinding`. |
+| `SCBootstrapAuditBeforeExposure` | Fail/unknown stage or audit sync: `audit_unavailable`, retained hold, no public metadata forwarded or station result. | Durable owning stage/audit precedes first protected delivery and later successful completion. | Forward before sync; `SCBootstrapAuditBeforeExposure`. |
+| `SCBootstrapInstallIdentity` | Stale predecessor, wrong dispatcher or changed same-ID arguments cannot overwrite/associate; changed args give `request_conflict`. | Authenticated same-ID/current exact install recovers the original durable association identity. | Accept different predecessor under same ID; `SCBootstrapInstallIdentity`. |
+| `SCBootstrapCurrentnessABA` | Change an association without closing both owners, withdraw/re-add equal bytes, stale generation/version or late acknowledgement cannot restore admission; mismatch/unknown uses the specified invalid/unavailable refusal and retains closure. | Current nonregressing same installation passes both owners' final checks. | Omit one owner from the closure barrier or compare public key only; `SCBootstrapCurrentnessABA`. |
+| `SCBootstrapCrashCuts` | Inject death/unknown outcome before/after every B0–B5 local write/sync, remote install/ack and activation; retain original debt, no duplicate registration/install/activation or replacement occurrence. | Verified same-occurrence recovery reaches only the original outcome after current checks. | Treat absent acknowledgement as no effect; `SCBootstrapCrashCuts`. |
+| `SCBootstrapInstallOrder` | Missing association/allowlist/policy, unsupported scoped closure or one-sided activation never enables station output/new issue/start; missing qualification uses `station_caller_unqualified`. | Fully accepted B0–B5 order reaches only dispatch and owned-run cancel under current M0 policy. | Let an installed allowlist or marker imply readiness; `SCBootstrapInstallOrder`. |
+| `SCBootstrapRecreateFences` | Change generation, revoke, stop or change tuple between stage and release: no cached/late output/start, no silent policy/allowlist adoption. | Explicit new association/policy/allowlist installation for the new accepted generation can activate. | Reuse equal-key old association; `SCBootstrapRecreateFences`. |
+| `SCBootstrapRetentionAndReaders` | Exhaust reserved capacity, downgrade to an old reader or restore unknown history: precise capacity/audit/source refusal, retained original evidence, no reset/prune/reissue. | Qualified supported reader recovers bounded exact state/audit without altering historical bytes. | Reset unknown occurrence to pristine; `SCBootstrapRetentionAndReaders`. |
 
 ## 8. Owner questions and safe defaults
 

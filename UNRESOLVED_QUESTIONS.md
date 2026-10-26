@@ -41,6 +41,24 @@ operator-enrolled bootstrap and recursive delegation, remains disabled until
 qualified. Readable keys, interim Git signing and arbitrary-bytes substitutes
 are forbidden; the protected operator service root retains its own authority.
 
+The [M0 operator bootstrap transaction](spec/keymaker-station-caller.md#41-m0-operator-bootstrap-transaction)
+proposes create -> active -> operator register-after-active, then qualified
+operator-only public staging, inert dispatcher association/currentness, broker
+v0 allowlist, exact UID/generation M0 policy and full activation. It is not a
+first-create provision/confirm path, a station-facing bootstrap exception or an
+implementation. Purpose 6 remains unallocated. SC-Q2, SC-Q4 and SC-Q6 remain open:
+Keymaker's closed bounded intent/result/audit attribution and finite original
+operator budget, dispatcher's owned association/policy formats and idempotent
+install/acknowledgement, broker-owned scoped admission during installation,
+joint invalidation/restore/old-writer exclusion and final local rechecks need
+publication, implementation and native qualification. An equal key, installed
+allowlist or saved acknowledgement cannot open readiness. Recreate needs new
+association, policy and allowlist installation. All
+[bootstrap tests](spec/keymaker-station-caller.md#71-m0-bootstrap-paired-qualification-requirements)
+are PENDING / NOT RUN; macOS, bootstrap completion and station output remain
+closed. No new dispatcher field, station method, signing domain or audit member
+is allocated by this proposal.
+
 ## Q7: operator-record integration sources
 
 The [Q7 supplement](spec/keymaker-operator-record.md) recommends retaining the

@@ -9,9 +9,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/relux-works/swarma-credential-broker/timeconf"
+	"github.com/relux-works/swarma-envelope/record"
+	"github.com/relux-works/swarma-envelope/verifier"
 	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
-	"github.com/relux-works/waggle/record"
-	"github.com/relux-works/waggle/verifier"
 )
 
 // This capability is internal and has no daemon constructor, root-signing RPC or

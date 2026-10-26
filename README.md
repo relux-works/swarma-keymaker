@@ -293,17 +293,19 @@ beyond the public key. A revoke result contains the registration number and
 
 ## Internal message-key slice
 
-K3 S1 adds an internal purpose-4 sibling key capability and canonical waggle
+K3 S1 adds an internal purpose-4 sibling key capability and canonical envelope
 key IDs. It has no production constructor or dispatch; `sign_message` remains
 unsupported. Surface A and ordinary key APIs retain purpose-1 identity keys.
 S2 adds an internal fixed-body purpose-5 issuer and schema-2 certification state,
 described below. Native message admission and publication qualification remain
 later K3 slices.
 
-The byte/crypto helper is pinned to waggle
-`9b42338b8a57d12a21da4db4375b269deacdd6bf`
-(`v0.0.0-20261024213811-9b42338b8a57`). It shares the existing registrar pin;
-the shared time provider requires `golang.org/x/sys v0.38.0`.
+The byte/crypto helper is
+[`swarma-envelope`](https://github.com/relux-works/swarma-envelope)
+`v0.0.0-20261026200550-5636986d0de5`. Module selection retains the existing
+registrar pin; the shared time provider requires `golang.org/x/sys v0.38.0`.
+The dependency includes newer currency APIs, but the current adapters retain
+the legacy /1 profile; this update enables no /2 state or production feature.
 
 | Tool | Exact entry point | Evidence |
 | --- | --- | --- |
@@ -341,7 +343,8 @@ mapping, provider/audit collection outside generation windows with bounded
 original authority through persistence, and owner-registry/WC1 evidence. The [S4/S5 spec adoption](spec/keymaker-msg-state.md#4-publication-record-and-restart)
 now separates D39 prior-checkpoint custody, live freshness and process-local
 receipts, with [paired imported fixtures](vectors/waggle-s4/README.md).
-The module now pins waggle S4/S5 `5f4e743`. Internal in-memory adapters verify
+The retained S4/S5 fixtures originate at historical `5f4e743`. Internal
+in-memory adapters use the current envelope module in legacy mode and verify
 journal publication proofs with the raw anchor and exact authenticated prior,
 normal freshness and explicit re-anchor with endpoint/skip audit metadata, and
 receipt-aware attestations/messages using one immutable Evidence lifetime.

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/relux-works/swarma-credential-broker/timeconf"
-	"github.com/relux-works/waggle/record"
-	"github.com/relux-works/waggle/verifier"
+	"github.com/relux-works/swarma-envelope/record"
+	"github.com/relux-works/swarma-envelope/verifier"
 )
 
 var messageTestNow = time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)

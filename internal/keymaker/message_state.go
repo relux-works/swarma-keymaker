@@ -13,8 +13,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/relux-works/swarma-envelope/verifier"
 	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
-	"github.com/relux-works/waggle/verifier"
 )
 
 const messageHistoryLimit = 65536

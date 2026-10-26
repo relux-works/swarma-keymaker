@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/relux-works/waggle/record"
+	"github.com/relux-works/swarma-envelope/record"
 )
 
 type pc2Golden struct {

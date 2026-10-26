@@ -10,14 +10,15 @@ a publisher transport, a public purpose-5 capability or an administration comman
 
 The target currency/receipt contract is waggle S8 at
 `b63d627b19c4178d34b7cff58f8f6068efeca1a0`, including D42(a) option I and D43–D45.
-Keymaker currently depends on `5f4e7435d75697385ff6ce15a7501ac6f31c8ea5` and has
-S4/S5 in-memory adapters only. This specification target is not a module upgrade
-or a production adapter. Existing act/message signature domains, purpose/role
-boundaries and unchanged S0 formats remain unchanged; no second parser or new
+Keymaker currently depends on `swarma-envelope`
+`v0.0.0-20261026200550-5636986d0de5` and retains S4/S5 in-memory adapters
+in legacy /1 mode. The dependency update does not implement the proposed retained
+/2 state or provide a production adapter. Existing act/message signature domains,
+purpose/role boundaries and unchanged S0 formats remain unchanged; no second parser or new
 root-signing operation is introduced.
 
 The normative /2 source is [waggle S8](https://github.com/relux-works/waggle/blob/b63d627b19c4178d34b7cff58f8f6068efeca1a0/spec/swarm-envelope-2.md).
-The unchanged runtime pin and pure S4/S5 adapters remain historical /1 support;
+The pure S4/S5 adapters remain historical /1 support under the current module;
 §7 records their limits. Populated production publication state remains closed.
 This target does not replace the message supplement's S0 signature/record profile.
 WC1 below means the separately reviewed state-witness service's registry stream:
@@ -793,7 +794,7 @@ qualification remain PENDING.
 
 | Gate | Required integration/qualification before activation |
 | --- | --- |
-| K3-G1 exact adapter/version | Implemented in memory: waggle `5f4e743`, journal/freshness/explicit-reanchor and receipt-aware attestation/message adapters, exact prior checkpoint custody inputs, endpoint/skip origin audit and separate outer size gates. PENDING: review and production integration; explicit successor state/artifact codecs, protected floor and quiesced migration/recovery retaining every S2 history/result/fence. Current production still rejects populated publication state. PC2 combined-root/preimage/restore acceptance remains required wherever PC2 participates; no second commit point or implicit C switch. |
+| K3-G1 exact adapter/version | Implemented in memory: current envelope module in legacy /1 mode (historical `5f4e743` fixtures), journal/freshness/explicit-reanchor and receipt-aware attestation/message adapters, exact prior checkpoint custody inputs, endpoint/skip origin audit and separate outer size gates. PENDING: review and production integration; explicit successor state/artifact codecs, protected floor and quiesced migration/recovery retaining every S2 history/result/fence. Current production still rejects populated publication state. PC2 combined-root/preimage/restore acceptance remains required wherever PC2 participates; no second commit point or implicit C switch. |
 | K3-G2 actual authority | Qualified protected root/owner/lineage/epoch policy, purpose-5 scope and <=24h lifetime, exact active-generation/binding/T/current-status checks and qualified-T1 renewal; native signing/retry/actual-release implementation. Existing kernel/generation/enrollment deadlines and gates remain. |
 | K3-G3 publication custody | PENDING /2: Real owner-registry publisher boundary, D39 raw anchor and exact prior IDJournal custody; gap-free complete-prefix qualification through the current checkpoint/2/head, full configured-role index including omitted roles, selected sorted per-root set, original signed snapshots and all required entry/dependency/endpoint history. Prove actual changed-content submissions' inclusion and derived latest selection. Unchanged authentic latest content requires no head-change reissue or synthetic add/revocation; it still requires the independent current journal/checkpoint proof and qualified bounded catch-up of §4/§4.1. Retain independent WC1 committed pairing/head/control/transport/custodian and authenticated read qualification. No client URL, extra egress, fake witness, missing history or receipt-as-inclusion-proof. |
 | K3-G4 time and cumulative premises | Qualified timeconf collection/uncertainty/hold/continuity and safe margin mapping within existing deadlines, durable W bootstrap/advancement/restore continuity, real authenticated witness read and independently qualified cumulative rollback_safe. No W=Now, old-clock or complete=true substitutes. |

@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/relux-works/waggle/record"
+	"github.com/relux-works/swarma-envelope/record"
 )
 
 func messageSubdir(parent *os.File, name string, uid uint32, create bool) (*os.File, error) {

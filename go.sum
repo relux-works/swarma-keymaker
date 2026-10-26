@@ -1,10 +1,10 @@
 github.com/relux-works/swarma-credential-broker v0.0.0-20261025133248-8cdea829b261 h1:PqDatDKLVs7mvIkoNriWw+rRL3tch2RPY0LSQTZMz5s=
 github.com/relux-works/swarma-credential-broker v0.0.0-20261025133248-8cdea829b261/go.mod h1:5Gqu75cqNaYymPpS0dAczdgyaai88O1FKsFFasm4kds=
+github.com/relux-works/swarma-envelope v0.0.0-20261026200550-5636986d0de5 h1:Dy8UwCgPb9Ak8VTh4q9fprGzWd7XH1o/7p7xN2VnxQM=
+github.com/relux-works/swarma-envelope v0.0.0-20261026200550-5636986d0de5/go.mod h1:N9T1gQU4MBLIj/LyFBeT+betwul46G4bYluVc546jnY=
 github.com/relux-works/swarma-registrar v0.0.0-20261025040811-264660e5dabb h1:BwzK8TgW/UdrVlJnE1xz6cfh5q0lusAIweYgw4nrut4=
 github.com/relux-works/swarma-registrar v0.0.0-20261025040811-264660e5dabb/go.mod h1:4bnxh4kC6jNAovfx5i8t1OdnhytaM/ZeD/zXoQQTKwA=
 github.com/relux-works/swarma-user-manager v0.0.0-20261024191358-505fb9f55a6d h1:uCwxr2ALn8F9cYh4jr3zD2S9ylgPhJMfanNuG6zV+pg=
 github.com/relux-works/swarma-user-manager v0.0.0-20261024191358-505fb9f55a6d/go.mod h1:jSLVCLamJhaNjWDXZ3OEa4FBQFarjVmWYUvQqwjbuzg=
-github.com/relux-works/waggle v0.0.0-20261025015329-5f4e7435d756 h1:WOaH0U9lOx7w7jpjZWtbpWEalM/HBxvDqvEqYIyLyjM=
-github.com/relux-works/waggle v0.0.0-20261025015329-5f4e7435d756/go.mod h1:EMhIu0XTUSinbT5fD1NXV9LZX52R/vZGVIFnGrHzBnE=
 golang.org/x/sys v0.38.0 h1:3yZWxaJjBmCWXqhN1qh02AkOnCQ1poK6oF+a7xWL6Gc=
 golang.org/x/sys v0.38.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=

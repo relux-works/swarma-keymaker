@@ -43,18 +43,21 @@ are forbidden; the protected operator service root retains its own authority.
 
 The [M0 operator bootstrap transaction](spec/keymaker-station-caller.md#41-m0-operator-bootstrap-transaction)
 proposes create -> active -> operator register-after-active, then qualified
-operator-only public staging, inert dispatcher association/currentness, broker
-v0 allowlist, exact UID/generation M0 policy and full activation. It is not a
-first-create provision/confirm path, a station-facing bootstrap exception or an
+operator-only public staging, inert dispatcher association/currentness, exact
+UID/generation dispatcher M0 policy and full activation. The operator's broker v0
+allowlist setup and qualified exact-UID positive control precede B0, with admission
+closed and no active lease; policy Replace invalidates every old-generation lease.
+It is not a first-create provision/confirm path, a station-facing bootstrap exception or an
 implementation. Purpose 6 remains unallocated. SC-Q2, SC-Q4 and SC-Q6 remain open:
 Keymaker's closed bounded intent/result/audit attribution and the proposed original
 120-second installation budget, dispatcher's owned association/policy formats and idempotent
-install/acknowledgement, broker-owned scoped admission during installation,
+install/acknowledgement, broker setup evidence and its currentness through activation,
 joint invalidation/restore/old-writer exclusion and final local rechecks need
 publication, implementation and native qualification. An equal key, installed
 allowlist or saved acknowledgement cannot open readiness. Recreate needs new
-association, policy and allowlist installation. All
-[bootstrap tests](spec/keymaker-station-caller.md#71-m0-bootstrap-paired-qualification-requirements)
+association/policy installation and separately verified broker setup; any required
+allowlist replacement remains outside B0–B5 and forbidden while leases are active.
+All [bootstrap tests](spec/keymaker-station-caller.md#71-m0-bootstrap-paired-qualification-requirements)
 are PENDING / NOT RUN; macOS, bootstrap completion and station output remain
 closed. No new dispatcher field, station method, signing domain or audit member
 is allocated by this proposal.
@@ -64,13 +67,18 @@ keeps one original B0 entry start through the complete B5 durable outcome/audit
 and final openings. Human think-time, retries and reconciliation consume the same
 120-second ceiling and fixed step cutoffs; no late activation is permitted. The
 per-step 8 MiB/16-call Keymaker installer caps do not establish remote service or
-nested-work bounds. The full joint envelope remains incomplete and unqualified.
+nested-work bounds. All of B4's 40 seconds is proposed for dispatcher policy
+installation/currentness, with zero broker share. Broker/operator setup has its
+own finite budget, not assigned here. A reload without error is not positive
+evidence; a real `lease.request` control creates worker-owned lease debt that
+must be accounted and resolved before B0. The full joint envelope remains
+incomplete and unqualified.
 
 | ID / owner | Required input and safe default |
 |---|---|
-| SC-BT1 / operator, Keymaker and platform qualification | Accept or revise the proposed 120-second B0–B5 ceiling, 10/10/20/20/40/20-second phase caps and charged local 8 MiB/16-call per-step workload, including human time. Publish original occurrence/start/deadline and exact act/use/outcome recovery encoding, capacity and independently current custody. Missing acceptance or actual post-read endpoint enforcement keeps Linux/macOS closed; no context/timer or post-write refusal substitute. |
-| SC-BT2 / dispatcher with Keymaker | Confirm bounded install/ack/status/retry/currentness/activation delivery and byte/call totals, including nested work and every original cutoff. Supply the exact predecessor/occurrence binding, unknown-outcome holds and effect-enforcing late-activation exclusion. The installer caps assign no dispatcher SLA or wire fields; unset limits keep the joint profile closed. |
-| SC-BT3 / broker and operator with dispatcher/Keymaker | Confirm the allowlist operator step, closure/admission, its B4 share before policy installation and final recheck, with bytes/calls/retries, human work and exact-outcome reconciliation. No disabled-entry feature, broker method, acknowledgement shape or invented service budget is assumed. Unknown currency or missing bounded protocol keeps the tuple closed. |
+| SC-BT1 / operator, Keymaker and platform qualification | Accept or revise the proposed 120-second B0–B5 ceiling, 10/10/20/20/40/20-second phase caps and charged local 8 MiB/16-call per-step workload, including human time; B4's 40 seconds is entirely dispatcher policy/currentness, with no broker operation. Require accepted pre-B0 setup evidence. Publish original occurrence/start/deadline and exact act/use/outcome recovery encoding, capacity and independently current custody. Missing acceptance or actual post-read endpoint enforcement keeps Linux/macOS closed; no context/timer or post-write refusal substitute. |
+| SC-BT2 / dispatcher with Keymaker | Confirm bounded install/ack/status/retry/currentness/activation delivery and byte/call totals, including nested work and every original cutoff. Supply the exact predecessor/occurrence binding, unknown-outcome holds and effect-enforcing late-activation exclusion. Confirm policy installation/currentness within the proposed entire 40-second B4 cap and setup-evidence validity through activation. All dispatcher numbers remain joint inputs; the installer caps assign no dispatcher SLA or wire fields. Unset limits keep the joint profile closed. |
+| SC-BT3 / broker and operator with dispatcher/Keymaker | Publish the separate finite one-time setup budget before B0 (time/human work, bytes/calls/retries, unknown-outcome reconciliation), with admission closed and no active lease. Its bootstrap-clock share is zero. Qualify a positive exact station-UID/current-policy-generation control and evidence currentness through activation; absence of reload error is insufficient. Require a read-only control or explicitly account for real worker-owned `lease.request` debt and its disposition before B0. Any policy replacement while leases are active is forbidden because Replace invalidates every old-generation lease. No broker installation/confirmation API, disabled entry, new fields or setup numbers are assigned. Missing evidence/bounds keeps the tuple closed. |
 
 ## Q7: operator-record integration sources
 

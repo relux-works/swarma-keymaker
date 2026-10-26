@@ -354,9 +354,13 @@ retain a hold and actual evidence, never a claim of no effect. No new code is
 needed. No signing challenge or purpose-2 proof substitutes for operator authority.
 
 **Invalidation.** A generation change/retirement, purpose-1 or caller-key
-revocation, epoch/association/policy change, stop or qualification-tuple change
-closes affected readiness before a new signature/public disclosure or dependent
-start/release, including retained results and asynchronous completions (§6).
+revocation, epoch/association change, stop or qualification-tuple change closes
+affected readiness before a new signature/public disclosure or dependent
+start/release, cancel included, including retained results and asynchronous
+completions (§6). M0 policy expiry or revocation immediately closes new `dispatch`
+signing; it preserves only the exact admitted run's reduce-only `cancel` consent
+under §6, without renewing dispatch authority. Other policy changes invalidate
+the affected operation scope before its next release.
 Recreate requires a new association installation, new M0 policy and new operator
 allowlist installation for the exact new generation; retained identical public
 bytes never reactivate the old association. A UID-only v0 entry does not attest
@@ -400,9 +404,12 @@ readiness, and no part of the conjunction is waived for station output.
 The separate protected **operator service root stays independently usable** under
 its own authority and recovery prerequisites; it is never restored into a station.
 
-Relevant tuple/profile/policy/key changes invalidate readiness before another
-signature release or dependent effect. No revoked rollback, receipt-only migration,
-standalone credential-refresher conformance claim or silent weaker fallback.
+Relevant tuple/profile/key changes invalidate readiness before another
+signature release or dependent effect. Policy changes, expiry and revocation
+close the affected operation authority; only §6's retained reduce-only cancel
+consent survives expiry/revocation of M0 launch policy, with all other readiness
+terms still required. It cannot reopen dispatch. No revoked rollback, receipt-only
+migration, standalone credential-refresher conformance claim or silent weaker fallback.
 macOS `keys.station` remains absent until a native port and login dependency
 qualify; missing proof on any platform remains `PENDING-VERIFY`, not activated.
 
@@ -437,6 +444,30 @@ including cached results and in-flight asynchronous work. A previously issued
 signature cannot be recalled: dispatcher/broker readers must independently check
 current association, chains, epochs and revocation at their actual effect/final
 release boundaries. Keymaker signatures are not boundary receipts or leases.
+
+M0 launch-policy expiry or revocation immediately closes new `dispatch` signing.
+Reduce-only owned-run `cancel` stays signable under **retained consent** only
+for the exact run durably admitted under that policy and not yet confirmed
+stopped, while the caller association, purpose-1 binding/generation and caller
+key remain current and not revoked. The protected typed cancel plan must prove
+that original admission, ownership and current stop state; it grants no new
+authority, extension or re-dispatch. All remaining qualification, custody,
+audit/replay, current-plan validity and original request deadlines still apply;
+retained consent renews no expired plan or deadline. Dispatcher independently
+checks that same reduce-only scope at the cancel effect boundary. A non-admitted,
+foreign or confirmed-stopped run refuses `station_caller_plan_invalid`; missing
+complete protected evidence is `station_caller_plan_unavailable`. Terminal stop
+also prevents a cached signature from being disclosed on retry. Missing live
+cancel qualification/association refuses `station_caller_unqualified`, preserving
+earlier precise base key/generation refusals. Association, key or generation
+revocation closes cancel signing too; retained consent never authorizes a
+compromised or obsolete signer.
+
+The dispatcher's automatic P7 stop does **not depend on any Keymaker signature**,
+including when association/key/generation revocation prevents requester cancel.
+It uses retained stop consent under its own authority and the original deadline:
+at most 300 seconds from detection, or the shorter profile bound, without renewal.
+Confirmed account-wide absence and quiet period remain required (the stop rule below).
 
 Emergency stop closes station-caller readiness until explicitly authorized
 recovery and all ordinary gates pass. Neither an intact cache nor a stale
@@ -501,6 +532,7 @@ station output; its bootstrap-completion case cannot make B2 depend on B5.
 | `SCBootstrapInstallOrder` | Missing association/allowlist/policy, unsupported scoped closure or one-sided activation never enables station output/new issue/start; missing qualification uses `station_caller_unqualified`. | Fully accepted B0–B5 order reaches only dispatch and owned-run cancel under current M0 policy. | Let an installed allowlist or marker imply readiness; `SCBootstrapInstallOrder`. |
 | `SCBootstrapRecreateFences` | Change generation, revoke, stop or change tuple between stage and release: no cached/late output/start, no silent policy/allowlist adoption. | Explicit new association/policy/allowlist installation for the new accepted generation can activate. | Reuse equal-key old association; `SCBootstrapRecreateFences`. |
 | `SCBootstrapRetentionAndReaders` | Exhaust reserved capacity, downgrade to an old reader or restore unknown history: precise capacity/audit/source refusal, retained original evidence, no reset/prune/reissue. | Qualified supported reader recovers bounded exact state/audit without altering historical bytes. | Reset unknown occurrence to pristine; `SCBootstrapRetentionAndReaders`. |
+| `SCBootstrapCancelAfterPolicyExpiry` | After policy expiry/revocation, new dispatch refuses `station_caller_unqualified`; revoked association refuses cancel with that code (earlier precise key/generation refusals still apply). Cancel for a non-admitted, foreign or confirmed-stopped run, including cached replay after stop, refuses `station_caller_plan_invalid`, with no signature/onward effect or renewed authority. | With policy expired or revoked, the same qualified current caller signs only reduce-only cancel for its exact admitted, not-confirmed-stopped run; dispatcher may stop it under retained consent. Automatic P7 stop still progresses when signer revocation closes cancel. | Blanket-deny expired policy must fail the positive cancel assertion; admit dispatch on retained consent, skip signer revocation, or omit run admission/stop checks must fail the corresponding denial in `SCBootstrapCancelAfterPolicyExpiry`. |
 
 ## 8. Owner questions and safe defaults
 

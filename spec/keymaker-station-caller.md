@@ -315,10 +315,134 @@ polling interval, matching key or time-to-live alone cannot supply currentness.
 Missing closure participation or unknown currency keeps admission closed. External
 delivery/queries run outside short state/generation locks; re-enter local exclusion
 and revalidate the same attempt before commit/release.
-No Keymaker lock is held waiting for dispatcher/broker. Original deadlines are
-not restarted; the operator entry's finite original budget and its time/custody
-qualification must be supplied, not borrowed from a native two-second timer or
-an enrollment approval's lifetime. Undefined timing keeps the entry closed.
+No Keymaker lock is held waiting for dispatcher/broker. The proposed original
+installation budget below is independent of enrollment issue/consumption, native
+two-second calls and approval lifetime. Its time/custody, workload and joint
+consumer qualification remain required; the proposal keeps the entry closed.
+
+#### Original installation budget and complete endpoint
+
+**Owner budget decision — proposal: whole B0–B5 installation <=120 seconds.**
+Name the original installation start **t_B**: entry to B0 reservation, before
+configuration/provider lookup, locks, closure acknowledgements, operator
+confirmation, reservation or derivation. It is not successful reservation time.
+Capture the original exclusive ceiling **D_B=t_B+120 s**, using checked qualified
+suspend-aware elapsed arithmetic, and intersect every shorter original caller,
+authority and component deadline. These are semantic timing properties for the
+next owning transaction, not new request/acknowledgement members. Retain the
+original occurrence, start/deadline, exact predecessors and step outcomes through
+restart; unavailable boot/deadline continuity holds, never starts another timer.
+
+The following are **proposed installer scheduling caps**, not measured bounds or
+confirmed dispatcher/broker service numbers. Each step starts once; its deadline
+is the earlier of that first step entry plus its allowance, its cumulative
+cutoff from t_B, and the original effective D_B. Exact retries, lookups and
+reconciliation retain that same step deadline. No unused allowance transfers to
+a later step or permits work after a cutoff; equality refuses.
+
+| Step | Owning participants | Installer allowance | Cumulative exclusive cutoff from t_B | Included work / joint confirmation |
+|---|---|---|---|---|
+| B0 | Keymaker; operator authorizes; each owner closes its scope | 10 s | 10 s | Entry, bounded inputs, operator/target checks, closure and intent/capacity reservation. Dispatcher/broker closure calls and bounds are joint inputs. |
+| B1 | Keymaker | 10 s | 20 s | Resolve/derive once in custody; full protected stage/result/audit durability and required custody confirmation before disclosure. |
+| B2 | Dispatcher; operator installs; Keymaker retains evidence | 20 s | 40 s | Inert association install, acknowledgement, permitted exact retry/status lookup and local retention. Dispatcher service/workload numbers remain joint inputs to be confirmed. |
+| B3 | Keymaker and dispatcher | 20 s | 60 s | Exact current association/revision verification, any same-occurrence reconciliation and durable checkpoint/audit. Dispatcher currentness/lookup bounds remain joint inputs. |
+| B4 | Broker, then dispatcher; operator authorizes | 40 s | 100 s | Allowlist installation before policy installation, acknowledgements/lookups and partial-outcome retention. The broker/dispatcher split and their service/workload bounds are joint inputs, not assigned here. |
+| B5 | Keymaker, dispatcher and broker under operator activation | 20 s | 120 s | Final current checks, exact durable B5 outcome/audit/custody and each applicable final activation/opening. Dispatcher activation/currency and broker final admission bounds remain joint inputs. |
+
+The allowances sum to **120 s**: 20 s for local reservation/staging, 80 s for
+cross-owner installation/currentness and 20 s reserved for full finalization.
+This is a finite owner proposal with explicit finalization headroom, not a claim
+that remote calls, storage or a person meet it. In particular B4's 40 s is an
+installer envelope, not two invented 20-second service promises. Owners must
+confirm a jointly feasible decomposition or propose a reviewed revision before
+implementation/activation; unknown component bounds close the tuple.
+
+**Human steps count inside the same ceiling**, including think-time, prompts,
+review and explicit operator actions. The intent is one bounded installation,
+without indefinitely retaining nearly-ready authority between human steps.
+Read-only preparation of a candidate decision before t_B grants no installation
+authority; B0 independently revalidates it under the original deadline. A slow
+confirmation refuses/holds the original occurrence as applicable. A prompt,
+manual handover or supplied confirmation cannot restart t_B or borrow the
+approval TTL. No automatic fresh occurrence is authorized by this refusal.
+
+**Complete enforced endpoint.** Before the effective D_B and B5 cutoff, commit
+the exact original B5 installation outcome, all required owning state and audit,
+independent custody/acknowledgement evidence and checked file/namespace barriers;
+then complete each required final activation/admission opening under its current
+local exclusion within those same bounds. No required authority durability may
+follow opening. Every owner must enforce its part against delayed or restored
+executors, including previously prepared activation responses. A caller timeout
+or cancellation alone cannot stop a remote writer. A late acknowledgement,
+readable success marker, durable outcome alone or post-expiry response refusal
+cannot authorize a later opening. No atomic cross-service commit is claimed.
+Only a subsequent notification reports the already-complete original outcome;
+notification loss cannot refund it or cause a second activation. A scope already
+fully activated on time continues only under its ordinary current policy,
+qualification and runtime limits; 120 s is not its policy lifetime.
+
+After each sole qualified final read, the enforced positive post-read bound
+must cover that owner's entire remaining act/use/outcome/opening endpoint,
+including pauses, storage stalls and custody/release ordering. All external
+preparation remains outside final locks, with exact revalidation before entry;
+no remote call, refreshed receipt, second clock read or new use admission repairs
+an expired final window. Intersect any applicable native/generation/time window
+without enlarging its allowance. No such installation endpoint/fence is qualified
+on Linux or macOS; both remain closed. Original elapsed bounds and independently
+qualified time/currentness are separate requirements, not a polling interval.
+
+**Retry and reconciliation cutoffs.** No installation/status/retry call may
+start unless its accepted complete bound fits strictly inside the original step
+cutoff and remaining D_B. Every retry uses the original occurrence and canonical
+arguments; no duplicate key, registration, association, policy or activation.
+B2 ends before t_B+40 s, B3 before t_B+60 s and all B4 work before t_B+100 s;
+B5's last 20 s is not another install/retry allowance. An unknown outcome at any
+cutoff, especially D_B, retains actual pending/held evidence with affected
+signing/start/issue authority closed, never a claim of no effect. Late or duplicate
+acknowledgements may be retained for investigation but cannot reopen the scope.
+After expiry, a separately authorized, finitely bounded recovery may establish
+only the exact old outcome and contain effects; it cannot finish or reactivate
+the expired installation. Any later installation needs a distinct explicit
+operator decision only after the predecessor's effects/holds are conclusively
+resolved under the owners' accepted recovery protocol. Changing IDs, Run, epoch,
+process, connection or host is not that resolution and never clears the debt.
+
+**Maximum admitted load — proposal and remaining joint inputs.** One occurrence
+addresses one active target generation, one purpose-1 binding, one purpose-6
+stage and one dispatcher/scope; B4 installs one broker allowlist entry followed
+by one policy. No batch install, additional target or arbitrary inventory scan
+is admitted. Propose a **Keymaker-controlled 8 MiB aggregate byte-work cap per
+step** (48 MiB across six steps): charge all bytes Keymaker reads, validates,
+writes or sends, including repeated work, retained originals, stage/result/audit
+and custody evidence. Count each access/transfer again, not only distinct bytes.
+Also propose **at most 16 Keymaker-initiated dependency calls per step**
+(96 across the installation), charging each initial request, retry, status lookup,
+reconnect and time/generation/custody/audit invocation; a retry cannot reset the
+counter. These installer caps deliberately bound a small M0 qualification workload;
+they are not component owners' internal call counts, a frame-size change, a cache
+exemption, another storage allowance or a promise of throughput.
+All retained bytes still fit the existing single 256 MiB state budget and audit
+budgets; reserve the full actual inventory before work. Oversize or unknown
+complete workload refuses before effects, never truncates needed history.
+
+| Step | Local logical work cap for the same occurrence | Bytes and delegated-call bounds still required before admission |
+|---|---|---|
+| B0 | One original reservation/closure transaction, no target batch | Keymaker <=8 MiB / <=16 dependency calls; dispatcher/broker closure, generation/time/custody and audit dependency bytes/call counts need accepted joint limits. |
+| B1 | One derivation and one owning public-stage transaction; no second derivation to replace unknown evidence | Keymaker <=8 MiB / <=16 dependency calls; complete custody/audit/time-original closure and nested calls require qualified limits. |
+| B2 | One association installation identity; repeated calls cannot mean another install | Keymaker <=8 MiB / <=16 dependency calls; dispatcher install/ack/lookup/retry bytes and total calls are **joint inputs to be confirmed**. |
+| B3 | One exact association/currentness checkpoint transaction | Keymaker <=8 MiB / <=16 dependency calls; dispatcher verification/reconciliation bytes and total calls are **joint inputs to be confirmed**. |
+| B4 | One allowlist target, then one policy identity | Keymaker <=8 MiB / <=16 dependency calls; broker/operator and dispatcher input/output, install/lookup/retry bytes and total calls are **joint inputs to be confirmed**, including all internal delegated work. |
+| B5 | One original completion/activation outcome; exact recovery never repeats activation | Keymaker <=8 MiB / <=16 dependency calls; dispatcher activation/status, broker admission and custody/audit/time dependency bytes and total calls are **joint inputs to be confirmed**. |
+
+No remote service guarantee, internal RPC/retry count, acknowledgement grammar
+or broker feature is inferred from those local installer caps. Each owner must publish
+finite aggregate bytes/calls for the initial call, every status lookup, retry,
+reconnect, reconciliation and nested custody operation under its phase cap.
+Unset is **unqualified**, never zero, unlimited or “one logical call”. Until
+those inputs and actual persistence workload are accepted, this is an
+incomplete joint admission envelope and no bootstrap is admitted. Changing a
+bound invalidates qualification for that tuple. There is no new wire field,
+public method, refusal code, side ledger or implementation in this proposal.
 
 The acyclic installation dependencies are independent operator/qualification
 inputs -> active purpose-1 binding -> B0/B1 protected public stage -> B2/B3 inert
@@ -533,6 +657,12 @@ station output; its bootstrap-completion case cannot make B2 depend on B5.
 | `SCBootstrapRecreateFences` | Change generation, revoke, stop or change tuple between stage and release: no cached/late output/start, no silent policy/allowlist adoption. | Explicit new association/policy/allowlist installation for the new accepted generation can activate. | Reuse equal-key old association; `SCBootstrapRecreateFences`. |
 | `SCBootstrapRetentionAndReaders` | Exhaust reserved capacity, downgrade to an old reader or restore unknown history: precise capacity/audit/source refusal, retained original evidence, no reset/prune/reissue. | Qualified supported reader recovers bounded exact state/audit without altering historical bytes. | Reset unknown occurrence to pristine; `SCBootstrapRetentionAndReaders`. |
 | `SCBootstrapCancelAfterPolicyExpiry` | After policy expiry/revocation, new dispatch refuses `station_caller_unqualified`; revoked association refuses cancel with that code (earlier precise key/generation refusals still apply). Cancel for a non-admitted, foreign or confirmed-stopped run, including cached replay after stop, refuses `station_caller_plan_invalid`, with no signature/onward effect or renewed authority. | With policy expired or revoked, the same qualified current caller signs only reduce-only cancel for its exact admitted, not-confirmed-stopped run; dispatcher may stop it under retained consent. Automatic P7 stop still progresses when signer revocation closes cancel. | Blanket-deny expired policy must fail the positive cancel assertion; admit dispatch on retained consent, skip signer revocation, or omit run admission/stop checks must fail the corresponding denial in `SCBootstrapCancelAfterPolicyExpiry`. |
+| `SCBootstrapBudgetTimelyLate` | Exhaust B0 entry-to-completion time, any step cutoff or shorter caller bound; B5 outcome/audit/opening at equality or later cannot activate. | Same workload completes every step, full durability and all final openings strictly within the original bounds; subsequent notification may be lost without repeating activation. | Reset t_B at reservation/step entry, transfer unused allowance, or omit final opening; `SCBootstrapBudgetTimelyLate`. |
+| `SCBootstrapBudgetUnknownCeiling` | Lose install/activation acknowledgement or custody/audit durability at a cutoff/D_B: retain exact held evidence and closed authority, no assumed rollback or no-effect result; a late ack cannot reopen. | Within the original bound, authenticated exact-outcome reconciliation proves complete durability/currentness before the same occurrence's sole activation. | Treat missing ack as no effect or accept late ack as activation; `SCBootstrapBudgetUnknownCeiling`. |
+| `SCBootstrapBudgetRetryCeiling` | Retry, lookup or recovery after the original phase cutoff/D_B, including a new ID/Run/epoch or fresh receipt: no renewed install/activation or refunded debt. | An accepted bounded exact retry/status lookup fits the same original cutoff and returns only its original proven outcome, without another effect. | Give reconnect/reconciliation a fresh timer or occurrence; `SCBootstrapBudgetRetryCeiling`. |
+| `SCBootstrapBudgetHumanPause` | Human pause, suspend or delayed confirmation consumes the original allowance and cannot reopen expired installation; unknown prior effects stay held. | The same independently authorized operator confirmation arrives and all endpoints complete within the original ceiling. | Start timer after confirmation or exclude think-time; `SCBootstrapBudgetHumanPause`. |
+| `SCBootstrapBudgetLoad` | Missing joint byte/call limits, a second target, exceeding charged repeated byte-work/call caps or unbounded nested work refuses before new effects; preserve any earlier evidence. | One target's complete original workload fits accepted local and joint caps, including all retries/originals and reserved durable evidence. | Treat unset calls as unlimited or count repeated bytes once; `SCBootstrapBudgetLoad`. |
+| `SCBootstrapBudgetPostReadPause` | Pause after a final read, during outcome/audit/barrier or between durable B5 outcome and opening: enforced original bound prevents late activation; preserve exact unknown/burned outcome. | The same fully admitted native endpoint durably commits and opens on time, with no second read or RPC under final locks. | Replace actual endpoint enforcement with a timer/post-write error; `SCBootstrapBudgetPostReadPause`. |
 
 ## 8. Owner questions and safe defaults
 

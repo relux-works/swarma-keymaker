@@ -347,25 +347,127 @@ exclusion must cover every paused holder and ambiguous write, on both OSes.
 | --- | --- |
 | Native operation / expected read set | Root `enrollment reconcile`, including explicit bootstrap: confirmed exact state digest, protected config-path/pin digests, service identity, boot, fixed approval ID and consumed-ledger generation, existing approval/fence/high-water predecessor and command occurrence. Freeze these before H. Current issue construction is [approval_linux.go:87][approval-check]; confirmation, protected reread and reinspection precede it at [reconcile_command_linux.go:352][enrollment-confirm]. A new independently authorized confirmation is a new operation; a retry is not. |
 | Locks | Root-exclusive directory lease, then existing high-water Store inode EX/nonwaiting for normal reconcile ([reconcile_command_linux.go:305][enrollment-command-locks]); bootstrap instead uses the initial publisher's own Store exclusion ([reconcile_command_linux.go:403][enrollment-bootstrap]). Retain the applicable chain through final publication. Admit exact approval/fence/ledger head and unused E-I slot before m. Current provider sampling while these exclusions are held remains a gap; unlocked preparation needs review. |
-| Original budget and authority | Whole command/publication budget **`undefined`**: the CLI uses a signal context without a timeout ([main.go:45][command-context]); each inspection alone gets 10 seconds ([reconcile_command_linux.go:330][enrollment-command-locks]). Neither inspection timer covers human confirmation, output or publication. Admission refuses until the owner supplies an original finite deadline. The [10-minute TTL:24][approval-ttl] and [strict age checks:121][approval-check] are approval lifetime, not command allowance. Proposed encoding must retain L_issue and D_approval<=L_issue+600 s, U_current<D_approval, U_current<A and same-boot elapsed age <600 s; version 1 retains O_issue, not L_issue ([approval_linux.go:132][approval-check]). |
-| Read / enforcement | Use the shared before-m admission rule under the exact normal/bootstrap chain, with matching confirmed state and reserved publication workload. Pure check then burn E-I. No enforced bound from m through output, file barriers and fence removal exists: `handoff_unqualified`; a post-write `approvalValid` call is not enforcement. |
-| Endpoint | Proposed endpoint includes durable issue-use/outcome, approval file and parent, ledger initialization where needed, bootstrap high-water where applicable, and required fence/namespace cleanup before startup can accept authority. Today's sequence flushes a pending marker before approval replacement, checks again after output, then removes the marker **without a following directory sync** ([reconcile_command_linux.go:441][approval-publication]). That safe-refusal-on-marker-resurrection protocol does not establish the proposed complete durable endpoint. The next version must specify it; this profile does not claim it already exists. |
-| Use transition key / recovery | Proposed owning approval-issue transition: consumer incarnation, original confirmed command occurrence, fixed approval ID, ledger generation, E-I publication slot and expected approval/state predecessor. There is no current durable occurrence/use slot; new format/migration/capacity review is mandatory. Burn before separable publication, retain burned/held evidence through fence cleanup and lost output; do not mint another ID to refund a failed window. A/P uses cannot substitute. |
-| Existing refusals | Preserve command errors such as `clock_untrusted`, `approval_expired`, `approval_boot_changed`, `approval_clock_rollback`, `approval_clock_discontinuity`, `store_writer_live`, configuration/trust and I/O failures ([approval checks][approval-check], [command locks][enrollment-command-locks]). Undefined/unqualified QT-2c admission remains closed; it is not a new CLI success or public code. |
-| macOS | Same identity, undefined command budget, lifetime predicates and endpoint; continuous clock/boot/deadline mapping and checked full file flush plus separately qualified namespace cleanup as above. Linux-only root lease/Store metadata and bootstrap/publication code do not prove a Darwin port. No accepted Darwin receipt platform representation or qualified post-read act/stop exists; `handoff_unqualified`. |
+| Original budget and authority | **Owner budget decision — proposal: E-I <=60 seconds**, from original command entry **before** config/provider lookup, lease/Store acquisition, inspection, output or human confirmation, through the complete issue endpoint below. Intersect that exclusive deadline with any shorter original caller deadline; retain both starts. Each existing 10-second inspection is a subdeadline, shortened by the remaining command allowance, never another command budget. Today the CLI has only a signal context ([main.go:45][command-context]); no whole-command enforcement is implemented. The [10-minute TTL:24][approval-ttl] and [strict age checks:121][approval-check] remain approval lifetime, not command allowance. The next encoding retains L_issue and D_approval<=L_issue+600 s, U_current<D_approval, U_current<A and same-boot elapsed age <600 s; version 1 retains O_issue, not L_issue ([approval_linux.go:132][approval-check]). |
+| Read / enforcement | Use the shared before-m admission rule under the exact normal/bootstrap chain, with matching confirmed state, fixed occurrence/original start/D and reserved publication workload. After all persistence/use-CAS admission, take the sole m, pure-check, then durably burn E-I before separable publication. The enforced f must cover all remaining pre-commit output, file/namespace barriers, fence cleanup and durable use outcome, strictly before D. Neither the proposed 60 seconds nor a post-write `approvalValid` call supplies that enforcement: `handoff_unqualified`. |
+| Endpoint | The proposed complete owning issue transaction commits the exact approval and conservative issue bound, ledger initialization where needed, bootstrap acceptance/high-water where applicable, and their checked writes/full file syncs/closes/parent syncs; completes provisional pre-commit output and publication-fence removal **including its parent-directory sync**; and durably commits the same occurrence's E-I use/outcome. Startup may accept only this complete exact tuple, never a readable approval, report or use record alone. Only a subsequent notification may report successful completion; notification loss/failure returns no new authority and cannot refund the committed occurrence. A provisional report is never that success. Today's post-output marker removal has **no following directory sync** ([reconcile_command_linux.go:441][approval-publication]); that safe-refusal protocol is not this endpoint. A matching next-version issuer and startup reader/transaction protocol remain required. |
+| Use transition key / recovery | The next owning approval-issue transaction durably binds consumer incarnation, original independently confirmed command occurrence/start/D, fixed approval ID, ledger generation, E-I publication slot, exact state/pin/config-path and expected approval/fence/state predecessors. It carries QTUse/1 burned/held/committed state and exact outcome through fence cleanup and lost output. A retry identifies that same occurrence; no new approval ID, confirmation replay, challenge, Run or Epoch refunds it. Unknown burn/publication/use durability holds issuance until qualified reconciliation, never re-issues. No such durable occurrence/use slot exists today; format/migration/capacity review is mandatory. A/P uses cannot substitute. |
+| Existing refusals | Preserve command errors such as `clock_untrusted`, `approval_expired`, `approval_boot_changed`, `approval_clock_rollback`, `approval_clock_discontinuity`, `store_writer_live`, configuration/trust and I/O failures ([approval checks][approval-check], [command locks][enrollment-command-locks]). Unadopted/unqualified QT-2c admission remains closed; it is not a new CLI success or public code. |
+| macOS | Same identity, proposed original 60-second command budget, lifetime predicates and complete act/use endpoint; continuous clock/boot/deadline mapping and checked full file flush plus separately qualified namespace cleanup as above. Linux-only root lease/Store metadata and bootstrap/publication code do not prove a Darwin port. No accepted Darwin receipt platform representation or qualified post-read act/stop exists; `handoff_unqualified`. |
 
 ### Enrollment E-C: approval recheck, consumption and authority admission
 
 | Field | E-C profile |
 | --- | --- |
 | Native operation / expected read set | Protected startup approval: exact invalidated approval bytes and inode, approval ID/ledger generation, config/pin/state digests, current retained high-water and registry/policy identity, boot, original issue interval and expiry, exact unused consumer-use revision and candidate authority epoch. Current startup's rename and directory sync invalidate approval **before every retained-state/consent check** ([reconcile_command_linux.go:569][enrollment-startup]). Preserve that ordering even when arranging unlocked preparation; no pre-invalidation consent read is authorized. Invalidation is a required fail-closed precondition, not a successful QT act, and remains effective on refusal before m. |
-| Locks | Service directory lease and enrollment Store EX lock through startup; startup does not hold `Authority.mu` ([authority.go:143][enrollment-load], [startup:569][enrollment-startup]). Reload serializes with `reloadMu`, pauses new readers, loads a private candidate, then takes the admission write barrier only for the swap ([authority.go:99][enrollment-reload]). Specify and review the next transition's protected handover between these phases; never claim the write barrier spans today's load. Before m all final persistence/use admissions must be complete and exact ledger/high-water/authority heads and unused E-C slot selected; no new initial use admission at the later swap. |
-| Original budget and authority | The private `load` gets **10 seconds from load entry**, intersected with a shorter original caller deadline ([authority.go:129][enrollment-load]); startup consumption/cleanup is inside it. The full Reload begins before load and swaps after it returns ([authority.go:111][enrollment-reload]): its operation-wide budget is **`undefined`** absent a finite original caller budget through the swap. Admission for that full endpoint refuses; do not restart the load's 10 seconds at approval recheck. Keep E-I's original D_approval<=L_issue+600 s, current U<D_approval/A and same-boot elapsed bound. A fresh recheck cannot renew issue time or D. |
-| Read / enforcement | After durable invalidation and unlocked authenticated preparation, require the full reviewed final exclusion/handover and unused E-C selection before m; pure check then burn. Current samples at [startup:647/657/684][enrollment-startup] occur under Store and are not QT-2c reads. No enforced m-to-consumption/cleanup/admission bound exists: `handoff_unqualified`. |
-| Endpoint | Consumed-ID append with checked full write/sync/close; remove the invalidated inode, verify no remaining links, directory sync and close; retain exact burned E-C outcome ([approval_linux.go:236][approval-consume], [startup:650][enrollment-startup]). These durable steps alone do not expose the candidate: the final provider check, registry validation/high-water persistence and eventual admission swap also precede authority opening ([startup:684][enrollment-startup], [authority.go:196][enrollment-load], [authority.go:112][enrollment-reload]). Move provider/Git validation into reviewed unlocked preparation; no protected final handover is implemented today. Qualify the complete endpoint or keep the candidate closed; a later swap cannot escape D by calling itself cleanup. |
-| Use transition key / recovery | Proposed next enrollment consumption transition: consumer incarnation, original startup/admission occurrence, approval ID, ledger generation, E-C slot and expected high-water/authority predecessor. Existing ID append prevents approval reuse but carries no generic QTUse/1 state. Integrate/review its new owning transition; never add H to the closed approval or reinterpret an ID as H. Invalidated or consumed approvals remain unavailable on every failure, unknown write, restart or lost response; another H cannot refund them. |
+| Locks | Today startup holds the service directory lease and Store EX, without `Authority.mu` ([authority.go:143][enrollment-load], [startup:569][enrollment-startup]); reload holds reloadMu, pauses new readers, privately loads, then takes the admission write barrier only for the swap ([authority.go:99][enrollment-reload]). The proposed two-phase handover below retains reload serialization/directory exclusion, prepares outside final locks, then takes Store EX and the admission write barrier before m. Select exact ledger/high-water/authority heads and unused E-C revision with all final persistence/use admissions complete. Retain that chain through commit/swap/opening; no initial use admission at the later swap. This is a next-version proposal, not today's lock span. |
+| Original budget and authority | **Owner budget decision — proposal: E-C <=10 seconds** from original Reload entry **before reloadMu acquisition or reader pause**, through validation, durable consumption/high-water/use commit and the final admission swap/opening. For initial startup, start at the original authority-open entry before private load/lease acquisition. Intersect with every shorter original caller deadline. The private `load` retains its own **10 seconds from load entry** ([authority.go:129][enrollment-load]), shortened by the remaining E-C/caller allowance; neither load return nor swap starts a new timer. Today no whole-reload deadline covers both phases ([authority.go:111][enrollment-reload]). Keep E-I's original D_approval<=L_issue+600 s, current U<D_approval/A and same-boot elapsed bound. A fresh recheck cannot renew issue time or D. |
+| Read / enforcement | After durable invalidation and authenticated preparation, complete the proposed final handover and unused E-C selection before the sole m; pure-check then durably burn before separable consumption. Enforce f through consumed-ID/high-water durability, cleanup, exact use outcome and final gated swap/opening, strictly before the earliest original D. Current samples at [startup:647/657/684][enrollment-startup] occur under Store and are not QT-2c reads. No enforced full endpoint exists: `handoff_unqualified`. |
+| Endpoint | Complete the exact consumed-ID append with checked full write/sync/close; remove the invalidated inode, verify no remaining links, sync its directory and check close; durably persist the validated registry/high-water. Under the retained admission barrier stage the exact candidate/epoch swap while still inaccessible, durably commit the same occurrence's linked E-C use/outcome, and only then open admissions within f/D. No required durability may follow visibility. A completed load or consumed ledger alone is not the endpoint ([approval_linux.go:236][approval-consume], [startup:650][enrollment-startup], [authority.go:196][enrollment-load], [authority.go:112][enrollment-reload]). Provider/Git work moves to preparation; exact cross-phase/recovery and deadline-enforcing publication remain unimplemented. |
+| Use transition key / recovery | The proposed next owning enrollment transition durably binds consumer incarnation, original startup/reload occurrence/start/D, approval ID/ledger generation where consumed, E-C slot, exact candidate and expected high-water/authority/use predecessors. Live reload with retained reconciliation binds that exact retained state instead of inventing a startup approval. Retain burned/held/committed use and original outcome across swap, restart and lost response. Existing ID append prevents approval replay but carries no generic QTUse/1 state; never add H to the closed approval or reinterpret an ID as H. Invalidation stays effective on refusal, even before burn; unknown consumption/use/swap outcome holds admission and never consumes or opens again. |
 | Existing refusals | Approval checks keep their existing precise diagnostics internally; startup failures keep authority `enrollment_unverified` ([authority.go:125/156][enrollment-load]). Preserve existing caller deadline, trust/registry/revocation and I/O refusals. Neither an expired approval nor failed consumption grants a callback. |
-| macOS | Same post-invalidation order, exact ID/ledger/use retention, load subdeadline and full-endpoint budget gap. A reviewed Darwin lease, metadata/link verification, no-replace rename and namespace/full-flush protocol plus continuous clock/receipt/stop qualification are missing. `handoff_unqualified`; no Linux startup evidence transfers. |
+| macOS | Same post-invalidation order, exact ID/ledger/use retention, original proposed 10-second full-endpoint budget and shortened load subdeadline. A reviewed Darwin lease, metadata/link verification, no-replace rename and namespace/full-flush protocol plus continuous clock/receipt/stop qualification are missing. `handoff_unqualified`; no Linux startup evidence transfers. |
+
+### Proposed enrollment occurrence and final handover
+
+The **60-second E-I / 10-second E-C values are owner budget decisions**, not
+accepted latency bounds or activation. E-I allows at most the existing two
+10-second inspections plus 40 seconds shared by configuration, lock admission,
+human confirmation, output and full publication; this is rationale for a finite
+proposal, not evidence that any step meets it. A supplied `--confirm` still uses
+the same original command entry. Confirmation arriving too late refuses; it
+cannot start a fresh 60 seconds. E-C deliberately reuses the existing 10-second
+load ceiling for the **whole** operation: waiting for reload serialization,
+preparation and barrier/swap now spend it, so load may have less than 10 seconds.
+A shorter original caller deadline always wins. Name the original native entry
+captures t_I (command) and t_C (Reload, or initial authority-open entry): the
+exclusive native ceilings are D_I=t_I+60 s and D_C=t_C+10 s, respectively, with
+checked same-boot arithmetic. The effective D is the earliest qualified mapping
+of that ceiling and every applicable original caller, load, approval or authority
+limit. These symbols are timing requirements, not new serialized members.
+
+These budgets bound original native operations. Preserve their suspend-aware
+same-boot start/deadline in the next owning transaction; a Go context is not the
+enforcement primitive. They neither supply a post-read f nor expand the shared
+1.5-second total uncertainty/reserve, approval TTL or any stricter enclosing
+250 ms/native 2 s window. Keep the receipt's original s/T distinct from the
+command/reload start; intersect its existing grant with the original operation
+D using the common inequalities, never reset s or allocate another reserve.
+If no qualifying final evidence and enforced f fit, refuse. A retry, fresh
+receipt, human reconfirmation of the same occurrence or load-to-swap handoff
+cannot restart the native deadline.
+
+The next owning transaction must retain the independently authorized occurrence,
+original argument/read-set/predecessor bindings and fixed IDs, not merely a new
+random invocation token. Exact retry resolves that occurrence from protected
+retained state; absence of a local record is not proof of unused. After final
+admission and the sole m, the first durable burn binds that occurrence and
+original start/D before any separable approval publication or consumption.
+`burned -> committed(exact outcome)` requires the complete endpoint in its row;
+unknown burn, act, cleanup or outcome durability is held and never refunds use.
+Lost output/acknowledgement returns only the resolved original outcome, never
+another issuance or admission act. A separately authorized new confirmation
+needs a distinct protected occurrence after the prior outcome is conclusively
+resolved; changing IDs, argv, a challenge or the process is not that decision.
+Bootstrap inspection/confirmation remains read-only before this admitted
+transaction; prior attempt evidence still forbids a pristine-state reset.
+
+For E-C the proposed handover is specifically:
+
+1. Start the original deadline before reload serialization; pause new admissions
+   while existing bounded readers finish. Retain the directory/lifetime lease.
+   On startup, take Store EX only to locate/invalidate the approval durably
+   **before** retained-state or consent checks; refusal never renames it back.
+2. Release Store EX for authenticated provider/Git and complete candidate
+   preparation outside the final critical section, retaining the directory
+   exclusion and invalidation evidence. Bind exact protected high-water,
+   approval/consumed ledger (where applicable), authority epoch and candidate.
+   This phase grants no admission; it is not the current startup implementation.
+3. Reacquire Store EX, then acquire the admission write barrier; revalidate the
+   exact prepared heads/epoch and predecessor under that chain. A change closes
+   this window and requires unlocked preparation within the **same** original D.
+   Complete all persistence and use-CAS admission before m; retain these locks
+   through burn, durable consumption/high-water/cleanup and the staged swap.
+4. Stage the candidate under the barrier with admissions still closed; the next
+   transaction's durable committed E-C outcome binds that exact candidate and
+   epoch before the final gate opens. Opening and any barrier-release gap are
+   inside the enforced f/D, with no second m, provider call or new use admission.
+   Failure fences the authority, rather than falling back to the old snapshot;
+   uncertain commit requires reconciliation. A durably committed record before
+   opening is not permission for a restarted process to open from the same use.
+
+This handover and the issuer/consumer visibility gate require joint format,
+locking, storage/capacity and recovery review before code. Keep process `Run`
+identity separate from independently current ownership `Epoch` and the durable
+use revision; pin and validate each independently. Consumer incarnation is
+a protected authority identity, not a new process nonce. Neither changing it
+nor replacing Epoch erases the original burn; Epoch replacement fences the
+old execution even after burn. None creates a new logical occurrence or clears
+a burned slot. A restarted Run must resolve the retained outcome; it cannot
+continue an old final act.
+Independent original/witness custody and old/restored-instance exclusion must
+retain this distinction across coherent restore. A new use file, spare codec
+member or assumed atomicity of unrelated files is not supplied by this proposal.
+Linux, macOS, native endpoints and custody/time qualification all stay closed.
+
+Enrollment-specific paired controls below are **PENDING / NOT RUN**, semantic
+specifications only. Every negative uses the same authorized timely control,
+exact predecessor/occurrence, workload and original allowance; check the exact
+burned/held/committed and visibility state, not just an error or timeout.
+
+| Pending specification | Positive control and forbidden neighboring outcome |
+| --- | --- |
+| `QT2cEnrollmentIssueEndpoint.TimelyLate` | Fully admitted issue completes all publication/fence/use durability strictly before the earliest D. Pair command/confirmation delay that exhausts the original 60 seconds, a shorter caller D, and endpoint equality at D: no new usable approval or successful issue; post-burn uncertainty stays held. No new timer after confirmation or second inspection. |
+| `QT2cEnrollmentConsumeEndpoint.TimelyLate` | Same candidate completes consumption, high-water/use durability and barrier/swap/opening within the original 10 seconds and load subdeadline. Pair time spent waiting for reloadMu, returning from load just before expiry but swapping at/after D, and a shorter caller D: no candidate admission, old authority fenced, invalidation retained. |
+| `QT2cEnrollmentIssueEndpoint.PostReadPause` / `QT2cEnrollmentConsumeEndpoint.PostReadPause` | Same on-time endpoint succeeds. Pair suspend/preemption after m and pauses at output/fence sync or ledger/high-water/use/swap/opening: enforcement must prevent a late authoritative act, retaining exact debt. A post-commit refusal message alone does not pass this control. |
+| `QT2cEnrollmentIssueEndpoint.SecondRead` / `QT2cEnrollmentConsumeEndpoint.SecondRead` | Exactly one admitted m authorizes the timely control. A second clock read, refreshed H or use admission after m cannot rescue the same window: no publication/opening; any prior burn remains burned. Pure verification repeated on the same captured integer is not another clock read. |
+| `QT2cEnrollmentIssueEndpoint.UnknownRetry` / `QT2cEnrollmentConsumeEndpoint.UnknownRetry` | Resolve a complete original endpoint with a lost reply to its exact original outcome and no second act. Pair crash/unknown burn, partial approval/consumption, lost cleanup/use sync or a new Run: retain held/unknown evidence, no new approval ID, fresh occurrence, second consumption or swap. |
+| `QT2cEnrollmentConsumeEndpoint.Handover` | Exact prepared heads remain current through Store EX/barrier acquisition and gate opening. Pair a changed high-water/use head/epoch, invalidation refusal, or a pause between staged swap, use commit and opening: no stale candidate or old-snapshot fallback, and no restored approval. |
+
+Named future narrowing controls remove the original-start intersection, complete
+endpoint, invalidation-before-checks, sole-read admission, durable occurrence/use
+or final handover check respectively. Each must fail its corresponding negative
+above while the timely control still passes. These controls and all storage/
+stop/restore evidence remain pending; listing them adds no executable tests.
 
 ### Registration private helpers R-B, R-V and R-A
 
@@ -459,9 +561,10 @@ exposure requires the distinct pre-send endpoint above.
 | Ordinary SSH signature transport | No time-bearing registration proof or QT-2c handoff is consumed: private SSH signing precedes the generation -> Store -> audit -> actual release chain ([engine.go:267][ssh-release]). Its audit's time belongs to A; that does not make the signature write an A act. Original generation/custody/deadline checks remain mandatory, and any future qualified transport use needs its own profile. |
 
 The consuming profiles require additional **PENDING / NOT RUN** paired native
-controls: `QT2cEnrollmentIssueEndpoint` (undefined budget, L_issue substitution,
-blocked output/fence cleanup), `QT2cEnrollmentConsumeEndpoint` (invalidation
-before checks, pause at ledger/cleanup/swap, no approval replay),
+controls: `QT2cEnrollmentIssueEndpoint` (proposed original 60-second budget, L_issue
+substitution, blocked output/fence cleanup), `QT2cEnrollmentConsumeEndpoint`
+(proposed original 10-second reload-through-swap budget, invalidation before
+checks, pause at ledger/cleanup/swap, no approval replay),
 `QT2cRegistrationStageEndpoint` (immutable staged bytes/original A through
 retention), and `QT2cRegistrationReleaseEndpoint` (enrollment change, U=expiry/A,
 post-audit pause, partial transport, lost reply and replacement H). Each pairs

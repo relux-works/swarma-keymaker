@@ -223,10 +223,11 @@ Do not call a hypothetical method or accept an unsigned registry row as evidence
 Status: **proposed transaction; not implemented, qualified or activated**.
 M0 uses ordering A: once before dispatch, the operator performs ordinary
 `user.create` -> durable `active` -> authorized purpose-1 `register`, then this
-purpose-6 installation and the protected M0 launch policy pinned to that existing
-UID/generation. The broker v0 allowlist is a separately verified operator setup
-precondition before B0, not a step in this installation. Dispatch starts only that
-existing active generation. Ordinary create remains
+purpose-6 caller installation and the protected M0 launch policy. The broker v0
+allowlist is a separately verified operator setup precondition before B0, not a
+step in this installation. Dispatch starts only the separately pinned executor
+worker's active generation under the selected caller-to-worker mapping. Ordinary
+create remains
 [register-after-active](keymaker-provision.md#6-failure-recovery-and-create);
 this is not bump's `provision`/`confirm_provision`, an early-active workaround,
 a PC2 credit exemption or registrar purpose-2 enrollment. The broker v0 lease
@@ -236,6 +237,17 @@ and owned-run `cancel`; requester delegation and federation remain later work.
 The dispatcher must publish the matching minimal authority/request contract;
 the Keymaker request signature authenticates a caller and never supplies launch
 authority.
+
+**Two identities and explicit mapping.** The **purpose-6 caller** is the station
+whose active purpose-1 binding and purpose-6 association B0–B5 install. The
+**executor worker** is the station UID and generation that the M0 launch policy
+pins and dispatch starts. The caller target of bootstrap is not evidence of the
+worker's identity. The protected M0 policy must pin both the caller association
+and exact worker UID/generation, with an explicit selected caller-to-worker
+mapping. Even when both roles use the same account, equality is an explicit
+selected mapping recorded in protected policy, never inferred from the caller.
+The dispatcher must publish and qualify this mapping/pinning/currentness contract
+as a joint input; these are semantic requirements, not invented policy fields.
 
 **Admission and staging boundary.** An exact active purpose-1 binding, current
 protected generation/admission policy, approved name-index registry, master epoch
@@ -261,10 +273,10 @@ format and joint interfaces still require review before implementation. No
 operator service root or private material is installed in a station.
 
 **Broker v0 setup precondition — outside B0–B5.** Before B0, the operator
-installs the allowlist entry for the **exact station UID** during one-time setup,
-with admission closed and **no active lease on that broker**. The operator
+installs the allowlist entry for the **exact executor worker UID** during one-time
+setup, with admission closed and **no active lease on that broker**. The operator
 atomically replaces the protected policy file with a new monotonic policy
-generation and the station UID added, then signals reload. The daemon validates
+generation and the executor worker UID added, then signals reload. The daemon validates
 and runs `Manager.Replace`; on refusal it reports `configuration_reload_refused`
 and retains the old policy. A successful Replace closes all connections and
 **invalidates every lease of the old generation**. Installing the allowlist while
@@ -272,11 +284,14 @@ other leases are active is therefore forbidden; this is an operator precondition
 not a claim that the daemon rejects every such reload. There is no broker
 allowlist-installation or confirmation API.
 
-The selected **exact station-UID positive control** is broker v0's existing
-peer-scoped `status` call from that station UID: it must return the expected new
+The selected **exact executor worker-UID positive control** is broker v0's existing
+peer-scoped `status` call from that worker UID: it must return the expected new
 `policy_generation` and the required account in its allowed-account list, with
 no lease payload. Pair it with a **foreign-UID negative control** that returns an
-empty or denied result. Absence of a reload error alone is not positive evidence;
+empty or denied result, including the caller UID when it differs from the worker
+UID. Allowlisting or status-checking the caller UID instead of the worker UID
+cannot satisfy setup; never infer the worker UID from the caller identity.
+Absence of a reload error alone is not positive evidence;
 a wrong generation/account or failed negative control cannot satisfy setup.
 `lease.request` is **forbidden as a precondition probe**: it delivers a real vendor
 token that lease release cannot revoke. The selected `status` control still needs
@@ -297,9 +312,11 @@ B0 admission.
 **Original occurrence and retention.** Before deriving, the owning Keymaker
 transaction reserves one operator-scoped occurrence, using the base request-ID
 domain and full canonical argument comparison. Retain the original authenticated
-operator UID/generation and ID, exact target UID/generation, purpose-1 registration,
-master epoch, resolved purpose-6 path/public key, intended dispatcher and scope,
-immutable adapter/qualification/policy identities, predecessor versions, completed
+operator UID/generation and ID, exact caller target UID/generation, its purpose-1
+registration, exact executor worker UID/generation and selected protected-policy
+mapping, master epoch, resolved purpose-6 path/public key, intended dispatcher
+and scope, immutable adapter/qualification/policy identities, predecessor versions,
+completed
 steps and their durable evidence. These are required protected transaction
 properties, not dispatcher field names or new native params. Reserve the next
 closed, versioned transaction/result format and all staging/history within the
@@ -311,12 +328,12 @@ cannot change the original identity or mint a replacement occurrence to clear de
 
 | Step | Operator-only action and durable order | Crash / unknown outcome |
 |---|---|---|
-| B0 — reserve closed installation | Authenticate the operator and exact active target; capture approved full tuple, current revisions and original deadline. Durably reserve the original intent/result capacity before derivation. Keep station disclosure/signing and new dispatch for this scope closed. | No reservation before a proven no-effect refusal; possible reservation retains the exact occurrence and hold. Missing local evidence never means pristine state. |
+| B0 — reserve closed installation | Authenticate the operator and exact active caller target; capture the exact worker UID/generation, selected mapping, approved full tuple, current revisions and original deadline. Durably reserve the original intent/result capacity before derivation. Keep station disclosure/signing and new dispatch for this scope closed. | No reservation before a proven no-effect refusal; possible reservation retains the exact occurrence and hold. Missing local evidence never means pristine state. |
 | B1 — derive and stage | Keymaker resolves the purpose-6 sibling from the existing master/name-index, derives only inside custody, and stages its public key, purpose-6 path, purpose-1 registration number and master epoch bound to the target generation and intended dispatcher. Commit protected stage/result and successful audit before any public metadata leaves Keymaker for installation. Discard transient private child material; no station file/export. | Recover only the original committed public stage after current checks. Partial stage/audit is held and reconciled; never generate another key, registration or epoch, or silently repeat derivation to replace unknown evidence. |
 | B2 — install inert dispatcher association | The authenticated operator installs exactly B1's public metadata and full target/scope provenance at the dispatcher. Dispatcher owns its protected format, predecessor checks, durable idempotent install and acknowledgement. Association installation is separate from authority activation and grants no launch. Retain its exact committed identity/version in Keymaker's original transaction. | Lost acknowledgement requires authenticated lookup/reconciliation of that same install. Same bytes with unknown history are not proof; no reassociation, overwriting another predecessor or blind retry as a new install. |
 | B3 — establish joint currentness and audit | Both owners verify that their protected current records identify the same installed public key/path/registration/epoch, target UID/generation, receiver/scope and immutable installation occurrence. Bind exact current revisions, not key equality alone. Durably retain the verified association and audit checkpoint before proceeding. | Missing, mismatched, stale or unknown evidence leaves the scope held. A late acknowledgement cannot reopen it. Resume only the original step after proving the actual outcome and current authority. |
-| B4 — install dispatcher M0 policy | Install only dispatcher-owned limited M0 policy bound to that association, exact UID/generation, allowed plan/operations, expiry and currency rule, then establish its currentness. The pre-installed and verified broker allowlist remains a precondition; no broker policy replacement occurs here. Keep dependent new issue/start/release authority closed through installation using the jointly accepted admission protocol; an installed policy alone is not activation. | Retain partial policy installation and original evidence; no launch or compensating grant/key/policy. Missing dispatcher closure or currentness leaves this tuple unqualified; do not invent a broker field, confirmation API or disabled-entry feature. |
-| B5 — verify and activate accepted scope | Revalidate B0–B4, the retained broker setup precondition and all §5 terms, durably audit/checkpoint the original installation outcome and exact operator activation, then admit only the accepted request scope. Keymaker and dispatcher independently consume current installation/activation facts; dispatcher rechecks its M0 policy at prepare and start. Broker retains its own current issue/renewal gates. | Unknown completion or one-sided activation stays closed for affected signing/new effects. Recover the original outcome and reconcile all owners before reopening; a readable success marker is insufficient. No atomic cross-service commit is claimed. |
+| B4 — install dispatcher M0 policy | Install only dispatcher-owned limited M0 policy pinned to the caller association and caller UID/generation, the exact executor worker UID/generation and explicit selected mapping, allowed plan/operations, expiry and currency rule, then establish its currentness. These pins/mapping remain a joint dispatcher publication/qualification item, not new field names. The pre-installed and verified broker allowlist for that worker UID remains a precondition; no broker policy replacement occurs here. Keep dependent new issue/start/release authority closed through installation using the jointly accepted admission protocol; an installed policy alone is not activation. | Retain partial policy installation and original evidence; no launch or compensating grant/key/policy. Missing dispatcher closure or currentness leaves this tuple unqualified; do not invent a broker field, confirmation API or disabled-entry feature. |
+| B5 — verify and activate accepted scope | Revalidate B0–B4, both pinned identities and their selected mapping, the retained worker-UID broker setup precondition and all §5 terms, durably audit/checkpoint the original installation outcome and exact operator activation, then admit only the accepted request scope. Keymaker and dispatcher independently consume current installation/activation facts; dispatcher rechecks the caller association, selected mapping and worker UID/generation in its M0 policy at prepare and start. Broker retains its own current issue/renewal gates. | Unknown completion or one-sided activation stays closed for affected signing/new effects. Recover the original outcome and reconcile all owners before reopening; a readable success marker is insufficient. No atomic cross-service commit is claimed. |
 
 **Joint currentness and exclusion.** Keymaker owns custody, derivation, local
 intent/result retention, audit and its final release check. Dispatcher owns its
@@ -332,10 +349,12 @@ changing a live association, generation-policy link or activation decision. No
 writer bypasses this barrier, including installer, revoke, restore and recovery.
 Generation changes additionally retain user-manager's authoritative final fence.
 For every Keymaker stage/result disclosure, including recovery, the final bounded
-verified generation window checks both operator and target active; target binding,
+verified generation window checks both operator and caller target active; caller binding,
 policy and custody checks, owning state/audit and actual handoff remain ordered
 against retirement. An operator-only generation check is insufficient. Dispatcher
-likewise rechecks the target generation at its actual install/start boundary.
+likewise rechecks the caller association and independently pinned worker generation
+under the selected mapping at its actual install/start boundary. A caller-generation
+check cannot stand in for the worker-generation check.
 Then install only against the retained exact predecessor, verify the same complete
 committed association at both owners, and durably publish the operator's activation
 decision bound to that occurrence and the accepted tuple. Each service consumes
@@ -449,8 +468,9 @@ resolved under the owners' accepted recovery protocol. Changing IDs, Run, epoch,
 process, connection or host is not that resolution and never clears the debt.
 
 **Maximum admitted load — proposal and remaining joint inputs.** One occurrence
-addresses one active target generation, one purpose-1 binding, one purpose-6
-stage and one dispatcher/scope; B4 installs one dispatcher policy and verifies
+addresses one active caller target generation, one purpose-1 binding, one purpose-6
+stage, one explicitly mapped executor worker UID/generation and one dispatcher/scope;
+B4 installs one dispatcher policy and verifies
 its currentness. Broker setup load is separate and unconfirmed; it is not charged
 as a B4 installation or hidden in another phase. No batch install, additional
 target or arbitrary inventory scan is admitted. Propose a **Keymaker-controlled 8 MiB aggregate byte-work cap per
@@ -527,13 +547,15 @@ completions (§6). M0 policy expiry or revocation immediately closes new `dispat
 signing; it preserves only the exact admitted run's reduce-only `cancel` consent
 under §6, without renewing dispatch authority. Other policy changes invalidate
 the affected operation scope before its next release.
-Recreate requires a new association installation, new M0 policy and explicit
-operator verification of the broker setup precondition for the exact target UID
-before B0; retained identical public bytes never reactivate the old association.
+Recreate of either identity requires a new association installation, new M0 policy
+pinning the caller association, exact worker UID/generation and explicit selected
+mapping, and operator verification of the broker setup precondition for that
+worker UID before B0; retained identical public bytes never reactivate the old
+association.
 A UID-only v0 entry does not attest a generation: the owners must invalidate old
 admission, with explicit new-generation installation and generation binding
-enforced by the protected M0 policy and joint currentness protocol. Any required
-allowlist replacement remains a separate operator setup before B0, while admission
+enforced for both roles by the protected M0 policy and joint currentness protocol.
+Any required allowlist replacement remains a separate operator setup before B0, while admission
 is closed and no lease is active on that broker. No implicit UID reuse, bump or
 rotation is enabled.
 Authorized stop/recovery retains its own prerequisites and original stop deadline.
@@ -702,8 +724,9 @@ station output; its bootstrap-completion case cannot make B2 depend on B5.
 | `SCBootstrapRecreateFences` | Change generation, revoke, stop or change tuple between stage and release: no cached/late output/start, no silent policy/allowlist adoption. | Explicit new association/policy installation for the new accepted generation, with separately verified current broker setup and any required replacement only while no lease is active, can activate. | Reuse equal-key old association; `SCBootstrapRecreateFences`. |
 | `SCBootstrapRetentionAndReaders` | Exhaust reserved capacity, downgrade to an old reader or restore unknown history: precise capacity/audit/source refusal, retained original evidence, no reset/prune/reissue. | Qualified supported reader recovers bounded exact state/audit without altering historical bytes. | Reset unknown occurrence to pristine; `SCBootstrapRetentionAndReaders`. |
 | `SCBootstrapCancelAfterPolicyExpiry` | After policy expiry/revocation, new dispatch refuses `station_caller_unqualified`; revoked association refuses cancel with that code (earlier precise key/generation refusals still apply). Cancel for a non-admitted, foreign or confirmed-stopped run, including cached replay after stop, refuses `station_caller_plan_invalid`, with no signature/onward effect or renewed authority. | With policy expired or revoked, the same qualified current caller signs only reduce-only cancel for its exact admitted, not-confirmed-stopped run; dispatcher may stop it under retained consent. Automatic P7 stop still progresses when signer revocation closes cancel. | Blanket-deny expired policy must fail the positive cancel assertion; admit dispatch on retained consent, skip signer revocation, or omit run admission/stop checks must fail the corresponding denial in `SCBootstrapCancelAfterPolicyExpiry`. |
-| `SCBootstrapAllowlistActiveLeases` | Attempt allowlist replacement while any lease is active: operator setup forbids the operation, so it is not performed; B0 cannot use the attempted setup as evidence. Do not assert daemon rejection: successful Replace would invalidate every old-generation lease. | With admission closed and no active lease, operator replacement and qualified exact-UID `status` establish the separately bounded precondition before B0. | Permit setup with active leases; `SCBootstrapAllowlistActiveLeases`. |
-| `SCBootstrapAllowlistPositiveEvidence` | Reload with no error, `status` with a stale/wrong `policy_generation` or missing required account, wrong peer UID, or a foreign-UID negative control returning allowed accounts cannot satisfy setup or admit B0. Any `lease.request` precondition probe is forbidden; no token/lease is issued by these controls, and failed qualification keeps admission closed. | Qualified peer-scoped `status` from the exact station UID returns the expected new `policy_generation` and required account, with no lease payload; the paired foreign UID gets empty or denied. Both fit the separate setup budget before B0. | Accept wrong generation/account, skip foreign-UID control, treat no reload error as evidence or permit `lease.request` probing; `SCBootstrapAllowlistPositiveEvidence`. |
+| `SCBootstrapAllowlistActiveLeases` | Attempt allowlist replacement while any lease is active: operator setup forbids the operation, so it is not performed; B0 cannot use the attempted setup as evidence. Do not assert daemon rejection: successful Replace would invalidate every old-generation lease. | With admission closed and no active lease, operator replacement and qualified exact executor worker-UID `status` establish the separately bounded precondition before B0. | Permit setup with active leases; `SCBootstrapAllowlistActiveLeases`. |
+| `SCBootstrapAllowlistPositiveEvidence` | Reload with no error, `status` with a stale/wrong `policy_generation` or missing required account, wrong worker UID (including the caller UID when distinct), or a foreign-UID negative control returning allowed accounts cannot satisfy setup or admit B0. Any `lease.request` precondition probe is forbidden; no token/lease is issued by these controls, and failed qualification keeps admission closed. | Qualified peer-scoped `status` from the exact executor worker UID returns the expected new `policy_generation` and required account, with no lease payload; the paired foreign UID, including a distinct caller UID, gets empty or denied. Both fit the separate setup budget before B0. | Accept wrong generation/account, skip foreign-UID control, treat no reload error as evidence or permit `lease.request` probing; `SCBootstrapAllowlistPositiveEvidence`. |
+| `SCBootstrapCallerWorkerMapping` | With caller UID different from worker UID, allowlisting or status-checking only the caller cannot satisfy worker setup or admit B0. Missing/swapped/stale worker UID/generation, caller association or mapping cannot activate; caller-generation evidence never substitutes worker evidence. | With a qualified explicit protected-policy mapping, the caller association and exact active worker UID/generation are independently pinned and checked; worker-UID allowlist/status plus foreign controls succeed. Exercise both distinct accounts and an explicitly selected same-account mapping. | Substitute caller UID for worker UID or infer equality without a selected mapping; `SCBootstrapCallerWorkerMapping`. |
 | `SCBootstrapBudgetTimelyLate` | Exhaust B0 entry-to-completion time, any step cutoff or shorter caller bound; B5 outcome/audit/opening at equality or later cannot activate. | Same workload completes every step, full durability and all final openings strictly within the original bounds; subsequent notification may be lost without repeating activation. | Reset t_B at reservation/step entry, transfer unused allowance, or omit final opening; `SCBootstrapBudgetTimelyLate`. |
 | `SCBootstrapBudgetUnknownCeiling` | Lose install/activation acknowledgement or custody/audit durability at a cutoff/D_B: retain exact held evidence and closed authority, no assumed rollback or no-effect result; a late ack cannot reopen. | Within the original bound, authenticated exact-outcome reconciliation proves complete durability/currentness before the same occurrence's sole activation. | Treat missing ack as no effect or accept late ack as activation; `SCBootstrapBudgetUnknownCeiling`. |
 | `SCBootstrapBudgetRetryCeiling` | Retry, lookup or recovery after the original phase cutoff/D_B, including a new ID/Run/epoch or fresh receipt: no renewed install/activation or refunded debt. | An accepted bounded exact retry/status lookup fits the same original cutoff and returns only its original proven outcome, without another effect. | Give reconnect/reconciliation a fresh timer or occurrence; `SCBootstrapBudgetRetryCeiling`. |

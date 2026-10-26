@@ -911,15 +911,24 @@ cannot reconstruct a missing mode or prove verification; absence is not accept.
 | --- | --- |
 | `payload_digest` (existing) | `record.Digest(rawAct)` over the exact received act bytes, when bounded act bytes are available: at most 8192 received bytes under §5's act bound. Format is `sha256:` followed by 64 lowercase hex digits. Otherwise null. Do not hash the enclosing native params, decoded/re-encoded body or signatures separately. Bounded malformed act bytes can have a digest; that is not verification success. Historical records without the pair retain their original digest meaning; other paths are unchanged. |
 | `operator_action_id` | Null until a bounded canonical action ID is known; otherwise the exact canonical unpadded base64url encoding of exactly 16 bytes (22 characters), as in the signed act. Reject padding, alphabet/length aliases and nonzero unused bits. Syntactic availability is not proof of accepted authority or consumed action; never substitute the native request ID or a nonce. |
-| `operator_reason` | Null if operator verification has not been reached and no adapter-unavailability verdict exists; otherwise the exact nonempty S1 stable decision code for this attempt, including `accept` for an accepted candidate plan, or `state_unavailable` for adapter unavailability. The allowed strings are the closed stable decision-code inventory of the pinned S1 verifier and its §6 table, never an error string. Reject empty strings, unknown/future codes, case aliases and coercions. No arbitrary string prefix or generic diagnostic is an extension mechanism. |
+| `operator_reason` | Null if operator verification has not been reached and no adapter-unavailability verdict exists; otherwise the exact nonempty adopted stable decision code for this attempt, including `accept` for an accepted candidate plan, or `state_unavailable` for adapter unavailability. The allowed strings are the closed historical S1 §6 inventory plus exactly registry_currency_version_mismatch, freshness_receipt_unavailable, freshness_receipt_invalid, freshness_receipt_binding_mismatch and freshness_receipt_expired for the target /2 verifier, never an error string. Reject empty strings, unknown/future codes, case aliases and coercions. No arbitrary string prefix or generic diagnostic is an extension mechanism. |
 | `refusal_code` (existing) | `refusal_code` keeps the coarse native outcome, or null where the existing result rules require it. A fine `accept` means only verifier acceptance, never proof of effect commit; subsequent native failure/unknown still fences and uses its existing code/result. |
 
 The type/decision owner is pinned waggle S1
 [`98c9cfd`](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/verifier/types.go),
 with the [§6 decision inventory](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/spec/swarm-envelope-2.md#6-future-verifier-contract-and-refusal-order)
 and [record digest/base64 encoding](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/record/record.go).
-A new upstream pin or code requires explicit schema review; it cannot silently
-widen this allowlist. An absent verifier result maps to adapter
+The explicit /2 fine-code/type owner is [waggle S8 b63d627](https://github.com/relux-works/waggle/blob/b63d627b19c4178d34b7cff58f8f6068efeca1a0/verifier/types.go).
+This specification adds exactly the five reasons above, no prefix wildcard or
+arbitrary future code. The unavailable mapping set is unchanged: all five map
+through OperatorRecordCode to operator_record_invalid, retryable=false. Native
+framing/capacity/deadline/audit/storage outcomes keep their own existing codes.
+Version the allowlist and qualify every serving/recovery reader on unchanged
+old/new/mixed histories before enabling it; its concrete reader-floor carrier
+remains a pre-code integration gate. A dependency bump alone cannot widen the
+allowlist or qualify those readers. Any further pin/code needs explicit schema
+review; no audit member, native result enum or hash algorithm is added.
+An absent verifier result maps to adapter
 `state_unavailable`, never an empty-string audit reason or default `accept`.
 
 Operator evidence in audit is a **digest and an action ID only**, plus this

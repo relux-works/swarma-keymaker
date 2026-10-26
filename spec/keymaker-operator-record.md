@@ -12,7 +12,10 @@ Sources: [waggle S1 verifier API](https://github.com/relux-works/waggle/blob/98c
 [operator pipeline](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/verifier/verify.go),
 [record package](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/record/README.md)
 and [S0 §§2.6, 4.2, 6–7](https://github.com/relux-works/waggle/blob/98c9cfd26cfc57a7ee82176cd599e92af03e69bb/spec/swarm-envelope-2.md).
-These immutable public sources define the bytes, authority and refusal order;
+These S1 sources retain the act bytes and authority/refusal pipeline. The
+currency/receipt target and fine-code mapping are [waggle S8](https://github.com/relux-works/waggle/blob/b63d627b19c4178d34b7cff58f8f6068efeca1a0/spec/swarm-envelope-2.md)
+and [message-state §§2.1.1,4](keymaker-msg-state.md#211-s4s5-state-format-boundary);
+no runtime dependency or production adapter is upgraded. All sources remain immutable;
 this adapter must not implement another record parser or signature verifier.
 
 ## 1. Exact request and verifier call
@@ -82,8 +85,8 @@ Budget exhaustion closes admission; never truncate retained history to fit.
 | `Now` | Exact sampled whole-second UTC string from that same qualified provider, not `time.Now`, a signed iat or caller timestamp. Provider integration is separate work, not assumed present here |
 | `WatermarkAvailable` | `true` only after loading and validating the local durable watermark and its restore continuity; otherwise unavailable |
 | `Watermark` | Exact local durable timestamp W. Initialization and qualified advancement need review; no in-memory replacement with Now just to accept an act |
-| `IDJournalAvailable` | `true` only for complete, reconciled local exact-byte act-ID history |
-| `IDJournal` | Map accepted content ID -> original raw act bytes in the protected Store transaction domain, including retained historical entries; same ID with different bytes must remain detectable |
+| `IDJournalAvailable` | `true` only for complete, reconciled required exact-original history, including acts and the /2 currency proof dependencies; unavailable history never becomes an empty map |
+| `IDJournal` | Exact-ID-to-original-byte map for complete retained act history and required currency checkpoint/anchor-row snapshot/add/revocation/proof originals. Protect it in the recoverable transaction domain; same ID with different bytes must remain detectable. The /2 producer inventory expands as in message-state §5.1; no absent history becomes an empty map |
 | `ReplayAvailable` | `true` only with complete, reconciled durable action history; unreadable/missing/pending state never becomes an empty history |
 | `UsedActions` | Explicit array of consumed action IDs from the installation-wide protected ledger, not merely this caller's request IDs. Retain across caller generations/restarts; reserve atomically at commit |
 | `ActBinding` | Exact protected request/binding projection in §1, reread and compared at commit |
@@ -97,6 +100,20 @@ to bypass that comparison. The operator root legitimately signs both its device
 attestations and operator-domain snapshots; this is one role. The registry's
 key cannot substitute for it. D31 supplies no v0 root-recovery record; this
 adapter cannot replace/recover a root or infer a new root from received bytes.
+
+For the /2 currency-required path also provide the exact protected
+RegistryCurrencyVersion=2, SnapshotJournal=Present({anchor,entries}), whole-set
+FreshnessAnchor, six-field JournalWitness, WitnessReadAt and required receipt/
+margin policy under [message-state §§4.1–4.2](keymaker-msg-state.md#41-b-live-status-full-freshness-admission).
+The latest index has every configured snapshot role, including omitted coverage;
+SignedSnapshots and IDJournal retain the required original signed bytes. Keep
+BOTH ORIGINAL SignedSnapshots and SnapshotJournal Evidence through mint/commit/use,
+persist detached Plan.SnapshotJournal separately, and remint on restart or
+premise/head/pin/version change. Rebuilding Present invalidates the old receipt.
+The monotonic version/pin floor outside restore domains and old-binary exclusion
+must be independently qualified before admission. None of these facts is supplied
+by an act, receipt, local flag or library Plan. All current-owner, used-action,
+time/W, delivery/custody and durable/native gates remain independent and closed.
 
 The existing retained-request store does **not** already implement the three
 S1 journals, continuity proofs or these configuration sources. Extend its
@@ -112,12 +129,20 @@ and durable integration are accepted and qualified.** S1 landing alone does
 not open persistent revoke. There is no deployed owner-registry/trust-node
 snapshot service to call. This path is not an emergency-stop mechanism.
 
-S5 registry-root freshness receipts do not extend operator-root device/act
-snapshot age. The [K3 composition](keymaker-msg-state.md#42-s5-process-local-receipt-composition)
-leaves this domain independent: persistent revoke stays closed until its actual
-sources/durable integration and D42 offline-root policy exist. A registry B
-refresh is not operator evidence; registry inactivity alone does not invalidate
-otherwise current independently qualified operator evidence.
+External operator/grant roots sign snapshot content only on change; no online root
+freshness signer or periodic content re-signing is required. On the adopted /2
+currency-required path, original operator/grant-root signatures authenticate
+content; they do not become stale merely because unchanged content was signed long
+ago. Require full S8 checkpoint/2/freshness/2 complete-prefix/latest-set
+validation and required coverage for every reached root. This replaces only the
+covered root's own-age slot, never its actual signature, issuer, complete
+schema/cumulative continuity, future-issued rejection, effective-from match or
+independent authority/time predicates. Protected local delivery may carry exact
+originals but cannot supply currency on its own or become an online root signer. A
+copied old file, a registry signature replacing the content root, a latest-list
+assertion without prefix proof, or omitted required-root coverage supplies no
+current authority. Operator current-owner policy, ActBinding, replay/action/ID
+journals and min(Now,W)/max(Now,W) act-window checks remain independent.
 
 Candidate (b), if accepted later: an operator-delivered protected local bundle
 of original operator-root-signed device attestations/snapshots plus separately
@@ -134,29 +159,39 @@ independent continuity after joint restore. A restored local floor is not
 independent proof: preserve option A's explicit
 operator reconciliation and external restore evidence; do not claim option C.
 
-S1 must verify the original signature, issuer, complete=true, every entry and
-scope. For configured `0 < A <=60` seconds, require
-`issued_at <= min(Now,W)` and `max(Now,W)-issued_at <= A`; current revocation
-matches from `from <= max(Now,W)` for the device key, its attestation ID and
-act ID. Missing/stale/future/incomplete/continuity-unavailable evidence refuses
-unavailable; bad signature/issuer/shape and revoked authority refuse invalid.
-No unsigned empty snapshot, removal of retained entries, stale grace period,
-local re-signing or switching to a registry-key signature is permitted.
+The guarantee is relative to the observed authenticated witnessed prefix: after it
+contains a newer cumulative root snapshot, a new /2 admission cannot select the
+older one. The max(S+A,from) bound applies only to legacy own-age profiles, not
+external-root /2 withdrawal; periodic content re-signing is not required.
+Signing/submission-to-journaling withholding, unpublished/unobserved tails,
+previously minted receipts until fixed expiry and immediate global revocation are
+not bounded by this policy. Separately qualify any publication-latency claim.
+Preserve all entries and from; a match effective at from<=max(Now,W) revokes even
+if the act/message has old iat or the receipt remains live. Root withdrawal is a
+separately protected pin/recovery action; Keymaker gains no snapshot signer.
 
-A newly copied old file gains no age. Candidate (b) works only while its
-qualified evidence remains fresh; manual delivery supplies no availability
-promise. Respect the 64-entry/8192-byte profile: capacity cannot justify dropping
-revocations. The bound `max(S + A, from)` assumes complete, cumulative,
-non-equivocating issuance and continuity; S is first-containing issuance, not
-submission. No pre-publication or end-to-end completion deadline is claimed.
+External root signing applications retain exact changed-content submissions and
+independently check their op=add inclusion through a gap-free chain to
+checkpoint/2 and authenticated witness checkpoint/head, including latest selection
+when covered. An intake acknowledgment or receipt alone is insufficient.
+Publishers retain/serve exact anchor entries, predecessor checkpoints, referenced
+original signed snapshots and complete journal/publication history. These are
+external source obligations, not new Keymaker root operations, live calls or an
+implemented distribution service.
 
-Alternative (c): a future reviewed trust-node source can distribute originals
-and independently retained continuity; it still needs operator-root signatures,
-current-owner facts and the same freshness rule. No listener, RPC or deployment
-is authorized here. For effects classified critical by protected consumer
-policy, S0 §6's authority-owner online check additionally applies; the sender
-cannot classify the effect. Its exact source and serialization must be decided
-before activation, not replaced with a cached boolean.
+Independent /2 journal/checkpoint validation and complete-prefix qualification
+are required under [message-state §4](keymaker-msg-state.md#4-publication-record-and-restart);
+a receipt cannot replace initial inclusion/currentness proof. Original issuer,
+signature, complete schema, future-issued rejection and every effective revocation
+still verify, including effective device-key, device-attestation-ID and act-ID
+matches at from<=max(Now,W). Missing/unproved prefix, originals or coverage
+refuses; a copied old file supplies no currency. Protected bundle/trust-node delivery may distribute
+originals with independently retained continuity but supplies no availability or
+latency promise. The 64-entry/8192-byte profile cannot justify dropping entries.
+For effects classified critical by protected consumer policy, S0 §6's exact-request
+authority-owner check additionally applies; the sender cannot classify the effect.
+Its real source and serialization remain prerequisites, never a cached boolean.
+No daemon signing key, listener, automatic fetch or deployment is enabled here.
 
 S1 uses `min(Now,W)` for starts and `max(Now,W)` for expiry. Thus an act whose
 iat is newer than durable W refuses `not_yet_valid` even if Now is later.
@@ -209,29 +244,35 @@ verified-plan/commit invariant when implementation is separately authorized.
 
 ## 5. Public codes and audit delta
 
-Use S1 `OperatorRecordCode` for verifier results, including the following exact
-unavailable set. Both public refusal codes have **retryable=false**.
+Use the target verifier `OperatorRecordCode` for verifier results, including the
+following exact unavailable set. Both public refusal codes have **retryable=false**.
 
-| S1 result / adapter condition | Native outcome |
+| Adopted result / adapter condition | Native outcome |
 | --- | --- |
 | `accept` | Candidate plan only; native success only after §4 commit/revalidation |
 | empty code, `operator_record_unavailable`, `signer_unavailable`, `key_binding_unavailable`, `time_unavailable`, `watermark_unavailable`, `revocation_unavailable`, `id_journal_unavailable`, `replay_unavailable`, `state_unavailable` | `operator_record_unavailable`, retryable=false |
-| Every other definite S1 refusal, including binding/audience/owner/epoch errors, revoked, stale act, bad signature, `envelope_conflict`, `act_replay` | `operator_record_invalid`, retryable=false |
+| Every other definite refusal, including `registry_currency_version_mismatch`, the four closed receipt decisions below, binding/audience/owner/epoch errors, revoked, stale act, bad signature, `envelope_conflict`, `act_replay` | `operator_record_invalid`, retryable=false |
 
 Unavailable verifier/plan-commit inputs must be supplied as `state_unavailable`
 or an explicit unavailable result, never default accept. Native framing,
 `request_conflict`, caller/generation, capacity, deadline and fatal audit/storage
 handling retain their existing outer codes/fences; do not blanket-map unrelated
 native errors. A failed/uncertain commit cannot yield success even if verification
-was accept. Preserve the original fine S1 reason locally, never on the wire.
+was accept. Preserve the exact adopted fine reason locally, never on the wire.
+The new registry_currency_version_mismatch and the unchanged four receipt reasons
+freshness_receipt_unavailable, freshness_receipt_invalid,
+freshness_receipt_binding_mismatch and freshness_receipt_expired are outside the
+unchanged unavailable set: each maps to operator_record_invalid, retryable=false.
+Missing journal/version/floor/role coverage never selects a /1 or no-receipt fallback.
 
 Base §11 now defines the [closed optional operator audit extension](keymaker.md#111-operator-record-audit-extension):
 `payload_digest` is `record.Digest(rawAct)` for bounded available act bytes, else
 null; the complete optional `operator_action_id`/`operator_reason` pair is emitted
 only on new operator-record path records, with nulls until the corresponding
 bounded value/verdict is known. Action IDs use the signed canonical16-byte
-base64url representation. Reasons use only the pinned S1 stable inventory or
-adapter `state_unavailable`, never error strings; `refusal_code` stays coarse.
+base64url representation. Reasons use only the base §11.1 closed versioned
+inventory (S1 plus the exact five S8 additions), or adapter `state_unavailable`,
+never error strings; `refusal_code` stays coarse.
 Other paths omit both members. Historical records/hashes are preserved without
 backfill; old readers refuse the new members. The exact types, scope, closed
 member rules and [Q7-A01–Q7-A09 acceptance rows](keymaker.md#112-q7-historical-recovery-acceptance-rows)
@@ -250,7 +291,9 @@ prevents release and cannot recursively log itself into apparent success.
 Future tests, **NOT RUN**; these do not qualify the missing sources or commit
 adapter. Control V has a current configured operator caller, protected matching
 binding, valid P-256 device act/attestation, independently current owner policy,
-fresh complete continuous snapshot, qualified time with W=Now, unused action
+authentic latest complete continuous operator snapshot with full /2 currency,
+required exact operator coverage and BOTH ORIGINAL Evidence objects, qualified
+time with W=Now, unused action
 and healthy durable storage. Every refusal has no new tombstone/action commit;
 an indeterminate transaction instead preserves evidence and fences.
 
@@ -258,7 +301,7 @@ an indeterminate transaction instead preserves evidence and fences.
 | --- | --- | --- |
 | OR01 | Wrong operation/target, owner or epoch -> act_operation_unknown/act_binding_mismatch, mapped invalid | V matches exact protected request and target binding |
 | OR02 | Current snapshot revokes device, attestation or act -> revoked/invalid; no old-iat bypass | Same valid complete snapshot with no matching effective entry permits V |
-| OR03 | Snapshot age>A (including A=60 boundary), missing/stale/future/incomplete or unproved continuity -> unavailable | Valid signed continuous snapshot age exactly A is admitted if all other checks pass |
+| OR03 | Missing prefix/originals/required coverage, non-latest selected snapshot, invalid/rebuilt receipt, expiry equality, future-issued/incomplete or unproved continuity refuses with the exact fine/coarse mapping; no new tombstone/action commit | Old unchanged authentic latest operator content with fully admitted same-scope /2 currency and BOTH ORIGINAL Evidence objects may pass currency, subject to every independent authority/time/effect gate. Historical /1 own-age tests stay under their original profile, never current fallback |
 | OR04 | New native ID reuses consumed action -> act_replay/invalid, including another caller generation/restart; racing IDs cannot both commit | Exact same native ID/arguments returns original result with current disclosure authority, no second effect |
 | OR05 | Expired/future act -> expired/not_yet_valid, invalid | V lies inside half-open validity and<=120s lifetime |
 | OR06 | Non-operator/agent key, wrong root, invalid P-256 signature or WebAuthn wrapper -> invalid | Original raw-preimage P-256 low-S device signature under pinned operator attestation verifies |

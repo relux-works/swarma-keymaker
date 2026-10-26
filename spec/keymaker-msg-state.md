@@ -8,14 +8,18 @@ The internal S2 implementation covers issuance and closed durable state; see the
 S1 supplies the internal purpose-4 key. Nothing here enables message signing,
 a publisher transport, a public purpose-5 capability or an administration command.
 
-The adopted spec contracts are pinned to waggle S4+S5
-[`5f4e743`](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md):
-[D39 journal §2.7](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#27-identity-journal-and-checkpoints),
-[D38 B freshness §2.9](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#29-signed-snapshot-freshness-d38-b),
-and [S5 receipts §2.10](https://github.com/relux-works/waggle/blob/5f4e7435d75697385ff6ce15a7501ac6f31c8ea5/spec/swarm-envelope-2.md#210-process-local-freshness-receipts-d41-composition).
-The module and internal in-memory verifier adapters now use this pin; §7 records
-the implemented boundary and remaining qualification. The runtime still refuses
-populated publication state. This does not replace the message supplement's S0 profile.
+The target currency/receipt contract is waggle S8 at
+`b63d627b19c4178d34b7cff58f8f6068efeca1a0`, including D42(a) option I and D43–D45.
+Keymaker currently depends on `5f4e7435d75697385ff6ce15a7501ac6f31c8ea5` and has
+S4/S5 in-memory adapters only. This specification target is not a module upgrade
+or a production adapter. Existing act/message signature domains, purpose/role
+boundaries and unchanged S0 formats remain unchanged; no second parser or new
+root-signing operation is introduced.
+
+The normative /2 source is [waggle S8](https://github.com/relux-works/waggle/blob/b63d627b19c4178d34b7cff58f8f6068efeca1a0/spec/swarm-envelope-2.md).
+The unchanged runtime pin and pure S4/S5 adapters remain historical /1 support;
+§7 records their limits. Populated production publication state remains closed.
+This target does not replace the message supplement's S0 signature/record profile.
 WC1 below means the separately reviewed state-witness service's registry stream:
 independent checkpoint observer, intent and matching committed resolution,
 original receipts, authenticated fresh head and continuity/control evidence.
@@ -118,6 +122,31 @@ phase fences, artifacts and recovery copies. Compose that version/preimage
 with PC2's separately reviewed combined root; neither subsystem gains a second
 commit authority or another 256 MiB budget. No receipt is a persisted member.
 
+Every adopted currency-required path explicitly sets protected
+`Context.RegistryCurrencyVersion=2`. Before its first /2 admission, qualify the
+complete-prefix index for all configured snapshot roles, including operator/grant
+roles absent from /1 coverage. Protect a monotonic currency-version/pin floor and
+installation/registry/transition identity outside the relevant
+snapshot/backup/restore domain; enforce it against all serving and recovery
+binaries and old instances. A mutable flag beside the store is insufficient.
+Missing, older, conflicting or unreconciled floor/pin/index state closes
+admission. Retain exact /1 checkpoints, publications, anchors and their original
+digests only as qualified archival upgrade predecessors, never current /1
+authority under pin2. The first checkpoint/2 advances registry sequence; normal
+first /2 publication is old publication_seq+1 with later issued_at and null prev
+on the advanced head. Missing /1 publication positions require explicit approved
+re-anchor, which cannot skip journal positions. No relabelling, re-signing or
+synthetic journal change performs migration.
+
+Before code, Keymaker and the PC2/state owners must qualify the enclosing
+codec/preimage/dispatch and an explicit versioned historical /1 union or
+referenced archival inventory. Never reinterpret combined-3/root-2 in place.
+The external version/pin floor carrier, concrete enforcer, installation/registry
+transition binding and old-instance exclusion require qualification outside the
+relevant restore domain. A store-adjacent flag is insufficient. These remain
+pre-code gates, not selected deployment formats or custody authority. Existing
+schema-2/combined-3 floors and separately qualified rollback authority remain.
+
 ### 2.2 Migration and downgrade
 
 Migration is a trusted offline service operation under the exclusive state lock,
@@ -184,6 +213,33 @@ or ad hoc splitting/pagination. Existing state, sequences and anchors remain
 unchanged; bounded refusal telemetry is permitted. Exact byte boundaries pass
 only their respective size gate, subject to every other validity and capacity
 check; they do not establish publication or activate K3.
+
+Apply landed D45 capacity before current-candidate version probes/body parsing at
+J1/F1: raw argument occurrences plus Present's immutable costs for
+SnapshotJournal, SignedSnapshots, IDJournal, FreshnessAnchor, JournalWitness,
+AgentRevocationRoot, RegistryOwner, GrantRoot, OperatorRoot, ServiceRoot and
+WitnessReadAt, plus **65536 bytes reserved inside 2097152**. Present costs are 16
+per value plus UTF-8 member/string bytes and raw byte lengths recursively;
+repeated copies are charged separately. Each Evidence remains <=1048576/depth32,
+each embedded raw original <=8192/depth16, journal<=64/2 checkpoints/540672 raw
+bytes and freshness<=64/1 checkpoint/532480. An oversized wrong-profile candidate
+refuses journal_malformed or freshness_malformed, not
+registry_currency_version_mismatch. Do not parse bodies or combine raw slices to
+discover the charge.
+
+Independently preflight actual canonical serialization, references,
+base64/escaping, pin/index/audit metadata and simultaneous
+committed/staging/recovery/history copies before signing, allocation or intent.
+Waggle's 16777216-byte canonical and 33554432-byte committed-plus-staging
+ceilings are not new Keymaker allowances. Keymaker's existing tighter <=65536-byte
+policy/freshness artifact/journal-row limits, <=8192 signed records, 256 MiB
+shared state/copies, 64 MiB audit segments/1 GiB online/16 MiB refusal reserve,
+<=65536 retained row classes, 524288-byte intake, separate 2097152-byte full-proof
+bundle and entire 8192-byte WC1 wrapper including LF all still compose. Raw D45
+charge and encoded outer bundle are distinct tests even when both caps equal 2
+MiB. Maxima need not coexist. Refuse growth before new intent, retain history, and
+keep a previously pending insufficient reservation fenced; no truncation, silent
+dependency dropping, unauthorized backfill or ad hoc carrier splitting.
 
 Capacity or history overflow refuses `state_capacity_exceeded` before a new
 transition, leaves existing evidence intact and supplies no message success.
@@ -280,8 +336,8 @@ no network access and accepts no client-selected URL, root or witness stream.
 | Publication member | Retained bytes/facts and required verification |
 | --- | --- |
 | `transaction,content_id` | Exact committed certification transaction and T; match envelope body content ID, purpose-5 signature, policy, key and full binding independently. |
-| `entry,suffix` | Retain the original unsigned target `journal-entry/1` envelope `{version,body,id}` with `op:add`, `record_type:attestation/1`, `record:T`, and exact protected registry/owner/seq/prev/time. Retain the complete oldest-first contiguous inclusion suffix, including the authenticated raw anchor required by the owner-registry adapter. Other suffix entries retain their own exact supported types and record IDs: a snapshot reissue contributes `op:add,record_type:revocation/1,record:<new snapshot ID>`. Verify every entry ID/link/time and the target entry's exact T independently. An entry alone or Git commit is not proof. |
-| `checkpoint,conflict,snapshot` | Original registry-root-signed `checkpoint/1` and its exact referenced signed complete revocation snapshot; optional original second checkpoint for fork detection. Checkpoint seq equals the attestation entry or is the nearest subsequent checkpoint covering it, with verified ancestry to that exact entry. Registry/owner/root role, author signature, ids, seq/head/snapshot and time all verify under the adopted D39 profile. Purpose 5 never signs checkpoints/snapshots. |
+| `entry,suffix` | Retain the original unsigned target `journal-entry/1` envelope `{version,body,id}` with `op:add`, `record_type:attestation/1`, `record:T`, and exact protected registry/owner/seq/prev/time. Retain the complete oldest-first contiguous inclusion suffix, including the authenticated raw anchor required by the owner-registry adapter. Other suffix entries retain their own exact supported types and record IDs: an actual snapshot content change contributes `op:add,record_type:revocation/1,record:<new snapshot ID>`. Verify every entry ID/link/time and the target entry's exact T independently. An entry alone or Git commit is not proof. |
+| `checkpoint,conflict,snapshots` | Original registry-root-signed checkpoint/2 and its exact sorted per-root set of original signed complete snapshots, agreeing with the complete-prefix latest index in §4.1; optional original second current checkpoint for fork detection. Checkpoint seq equals the attestation entry or is the nearest subsequent covering checkpoint, with verified ancestry to that exact entry. Registry/owner/root roles, signatures, IDs, seq/head/set and time all verify. Purpose 5 never signs checkpoints/snapshots. Historical checkpoint/1 bytes retain their archival profile only. |
 | `validation` | Exact original verified anchor projection, protected root/policy revision, decision-time context (including durable W), verifier plan and input manifest/digests. The exact six-field projection is exactly `{registry_id,owner,registry_seq,registry_head,checkpoint_id,previous_checkpoint_id}`; do not add timestamps or trust caller-created facts. |
 | `witness` | WC1 stream/policy pins, original registry intent and matching committed resolution bytes, both original receipts, checkpoint/candidate association, independently authenticated head/control anchor and continuity evidence. Verify checkpoint time verbatim in WC1 evidence. A mere intent receipt, cached head, registry writer's claim or another consumer's stream cannot confirm publication. |
 
@@ -301,11 +357,13 @@ when the next invocation needs only the last prior checkpoint.
 
 Store the covering checkpoint at publication time. For an attestation entry E_n,
 retain C_n or the nearest subsequent qualifying covering checkpoint with every
-linking entry. If the registry appends a fresh snapshot reissue as E_(n+1),
+linking entry. For actual changed snapshot content appended as E_(n+1),
 retain E_(n+1), C_(n+1) and the exact new snapshot referenced by C_(n+1); never
 rewrite C_n. With the owner-registry bundle's raw anchor at n-1, the anchor, E_n
 and E_(n+1) occupy three of the journal's 64 total entry slots. An anchor leaves at most
-63 new entries, including any reissue. Supply one candidate checkpoint; the
+63 new entries, including any changed-content entry. Unchanged latest /2 content
+requires no new snapshot or synthetic journal entry. Supply one candidate
+checkpoint; the
 optional second is fully admitted fork evidence, never a previous/next
 checkpoint slot. Keep the per-record, 540672-byte journal aggregate and separate
 532480-byte freshness aggregate independent of the registry's 512 KiB intake
@@ -320,8 +378,9 @@ anchors only through separately verified current bounded steps, persisting each
 accepted anchor; expired intermediate checkpoints require another qualified
 path, not an old time sample.
 
-At original acceptance use the real qualified time/W, current signed snapshot
-and already independently verified witness projection. VerifyJournal checks freshness
+At original acceptance use real qualified time/W, exact selected signed snapshot
+content and the independently verified witness projection. VerifyJournal checks
+current checkpoint freshness
 (max_age <=60 seconds), genesis/ancestry and fork/rollback as specified. Its
 returned plan is not publication or a witness-update permit; atomically retain
 exact proof and required watermark before authority use, and separately satisfy
@@ -337,19 +396,20 @@ before reopening, under final serialized authority checks. Missing/stale or
 conflicting evidence keeps messages closed; restart does not turn `published`
 into `active`, forget a fence or erase a stored acknowledgement.
 
-D38=B separates ongoing snapshot freshness from retained publication inclusion.
-At initial publication, **VerifyJournal is outside receipt mode**: its candidate
-checkpoint and exact referenced snapshot must be current under real qualified
-Now/W and protected max_age<=60s. A receipt cannot waive that snapshot's own-age.
-The registry-authorized head-change reissue path supplies current evidence:
-retain cumulative entries, advance snapshot issued_at strictly, append the
-add/revocation/1 entry and retain its descendant checkpoint/exact snapshot.
-The three-entry proof and exact prior are captured by the byte-imported
-[P-JRN-publish-reissue family](../vectors/waggle-s4/README.md).
-An aged unchanged initial base still refuses; freshness/receipt composition
-cannot convert it into a journal accept. Retain pending, `key_not_enrolled`,
-no T2 activation and no T1 fallback until a valid publication proof exists.
-Never lower Now/W or replace a snapshot beneath an existing checkpoint.
+VerifyJournal /2 is outside receipt mode and verifies selected original snapshot
+content against the qualified complete prefix without snapshot own-age. Its
+current checkpoint-age/time, raw anchor/prior, signature, head/index and
+independent witness/custody predicates remain mandatory. Therefore initial /2
+publication does not require reissuing unchanged root content to make it young; a
+receipt cannot bypass this independent journal proof. Preserve historical /1
+proof/reissue vectors unchanged under their original profile. They do not mandate
+a synthetic add/revocation reissue in /2. Pending publication remains closed,
+key_not_enrolled persists, and no T1 fallback or early T2 activation follows.
+
+The original /1 head-change reissue proof and exact prior remain historical
+[P-JRN-publish-reissue fixtures](../vectors/waggle-s4/README.md), not a /2
+reissue requirement or fallback. Never lower Now/W or substitute a snapshot
+beneath an existing checkpoint.
 
 ### 4.1 B live status: full freshness admission
 
@@ -358,15 +418,62 @@ After publication, current registry-domain status uses the complete
 not a Boolean assertion or a receipt invented by the adapter. The exact inputs
 are protected independently of transport and bound to the original proof:
 
+In addition to the existing independently qualified Time/Now/W, original
+IDJournal, replay/action, owner/binding, cumulative/restore and six-field
+JournalWitness facts, /2 supplies `Context.SnapshotJournal` as
+`Present(map[string]any{"anchor": anchor, "entries": []any{rawEntryBytes,...}})`.
+Check every Present error. Anchor is exactly
+`{version,registry_id,owner,registry_seq,registry_head,checkpoint_id,latest}`,
+with `version:int64(2)`. Latest is ASCII-role-sorted and has exactly one
+`{root_role,root_key_id,snapshot_id,record_seq}` row for every configured snapshot
+role: registry-owner, plus configured grant/operator, even if omitted from
+checkpoint coverage. The purpose-5 ServiceRoot remains a distinct D30 pin, not an
+extra snapshot role. Non-null snapshot_id is an exact content ID with
+1<=record_seq<=registry_seq; null with record_seq0 means independently qualified
+absence over the complete prefix, never an uninspected role. A positive anchor
+binds the exact retained checkpoint/head; only explicit owner-qualified index
+genesis uses seq0, null head/checkpoint and all rows null/zero. There is no seq0
+witness or missing-state bootstrap.
+
+Preserve protected pairwise-distinct D30 pins; received records cannot choose or
+omit known pins. Changes to configured roles/pins requalify the complete prefix.
+IDJournalAvailable and IDJournal retain original signed bytes for every non-null
+anchor-row snapshot, scanned add/revocation reference, prior checkpoint and other
+required exact-ID evidence. Verify original IDs, issuers, signatures, closed
+schemas and every gap-free journal position through the authenticated target. New
+snapshot content must strictly advance issued_at, retain every old entry including
+future-effective entries, and never postpone from. Re-adding the current ID is a
+no-op preserving its first record_seq; re-adding an older ID cannot regress the
+row. Neither journal order nor complete=true proves independent rollback-safe
+continuity.
+
+A checkpoint/2 and freshness/2 bind the same whole sorted 1..3
+`{root_role,root_key_id,snapshot_id}` set, including registry-owner and any
+included external roots. Every selected ID equals its root's derived latest row.
+Omitted configured roles still retain index rows and originals, but receive no
+coverage waiver. FreshnessAnchor/2 is exactly
+`{registry_id,owner,publication_seq,freshness_id,issued_at,snapshots,registry_seq,checkpoint_id}`:
+replace the /1 snapshot member with snapshots, not extra fields in /1. Context
+freshness proof entries are authoritative for F; VerifyJournal instead uses its
+explicit entries argument. Positive advancing-anchor proofs include the retained
+anchor entry within the 64-entry limit, normally leaving 63 new entries. Empty
+same-head proof requires an already qualified exact index. Re-anchor never skips
+index history. Ordinary journal checkpoint-age checks still apply; stale
+intermediate checkpoints do not supply a backfill API. Beyond usable bounded
+steps, only separately owner-qualified complete-history provisioning tied to the
+final independent checkpoint/head can qualify the prefix; otherwise remain closed.
+
 | Input | Authoritative value and custody |
 | --- | --- |
 | `AgentRevocationRoot`, `RegistryOwner` | Protected exact registry-revocation key/purpose/attestation_root and owner; enforce the inherited distinct-role catalog and scope before evidence. Never select these from received assertions. |
-| `FreshnessAnchor` | Exactly `{registry_id,owner,publication_seq,freshness_id,issued_at,snapshot,registry_seq,checkpoint_id}` from the last durable accepted publication. Sequences are safe integers, registry_seq positive; IDs/timestamps use the pinned canonical types. Explicit authorized genesis has publication_seq0 and null freshness_id/issued_at, but still a positive authenticated registry checkpoint/snapshot. Missing/lost state never bootstraps. |
+| `RegistryCurrencyVersion`, receipt policy | Protected explicit version2 and required-receipt policy under §2.1.1/§4.2, never caller negotiation or a default. All configured snapshot roles have qualified index rows and protected max_age policies. |
+| `FreshnessAnchor` | Exact eight-field /2 anchor above from the last durable accepted publication. Sequences are safe integers, registry_seq positive; canonical IDs/timestamps. Explicit authorized freshness genesis has publication_seq0 and null freshness_id/issued_at but positive authenticated checkpoint and whole selected set; missing/lost state never bootstraps. |
+| `SnapshotJournal` | Original immutable Evidence from checked Present({anchor,entries}) above; preserve its identity across mint/commit/use. Persist detached Plan.SnapshotJournal separately. |
 | `JournalWitness`, `WitnessReadAt` | Independently authenticated six-field registry/owner/sequence/head/checkpoint/previous-checkpoint projection above, plus the protected time of its fresh read. Read time is >=tip.issued_at, <=min(Now,W), and at most max_age<=60s old. Never copy read time from received assertions. Resolve WC1 intent/resolution/control/continuity, not a cached head. |
-| `chain`, `checkpoint` | Original oldest-first signed freshness/1 records, exact signed checkpoint, protected root/owner/scope pins. Verify every global publication position, strict time, same-head prev and head-change null-prev rule. Normal proof has <=64 publications/one checkpoint/532480 bytes; independent journal bounds remain. |
-| `SignedSnapshots` | Exact original registry-root signed complete revocation/1, snapshot ID equal to both tip.snapshot and checkpoint.snapshot, protected max_age<=60, and independently qualified cumulative `rollback_safe`. Signature/schema/all entries and future-effective matching still verify, even when the base snapshot itself is old. |
+| `chain`, `checkpoint` | Original oldest-first signed freshness/2 records, exact signed checkpoint/2, protected root/owner/scope pins. Verify every global publication position, strict time, same-head prev and head-change null-prev rule. Normal proof has <=64 publications/one checkpoint/532480 bytes; independent journal bounds remain. |
+| `SignedSnapshots` | Exact original signed complete revocation/1 for each configured snapshot role under its own protected root, selected whole set matching tip/checkpoint/index, protected positive max_age<=60 and independently qualified cumulative rollback_safe. Verify every signature/schema/entry and future-effective match even for old unchanged content. Retain this original Evidence object as well as SnapshotJournal. |
 | `Time`, `Now`, `WatermarkAvailable`, `Watermark` | The real qualified shared timeconf decision and independently continuous durable W, not wall clock, receipt timestamps or guessed W=Now. Keep provider uncertainty/hold/continuity and existing operation/release budgets. |
-| `ids`, `keys` | At most64 exact queried record IDs (including T and applicable attestations) and at most64 key IDs for the dependent admission. Query coverage is not inferred from an empty array or a previous accept. Active generation/binding, certificate validity and WC1 remain separate mandatory checks. |
+| `ids`, `keys` | F queries remain registry-domain revocation queries, not foreign-root action verdicts. At most64 exact queried record IDs (including T and applicable attestations) and at most64 key IDs for the dependent admission. Query coverage is not inferred from an empty array or a previous accept. Active generation/binding, certificate validity and WC1 remain separate mandatory checks. |
 
 `rollback_safe` comes only from qualified cumulative-publication evidence:
 retain every effective and future-effective entry without postponing from,
@@ -375,75 +482,86 @@ continuity. Never infer rollback_safe from a re-anchor, complete=true or a highe
 An authenticated head alone does not prove unseen issuer honesty or cumulative
 publication. Unavailable evidence refuses; it is not an empty revocation set.
 
-Before dependent use, atomically retain exact signed inputs, both protected
-endpoint references, accepted new anchor and Plan.Watermark, cumulative-policy
-provenance and authenticated read/witness evidence in the single recoverable
-state/audit transaction (§5). Retain previous originals for recovery; no eviction.
+Before dependent use, atomically retain the complete index/set, expanded
+Plan.IDs/originals, endpoint references, accepted new anchor/Plan.Watermark and
+pin/version/policy/audit bindings under §5.1, including cumulative provenance
+and authenticated read/witness evidence in the single recoverable transaction.
+Retain previous originals for recovery; no eviction.
 No receipt/plan grants Commit or an effect permit. Repeat current authority and
 fresh head checks at the serialized release boundary; no RPC or provider refresh
 under generation/store locks, no new egress and no renewed deadline.
 
 ### 4.2 S5 process-local receipt composition
 
-Only full successful VerifyFreshness or VerifyFreshnessReanchor returns
-`Result.FreshnessReceipt`; every refusal has zero Plan and nil receipt. Commit
-its accepted anchor/W/evidence transaction first; then supply the original
-opaque pointer in Context with the **admitted new anchor**, real current facts
-and the **same immutable SignedSnapshots Evidence** for its entire lifetime.
-One Evidence per receipt lifetime is mandatory. Rebuilding it byte-identically
-invalidates the receipt. Snapshot bytes, root/owner/witness/anchor/read bindings,
-cumulative/rollback-safe premise or process change requires fresh full F
-verification, including after a change that later returns to the same values.
-After restart, revalidate retained inputs and perform a new VerifyFreshness;
-never deserialize/recreate the old receipt, use Present to admit it, or persist
-private fields/a verified=true surrogate. A re-anchor must mint its own fresh
-receipt after full successful recovery verification, never reuse the old one.
+Only full successful VerifyFreshness or explicit VerifyFreshnessReanchor mints a
+process-local receipt; a refusal has zero Plan and nil receipt. First durably
+commit the admitted anchor, detached Plan.SnapshotJournal, dependencies/originals,
+pin/version and W in the one recoverable transaction. Then use the original
+receipt with the admitted new FreshnessAnchor and **both original immutable
+SignedSnapshots and SnapshotJournal Evidence objects** from mint. Persist
+Plan.SnapshotJournal separately from the original proof premise; do not rebuild
+SnapshotJournal from the newly committed index while retaining that receipt.
+Byte-identical Present reconstruction of either Evidence invalidates it. Never
+persist the receipt, private fields, Evidence object identity or a verified flag
+as authority. Restart or premise/head/version/pin changes require reconstructed
+protected inputs and a new full F decision; changing back to old-looking values
+does not restore the old receipt.
 
-Keymaker adopts registry-root own-age composition only for receiver/agent
-VerifyAttestation, VerifyMessage and its standalone registry CheckRevocation
-path. It creates no Authorize/VerifyEnvelope capability. For completeness the
-pinned §2.10 classification covers **all 17 exported callables** (VerifyAttestation
-has two path classes, counted once):
+Set RequireFreshnessReceipt=true on every adopted currency-required consumer path,
+including Q7 when separately enabled, and require coverage for every root actually
+reached by that operation. Under /2, agent VerifyAttestation covers
+registry-owner, device VerifyAttestation covers operator, VerifyMessage covers
+registry-owner and reached operator-device approvers, VerifyOperator covers
+operator, VerifyServiceAttestation covers grant, and CheckRevocation covers its
+explicit protected root. This is a contract table, not a new Keymaker capability:
+Authorize/VerifyEnvelope and service verification remain outside adoption unless
+separately authorized. VerifyJournal/VerifyFreshness/VerifyFreshnessReanchor
+remain independent proof/producer paths outside receipt mode;
+New/Present/IsAvailable/Audit/serialization/OperatorRecordCode grant no admission.
 
-| Class | Exported calls | Rule |
-| --- | --- | --- |
-| May waive only bound registry snapshot own-age | VerifyAttestation(agent), VerifyMessage, CheckRevocation; library Authorize and VerifyEnvelope where applicable | Validate R1–R3 and all other checks. CheckRevocation's explicit root must match. Keymaker adopts only the three named receiver/status paths. |
-| Validate-only | VerifyAttestation(device=true), VerifyOperator, VerifyServiceAttestation | Supplied receipts validate R1–R3 but cannot waive operator-root/grant-root own-age. No new operator or service policy is activated. |
-| Outside receipt mode | VerifyJournal, VerifyFreshness, VerifyFreshnessReanchor | Ignore FreshnessReceipt, RequireFreshnessReceipt and FreshnessMarginSeconds even if invalid; independently run complete journal/F contracts. |
-| Context storage only | New | Does not verify a receipt or grant admission; the later method chooses the class. |
-| Context-free evidence | Present, Evidence.IsAvailable | No receipt-consuming admission; Present still rejects receipt construction. |
-| Context-free code mapping | OperatorRecordCode | No receipt-consuming admission or freshness authority. |
-| Origin metadata only | FreshnessReceipt.Audit | Authentic-origin bool and detached Audit() identifiers only, never currency or authority. |
-| Unsupported persistence | FreshnessReceipt.MarshalJSON, FreshnessReceipt.UnmarshalJSON | Refuse receipt JSON encoding/decoding; no accepted wire or persistence format. |
+A supplied receipt is globally validated before any own-age waiver, even when
+optional. Waive only the exact reached covered root/snapshot's own-age slot;
+preserve signatures, complete schema, cumulative premises, non-future checks,
+effective revocation, owner/binding/generation, operation/certificate validity,
+action/replay and commit authority. Required missing coverage refuses even if
+own-age would pass. Optional uncovered-root own-age behavior describes the
+upstream library only, never a fallback for a Keymaker currency-required path.
+Invalid/expired/foreign/rebuilt-premise receipts never retry without the receipt.
+A is the minimum protected max_age of **included** roots only, 0<A<=60. Fixed
+E=min(tip.issued_at+A,mint WitnessReadAt+A); use requires
+max(Now,W)<E-FreshnessMarginSeconds. Margin is protected, conservatively mapped
+from qualified timeconf bounds within integer 0..60, not supplied by a caller;
+unsupported safe mapping refuses. A later read cannot extend E. Future-from
+entries may become effective during the receipt lifetime and must still revoke.
 
-For consumers/validate-only calls, `RequireFreshnessReceipt=true` rejects absence;
-optional nil/false retains legacy own-age behavior. **Any supplied invalid receipt
-refuses even when own-age would pass; no legacy fallback.** R follows the
-existing trusted-time gate and precedes validity continuation. Preserve exact
-freshness_receipt_unavailable, freshness_receipt_invalid,
-freshness_receipt_binding_mismatch and freshness_receipt_expired decisions locally
-and the existing outer native outcomes. An old base can pass only its bound
-registry own-age replacement: signatures, completeness, all effective/future
-revocation matches, active status and current authorization are never waived.
+Obtain and authenticate the independent witness for each admission, including
+re-entry after asynchronous work, outside final locks. Within the final serialized
+window compare the exact head/state revision and enforce qualified
+read-age/original-deadline bounds; a change requires new evidence outside the
+window. No provider/network acquisition under final locks, cached last-good
+fallback, refreshed stage budget or receipt-as-effect-permit is allowed.
 
-Expiry is fixed at mint: `E=min(tip.issued_at+A, issuing WitnessReadAt+A)`, A<=60s.
-Use requires `max(Now,W) < E - FreshnessMarginSeconds`. The nonnegative integer
-margin0..60 comes conservatively from the qualified timeconf uncertainty/decision
-bounds, not a caller option; refuse if a safe supported margin cannot be mapped.
-It only tightens admission, never extends E, changes Now/W or replaces the
-provider's own gates. Newer witness reads cannot extend expiry; the read must
-remain non-future and no earlier than the mint read. An inclusive-age F accept
-at E may mint a receipt already unusable by consumers. Future from may become
-effective before expiry and MUST still revoke.
+R still follows the first trusted-time gate before validity continuation. A
+later witness read remains non-future and no earlier than the mint read; it
+cannot renew fixed E. An inclusive-age F accept at E may mint a receipt already
+unusable by consumers. FreshnessReceipt.MarshalJSON/UnmarshalJSON still refuse
+serialization, and Present cannot manufacture a receipt.
 
-Audit derives receipt metadata only through `Audit()` identifiers: registry,
-owner, snapshot/checkpoint/freshness IDs, reanchored status and old endpoint IDs.
-Its bool proves origin only. No opaque pointer/private fields or original
-proof bytes enter a base audit row; §5 binds retained typed artifacts by digest.
-Registry S5 never extends operator-root device/act evidence: Q7 persistent revoke
-remains closed until its independent sources/durable gates and D42 policy exist.
-Current registry freshness neither refreshes stale operator evidence nor revokes
-otherwise current independent operator evidence merely because registry B is idle.
+Preserve the exact closed fine decisions freshness_receipt_unavailable,
+freshness_receipt_invalid, freshness_receipt_binding_mismatch and
+freshness_receipt_expired, and existing outer native outcomes. The sole new S8
+fine decision is registry_currency_version_mismatch. Supplied invalid receipts
+never retry without the receipt. Additional preparation-stage J/F-to-native
+mappings outside these owning contexts require an explicit closed mapping; no
+generic diagnostic or future-code prefix supplies one. The operator coarse
+mapping and closed audit allowlist are in [operator-record §5](keymaker-operator-record.md#5-public-codes-and-audit-delta)
+and [base §11.1](keymaker.md#111-operator-record-audit-extension).
+
+Audit metadata comes only from authentic Audit() origin; persist the detached
+version/set/identifier mapping in §5.1, never pointer/private fields, raw proof
+bytes or a persisted origin bool as authority. Q7 remains closed pending its
+independent source/custody/durable/audit/native gates. Registry-owner coverage
+cannot waive a reached operator root's own-age or any independent authority.
 
 ### 4.3 Explicit re-anchor and owner recovery runbook
 
@@ -459,9 +577,13 @@ from a failed normal proof. It requires a real positive retained old publication
 fresh authenticated current witness/read, exact signed tip/checkpoint/snapshot,
 qualified cumulative rollback_safe and real Now/W. Tip publication_seq and
 issued_at must strictly advance. SAME registry head is allowed only at equal
-registry_seq with identical checkpoint ID/head and snapshot; lower sequence or
+registry_seq with identical checkpoint ID/head and whole sorted snapshot set;
+lower sequence or
 equal-position conflict refuses. A head advance needs its validated new binding.
 No re-anchor establishes missing genesis, cumulative truth or hidden ancestry.
+It never skips SnapshotJournal history: a higher head requires a qualified
+complete new index. Long-gap handling uses existing consumer-owner authority,
+not a new D42 choice, automatic waiver or invented migration authority.
 
 Owner runbook, no new command or installed recovery implementation:
 
@@ -476,14 +598,18 @@ Owner runbook, no new command or installed recovery implementation:
    closed. Missing current evidence is not repaired by a historical receipt.
 3. Pure-verify the explicit sibling. On refusal keep all old anchors/evidence;
    no truncated normal proof or partial Plan use. On accept independently check
-   Plan.Reanchor's flag/count and both endpoint IDs against retained originals.
+   Plan.Reanchor's flag/count, old/new whole sets/currency versions and all endpoint
+   IDs against retained originals; preserve old evidence even if absent from
+   returned Plan.IDs.
 4. Reserve real encoded bytes for the full recovery transaction and copies;
    durably retain §5's typed artifact and endpoint evidence. Atomically commit
-   new anchor, W, artifact references and event/binding audit. Unknown append,
+   complete index/set/dependencies/originals, new anchor, W, protected pin/version,
+   artifact references and event/binding audit. Unknown append,
    sync/rename/cleanup outcome fences; qualified exact-outcome recovery only,
    with no fabricated re-anchor or receipt. PC2/C obligations remain separate.
-5. After commit, use the newly minted receipt with its one immutable Evidence
-   only while R and every current release predicate still pass. Reopen only
+5. After commit, use the newly minted receipt with BOTH ORIGINAL SignedSnapshots
+   and SnapshotJournal Evidence objects only while R and every current release
+   predicate still pass. Reopen only
    after all §7 gates, not merely because an endpoint audit digest exists.
 
 Cost accepted only by that explicit recovery approval: **skipped freshness-fork
@@ -547,44 +673,40 @@ and `request_id:msg:<transaction>:freshness` or `:reanchor`, with a unique retai
 service transaction ID. `payload_digest` hashes the exact canonical artifact,
 not a receipt pointer, log string or the snapshot containing its own audit link.
 
-The proposed versioned artifact has exactly
-`{kind,transaction,mode,policy,old_anchor,new_anchor,watermark_before,watermark_after,
- witness,witness_read_at,proof,checkpoint,snapshot,endpoints,receipt_audit,reanchor}`.
-`kind` is `message-freshness/1`; mode is `normal` or `reanchor`. Anchors have the
-exact eight fields in §4.1; witness is the six-field authenticated projection.
-Policy is an immutable reference binding protected root/scope, cumulative/restore
-qualification and time policy. Proof is the bounded ordered array of original
-signed publication references; checkpoint/snapshot are references to exact
-signed bytes. Every artifact reference is `{hash,bytes}` with the established
-SHA-256/encoded-byte bounds, resolving to already synced retained immutable
-objects. No self-reference/circular hash or unresolved URL is permitted.
+The local /2 policy, Anchor2/Index2, message-freshness/2, ReceiptAudit2,
+Reanchor2 and keymaker-message-authority/2 mappings are specified in
+[authority-root §7.3](keymaker-authority-root.md#73-2-currency-successor-contracts).
+That inner-map target does not select an enclosing codec/dispatch/preimage,
+versioned union or archived /1 carrier. Qualify those and the external reader/
+currency floor before code; never reinterpret old closed bytes or discard
+history. Historical /1 artifact definitions remain in
+[§7.1–7.2](keymaker-authority-root.md#71-retained-s4s5-inventory-in-this-same-codec).
+All original reference/hash/sort/count/bounds remain unless explicitly replaced.
+Every endpoint ID must recompute from retained signed originals and match its
+anchor; old freshness may be null only for qualified normal genesis, never
+re-anchor. Normal mode has reanchor=null. Approved re-anchor retains exact
+new publication_seq-old publication_seq-1, including zero, and skipped-fork cost.
+Authentic producer Audit origin/non-null matching identifiers are required for
+an accepted producer commit; null audit is unsuccessful-attempt evidence only.
+No persisted audit identifier or hash can become currency or effect authority.
 
-`endpoints` is exactly `{old,new}`; each is `{freshness,checkpoint}`, references
-to the corresponding original signed publication/checkpoint bytes (old freshness
-null only for authorized normal genesis, never re-anchor). `receipt_audit` is
-null if no authentic producer receipt exists, otherwise a detached typed copy
-of Audit() identifiers only per §4.2, never authority. An accepted producer
-commit requires authentic Audit origin; null is only unsuccessful-attempt evidence
-and cannot advance anchor/W. For normal mode reanchor is null; for reanchor it is exactly
-`{reanchored:true,skipped_publications,old_freshness_id,new_freshness_id,
- old_checkpoint_id,new_checkpoint_id}` from Plan.Reanchor. The nonnegative exact
-count is **new publication_seq - old publication_seq - 1**, including zero.
-Endpoint IDs MUST recompute from referenced originals and match both anchors;
-checkpoint references bind both full endpoint registry heads. A digest without
-retained resolvable endpoint evidence is insufficient.
+Retain the exact expanded, first-occurrence-deduplicated Plan.IDs order and
+independently required old endpoint history under
+[authority-root §7.3](keymaker-authority-root.md#73-2-currency-successor-contracts).
+Resolve every required original; no old single-snapshot projection may drop IDs.
 
-Reserve artifacts, predecessor/successor bodies, recovery/staging copies and
-audit headroom under the shared state budget before writes. File/directory sync
-and exact artifact hashes precede commit references. Publish accepted new anchor,
-Plan.Watermark and these references in one serialized recoverable snapshot/
-audit transaction, pairing message_freshness_commit with binding_commit and
-existing rename/directory-sync barriers (and PC2 common-root/cleanup if enabled).
-No use/release before proven durability; preserve exact uncertain candidate,
-old/new bodies and holds on any unknown outcome. Recovery must resolve the
-recorded outcome, never re-mint a receipt or recalculate a skip waiver. A fresh
-F decision after restart remains mandatory. Artifacts/histories are retained;
-this defines no eviction or on-disk schema-2 bypass. The explicit successor
-codec/migration/floor and recovery qualification in §2.1.1 are activation gates.
+Atomically bind the complete index, exact version/pin policy, expanded
+ID-to-original dependencies, old/new anchors/endpoints, detached audit/re-anchor
+sets and versions, original witness/read/proof references and Plan.Watermark in
+one recovery-qualified transaction. Sync dependencies before references. Pair
+message_freshness_commit with binding_commit, existing rename/directory-sync and
+common-root durability/intent cleanup where PC2 participates. A standalone
+accepted journal step also commits its index/originals/proof/W atomically; it
+invents no freshness publication or effect authority. No index side file, second
+commit authority, future/self hash or new capacity participant is introduced.
+Unknown outcomes retain exact candidates, old/new bodies, holds and evidence, not
+an inferred rollback or recalculated skip waiver. A fresh F decision is mandatory
+after restart; exact-outcome recovery itself does not mint a receipt.
 
 ## 6. Paired negative text vectors
 
@@ -593,6 +715,11 @@ Run each crash row for both initial issuance (previous current null) and renewal
 (previous valid T1), checking disk/audit state, no message output and no extra
 signature calls during recovery. Controls require exact expected outcomes, not
 merely any error. Bound examples satisfy all other limits.
+
+The S4/S5-specific MS-S12–MS-S25 and imported currency/receipt assertions retain
+their original /1 profile and exact names as historical evidence. They are not
+/2 current-authority fallback or /2 qualification. The /2 paired requirements
+in §7 preserve all independent authority/time/capacity/recovery gates.
 
 | Vector | Forbidden outcome / required rejection and retained state | Nearby positive control |
 | --- | --- | --- |
@@ -634,37 +761,64 @@ fixture expectations, not a claim that Keymaker executes this verifier today.
 
 ## 7. Remaining gates
 
-**K3 activation stays closed.** The following conjunctive gates, not a library
-accept or this spec adoption alone, permit enabling it:
+**K3 activation stays closed.** D42(a) option I is settled and waggle S8 is
+landed; it does not close Q7 or K3. Waggle implements pure /2
+index/currency/receipt decisions. Keymaker's current go.mod and in-memory message
+adapter remain S4/S5; it has no /2 fact slots/version dispatch or accepting
+production currency adapter. Its schema-2 publication state, full durable /2
+proof/index/version audit integration, external sources, migration/floor and
+native admission/release qualification remain unavailable. K3-G1/G4/G6/G7 and Q7
+source/custody/durable/audit/native requirements remain conjunctive gates;
+K3-G3/G5 remain conjunctive with their exact /2 successor definitions in the table
+below. K3-G2 authority and every existing base generation/root/time/recovery gate
+remain independent. Retained /1 assertions are historical-profile evidence, not
+conflicting /2 gate definitions or current-authority fallbacks. No root operation,
+admission, message signing, persistent revoke, live fetch or activation follows
+from this policy.
 
-Implemented in memory: `TestMsgS4ImportedJournal` executes the unchanged MS-S12
-positive and six imported MS-S12–15 negatives with exact codes/zero refusal plans;
-`TestMsgS4EqualCheckpointTime` covers equal-time admission. `TestMsgS45Caps`
-covers MS-S23–25 size gates, including original context/prior/snapshot/control
-encoding and the whole WC1 wrapper including LF. Padding is only a size-gate
-control, not real WC1 or maximal full-proof qualification. `TestMsgS5ReceiptConsumers`,
-`TestMsgS5OperatorOwnAge`, `TestMsgS5ReceiptNotPersistable` and
-`TestMsgS5ReanchorAudit` cover portions of MS-S17–22 at the library boundary:
-one Evidence lifetime, own-age restrictions, restart non-serialization and
-normal/explicit skip endpoint metadata. No retained proof, anchor/W, durable audit
-or release transition is implemented by these pure calls. The rows requiring
-actual publisher, WC1, time or atomic recovery remain PENDING below.
+Retain `TestMsgS4ImportedJournal`, `TestMsgS4EqualCheckpointTime`,
+`TestMsgS45Caps`, `TestMsgS5ReceiptConsumers`, `TestMsgS5OperatorOwnAge`,
+`TestMsgS5ReceiptNotPersistable` and `TestMsgS5ReanchorAudit`, their original
+names and MS-S/imported assertions under the original S4/S5 pin/profile. Their
+existing executions and any /1 head-change-reissue, one-Evidence or
+operator-own-age assertions are historical /1 evidence only; they do not qualify
+/2 or require /1 behavior on an adopted /2 path. G7 retains those historical
+regression obligations, while changed /2 contracts need separately qualified
+paired evidence. Independent applicable capacity, authority/time and recovery
+requirements remain mandatory. Padding is only a size control, not actual
+WC1/full-proof qualification. Pure calls implement no retained /2
+proof/index/set/originals, durable anchor/W/audit or release transition. Actual
+publisher/WC1/time, atomic custody, migration/floor, recovery/audit and native
+qualification remain PENDING.
 
 | Gate | Required integration/qualification before activation |
 | --- | --- |
 | K3-G1 exact adapter/version | Implemented in memory: waggle `5f4e743`, journal/freshness/explicit-reanchor and receipt-aware attestation/message adapters, exact prior checkpoint custody inputs, endpoint/skip origin audit and separate outer size gates. PENDING: review and production integration; explicit successor state/artifact codecs, protected floor and quiesced migration/recovery retaining every S2 history/result/fence. Current production still rejects populated publication state. PC2 combined-root/preimage/restore acceptance remains required wherever PC2 participates; no second commit point or implicit C switch. |
 | K3-G2 actual authority | Qualified protected root/owner/lineage/epoch policy, purpose-5 scope and <=24h lifetime, exact active-generation/binding/T/current-status checks and qualified-T1 renewal; native signing/retry/actual-release implementation. Existing kernel/generation/enrollment deadlines and gates remain. |
-| K3-G3 publication custody | Real owner-registry publisher boundary, D39 raw anchor and exact prior IDJournal custody, current head-change reissue/inclusion proof, complete signed records/retention and independent WC1 committed pairing/head/control/transport/custodian. No client URL, extra egress or fake witness. |
+| K3-G3 publication custody | PENDING /2: Real owner-registry publisher boundary, D39 raw anchor and exact prior IDJournal custody; gap-free complete-prefix qualification through the current checkpoint/2/head, full configured-role index including omitted roles, selected sorted per-root set, original signed snapshots and all required entry/dependency/endpoint history. Prove actual changed-content submissions' inclusion and derived latest selection. Unchanged authentic latest content requires no head-change reissue or synthetic add/revocation; it still requires the independent current journal/checkpoint proof and qualified bounded catch-up of §4/§4.1. Retain independent WC1 committed pairing/head/control/transport/custodian and authenticated read qualification. No client URL, extra egress, fake witness, missing history or receipt-as-inclusion-proof. |
 | K3-G4 time and cumulative premises | Qualified timeconf collection/uncertainty/hold/continuity and safe margin mapping within existing deadlines, durable W bootstrap/advancement/restore continuity, real authenticated witness read and independently qualified cumulative rollback_safe. No W=Now, old-clock or complete=true substitutes. |
-| K3-G5 receipt and live B | Atomic retained F proof/new-anchor/W before use; original in-memory pointer/one Evidence lifetime, full current queries and R checks at release/restart, no old-base initial publication via receipt, no operator-root extension. |
+| K3-G5 receipt and live B | PENDING /2: Atomically retain F proof, complete detached Plan.SnapshotJournal index, whole sorted selected set, expanded Plan.IDs/dependency and old/new endpoint originals, new anchor, W, protected pin/version and audit before use in the one recoverable transaction. Keep BOTH ORIGINAL in-memory SignedSnapshots and SnapshotJournal Evidence objects from mint through commit/use; persist the detached index separately, never reconstruct either premise for the old receipt. Enforce full current queries, global R checks and every reached root's exact required coverage at release/re-entry; restart or premise/head/pin/version change requires a new full F decision. Covered reached operator content may waive only its own-age slot; registry-owner-only coverage never covers operator and no /1 fallback supplies currency. Preserve effective revocation, current authority/time/windows, fixed E-minus-margin, original deadlines and independent journal proof; a receipt cannot bypass initial publication custody or grant effect authority. G1 migration/floor/atomic state, G6 recovery/audit and G7 actual live multi-UID/native release qualification remain closed prerequisites. |
 | K3-G6 bounded recovery/audit | Reviewed explicit owner re-anchor policy/runbook, retained endpoint/skip artifact and atomic audit/root transaction, independent no-hidden-revocation premise and declared skipped-fork-detection cost; exact unknown-outcome handling, capacity/archive and old-instance exclusion. Without re-anchor approval only bounded normal catch-up is usable and over-bound outage stays closed. |
 | K3-G7 executable evidence | Execute paired MS-S01–MS-S25 and imported positive/six negatives, actual crash/sync/restart/restore/replay/receipt/margin/expiry and negative-control evidence, live multi-UID/native release and real storage/provider/publisher/WC1/capacity qualification. Text rows and upstream byte equality are not these passes. |
 
 Q7 persistent revoke remains independently closed pending its sources, durable
-integration and D42 offline-root policy; S5 registry composition neither opens
-nor substitutes that operator-domain gate. All base root-custody/generation and
+integration; settled D42(a) option I and /2 registry composition neither open
+nor substitute that operator-domain gate. All base root-custody/generation and
 owner recovery requirements remain. No supplied formal catalog surface table
 (brief gap); no requested row is excluded. The in-memory tests above do not
 qualify deployment, publisher/receiver transport, real authority or durable
 commit/recovery. K3-G1's successor codec/floor/migration and K3-G2–G7 remain
 PENDING; production activation stays unavailable.
+
+Current /2 documentary controls, **PENDING / NOT RUN**:
+
+| Contract | Required positive and forbidden outcome | Prospective control |
+| --- | --- | --- |
+| Reached operator currency | Old unchanged authentic latest operator content with exact required operator coverage, BOTH ORIGINAL Evidence objects, atomic complete custody and use before E-margin may pass currency, subject to independent gates. Registry-owner-only coverage refuses freshness_receipt_unavailable even for young operator content; rebuilt Evidence cannot reuse the old receipt, and /1 cannot supply current pin2 authority. | TestK3D42RequiredRootCoverage / TestK3D42ReceiptEvidenceLifetime; reinstating a blanket operator waiver ban must break the valid covered /2 control. |
+| Initial publication | A real gap-free current prefix/checkpoint/2 may select authentic unchanged latest content without synthetic add/reissue, subject to publisher/WC1/authority/custody qualification. Receipt-only proof, missing index/originals, current /1 substitution, regressed latest selection or missing reached-root coverage cannot qualify. | TestK3D42CompletePrefixLatest; mandatory head-change reissue must break the valid no-reissue /2 control. |
+
+These text controls and upstream pure-library results are not runtime, storage,
+source, native or activation qualification. Actual /2 paired execution, including
+pin/floor/upgrade, audit/reanchor sets, capacity-before-profile and closed reasons/
+expiry, remains required. Uncertain transactions retain exact holds and evidence;
+no test or recovery may infer a prior no-effect result from an unknown outcome.

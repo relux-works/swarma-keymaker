@@ -462,7 +462,8 @@ owner registry. Until that registry exists, nothing is published and message
 signing is closed. Retain the exact journal entry for T, its nearest covering
 signed checkpoint and WC1 confirmation; only publication-backed activation
 makes T current. The [publication state contract](keymaker-msg-state.md#4-publication-record-and-restart)
-adopts pinned waggle S4/S5's D39 journal and separate freshness/receipt contracts;
+targets waggle S8 /2 currency, retaining the historical S4/S5 D39 journal and
+separate freshness/receipt contracts under their original profile;
 it specifies durable acknowledgement/restart and independent journal/freshness
 bounds. Runtime dependency/integration remains a later slice. Private material
 is never published.
@@ -477,13 +478,19 @@ plus their scope/purpose and epoch. Root-role overlap refuses before signed
 evidence intake; successful cryptography cannot widen a root's language. It then
 applies waggle §2.6's ordered envelope/header, content-ID/root-signature,
 complete typed profile/current binding/time, and separately authorized signed
-revocation-snapshot checks. For registry-root snapshot own-age only, the adopted
-[S5 receipt contract](keymaker-msg-state.md#42-s5-process-local-receipt-composition)
-permits VerifyAttestation(agent)/VerifyMessage receiver composition after full F
-admission and atomic retention. It does not extend certificate validity, active
-generation, operator/device or grant evidence. Invalid supplied receipts refuse;
-there is no legacy fallback. Initial VerifyJournal publication still requires
-its own current snapshot, including the real head-change reissue path.
+revocation-snapshot checks. The adopted
+[/2 receipt contract](keymaker-msg-state.md#42-s5-process-local-receipt-composition)
+requires full F admission, complete-prefix/latest-set validation and atomic
+index/set/originals/anchor/W/pin-version/audit retention. Require exact coverage
+for every reached root: VerifyMessage covers registry-owner and reached operator
+approvers; registry-only coverage cannot waive operator own-age. Retain BOTH
+ORIGINAL SignedSnapshots and SnapshotJournal Evidence through mint/commit/use;
+reconstructed Present values invalidate the receipt. Waive only the covered
+root/snapshot's own-age; certificate validity, active generation, owner/current
+binding, signatures, cumulative/from and all independent time/effect gates stay
+mandatory. Invalid/missing required receipts never select legacy fallback.
+Initial VerifyJournal /2 independently checks current checkpoint/proof/index
+and authentic latest content without requiring unchanged-content reissue.
 It additionally checks protected registry lineage, numeric purpose 4 and the
 exact path relationship from §2.1. These protected facts are not invented
 certificate members. Require Ed25519 subject/key-ID correspondence, author
@@ -524,21 +531,28 @@ attestations, and the purpose-5 root cannot sign snapshots; either cross-signatu
 wrong purpose/scope or overlapping root roles refuses `key_binding_invalid`.
 Missing protected policy is unavailable. Operator-device snapshots keep their
 operator root and grant snapshots their grant-owner root. Both issuer/verifier enforce the
-8192-byte evidence cap and typed timestamps. Authenticated complete snapshots
-need rollback continuity and protected positive maximum age <=60 seconds;
-future-issued, stale, incomplete, missing or rolled-back evidence refuses.
-Validate every entry before matching; key or attestation-record revocations
-are cumulative, effective at `from <= max(now,W)` per waggle §2.6, where
-W is the verifier's durable time watermark (§3.3 there). Root
-withdrawal remains an independent protected owner-pin/recovery action.
-For first containing snapshot issued at S, protected maximum age A (0 < A <=60 s)
-and entry `from`, the distribution bound is **max(S + A, from)**; there is no
-withdrawal guarantee before issuance S, no earlier effect than `from`, and no
-end-to-end platform completion promise. Every later complete snapshot retains
-entries (including future-effective ones), never moves `from` later, and has
-strictly increasing `issued_at`; equal-time retransmission must be identical.
-Consumers serialize snapshot currency with their effect gate. This closes
-S0's D29 timing decision without granting Keymaker snapshot-signing authority.
+8192-byte evidence cap and typed timestamps. Authentic complete snapshots need
+independent cumulative rollback/restore continuity and future-issued rejection.
+Under required /2 currency, unchanged latest external-root content does not expire
+merely because its original signature is old: the authenticated observed prefix,
+whole sorted set and required exact reached-root coverage supply currency.
+Validate every entry before matching; revocations remain cumulative and effective
+at `from <= max(now,W)`, even with old message iat or an unexpired receipt. A newer
+snapshot retains every old/future entry and never postpones from. Root withdrawal
+is a separately protected owner-pin/recovery action; Keymaker gains no signer.
+
+After the observed authenticated witnessed prefix contains newer cumulative root
+content, a new /2 admission cannot select its predecessor. The old max(S+A,from)
+bound is historical own-age-profile evidence, not an external-root /2 withdrawal
+bound or periodic re-signing requirement. Signing/submission withholding,
+unobserved tails, earlier receipts until fixed expiry and immediate global
+revocation are unbounded here. Separately qualify publication latency; no
+end-to-end platform completion promise follows. Consumers serialize currency
+with current effect authority and original operation/certificate deadlines.
+External root applications retain changed-content submissions and independently
+verify their gap-free inclusion/latest selection and authenticated witness head;
+publishers retain complete original journal/publication history. These are
+source obligations, not Keymaker root operations or an implemented service.
 
 Existing authorized binding revoke remains the sole local source of truth:
 it tombstones the identity path and withdraws the purpose-4 sibling under the
@@ -584,10 +598,10 @@ implementation, publication and qualification remain gates.
 | Fields absent from the new wire profile | `identity_path`, `registry_revision`, `issuer_path`, `issuer_purpose` are not attestation members. Enforce identity sibling/registry lineage/root tuple/purpose using independent protected evidence and pins; do not add unknown wire fields or claim the certificate signs these facts. These inputs need Q10 qualification. |
 | Binding path semantics | waggle specifies an opaque protected `binding.path` string; this consumer requires it to be the purpose-4 subject path. Both producer and protected evidence must use that meaning; an identity-purpose path cannot be silently substituted. This is an explicit consumer mapping; live issuer/evidence conformance remains Q10 qualification. |
 | Field ranges and evidence size | New binding strings <=255 bytes, UID excludes 4294967295 although native UIDs fit uint32, registration <=9007199254740991, timestamp years 1970–9999. Old certificate imposed no explicit whole-envelope cap; new evidence <=8192 bytes, depth16/string8192/array64. Issuer rejects nonrepresentable or oversized records; never truncate/coerce/omit binding fields. |
-| Lifetimes and status | Agent 86400-second ceiling matches on both sides; message bodies instead have <=120-second lifetime at receivers. Snapshot <=60-second freshness/64-entry cap and rollback continuity are additional requirements. Overflow cannot drop tombstones or claim completeness; rollover/publication capacity needs Q10 qualification. Snapshot currency does not replace fresh generation status. |
+| Lifetimes and status | Agent 86400-second ceiling matches on both sides; message bodies instead have <=120-second lifetime at receivers. The protected <=60-second freshness policy/64-entry cap and rollback continuity remain; /2 exact-set currency replaces only covered snapshot own-age under §4.3. Overflow cannot drop tombstones or claim completeness; rollover/publication capacity needs Q10 qualification. Snapshot currency does not replace fresh generation status. |
 | Purpose-5 revocation signing authority — resolved | Landed [§2.6](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#26-root-signed-attestations-and-shared-revocation) (X25/D30) restricts purpose 5 to agent attestation/1; the separately pinned registry-owner revocation root distributes binding withdrawal. Pairwise distinct roots and exact revoker scope are mandatory; cross-signatures refuse (§4.3). Keymaker provides no snapshot signer or new publication interface. |
 | Stable-key generation association — resolved | Landed [§2.5](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#25-message-signer-provider-opaque-canonical-bytes) and [§2.6](https://github.com/relux-works/waggle/blob/67df75bec015ea463f685e4daf4975ecda18816a/spec/swarm-envelope-2.md#26-root-signed-attestations-and-shared-revocation) (X01) bind the exact attestation ID in signed body.author_attestation. Signer checks the current active binding's T; receiver verifies precisely that referenced record before late author_attestation_mismatch. Another generation's attestation for the same stable key refuses (MSG-V25). No creation-time oracle is claimed. |
-| Landed-head delta check | Compared with the previous draft: three paths replace two; purpose-5/snapshot authority and generation association are resolved; revocation bound is max(S + A, from), A <=60 seconds (D29). The 24576/12 limits, string8192/array64, all nine literal labels, raw-key ed25519 ID form, and every §4.2 attestation field/range are unchanged. Agent grant issuance and WebAuthn assertions remain outside v0. D32 records trust-node placement, not deployment. |
+| Landed-head delta check | Compared with the previous draft: three paths replace two; purpose-5/snapshot authority and generation association are resolved; the original D29 max(S+A,from), A<=60 own-age bound remains historical for that profile; current /2 currency follows §4.3. The 24576/12 limits, string8192/array64, all nine literal labels, raw-key ed25519 ID form, and every §4.2 attestation field/range are unchanged. Agent grant issuance and WebAuthn assertions remain outside v0. D32 records trust-node placement, not deployment. |
 
 Every curator-required certificate fact is present or mapped explicitly in
 §4.2: uid, generation, registration_number, master epoch, subject purpose
@@ -716,7 +730,7 @@ signs/verifies P with the certified purpose-4 key or states its narrower control
 | MSG-V21 mandatory identity and resolution | Remove any of `key`, `body.author`, `body.author_attestation` (including canonical `{}`), use a canonical top-level scalar/array, set body to a scalar or any identity field to a non-string: `signer_identity_malformed`. Separately remove/invalidate protected resolved key/current attestation/policy after valid native admission: `signer_identity_unavailable`. All non-retryable | Correct BOUND_RECORD and valid caller identity resolution sign; precise generation/revoke failures retain their native codes |
 | MSG-V22 unique field resolution | Duplicate any of the three decoded authority members, including escaped aliases: `ccj_noncanonical` (canonical duplicates are impossible); use arrays/multi-value objects for any identity string: `signer_identity_malformed`; no first/last/alias choice | Exact `key` and `body.author` each resolve once to M's key ID and `body.author_attestation` to current T; disjoint opaque members cannot substitute |
 | MSG-V23 attestation closed schema and bounds | Omit any required certificate or binding member: verifier `key_binding_unavailable`; wrong type/profile/key-id/root/purpose, inactive binding, 86401-second window, evidence >8192 bytes, depth17, UID 4294967295, registration 9007199254740992 or binding string 256 bytes: verifier `key_binding_invalid`. Issuer refuses these before signing; never omit/coerce to fit | Complete §4.2 purpose-5 certificate with exact active binding, valid <=86400 window and each applicable boundary within 8192-byte evidence verifies; exact 8192-byte evidence is a codec boundary control only if all other profile limits hold |
-| MSG-V24 shared revocation and currency | Missing/stale/future/incomplete/rolled-back registry snapshot refuses current use as unavailable; malformed/signature-invalid or purpose-5-root-signed snapshot, registry-root-signed attestation, wrong scope/purpose or overlapping root roles refuse as invalid; effective key or attestation-record entry rejects even with old body.iat. Bound is max(S + A, from), A <=60 s | Complete authentic fresh continuous snapshot with no effective match plus independently active status allows the ordinary certificate/message checks; registry-owner revocation root, purpose and scope satisfy §4.3 |
+| MSG-V24 shared revocation and currency | Missing prefix/originals/required reached-root coverage, stale/invalid receipt or non-latest selected content refuses with exact /2 codes; malformed/signature-invalid or purpose-5-root-signed snapshot, registry-root-signed attestation, wrong scope/purpose or overlapping roots still refuses. Effective key/attestation-record matches reject even with old body.iat. New /2 admission cannot select old content after the observed authenticated prefix contains its newer cumulative successor | Authentic unchanged latest content under full same-scope /2 currency, exact reached-root coverage, BOTH ORIGINAL Evidence objects and independent active authority/time may pass currency; all ordinary certificate/message checks and §4.3 root purpose/scope checks remain. No withholding or immediate-global-revocation bound is claimed |
 | MSG-V25 exact current attestation binding | With active g2 and the same stable K as retired g1, supply g1's attestation ID T1 at body.author_attestation while key and body.author equal K: signer_identity_mismatch, retryable=false, no new successful result. An older noncurrent renewal ID within g2 also refuses. Missing/wrong-type author_attestation is signer_identity_malformed. At receiver, exact referenced evidence is fully verified; an inactive g1 record refuses earlier as key_binding_invalid, while otherwise valid evidence whose content ID disagrees with the reference refuses late author_attestation_mismatch; no newer-record substitution | Active g2's exact current purpose-5 attestation ID T2, with key=body.author=K, signs without rewriting under with_active. Receiver fetches T2 exactly and verifies all binding/profile/time/snapshot evidence before equality; the valid current g2 association verifies |
 
 | MSG-V26 committed renewal between sign requests | Sign P1/T1 under R1, then durably activate a distinct overlapping-validity renewal T2 with qualified publication for the same active binding and stable K. A new request still containing T1 refuses signer_identity_mismatch; exact R1/P1 retry also refuses signer_identity_mismatch without disclosing or changing its retained result; R1 with changed T2 bytes refuses request_conflict | Fresh R2/P2 with key=body.author=K and body.author_attestation=T2 signs. While T1 and its exact referenced message remain otherwise valid for that same active binding, receiver accepts P1/T1 without substitution, as in PW-concurrent-first/second; retirement still refuses |

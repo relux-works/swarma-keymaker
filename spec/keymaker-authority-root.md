@@ -577,6 +577,9 @@ accepts its S2 subset; future phases need their separate content/runtime gates.
 
 ### 7.1 Retained S4/S5 inventory in this same codec
 
+The maps in §7.1–7.2 retain the historical /1 contract; under protected currency
+pin2 they are archival only. The /2 target is §7.3, with its enclosing codec,
+dispatch/preimages and historical inventory carrier still unresolved before code.
 This draft incorporates the retained-state contract from
 [landed main b045dd6](https://github.com/relux-works/swarma-keymaker/blob/b045dd66a06bd5c4be6839375001c89ee0aadeb4/spec/keymaker-msg-state.md#51-retained-freshness-and-re-anchor-artifact).
 Its waggle S4/S5 source is
@@ -737,32 +740,84 @@ acyclic body/candidate/audit/root preimage DAG; artifact contains no own hash,
 future audit/root hash or resulting snapshot reference. Unknown outcomes retain
 the exact candidate/old/new/hold and phase, never recalculate a skip waiver.
 
-The opaque FreshnessReceipt pointer, its private fields and the same-lifetime
-immutable SignedSnapshots Evidence OBJECT identity **MUST NOT be persisted**.
-Only original signed bytes/provenance and detached audit identifiers are durable.
-After successful common-root commit, the original in-memory receipt may be used
-only with its admitted new anchor and the same immutable Evidence object for its
-entire lifetime. Byte-identical reconstruction/ABA invalidates it. Restart must
-revalidate originals and perform new full VerifyFreshness; recovery cannot mint
-a receipt, and persisted Audit identifiers cannot recreate one. Initial
-VerifyJournal is outside receipt mode and requires current checkpoint/snapshot
-own-age under real qualified Now/W. Receipt use cannot relax operator/service
-policy, bind an effect permit or renew a deadline. Fresh authenticated WC1/status/
-revocation and serialized current authority checks remain required at release.
-Receipt expiry is E=min(tip.issued_at+A, issuing WitnessReadAt+A), A<=60;
-use requires max(Now,W)<E-margin, 0<=margin<=60 from qualified protected policy.
-A later read cannot extend E; read is >=tip time, <=min(Now,W), age<=A.
-Normal chains retain every oldest-first publication position with strict time,
-same-head prev and head-change null-prev rules; cumulative future-effective
-revocations remain present. Snapshot-own-age waiver never proves cumulative
-rollback safety or relaxes certificate/binding validity and query coverage.
+Under /2, receipt composition follows
+[message-state §4.2](keymaker-msg-state.md#42-s5-process-local-receipt-composition):
+commit the complete index/set/dependencies/endpoints/originals/W/pin-version/audit
+atomically first; then retain BOTH ORIGINAL SignedSnapshots and SnapshotJournal
+Evidence objects with the admitted anchor for mint/commit/use. Persist detached
+Plan.SnapshotJournal separately. Neither opaque receipt/private fields nor
+Evidence identity is serializable authority. Rebuilding either Present value
+invalidates the receipt; restart or premise/head/version/pin changes remint via
+full F. Require exact reached-root coverage with fixed E-minus-margin; preserve
+signature, cumulative, effective-from, current authority/time and independent
+initial journal proof. Unchanged authentic latest /2 content needs no reissue.
+The historical /1 own-age/one-Evidence rules apply only to their old profile.
+No receipt is an effect permit, and no new manager read or critical-section RPC
+is introduced by the target /2 maps.
 
 These additions change no manager read under F in §6. Full message/proof/provider
 validation happens unlocked against the exact immutable payload/inventory;
 the manager rechecks the same prepared root and fixed participant measurements.
 No proof scan, provider refresh, receipt check or implicit lock is introduced there.
 
+### 7.3 /2 currency successor contracts
+
+The target currency contract is [waggle S8](https://github.com/relux-works/waggle/blob/b63d627b19c4178d34b7cff58f8f6068efeca1a0/spec/swarm-envelope-2.md).
+The following explicit local /2 inner-map deltas retain every unmentioned /1
+member/type/bound and all original /1 bytes/hashes/archived dispatch. They do
+not allocate an enclosing root/private/dispatch version, select a union/carrier,
+change an implementation pin or permit in-place extension of combined-3/root-2.
+
+| Local successor | Explicit delta from historical /1 map |
+|---|---|
+| `keymaker-message-policy/2` | Keep registry_root, owner, margin, scope/cumulative/restore/time provenance and explicit reanchor_approval. Replace max_age with `snapshot_policies:[{root_role,root_key_id,max_age}]`, sorted for every configured snapshot role, each max_age integer1..60; keys match the protected catalog. Add `registry_currency_version:2` and `require_freshness_receipt:true`. Scope provenance binds the complete distinct D30 catalog including ServiceRoot; cumulative/restore provenance binds complete-prefix qualification and the independently enforced version/pin floor. Inner qualification/floor codecs remain separately owned, not booleans manufactured by this policy. |
+| Anchor2 / Index2 | Anchor2 is the exact eight-field FreshnessAnchor/2 in [message-state §4.1](keymaker-msg-state.md#41-b-live-status-full-freshness-admission). Index2 is the detached Plan.SnapshotJournal serialization: `{version:2,registry_id,owner,registry_seq,registry_head,checkpoint_id,latest}` with positive endpoint strings and exact sorted rows. The input-only qualified seq0/null genesis map is allowed only as index-before evidence, not an empty returned Index2. Keep old Anchor1 only under explicit old currency version1 during upgrade. |
+| `message-freshness/2` | Keep transaction, mode, policy, watermark_before/after, witness/read, proof, checkpoint and existing endpoint/receipt_audit/reanchor meanings. Add `registry_currency_version:2`, `old_registry_currency_version` (integer1 or2), `index_before` (exact original input anchor), `index_after` (detached returned Index2), `journal_entries:[BlobRef]` (original SnapshotJournal suffix, distinct from freshness proof), and `dependencies:[{id,original:BlobRef}]` in exact returned Plan.IDs order. Old/new anchors use the matching currency version; new is always Anchor2. Replace singular snapshot with `snapshots:[SnapshotRef]`. Add snapshots to each old/new endpoint object to retain both endpoint sets' originals, not just checkpoint IDs. `SnapshotRef` is exactly `{root_role,root_key_id,snapshot_id,original:BlobRef}`, ordered like the selected set, resolving to exact independently verified signed bytes. Existing fresh publication proof remains an ordered BlobRef array. |
+| ReceiptAudit2 | Preserve the eight existing detached identifier/reanchor members, including legacy snapshot_id. Add exactly `registry_currency_version:2` and `snapshots:[{root_role,root_key_id,snapshot_id}]` from FreshnessAudit.RegistryCurrencyVersion/Snapshots. Legacy SnapshotID/snapshot_id means **registry-owner only**, never whole-set coverage. Authentic Audit origin is checked in-process; no persisted bool or identifier becomes authority. |
+| Reanchor2 | Preserve reanchored=true, exact skipped_publications and all four old/new endpoint IDs. Add exactly `old_snapshots`, `new_snapshots`, `old_registry_currency_version` (integer1 or2), `new_registry_currency_version:2` from Plan.Reanchor. Old /1 set normalization describes its registry-owner coverage only, never qualification of omitted roles. Equal registry sequence requires identical checkpoint/head and whole set; higher sequence requires complete new index. Retain independently required old endpoint history even when not in Plan.IDs. |
+| `keymaker-message-authority/2` | Keep watermark/scopes/journals/freshness and existing sort/uniqueness/phase rules. Each scope stores Anchor2, policy2, checkpoint, selected SnapshotRefs, committed Index2 and artifact2 reference. Each journal row stores selected SnapshotRefs instead of singular snapshot, detached returned Index2 and exact ordered dependencies alongside its unchanged original entries/current checkpoints/prior/witness/read/policy/W. Freshness rows reference artifact2. Preserve all historical /1 rows under their explicit archived codec; no /1 row or /1 dispatch is reinterpreted as /2. |
+
+Plan.IDs is not a singleton snapshot or an arbitrary set. Retain its
+first-occurrence-deduplicated order: F publications, target checkpoint, selected
+snapshots in sorted-set order (F only), positive index-anchor checkpoint, non-null
+anchor-row originals in role order, then authoritative suffix entry IDs and
+add/revocation originals in journal order. J uses its explicit argument suffix.
+Unresolved non-revocation references carry no authority and unrelated IDJournal
+originals are charged but excluded. Independently required old re-anchor endpoints
+and history remain dependencies even if absent from Plan.IDs. Resolve all required
+originals; do not silently drop new IDs because an old codec only knew a registry
+snapshot.
+
+Commit this complete index/set/ID-original/endpoint/audit inventory atomically
+with policy/pin/version and W under
+[message-state §5.1](keymaker-msg-state.md#51-retained-freshness-and-re-anchor-artifact),
+including standalone accepted journal steps. No side-file or second commit
+point, inferred unknown outcome or loss of retained evidence is permitted.
+
+Before code, Keymaker and the Architect/PC2 state owners must qualify enclosing
+codec/preimages/dispatch and either an explicit versioned historical /1 union
+or a separately referenced archived inventory. The protected currency pin-floor
+carrier/enforcer, installation/registry/transition binding, old-instance exclusion
+outside relevant restore domains, and versioned mixed-history audit allowlist/
+reader qualification remain gates. A store-adjacent flag is insufficient.
+These inner maps select no deployed carrier, custody authority, extra budget,
+participant or migration graph. Existing /1/schema-2 readers must refuse new
+unsupported formats, never strip members or reinterpret historical bytes.
+Long-gap handling retains existing consumer-owner authority and complete index
+history; it does not reopen D42 or invent a waiver authority.
+
+The D45 raw/Evidence charge, capacity-before-profile order and independent actual
+canonical/storage/staging/carrier bounds in
+[message-state §2.3](keymaker-msg-state.md#23-capacity-and-history) also apply here.
+All references, base64/escaping, detached metadata, old/new/recovery/history and
+simultaneous copies count before intent. The library's 16/32 MiB ceilings enlarge
+no existing Keymaker budget; no retained history may be truncated or dropped.
+
 ## 8. One migration graph and atomic crash walk
+
+The graph below retains its original S1/S2 and historical /1 format scope.
+The /2 enclosing codec/dispatch and archival inventory remain pre-code gates
+under §7.3; this text selects no /2 migration edge or in-place extension.
 
 The S1/S2 migration ordering is implemented only after content review:
 validated legacy (untagged conceptual 1) -> exact closed schema 2 -> combined 3.

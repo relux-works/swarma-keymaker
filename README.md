@@ -29,6 +29,10 @@ local audit distinguishes `closed`, `unloaded` and `protection_failed`. There is
 deployed security boundary or installer here.
 
 `internal/control` provides bounded CCJ-1 framing and dispatch.
+The public [`stationcaller`](stationcaller/README.md) package provides typed
+request/result/refusal frame codecs for the two proposed station-caller methods.
+It supplies no transport, signer, plan validator or authority and enables no
+production method or purpose.
 `internal/keymaker` supplies its kernel peer, durable request-ID, method,
 workload/audit and final release adapters. The normative contract and publication
 gates are in [`spec/keymaker.md`](spec/keymaker.md).
@@ -82,6 +86,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `spec/keymaker-msg.md` | Proposed Swarm Signer message domain, lifecycle, certification and text vectors; no implementation or activation |
 | `spec/keymaker-msg-state.md` | Proposed K3 schema, exact-outcome recovery, issuance audit and durable registry/WC1 publication proof; no runtime activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
+| `stationcaller/` | Public typed station-caller wire codec and byte-only tests; no signing or activation |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
 | `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |
 | `go.mod`, `go.sum` | Go version and exact dependency pins |
@@ -150,6 +155,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Pure station-caller wire codecs: `go test ./stationcaller -count=1`; `go build ./stationcaller` | Inert byte fixtures and build cache; no socket, signer or native activation |
 | GitHub Actions | Linux CI on pull requests and pushes to main: `.github/workflows/linux-ci.yml`, Ubuntu 26.04, Go 1.26.0; `go mod verify`, `go mod tidy -diff`, `go mod download`, `go build ./...`, `go vet ./...`, `bash -eo pipefail .github/scripts/check-format.sh`, `python3 .github/scripts/check-hygiene.py`, `bash -eo pipefail .github/scripts/check-controls.sh`, `bash -eo pipefail .github/scripts/check-pending-controls.sh`, `go test ./... -count=1 -timeout=25m -v` | Actions logs and private temporary fixtures; controls require stale-checksum, vet and format refusals (including broken Windows-only syntax), and four generic attribution refusals. Full checkout history preserves parent-tree provenance tests. `go vet -tags multiuid ./internal/keymaker`, `go vet -tags qualifiedtime ./internal/enrollment ./internal/registration ./internal/keymaker` and `bash -eo pipefail .github/scripts/report-pending.sh` compile and dynamically list both configured tag/pattern inventories as PENDING without executing their bodies. `pending-inventories.txt` supplies tag/pattern/package sets; `pending-rows.txt` is a required lower bound, never the report source: new matching rows appear automatically, and removing an expected gate requires reviewing that baseline. Real-Go controls reject missing rows, empty inventories, removed tags and compile failures; command-boundary controls preserve exact failure statuses. The provisioned window and qualified-time external inputs remain separate qualification gates; no runtime test gate or name-based skip |
 | Go | Reproduce offline release fixtures: `go mod download`, then `go test ./tools/release-bundle -count=1` (set `GOMODCACHE` to a fresh private directory to check cache independence) | Isolated copies of the selected module graph, not historical checksum versions; no test-time network fetch. Missing module artifacts name the dependency and request `go mod download`; bundle refusal tests retain empty-proxy controls |
 | Go | Fixture dependency containment: `go test ./internal/timeconfidence -run '^TestTimeconfFixtureDependencyPolicy$' -count=1 -v` after `go mod download` | Private TMPDIR fixtures and test logs; scans inactive sources and real default/tagged production graphs offline, with isolated import and compiled-construction controls; no production activation |

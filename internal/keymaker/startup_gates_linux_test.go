@@ -235,7 +235,134 @@ func TestTimeConfidencePackagedPolicy(t *testing.T) {
 	}
 }
 
-// Explicit off policy refuses before path access, writes or readiness. Startup
+// At config load, 0 and 999999999 ns refuse without publishing config or changing fixture files; 1000000000 ns is accepted.
+func TestTimeConfidenceConfigBackwardMinimum(t *testing.T) {
+	original, err := os.ReadFile("../../packaging/config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tolerance := range []time.Duration{0, time.Second - time.Nanosecond, time.Second} {
+		t.Run(tolerance.String(), func(t *testing.T) {
+			root := t.TempDir()
+			seed := []byte("seed sentinel")
+			registry := []byte("registry sentinel")
+			var fields map[string]json.RawMessage
+			if err := json.Unmarshal(original, &fields); err != nil {
+				t.Fatal(err)
+			}
+			for key, name := range map[string]string{"socket_dir": "socket", "state_dir": "state", "master_file": "master.seed", "registry_file": "registry.json"} {
+				fields[key], err = json.Marshal(filepath.Join(root, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			for name, content := range map[string][]byte{"master.seed": seed, "registry.json": registry} {
+				if err := os.WriteFile(filepath.Join(root, name), content, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var policy map[string]json.RawMessage
+			if err := json.Unmarshal(fields["time_policy"], &policy); err != nil {
+				t.Fatal(err)
+			}
+			policy["backward_tolerance_ns"], err = json.Marshal(tolerance)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fields["time_policy"], err = json.Marshal(policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := json.Marshal(fields)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var direct Config
+			directErr := direct.UnmarshalJSON(raw)
+			offline, offlineErr := ParseConfig(bytes.NewReader(raw))
+			var served productionConfig
+			serveErr := StrictJSON(bytes.NewReader(raw), &served)
+			if tolerance < time.Second {
+				if directErr == nil || directErr.Error() != "keymaker: invalid time policy" {
+					t.Fatal("wrong decoder refusal", directErr)
+				}
+				for _, err := range []error{offlineErr, serveErr} {
+					if err == nil || err.Error() != "keymaker: invalid configuration" {
+						t.Fatal("wrong config-load refusal", err)
+					}
+				}
+				for _, cfg := range []Config{direct, offline, served} {
+					if !reflect.DeepEqual(cfg, Config{}) {
+						t.Fatal("refused load published configuration")
+					}
+				}
+			} else {
+				if directErr != nil || offlineErr != nil || serveErr != nil {
+					t.Fatal("one-second control refused", directErr, offlineErr, serveErr)
+				}
+				for _, cfg := range []Config{direct, offline, served} {
+					if cfg.TimePolicy == nil || cfg.TimePolicy.BackwardTolerance != time.Second || cfg.MasterFile != filepath.Join(root, "master.seed") {
+						t.Fatal("accepted control changed configuration")
+					}
+				}
+			}
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 2 {
+				t.Fatal("config load created sockets or state", entries, err)
+			}
+			for name, want := range map[string][]byte{"master.seed": seed, "registry.json": registry} {
+				got, err := os.ReadFile(filepath.Join(root, name))
+				if err != nil || !bytes.Equal(got, want) {
+					t.Fatal("config load changed input", name, err)
+				}
+			}
+		})
+	}
+}
+
+// At 1 s, 500 real-SystemClock samples have zero refusals/holds: clock-read jitter only, not a real step or slewing, and not host qualification.
+func TestTimeConfidenceSystemClockAvailability(t *testing.T) {
+	raw, err := os.ReadFile("../../packaging/config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ParseConfig(bytes.NewReader(raw))
+	if err != nil || cfg.TimePolicy == nil || cfg.TimePolicy.BackwardTolerance != time.Second {
+		t.Fatal("packaged one-second policy", err)
+	}
+	collector := &fixtureTimeCollector{timeconf.Evidence{
+		Tracking: timeconf.Tracking{ReferenceID: "C0000201", Address: "192.0.2.1", Stratum: 3, Reference: time.Now().UTC().Add(-time.Second), Leap: "Normal"},
+		Sources:  timeconf.Sources{Count: 1, AllNTS: true, Entries: []string{"192.0.2.1"}},
+	}}
+	holds := 0
+	provider, err := timeconf.New(*cfg.TimePolicy, collector, timeconf.SystemClock{}, func(incident timeconf.Incident) {
+		if incident.Code == "clock_step_hold" {
+			holds++
+		}
+	})
+	if err != nil {
+		t.Fatal("provider construction", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	refusals := 0
+	for i := 0; i < 500; i++ {
+		var sample timeconf.Sample
+		if i == 0 {
+			sample, err = provider.StartSample(ctx)
+		} else {
+			sample, err = provider.Sample(ctx)
+		}
+		if err != nil || !sample.Trusted || !sample.Fresh {
+			refusals++
+		}
+	}
+	if refusals != 0 || holds != 0 {
+		t.Fatalf("500 samples: refusals=%d holds=%d", refusals, holds)
+	}
+}
+
+// Directly injected off policy refuses before path access, writes or readiness. Startup
 // returns a Code, not a wire envelope; TestTimeConfidenceNonRetryable in control
 // separately proves clock_untrusted maps to retryable=false (with a busy control).
 func TestTimeConfidenceStartupOff(t *testing.T) {
@@ -262,15 +389,21 @@ func TestTimeConfidenceStartupOff(t *testing.T) {
 // control reaches the registry refusal. This nonroot fixture does not qualify
 // root-owned registry loading or successful service startup.
 func TestStartupStateDirectoryBeforeInputs(t *testing.T) {
-	// Use a private home child: ordinary /tmp has writable ancestors and would
-	// exercise the earlier ancestor gate rather than the state-directory gate.
-	home, err := os.UserHomeDir()
+	// A package-local private root avoids HOME and sticky temporary ancestors.
+	parent, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := os.MkdirTemp(home, ".keymaker-startup-")
+	parent, err = filepath.EvalSymlinks(parent)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if err := safeAncestors(parent, uint32(os.Getuid())); err != nil {
+		t.Skip("requires a writable package directory with root/service-owned, non-symlink, non-group/other-writable ancestors: ", err)
+	}
+	d, err := os.MkdirTemp(parent, ".keymaker-startup-")
+	if err != nil {
+		t.Skip("requires a writable package directory for a private startup fixture: ", err)
 	}
 	t.Cleanup(func() { os.RemoveAll(d) })
 	state := filepath.Join(d, "state")

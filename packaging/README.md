@@ -25,7 +25,7 @@ account membership, state recovery or service readiness.
 | operator_principal | object with uint32 uid and string generation | Complete operator UID/generation authority tuple; replace both placeholders. |
 | master_epoch | nonempty string | Operator-pinned master epoch; replace the example text. |
 | registry_revision | nonempty string | Operator-pinned registry revision; replace the example text. |
-| time_policy | optional inline timeconf.Policy object | Required for `serve` to start; missing/off/unavailable confidence refuses `clock_untrusted` with `retryable=false` before state or sockets open. |
+| time_policy | optional inline timeconf.Policy object | Required for `serve` to start; missing/unavailable confidence refuses `clock_untrusted` with `retryable=false` before state or sockets open. Supplied policies below the one-second backward tolerance refuse at config load. |
 | generation_journal | optional object | Q6 source: `path` names the protected journal and `initial_floor` contains `seq` and `hash`. Required at runtime unless a source is injected by tests. This does not supply the generation adapter activation gate. |
 | registration_helper | optional object | `names` contains exactly string purpose/product/project/agent; `enrollment_config` and `approval_file` are string paths for protected enrollment inputs. The example uses purpose `host-registration`; remove the whole object to disable the helper. |
 
@@ -69,6 +69,17 @@ server time.example.net iburst nts
   }
 }
 ```
+
+Configuration loading rejects a supplied `time_policy` with
+`backward_tolerance_ns < 1000000000`, including an explicit `off` policy;
+omitting `time_policy` remains structurally valid and refuses at startup.
+Below 1 s, two-clock sampling jitter is refused as a backward step and the service never becomes available, measured on a real host.
+This uses the existing `failure("invalid time policy")` path in
+[`Config.UnmarshalJSON`](../internal/keymaker/config_linux.go), propagated as
+`failure("invalid configuration")` by
+[`StrictJSON`](../internal/keymaker/host_linux.go), just like other invalid
+service configuration members. `ProtectedConfig` completes this decoder before
+`serveConfigured` enters time sampling, socket creation, state opening or seed loading.
 
 The packaged policy is accepted by the pinned broker's own constructor:
 Keymaker calls `timeconf.Production(cfg.TimePolicy, nil)` in

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/relux-works/swarma-credential-broker/timeconf"
 	gj "github.com/relux-works/swarma-user-manager/tools/genjournal"
@@ -62,7 +63,9 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 		}
 	}
 	if raw, ok := fields["time_policy"]; ok {
-		if _, err := timeconf.DecodePolicy(raw); err != nil {
+		policy, err := timeconf.DecodePolicy(raw)
+		// Below 1 s, two-clock sampling jitter is refused as a backward step and the service never becomes available, measured on a real host.
+		if err != nil || policy.BackwardTolerance < time.Second {
 			return failure("invalid time policy")
 		}
 	}

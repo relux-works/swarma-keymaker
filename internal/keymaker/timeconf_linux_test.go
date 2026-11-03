@@ -201,19 +201,17 @@ func TestTimeConfidenceHelperAfterAudit(t *testing.T) {
 	}
 }
 
-// Embedded policy uses the provider's strict decoder. Missing policy remains
-// structurally valid/off, but production startup refuses it; malformed, looser,
-// unknown and null configurations cannot select authority through the schema.
+// Missing policy remains structurally valid; malformed and explicit off policies refuse at configuration load.
 func TestTimeConfidenceConfig(t *testing.T) {
 	base := `{"socket_dir":"/run/keymaker","state_dir":"/var/lib/keymaker","master_file":"/var/lib/keymaker/master","registry_file":"/etc/keymaker/registry","service_uid":1,"service_gid":1,"control_gid":1,"operator_principal":{"uid":1,"generation":"x"},"master_epoch":"x","registry_revision":"x"}`
-	for _, raw := range []string{`null`, `{"source":"off","fake_collector":true}`, `{"source":"chrony-nts-config"}`, `{"source":"off","source":"off"}`} {
+	for _, raw := range []string{`null`, `{"source":"off"}`, `{"source":"off","fake_collector":true}`, `{"source":"chrony-nts-config"}`, `{"source":"off","source":"off"}`} {
 		if _, err := ParseConfig(strings.NewReader(strings.TrimSuffix(base, "}") + `,"time_policy":` + raw + `}`)); err == nil {
 			t.Fatal("invalid provider policy accepted", raw)
 		}
 	}
-	cfg, err := ParseConfig(strings.NewReader(strings.TrimSuffix(base, "}") + `,"time_policy":{"source":"off"}}`))
-	if err != nil || cfg.TimePolicy == nil || cfg.TimePolicy.Source != timeconf.Off {
-		t.Fatal("off control", err)
+	cfg, err := ParseConfig(strings.NewReader(base))
+	if err != nil || cfg.TimePolicy != nil {
+		t.Fatal("absent policy control", err)
 	}
 }
 

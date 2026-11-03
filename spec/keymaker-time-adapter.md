@@ -81,10 +81,12 @@ Audit's under-lock sampling mutant is deferred with its implementation; no
 killed mutant or impossible-under-lock construction is claimed for today's
 known gap. Slice A adds no durable state, codec field or production activation.
 
-## B-1: inactive consumer and fixture integration plan
+## B-1: inactive consumer and fixture integration plan (history)
+
+Historical plan; superseded by the current broker pin `e7619dfc`.
 
 This section updates the available B inputs against Keymaker `28b1c88` and
-broker [`e7619dfc4b2a6cf1696d8a21eff603bc80f147c7`](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/docs/qualified-time-api.md).
+broker [`8cdea82`](https://github.com/relux-works/swarma-credential-broker/blob/8cdea82/docs/qualified-time-api.md).
 It proposes implementation slices; this documentation change bumps no pin,
 changes no codec and runs no fixture. Production activation remains closed.
 

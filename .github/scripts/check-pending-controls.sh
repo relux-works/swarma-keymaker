@@ -5,7 +5,7 @@ control_dir="$(mktemp -d)"
 trap 'rm -rf -- "$control_dir"' EXIT
 mkdir -p "$control_dir/valid/.github/scripts"
 cp "$script_dir/"{report-pending.sh,pending-inventories.txt,pending-rows.txt} "$control_dir/valid/.github/scripts/"
-printf '%s\n' 'module example.invalid/pending-control' '' 'go 1.26.8' > "$control_dir/valid/go.mod"
+printf '%s\n' 'module example.invalid/pending-control' '' 'go 1.26.10' > "$control_dir/valid/go.mod"
 
 # Real Go fixtures contain every baseline row, but fatal bodies ensure that
 # list-only success cannot be confused with executing qualification tests.

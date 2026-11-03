@@ -143,7 +143,7 @@ func TestReleaseFixtureModuleCacheUnavailableGraph(t *testing.T) {
 	root, cache := t.TempDir(), t.TempDir()
 	t.Setenv("GOMODCACHE", cache)
 	t.Setenv("GONOPROXY", "example.invalid/*")
-	writeFixture(t, filepath.Join(root, "go.mod"), []byte("module example.invalid/control\n\ngo 1.26.8\n\nrequire example.invalid/uncached v1.2.3\n"))
+	writeFixture(t, filepath.Join(root, "go.mod"), []byte("module example.invalid/control\n\ngo 1.26.10\n\nrequire example.invalid/uncached v1.2.3\n"))
 	modules, err := fixtureModules(root)
 	if err == nil || modules != nil || !strings.Contains(err.Error(), "example.invalid/uncached@v1.2.3") || !strings.Contains(err.Error(), "GOPROXY=off") || !strings.Contains(err.Error(), "run go mod download before tests") {
 		t.Fatal("unprovisioned dependency lost offline refusal or remedy", modules, err)

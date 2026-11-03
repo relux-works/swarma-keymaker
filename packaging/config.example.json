@@ -21,5 +21,22 @@
     },
     "enrollment_config": "/etc/swarma-keymaker/enrollment-pins.json",
     "approval_file": "/etc/swarma-keymaker/enrollment-approval.json"
+  },
+  "time_policy": {
+    "source": "chrony-nts-config",
+    "chronyc": "/usr/bin/chronyc",
+    "source_files": [
+      "/etc/chrony/chrony.conf"
+    ],
+    "max_sync_age_ns": 2048000000000,
+    "max_uncertainty_ns": 1500000000,
+    "max_offset_ns": 500000000,
+    "max_root_distance_ns": 1000000000,
+    "authority_window_ns": 300000000000,
+    "backward_tolerance_ns": 1000000000,
+    "step_tolerance_ns": 60000000000,
+    "timeout_ns": 1000000000,
+    "max_output_bytes": 4096,
+    "resync": "new-authenticated-sync"
   }
 }

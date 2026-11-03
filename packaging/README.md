@@ -7,8 +7,8 @@ The release tool checks the unit and specification from the requested commit.
 removals, reordering and changed settings. Packaging adds no unit settings.
 
 `config.example.json` uses the actual daemon Config decoder, also exposed as
-`keymaker.ParseConfig` for offline use. The base members below are required; `registration_helper`
-is optional, and every member within a supplied helper is required. Unknown,
+`keymaker.ParseConfig` for offline use. The base members below are required; `registration_helper`, `time_policy` and `generation_journal`
+are optional for decoding, and every member within a supplied helper is required. Unknown,
 missing, null and incorrectly typed members refuse. Duplicate members and trailing
 JSON refuse. Parsing does not inspect installation paths or establish ownership,
 account membership, state recovery or service readiness.
@@ -25,12 +25,56 @@ account membership, state recovery or service readiness.
 | operator_principal | object with uint32 uid and string generation | Complete operator UID/generation authority tuple; replace both placeholders. |
 | master_epoch | nonempty string | Operator-pinned master epoch; replace the example text. |
 | registry_revision | nonempty string | Operator-pinned registry revision; replace the example text. |
+| time_policy | optional inline timeconf.Policy object | Required for `serve` to start; missing/off/unavailable confidence refuses `clock_untrusted` with `retryable=false` before state or sockets open. |
+| generation_journal | optional object | Q6 source: `path` names the protected journal and `initial_floor` contains `seq` and `hash`. Required at runtime unless a source is injected by tests. This does not supply the generation adapter activation gate. |
 | registration_helper | optional object | `names` contains exactly string purpose/product/project/agent; `enrollment_config` and `approval_file` are string paths for protected enrollment inputs. The example uses purpose `host-registration`; remove the whole object to disable the helper. |
 
 Use an operator-supplied configuration, not an unchanged example. The allocator
 in section 12.1 owns the numeric IDs; the offline parser accepts zero placeholders
 so the runbook can replace them. The remaining file protection and identity
 checks still run in the daemon.
+
+## Protected time policy
+
+The root-owned mode 0640 service configuration is the protected policy carrier.
+`time_policy` stays an inline object; no second policy file is needed by the
+pinned provider. Use the same option-A policy as the registrar. The example
+below selects chrony with NTS sources and the platform limits (integer
+nanoseconds); source files must describe the complete protected chrony inventory.
+Every server/pool must carry `nts`. Source names belong in that protected chrony
+configuration, never in a second Keymaker profile. For example:
+
+```conf
+server time.example.net iburst nts
+```
+
+```json
+{
+  "time_policy": {
+    "source": "chrony-nts-config",
+    "chronyc": "/usr/bin/chronyc",
+    "source_files": [
+      "/etc/chrony/chrony.conf"
+    ],
+    "max_sync_age_ns": 2048000000000,
+    "max_uncertainty_ns": 1500000000,
+    "max_offset_ns": 500000000,
+    "max_root_distance_ns": 1000000000,
+    "authority_window_ns": 300000000000,
+    "backward_tolerance_ns": 1000000000,
+    "step_tolerance_ns": 60000000000,
+    "timeout_ns": 1000000000,
+    "max_output_bytes": 4096,
+    "resync": "new-authenticated-sync"
+  }
+}
+```
+
+The example uses `state_dir=/var/lib/swarma-keymaker/state` and
+`master_file=/var/lib/swarma-keymaker/master.seed`. Section 12.1 creates the
+0700 service-owned state child separately from the seed parent. The daemon
+requires that directory to exist and rejects unsafe ownership/modes or the
+seed parent itself. Parsing the example does not establish these runtime facts.
 
 ## Bundle contract
 
@@ -137,10 +181,7 @@ Those paths are parsed offline, not opened or reconciled by bundle assembly;
 `-enrollment` still explicitly supplies the validated bytes to bundle.
 
 The generation adapter and signed operator verifier remain activation gates.
-Section 12.1 also needs owner reconciliation with the dedicated `state_dir`
-required by the current custody loader: the example uses a child state directory,
-while the runbook currently creates only its parent. These are documented
-handoff dependencies, not an alternate privileged procedure. Verification and
+Verification and
 all root operations remain with the owner and the specification runbook.
 
 ## Test bounds

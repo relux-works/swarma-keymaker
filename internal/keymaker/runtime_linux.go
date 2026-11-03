@@ -51,7 +51,16 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 		return failure("configuration identity mismatch")
 	}
 	clock, err := timeconf.Production(cfg.TimePolicy, nil)
-	if err != nil || timeconfidence.Start(ctx, clock) != nil {
+	if err != nil {
+		return Code("clock_untrusted")
+	}
+	return serveWithClock(ctx, cfg, status, generation, clock)
+}
+
+// The injected provider seam exercises startup without a production fixture flag.
+func serveWithClock(ctx context.Context, cfg productionConfig, status io.Writer, generation GenerationSource, clock *timeconf.Provider) error {
+	uid := uint32(os.Getuid())
+	if timeconfidence.Start(ctx, clock) != nil {
 		return Code("clock_untrusted")
 	}
 	for _, dir := range []string{cfg.SocketDir, cfg.StateDir, filepath.Dir(cfg.MasterFile)} {
@@ -59,6 +68,11 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 			return e
 		}
 	}
+	state, e := openStateDirectory(cfg, uid)
+	if e != nil {
+		return e
+	}
+	defer state.Close()
 	var registry Registry
 	if e := ProtectedConfig(cfg.RegistryFile, &registry); e != nil {
 		return e
@@ -71,11 +85,6 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 		return e
 	}
 	defer master.Close()
-	state, e := OpenDirectory(cfg.StateDir, uid, 0700)
-	if e != nil {
-		return e
-	}
-	defer state.Close()
 	lock, e := LockState(state, uid)
 	if e != nil {
 		return e
@@ -111,4 +120,19 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 	}
 	fmt.Fprintf(status, "agent and control ready; memory_locked=%t\n", master.Locked())
 	return server.Serve(ctx)
+}
+
+// Validate the custody directory before loading seed or opening retained state.
+func openStateDirectory(cfg productionConfig, uid uint32) (*os.File, error) {
+	state, err := OpenDirectory(cfg.StateDir, uid, 0700)
+	if err != nil {
+		return nil, err
+	}
+	info, err := state.Stat()
+	parent, parentErr := os.Stat(filepath.Dir(cfg.MasterFile))
+	if err != nil || parentErr != nil || os.SameFile(info, parent) {
+		state.Close()
+		return nil, failure("state directory must differ from master parent")
+	}
+	return state, nil
 }

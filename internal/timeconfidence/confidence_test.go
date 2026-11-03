@@ -29,6 +29,7 @@ func TestQualifiedTimeAuthority(t *testing.T) {
 		{"unknown", func(v *timeconf.Sample) { v.Trusted = false }},
 		{"stale", func(v *timeconf.Sample) { v.Fresh = false }},
 		{"missing-boot", func(v *timeconf.Sample) { v.Boot = "" }},
+		{"over-cap", func(v *timeconf.Sample) { v.Uncertainty = 1500*time.Millisecond + time.Nanosecond }},
 		{"negative-delta", func(v *timeconf.Sample) { v.Uncertainty = -1 }},
 		{"upper-overflow", func(v *timeconf.Sample) {
 			v.Now = time.Unix(0, math.MaxInt64)
@@ -135,5 +136,17 @@ func TestQualifiedTimeConsumedVector(t *testing.T) {
 		if !ok || !l.After(journal) || l.After(u) != tc.pass {
 			t.Fatal("floor 140 cannot replace consumed 201", tc, l)
 		}
+	}
+}
+
+// The local consumer accepts exactly 1.5 s and rejects the adjacent over-cap sample.
+func TestTimeConfidenceInclusiveCap(t *testing.T) {
+	v := sample(211*int64(time.Second), 1500*time.Millisecond+time.Nanosecond, 230*int64(time.Second))
+	if Valid(v) {
+		t.Fatal("over-cap sample trusted")
+	}
+	v.Uncertainty--
+	if !Valid(v) {
+		t.Fatal("inclusive 1.5 s control refused")
 	}
 }

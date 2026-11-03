@@ -200,6 +200,22 @@ visudo() {
 	return nil
 }
 
+const stateInstall = "install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker/state\n"
+
+// The service excerpt must create the private state child immediately after its parent.
+func checkStateDirectory(spec string) error {
+	_, section, ok := strings.Cut(spec, "### 12.1 ")
+	if !ok {
+		return errors.New("missing section 12.1")
+	}
+	section = strings.SplitN(section, "### ", 2)[0]
+	parent := "install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker\n"
+	if strings.Count(section, stateInstall) != 1 || !strings.Contains(section, parent+stateInstall) {
+		return errors.New("missing ordered private state directory install")
+	}
+	return nil
+}
+
 func main() {
 	check := flag.Bool("check", false, "check marked specification shell blocks without host changes")
 	plant := flag.Bool("plant", false, "plant guard, parser and validation-order regressions in memory; checker must fail")
@@ -212,6 +228,20 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
+	}
+	stateSpec := string(raw)
+	if *plant {
+		if strings.Count(stateSpec, stateInstall) != 1 {
+			fmt.Fprintln(os.Stderr, "state directory plant not applied")
+			os.Exit(2)
+		}
+		stateSpec = strings.Replace(stateSpec, stateInstall, "", 1)
+	}
+	stateErr := checkStateDirectory(stateSpec)
+	if stateErr != nil {
+		fmt.Fprintln(os.Stderr, "FAIL TestRunbookStateDirectory:", stateErr)
+	} else {
+		fmt.Println("PASS TestRunbookStateDirectory")
 	}
 	blocks := map[string]string{}
 	for _, name := range []string{"guards", "service-preflight", "service-allocation", "window-preflight", "window-allocation", "window-provision", "window-sudoers-content"} {
@@ -324,6 +354,9 @@ func main() {
 		}
 	}
 	failures := 0
+	if stateErr != nil {
+		failures++
+	}
 	for _, test := range tests {
 		if test.sudoersPath == "" {
 			test.sudoersPath = filepath.Join(scratch, "absent")
@@ -369,8 +402,8 @@ func main() {
 		failures++
 	}
 	if failures > 0 {
-		fmt.Fprintf(os.Stderr, "%d/%d runbook checks failed; %d skipped\n", failures, len(tests)+3, skipped)
+		fmt.Fprintf(os.Stderr, "%d/%d runbook checks failed; %d skipped\n", failures, len(tests)+4, skipped)
 		os.Exit(1)
 	}
-	fmt.Printf("%d runbook checks passed; %d skipped; no host account writes\n", len(tests)+3-skipped, skipped)
+	fmt.Printf("%d runbook checks passed; %d skipped; no host account writes\n", len(tests)+4-skipped, skipped)
 }

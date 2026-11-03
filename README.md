@@ -217,7 +217,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Check published controls, G4 byte/preimage pairs and fixture integrity: `go run ./tools/vectors/main.go -check` | Summary; no service qualification |
 | Go | Regenerate path examples: `go run ./tools/vectors/main.go -write` | `vectors/keymaker-paths.json` |
 | Go + Bash + visudo | Check marked shell guards, provisioning order and generated sudoers syntax with stubbed NSS/mutations: `go run ./tools/runbook-check/main.go -check` | Named verdicts; real unprivileged `visudo -cf` on private scratch, or explicit SKIPPED with reason when absent; temporary fixtures under `TMPDIR`, then removed; no account writes |
-| Go + Bash + visudo | Plant lookup/path bypasses, unsupported `requiretty` and validation-after-allocation in memory: `go run ./tools/runbook-check/main.go -plant` | Expected exit 1 naming guard, `TestRunbookWindowSudoersCompatibility` and `TestRunbookWindowValidationBeforeMutation` failures; missing parser is SKIPPED; production files unchanged |
+| Go + Bash + visudo | Plant missing state-directory installation, lookup/path bypasses, unsupported `requiretty` and validation-after-allocation in memory: `go run ./tools/runbook-check/main.go -plant` | Expected exit 1 naming `TestRunbookStateDirectory`, guard, `TestRunbookWindowSudoersCompatibility` and `TestRunbookWindowValidationBeforeMutation` failures; missing parser is SKIPPED; production files unchanged |
 | Python 3 | JSON syntax: `python3 -c 'import json,pathlib; [json.loads(p.read_text()) for p in pathlib.Path("vectors").glob("*.json")]'` | Exit status; no files |
 | Git | Scope: `git diff --check`; signatures: `git log --format="%h %G?"` | Diagnostics and signature verdicts |
 
@@ -424,9 +424,9 @@ wait cancellably during reload and return `request_deadline_exceeded` when their
 request budget ends, releasing the shared generation and Store locks.
 
 Trusted UTC uses the public `swarma-credential-broker/timeconf` provider pinned to
-`8cdea829b261e97908623376fe6857e9960fe877`. `CollectorEntry` is the first main
+`e7619dfc4b2a6cf1696d8a21eff603bc80f147c7`. `CollectorEntry` is the first main
 statement. The daemon's root-owned protected configuration may embed `time_policy`
-using the provider's exact [policy schema](https://github.com/relux-works/swarma-credential-broker/blob/8cdea829b261e97908623376fe6857e9960fe877/docs/time-policy.md).
+using the provider's exact [policy schema](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/docs/time-policy.md).
 Enrollment pin configuration uses the same optional member for operator approval
 time. Invalid policy is rejected during configuration decoding. Missing/off policy
 or unavailable evidence refuses `clock_untrusted` before service readiness. There is no source flag, environment override,

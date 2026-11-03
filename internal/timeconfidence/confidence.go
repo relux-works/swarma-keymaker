@@ -9,7 +9,7 @@ import (
 	"github.com/relux-works/swarma-credential-broker/timeconf"
 )
 
-// Valid checks the shape of an authoritative provider result. Numeric ceilings,
+// Valid checks authoritative sample shape and the inclusive 1.5 s consumer cap.
 // NTS evidence, age, uncertainty calculation and holds belong to timeconf.
 func Valid(v timeconf.Sample) bool {
 	_, _, ok := Bounds(v)
@@ -20,7 +20,7 @@ func Valid(v timeconf.Sample) bool {
 // checks U<A, not O<A. This shape check supplies neither receipt authentication
 // nor current-boot, durable continuity or bounded-handoff qualification.
 func Bounds(v timeconf.Sample) (lower, upper time.Time, ok bool) {
-	if !v.Trusted || !v.Fresh || v.Now.IsZero() || v.Boot == "" || v.Uncertainty < 0 {
+	if !v.Trusted || !v.Fresh || v.Now.IsZero() || v.Boot == "" || v.Uncertainty < 0 || v.Uncertainty > 1500*time.Millisecond {
 		return lower, upper, false
 	}
 	o, a := v.Now.UnixNano(), v.AuthorityUntil.UnixNano()

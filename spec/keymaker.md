@@ -589,7 +589,7 @@ changes:
   policy's continuity requirements; later decisions/releases still require
   confidence. Keymaker MAY be stricter, never looser.
   Keymaker consumes the public `swarma-credential-broker/timeconf` provider
-  pinned to `3924ab6e811b5512ad8763a392c2c88abcdd1b2c`; it MUST NOT copy the
+  pinned to `e7619dfc4b2a6cf1696d8a21eff603bc80f147c7`; it MUST NOT copy the
   provider's rules into local logic. Missing protected policy or unavailable
   confidence refuses `clock_untrusted`, **`retryable=false`**. Real host
   qualification and durable process-replacement continuity remain activation
@@ -1046,6 +1046,7 @@ SERVICE_GID=$(getent group swarma-keymaker | cut -d: -f3)
 CONTROL_GID=$(getent group swarma-registration | cut -d: -f3)
 install -d -o root -g swarma-keymaker -m 0750 /etc/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker
+install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker/state
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/log/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0755 /run/swarma-keymaker
 umask 077

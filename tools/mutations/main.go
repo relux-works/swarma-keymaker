@@ -197,7 +197,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		}
 		dependencySource = filepath.Join(snapshot, "tools", "genjournal")
 		dependencyWorkspace = filepath.Join(dir, "go.work")
-		body := fmt.Sprintf("go 1.26.0\nuse (\n %q\n %q\n)\n", root, snapshot)
+		body := fmt.Sprintf("go 1.26.8\nuse (\n %q\n %q\n)\n", root, snapshot)
 		if err := os.WriteFile(dependencyWorkspace, []byte(body), 0600); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(2)

@@ -1,6 +1,6 @@
 module github.com/relux-works/swarma-keymaker
 
-go 1.26.0
+go 1.26.8
 
 require github.com/relux-works/swarma-registrar v0.0.0-20261025040811-264660e5dabb
 

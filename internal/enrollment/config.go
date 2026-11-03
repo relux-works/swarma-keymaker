@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-registrar/ccj"
@@ -300,7 +301,9 @@ func decodeConfig(location configLocation) (PinConfig, *format.Policy, error) {
 		return PinConfig{}, nil, errTrust
 	}
 	if raw, ok := members["time_policy"]; ok {
-		if _, err := timeconf.DecodePolicy(raw); err != nil {
+		policy, err := timeconf.DecodePolicy(raw)
+		// Zero or microsecond tolerances refuse two-clock read jitter as a backward step (measured on one VM with a fake collector); one second is the shared platform value.
+		if err != nil || policy.BackwardTolerance < time.Second {
 			return PinConfig{}, nil, errTrust
 		}
 	}

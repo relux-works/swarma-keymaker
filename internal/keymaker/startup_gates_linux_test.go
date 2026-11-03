@@ -235,14 +235,22 @@ func TestTimeConfidencePackagedPolicy(t *testing.T) {
 	}
 }
 
-// At config load, 0 and 999999999 ns refuse without publishing config or changing fixture files; 1000000000 ns is accepted.
+// For both chrony sources, config load refuses 0 and 999999999 ns without publishing
+// config or changing fixture files; 1000000000 ns is accepted.
 func TestTimeConfidenceConfigBackwardMinimum(t *testing.T) {
 	original, err := os.ReadFile("../../packaging/config.example.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tolerance := range []time.Duration{0, time.Second - time.Nanosecond, time.Second} {
-		t.Run(tolerance.String(), func(t *testing.T) {
+	for _, tc := range []struct {
+		source    timeconf.Source
+		tolerance time.Duration
+	}{
+		{timeconf.NTSConfig, 0}, {timeconf.NTSConfig, time.Second - time.Nanosecond}, {timeconf.NTSConfig, time.Second},
+		{timeconf.NTSAuthData, 0}, {timeconf.NTSAuthData, time.Second - time.Nanosecond}, {timeconf.NTSAuthData, time.Second},
+	} {
+		source, tolerance := tc.source, tc.tolerance
+		t.Run(string(source)+"/"+tolerance.String(), func(t *testing.T) {
 			root := t.TempDir()
 			seed := []byte("seed sentinel")
 			registry := []byte("registry sentinel")
@@ -263,6 +271,10 @@ func TestTimeConfidenceConfigBackwardMinimum(t *testing.T) {
 			}
 			var policy map[string]json.RawMessage
 			if err := json.Unmarshal(fields["time_policy"], &policy); err != nil {
+				t.Fatal(err)
+			}
+			policy["source"], err = json.Marshal(source)
+			if err != nil {
 				t.Fatal(err)
 			}
 			policy["backward_tolerance_ns"], err = json.Marshal(tolerance)
@@ -389,21 +401,38 @@ func TestTimeConfidenceStartupOff(t *testing.T) {
 // control reaches the registry refusal. This nonroot fixture does not qualify
 // root-owned registry loading or successful service startup.
 func TestStartupStateDirectoryBeforeInputs(t *testing.T) {
-	// A package-local private root avoids HOME and sticky temporary ancestors.
-	parent, err := os.Getwd()
+	// Keep even interrupted fixtures outside the repository scanned by other packages.
+	repository, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
 		t.Fatal(err)
 	}
-	parent, err = filepath.EvalSymlinks(parent)
+	repository, err = filepath.EvalSymlinks(repository)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := safeAncestors(parent, uint32(os.Getuid())); err != nil {
-		t.Skip("requires a writable package directory with root/service-owned, non-symlink, non-group/other-writable ancestors: ", err)
+	var d string
+	for _, root := range []string{os.TempDir(), os.Getenv("HOME")} {
+		if root == "" {
+			continue
+		}
+		parent, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		relative, err := filepath.Rel(repository, parent)
+		if err != nil || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))) {
+			continue
+		}
+		if err := safeAncestors(parent, uint32(os.Getuid())); err != nil {
+			continue
+		}
+		d, err = os.MkdirTemp(parent, ".keymaker-startup-")
+		if err == nil {
+			break
+		}
 	}
-	d, err := os.MkdirTemp(parent, ".keymaker-startup-")
-	if err != nil {
-		t.Skip("requires a writable package directory for a private startup fixture: ", err)
+	if d == "" {
+		t.Skip("requires a writable os.TempDir() or HOME outside the repository with root/service-owned, non-symlink, non-group/other-writable ancestors")
 	}
 	t.Cleanup(func() { os.RemoveAll(d) })
 	state := filepath.Join(d, "state")

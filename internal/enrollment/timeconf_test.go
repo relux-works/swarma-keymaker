@@ -4,9 +4,12 @@ package enrollment
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -117,7 +120,7 @@ func TestTimeConfidenceApprovalInvalidation(t *testing.T) {
 }
 
 // The pin policy delegates nested decoding to the shared strict policy schema;
-// no source/fake option or null can bypass it. Off is a valid structural control.
+// no source/fake option, null or explicit off can bypass it. Omission remains valid.
 func TestTimeConfidencePinPolicy(t *testing.T) {
 	f := newFixture(t)
 	f.config.Revision = strings.Repeat("a", 40)
@@ -126,14 +129,58 @@ func TestTimeConfidencePinPolicy(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	for _, policy := range []string{`null`, `{"source":"off","fake_collector":true}`, `{"source":"chrony-nts-config"}`} {
+	for _, policy := range []string{`null`, `{"source":"off"}`, `{"source":"off","fake_collector":true}`, `{"source":"chrony-nts-config"}`} {
 		candidate := fmt.Sprintf("%s,\"time_policy\":%s}", strings.TrimSuffix(string(raw), "}"), policy)
-		if _, e := ParseConfig([]byte(candidate)); e == nil {
-			t.Fatal("bad provider pin policy accepted", policy)
+		if cfg, e := ParseConfig([]byte(candidate)); !errors.Is(e, errTrust) || !reflect.DeepEqual(cfg, PinConfig{}) {
+			t.Fatal("bad provider pin policy did not refuse without publishing config", policy, e)
 		}
 	}
-	if _, e := ParseConfig([]byte(strings.TrimSuffix(string(raw), "}") + `,"time_policy":{"source":"off"}}`)); e != nil {
-		t.Fatal("off policy control", e)
+	if cfg, e := ParseConfig(raw); e != nil || cfg.TimePolicy != nil {
+		t.Fatal("omitted policy control", e)
+	}
+}
+
+// Both chrony pin policies refuse 0 and 999999999 ns through the existing trust
+// error with no published config or registrar policy; 1000000000 ns passes.
+// These byte-only decoder checks do not qualify approval creation or clock evidence.
+func TestTimeConfidencePinBackwardMinimum(t *testing.T) {
+	f := newFixture(t)
+	f.config.Revision = strings.Repeat("a", 40)
+	raw, err := os.ReadFile("../../packaging/config.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var example struct {
+		TimePolicy timeconf.Policy `json:"time_policy"`
+	}
+	if err := json.Unmarshal(raw, &example); err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []timeconf.Source{timeconf.NTSConfig, timeconf.NTSAuthData} {
+		for _, tolerance := range []time.Duration{0, time.Second - time.Nanosecond, time.Second} {
+			t.Run(string(source)+"/"+tolerance.String(), func(t *testing.T) {
+				policy := example.TimePolicy
+				policy.Source, policy.BackwardTolerance = source, tolerance
+				input := f.config
+				input.TimePolicy = &policy
+				raw, err := json.Marshal(input)
+				if err != nil {
+					t.Fatal(err)
+				}
+				offline, offlineErr := ParseConfig(raw)
+				loaded, registrarPolicy, loadErr := decodeConfig(configLocation{raw: raw})
+				if tolerance < time.Second {
+					if !errors.Is(offlineErr, errTrust) || !errors.Is(loadErr, errTrust) {
+						t.Fatal("wrong pin configuration refusal", offlineErr, loadErr)
+					}
+					if !reflect.DeepEqual(offline, PinConfig{}) || !reflect.DeepEqual(loaded, PinConfig{}) || registrarPolicy != nil {
+						t.Fatal("refused pin load published configuration or policy")
+					}
+				} else if offlineErr != nil || loadErr != nil || registrarPolicy == nil || !reflect.DeepEqual(offline, input) || !reflect.DeepEqual(loaded, input) {
+					t.Fatal("one-second pin control refused or changed", offlineErr, loadErr)
+				}
+			})
+		}
 	}
 }
 

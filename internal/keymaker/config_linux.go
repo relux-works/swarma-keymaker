@@ -64,7 +64,7 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 	}
 	if raw, ok := fields["time_policy"]; ok {
 		policy, err := timeconf.DecodePolicy(raw)
-		// Below 1 s, two-clock sampling jitter is refused as a backward step and the service never becomes available, measured on a real host.
+		// Zero or microsecond tolerances refuse two-clock read jitter as a backward step (measured on one VM with a fake collector); one second is the shared platform value.
 		if err != nil || policy.BackwardTolerance < time.Second {
 			return failure("invalid time policy")
 		}

@@ -428,8 +428,13 @@ Trusted UTC uses the public `swarma-credential-broker/timeconf` provider pinned 
 statement. The daemon's root-owned protected configuration may embed `time_policy`
 using the provider's exact [policy schema](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/docs/time-policy.md).
 Enrollment pin configuration uses the same optional member for operator approval
-time. Invalid policy is rejected during configuration decoding. Missing/off policy
-or unavailable evidence refuses `clock_untrusted` before service readiness. There is no source flag, environment override,
+time. Both configurations reject a supplied policy with
+`backward_tolerance_ns < 1000000000`, including `{"source":"off"}`, during
+decoding: the daemon returns `invalid configuration`, and pin configuration uses
+its existing `unverified local trust` refusal. Omitting the policy remains
+structurally valid; missing policy or unavailable evidence refuses
+`clock_untrusted` before daemon readiness or approval publication.
+There is no source flag, environment override,
 or kernel synchronization fallback. Policy changes require a new process.
 
 Startup samples fresh confidence before time decisions. The daemon shares that

@@ -162,7 +162,8 @@ func TestStartupStateDirectory(t *testing.T) {
 	}
 }
 
-// The shipped policy decodes strictly; omitting a required provider bound refuses without changing the example.
+// The shipped policy passes Production validation at the inclusive backward bound;
+// missing bounds fail decoding and invalid tolerances return no provider. No clock evidence is collected.
 func TestTimeConfidencePackagedPolicy(t *testing.T) {
 	raw, err := os.ReadFile("../../packaging/config.example.json")
 	if err != nil {
@@ -191,6 +192,25 @@ func TestTimeConfidencePackagedPolicy(t *testing.T) {
 	cfg, err := ParseConfig(bytes.NewReader(raw))
 	if err != nil || cfg.TimePolicy == nil || cfg.TimePolicy.Source != timeconf.NTSConfig || cfg.TimePolicy.MaxUncertainty != 1500*time.Millisecond {
 		t.Fatal("valid example refused or cap drift", cfg.TimePolicy, err)
+	}
+	// Broker e7619df: collect_linux.go:249-254 calls New; provider.go:65-67
+	// invokes Policy.Validate. policy.go:30,63 accepts at most one second.
+	if cfg.TimePolicy.BackwardTolerance != time.Second {
+		t.Fatal("packaged backward tolerance drift", cfg.TimePolicy.BackwardTolerance)
+	}
+	provider, err := timeconf.Production(cfg.TimePolicy, nil)
+	if err != nil || provider == nil {
+		t.Fatal("provider refused packaged policy", err)
+	}
+	for _, tolerance := range []time.Duration{-time.Nanosecond, time.Second + time.Nanosecond} {
+		t.Run(tolerance.String(), func(t *testing.T) {
+			invalid := *cfg.TimePolicy
+			invalid.BackwardTolerance = tolerance
+			provider, err := timeconf.Production(&invalid, nil)
+			if err != timeconf.ErrUnavailable || provider != nil {
+				t.Fatal("invalid tolerance did not refuse with no provider", provider, err)
+			}
+		})
 	}
 	doc, err := os.ReadFile("../../packaging/README.md")
 	if err != nil {

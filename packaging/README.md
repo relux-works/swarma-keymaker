@@ -70,6 +70,20 @@ server time.example.net iburst nts
 }
 ```
 
+The packaged policy is accepted by the pinned broker's own constructor:
+Keymaker calls `timeconf.Production(cfg.TimePolicy, nil)` in
+`internal/keymaker/runtime_linux.go:53`. At broker `e7619dfc4b2a`,
+[`timeconf/collect_linux.go:249-254`](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/timeconf/collect_linux.go#L249-L254)
+calls `New`, which invokes `Policy.Validate` in
+[`timeconf/provider.go:65-67`](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/timeconf/provider.go#L65-L67).
+[`timeconf/policy.go:30`](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/timeconf/policy.go#L30)
+sets the backward ceiling to one second; the validation at
+[`timeconf/policy.go:63`](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/timeconf/policy.go#L63)
+rejects negative values or values above that ceiling. Thus `1000000000` is
+accepted unchanged. `TestTimeConfidencePackagedPolicy` exercises this constructor
+with the packaged example and rejects -1 ns and 1000000001 ns with no provider.
+Constructor acceptance does not establish live time confidence.
+
 The example uses `state_dir=/var/lib/swarma-keymaker/state` and
 `master_file=/var/lib/swarma-keymaker/master.seed`. Section 12.1 creates the
 0700 service-owned state child separately from the seed parent. The daemon

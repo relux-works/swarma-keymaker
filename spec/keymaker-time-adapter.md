@@ -84,7 +84,7 @@ known gap. Slice A adds no durable state, codec field or production activation.
 ## B-1: inactive consumer and fixture integration plan
 
 This section updates the available B inputs against Keymaker `28b1c88` and
-broker [`8cdea829b261e97908623376fe6857e9960fe877`](https://github.com/relux-works/swarma-credential-broker/blob/8cdea829b261e97908623376fe6857e9960fe877/docs/qualified-time-api.md).
+broker [`e7619dfc4b2a6cf1696d8a21eff603bc80f147c7`](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/docs/qualified-time-api.md).
 It proposes implementation slices; this documentation change bumps no pin,
 changes no codec and runs no fixture. Production activation remains closed.
 

@@ -9,7 +9,7 @@ handoff design, **not a new Keymaker public refusal code**.
 
 The source contracts are the broker's
 [time contract at a1c69eb](https://github.com/relux-works/swarma-credential-broker/blob/a1c69eb9ed6576d3b060dfb3e697de2fd2180f0d/docs/time-contract.md#final-issuance-enrollment-and-registration-windows)
-and [provider API at 8cdea82](https://github.com/relux-works/swarma-credential-broker/blob/8cdea829b261e97908623376fe6857e9960fe877/docs/qualified-time-api.md),
+and [provider API at e7619dfc](https://github.com/relux-works/swarma-credential-broker/blob/e7619dfc4b2a6cf1696d8a21eff603bc80f147c7/docs/qualified-time-api.md),
 and Keymaker's [budgets and audit](keymaker.md#10-process-sockets-and-resource-budgets),
 [PC2 transaction](keymaker-pc2.md#3-participating-writers-and-durable-ordering) and
 [G4 preimage/order rules](keymaker-authority-root.md#6-exact-manager-read-set-under-f).

@@ -1045,8 +1045,10 @@ SERVICE_UID=$(id -u swarma-keymaker)
 SERVICE_GID=$(getent group swarma-keymaker | cut -d: -f3)
 CONTROL_GID=$(getent group swarma-registration | cut -d: -f3)
 install -d -o root -g swarma-keymaker -m 0750 /etc/swarma-keymaker
+# runbook-check:begin service-state-directory
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker/state
+# runbook-check:end service-state-directory
 install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/log/swarma-keymaker
 install -d -o swarma-keymaker -g swarma-keymaker -m 0755 /run/swarma-keymaker
 umask 077

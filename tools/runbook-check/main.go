@@ -204,11 +204,10 @@ const stateInstall = "install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /
 
 // The service excerpt must create the private state child immediately after its parent.
 func checkStateDirectory(spec string) error {
-	_, section, ok := strings.Cut(spec, "### 12.1 ")
-	if !ok {
-		return errors.New("missing section 12.1")
+	section, err := excerpt(spec, "service-state-directory")
+	if err != nil {
+		return err
 	}
-	section = strings.SplitN(section, "### ", 2)[0]
 	parent := "install -d -o swarma-keymaker -g swarma-keymaker -m 0700 /var/lib/swarma-keymaker\n"
 	if strings.Count(section, stateInstall) != 1 || !strings.Contains(section, parent+stateInstall) {
 		return errors.New("missing ordered private state directory install")

@@ -16,7 +16,7 @@ export GOTOOLCHAIN=local GOENV=off GOWORK=off LC_ALL=C
 test "$(go env GOVERSION)" = go1.26.10
 GOCACHE="$(mktemp -d)"
 export GOCACHE
-export GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 GOFLAGS=-mod=readonly
+export GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 GOFLAGS=-mod=readonly GOEXPERIMENT= GOFIPS140=off
 go build -trimpath -buildvcs=false -ldflags=-buildid= -o keymaker ./cmd/keymaker
 ```
 
@@ -35,9 +35,10 @@ dependencies and toolchain because `-trimpath` removes build paths and
 
 EXPECTED_SHA256_LINUX_AMD64: f336ee8c56cb22bf110626882ce461d47238cc902ac5df02f1c4b442f3925780
 
-The expected binary is 7365001 bytes. Two independent builds with this recipe
-agreed on this digest: a native linux/amd64 build and a cross-build from
-darwin/arm64, each from a fresh clean clone with an empty `GOCACHE`.
+The expected binary is 7365001 bytes. A darwin/arm64 cross-build of the final
+recipe, from a fresh clean clone with an empty `GOCACHE`, reproduces this digest.
+The earlier native linux/amd64 build agreed on this digest; native confirmation
+of the final environment pins is pending.
 
 Run `sha256sum keymaker` and compare its full digest to the expected value above.
 Any checksum mismatch must stop installation; do not install or activate the

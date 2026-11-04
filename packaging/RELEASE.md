@@ -33,12 +33,15 @@ dependencies and toolchain because `-trimpath` removes build paths and
 
 ## Verify before installation
 
-EXPECTED_SHA256_LINUX_AMD64: <pending two independent builds>
+EXPECTED_SHA256_LINUX_AMD64: f336ee8c56cb22bf110626882ce461d47238cc902ac5df02f1c4b442f3925780
+
+The expected binary is 7365001 bytes. Two independent builds with this recipe
+agreed on this digest: a native linux/amd64 build and a cross-build from
+darwin/arm64, each from a fresh clean clone with an empty `GOCACHE`.
 
 Run `sha256sum keymaker` and compare its full digest to the expected value above.
-The pending placeholder is not an accepted digest: installation must stop until
-it is replaced after the independent builds agree. Any checksum mismatch must
-stop installation; do not install or activate the mismatching binary.
+Any checksum mismatch must stop installation; do not install or activate the
+mismatching binary.
 
 On the same commit, with Go 1.26.10 and the build environment above, run:
 

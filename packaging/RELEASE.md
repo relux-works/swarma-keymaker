@@ -1,8 +1,9 @@
 # swarma-keymaker v0.1.0
 
 The released artifact is the `keymaker` binary for linux/amd64, built with
-Go 1.26.10. Run the following block from the root of a clean checkout or export
-of the release's tagged commit, using an already available Go 1.26.10 toolchain.
+the official Go 1.26.10 toolchain. Run the following block from the root of a
+fresh clean clone of the release's tagged commit, using an already available
+official Go 1.26.10 toolchain.
 The recipe must succeed in two independent builds with byte-identical outputs
 before the expected SHA-256 is finalized. The signed release tag is created
 later with the platform release key, never a development signing key.
@@ -11,13 +12,12 @@ later with the platform release key, never a development signing key.
 
 ```sh
 set -eu
-export GOTOOLCHAIN=local
-export CGO_ENABLED=0 GOOS=linux GOARCH=amd64
-export GOENV=off GOWORK=off GOFLAGS= LC_ALL=C
+export GOTOOLCHAIN=local GOENV=off GOWORK=off LC_ALL=C
 test "$(go env GOVERSION)" = go1.26.10
 GOCACHE="$(mktemp -d)"
 export GOCACHE
-go build -trimpath -buildvcs=false -mod=readonly -ldflags=-buildid= -o keymaker ./cmd/keymaker
+export GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOAMD64=v1 GOFLAGS=-mod=readonly
+go build -trimpath -buildvcs=false -ldflags=-buildid= -o keymaker ./cmd/keymaker
 ```
 
 `GOCACHE` must be a fresh, empty directory for each build; retain or remove that

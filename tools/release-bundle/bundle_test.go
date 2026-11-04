@@ -430,9 +430,9 @@ func TestReleaseBundle(t *testing.T) {
 }
 
 // On Linux amd64, compare the actual bundled binary with an independent build
-// executing the committed recipe verbatim under an environment allowlist, so
-// unlisted inherited variables cannot reach the build. Byte-changing poisons
-// exercise this boundary; equality proves exclusion for these inputs, while a
+// executing the committed recipe verbatim with an environment allowlist plus
+// GOENV=off blocking inherited variables and the user Go env file. Byte-changing
+// poisons exercise this boundary; equality proves exclusion for these inputs, while a
 // mismatch fails before acceptance. This is same-builder equivalence, not
 // independent release-build evidence.
 func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) {
@@ -458,10 +458,16 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 	if err != nil {
 		t.Fatal("recipe module cache", err)
 	}
+	home := privateTestScratch(t)
+	goConfig := filepath.Join(home, ".config", "go")
+	if err := os.MkdirAll(goConfig, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, filepath.Join(goConfig, "env"), []byte("GOEXPERIMENT=jsonv2\nGOFIPS140=latest\n"))
 	build := exec.CommandContext(ctx, "sh", "-c", script)
 	build.Dir = recipe.o.repo
 	build.Env = []string{
-		"PATH=" + os.Getenv("PATH"), "HOME=" + filepath.Dir(recipe.o.repo),
+		"PATH=" + os.Getenv("PATH"), "HOME=" + home,
 		"TMPDIR=" + os.TempDir(), "GOMODCACHE=" + strings.TrimSpace(string(cacheOutput)),
 		"GOPROXY=off", "GONOPROXY=none", "GOSUMDB=off", "GOTELEMETRY=off", "GOMAXPROCS=2",
 		"GOEXPERIMENT=jsonv2", "GOFIPS140=latest",

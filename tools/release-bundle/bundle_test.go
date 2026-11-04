@@ -462,6 +462,11 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 		t.Fatal("recipe module cache", err)
 	}
 	moduleCache := privateTestScratch(t)
+	t.Cleanup(func() {
+		if err := exec.Command("chmod", "-R", "u+w", moduleCache).Run(); err != nil {
+			t.Errorf("make recipe module cache removable: %v", err)
+		}
+	})
 	writeFixture(t, filepath.Join(filepath.Dir(recipe.o.repo), "go.work"), []byte("go 1.26.10\nuse ./evil\n"))
 	home := privateTestScratch(t)
 	goConfig := filepath.Join(home, ".config", "go")

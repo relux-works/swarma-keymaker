@@ -57,7 +57,7 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal("tests require committed packaging source", err)
 	}
 	registry := []byte(`{"products":[{"name":"example","index":1,"projects":[{"name":"project","index":1,"agents":[{"name":"agent","index":1}]}]}]}`)
-	f := fixture{o: options{repo: repo, commit: commit, version: "0.1.0-dev", target: filepath.Join(dir, "bundle"), config: filepath.Join(dir, "operator.json"), registry: filepath.Join(dir, "indices.json")}, config: config, registry: registry}
+	f := fixture{o: options{repo: repo, commit: commit, version: "0.1.0", target: filepath.Join(dir, "bundle"), config: filepath.Join(dir, "operator.json"), registry: filepath.Join(dir, "indices.json")}, config: config, registry: registry}
 	writeFixture(t, f.o.config, config)
 	writeFixture(t, f.o.registry, registry)
 	return f
@@ -429,6 +429,56 @@ func TestReleaseBundle(t *testing.T) {
 	testReleaseBundle(t, false)
 }
 
+// On Linux amd64, compare the actual bundled binary with an independent build
+// executing the committed recipe verbatim. A mismatch fails before acceptance;
+// this is same-builder equivalence, not independent release-build evidence.
+func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) {
+	t.Helper()
+	recipe := newFixture(t)
+	if recipe.o.commit != bundle.o.commit {
+		t.Fatal("recipe source commit differs from bundle")
+	}
+	raw, err := os.ReadFile(filepath.Join(recipe.o.repo, "packaging/RELEASE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, block, ok := strings.Cut(string(raw), "```sh\n")
+	if !ok {
+		t.Fatal("documented build block missing")
+	}
+	script, _, ok := strings.Cut(block, "\n```")
+	if !ok {
+		t.Fatal("documented build block unterminated")
+	}
+	cache := exec.CommandContext(ctx, "go", "env", "GOMODCACHE")
+	cacheOutput, err := cache.Output()
+	if err != nil {
+		t.Fatal("recipe module cache", err)
+	}
+	build := exec.CommandContext(ctx, "sh", "-c", script)
+	build.Dir = recipe.o.repo
+	build.Env = []string{
+		"PATH=" + os.Getenv("PATH"), "HOME=" + filepath.Dir(recipe.o.repo),
+		"TMPDIR=" + os.TempDir(), "GOMODCACHE=" + strings.TrimSpace(string(cacheOutput)),
+		"GOPROXY=off", "GONOPROXY=none", "GOSUMDB=off", "GOTELEMETRY=off", "GOMAXPROCS=2",
+	}
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("documented recipe build failed: %v: %s", err, output)
+	}
+	want, err := os.ReadFile(filepath.Join(recipe.o.repo, "keymaker"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(bundle.o.target, "keymaker"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("bundle/recipe binary mismatch: bundle=%x recipe=%x", sha256.Sum256(got), sha256.Sum256(want))
+	}
+	t.Logf("bundle/recipe byte equality: sha256=%x", sha256.Sum256(want))
+}
+
 // A supplied valid pin configuration is copied and checksummed in a real
 // offline build; this validates policy bytes, not installed Git trust or state.
 func TestReleaseBundleWithEnrollment(t *testing.T) {
@@ -453,7 +503,7 @@ func testReleaseBundle(t *testing.T, withEnrollment bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	args := []string{"-repo", f.o.repo, "-commit", f.o.commit, "-version", f.o.version, "-target", f.o.target, "-config", f.o.config, "-name-indices", f.o.registry, "-module-cache", f.o.moduleCache}
 	if withEnrollment {
@@ -498,6 +548,10 @@ func testReleaseBundle(t *testing.T, withEnrollment bool) {
 		t.Fatal("version metadata differs", err)
 	}
 	t.Logf("built source commit=%s version=%s go=%s target=%s/%s", record.Commit, record.Version, record.GoVersion, record.GOOS, record.GOARCH)
+	// The documented artifact and the bundle share a target only on amd64.
+	if !withEnrollment && runtime.GOARCH == "amd64" {
+		compareDocumentedRecipe(t, ctx, f)
+	}
 	if st, err := os.Stat(f.o.target); err != nil || st.Mode().Perm() != 0700 {
 		t.Fatal("target privacy mode differs", err)
 	}

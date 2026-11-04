@@ -14,7 +14,7 @@ import (
 	"github.com/relux-works/swarma-keymaker/internal/keymaker"
 )
 
-const version = "0.1.0-dev"
+const version = "0.1.0"
 
 func run(ctx context.Context, args []string, out, errOut io.Writer) int {
 	if len(args) == 1 && args[0] == "version" {

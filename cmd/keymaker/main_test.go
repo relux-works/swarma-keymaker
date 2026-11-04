@@ -10,7 +10,8 @@ import (
 	"testing"
 )
 
-// Version and malformed dispatch do not start a service or expose a signing path.
+// Version prints exactly 0.1.0; malformed dispatch refuses. Neither starts a
+// service or exposes a signing path.
 func TestCommandDispatch(t *testing.T) {
 	for _, sample := range []struct {
 		args   []string
@@ -19,6 +20,9 @@ func TestCommandDispatch(t *testing.T) {
 		var out bytes.Buffer
 		if code := run(context.Background(), sample.args, &out, &out); code != sample.status {
 			t.Fatal(code)
+		}
+		if sample.status == 0 && out.String() != "0.1.0\n" {
+			t.Fatalf("release version differs: %q", out.String())
 		}
 	}
 }

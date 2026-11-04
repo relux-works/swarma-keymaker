@@ -430,10 +430,11 @@ func TestReleaseBundle(t *testing.T) {
 }
 
 // On Linux amd64, compare the actual bundled binary with an independent build
-// executing the committed recipe verbatim with inherited byte-changing
-// GOEXPERIMENT and GOFIPS140 values. Equality proves the recipe overrides these
-// poisons; a mismatch fails before acceptance. This is same-builder equivalence,
-// not independent release-build evidence.
+// executing the committed recipe verbatim under an environment allowlist, so
+// unlisted inherited variables cannot reach the build. Byte-changing poisons
+// exercise this boundary; equality proves exclusion for these inputs, while a
+// mismatch fails before acceptance. This is same-builder equivalence, not
+// independent release-build evidence.
 func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) {
 	t.Helper()
 	recipe := newFixture(t)
@@ -464,6 +465,7 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 		"TMPDIR=" + os.TempDir(), "GOMODCACHE=" + strings.TrimSpace(string(cacheOutput)),
 		"GOPROXY=off", "GONOPROXY=none", "GOSUMDB=off", "GOTELEMETRY=off", "GOMAXPROCS=2",
 		"GOEXPERIMENT=jsonv2", "GOFIPS140=latest",
+		"GOCOMPILEDEBUG=checkptr=2", "GO_EXTLINK_ENABLED=1",
 	}
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("documented recipe build failed: %v: %s", err, output)

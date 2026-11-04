@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -432,9 +433,11 @@ func TestReleaseBundle(t *testing.T) {
 // On Linux amd64, compare the actual bundled binary with an independent build
 // executing the committed recipe verbatim with an environment allowlist plus
 // GOENV=off blocking inherited variables and the user Go env file. Byte-changing
-// poisons exercise this boundary; equality proves exclusion for these inputs, while a
+// poisons and a hostile parent workspace exercise this boundary, including
+// GOWORK=off; equality proves exclusion for these inputs, while a
 // mismatch fails before acceptance. This is same-builder equivalence, not
-// independent release-build evidence.
+// independent release-build evidence. A modified seeded module cache must then
+// fail verification with no binary; the preceding build is its valid control.
 func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) {
 	t.Helper()
 	recipe := newFixture(t)
@@ -458,6 +461,8 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 	if err != nil {
 		t.Fatal("recipe module cache", err)
 	}
+	moduleCache := privateTestScratch(t)
+	writeFixture(t, filepath.Join(filepath.Dir(recipe.o.repo), "go.work"), []byte("go 1.26.10\nuse ./evil\n"))
 	home := privateTestScratch(t)
 	goConfig := filepath.Join(home, ".config", "go")
 	if err := os.MkdirAll(goConfig, 0700); err != nil {
@@ -468,8 +473,9 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 	build.Dir = recipe.o.repo
 	build.Env = []string{
 		"PATH=" + os.Getenv("PATH"), "HOME=" + home,
-		"TMPDIR=" + os.TempDir(), "GOMODCACHE=" + strings.TrimSpace(string(cacheOutput)),
-		"GOPROXY=off", "GONOPROXY=none", "GOSUMDB=off", "GOTELEMETRY=off", "GOMAXPROCS=2",
+		"TMPDIR=" + os.TempDir(), "GOMODCACHE=" + moduleCache,
+		"GOPROXY=" + (&url.URL{Scheme: "file", Path: filepath.Join(strings.TrimSpace(string(cacheOutput)), "cache", "download")}).String(),
+		"GONOPROXY=none", "GOSUMDB=off", "GOTELEMETRY=off", "GOMAXPROCS=2",
 		"GOEXPERIMENT=jsonv2", "GOFIPS140=latest",
 		"GOCOMPILEDEBUG=checkptr=2", "GO_EXTLINK_ENABLED=1",
 	}
@@ -488,6 +494,22 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 		t.Fatalf("bundle/recipe binary mismatch: bundle=%x recipe=%x", sha256.Sum256(got), sha256.Sum256(want))
 	}
 	t.Logf("bundle/recipe byte equality: sha256=%x", sha256.Sum256(want))
+	if err := os.Remove(filepath.Join(recipe.o.repo, "keymaker")); err != nil {
+		t.Fatal(err)
+	}
+	unix := filepath.Join(moduleCache, "golang.org", "x", "sys@v0.38.0", "unix")
+	if err := os.Chmod(unix, 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, filepath.Join(unix, "recipe_poison.go"), []byte("package unix\nvar RecipePoison = 1\n"))
+	refusal := exec.CommandContext(ctx, "sh", "-c", script)
+	refusal.Dir, refusal.Env = build.Dir, build.Env
+	output, err := refusal.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "dir has been modified") {
+		t.Fatalf("modified cache did not fail verification: %v: %s", err, output)
+	}
+	absent(t, filepath.Join(recipe.o.repo, "keymaker"))
+	t.Logf("modified seeded cache refused before binary creation: %s", output)
 }
 
 // A supplied valid pin configuration is copied and checksummed in a real

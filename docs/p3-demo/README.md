@@ -8,19 +8,22 @@ The planner prints JSON instructions only; it never executes them.
 
 The assigned release inputs are:
 
-| Component | Exact source for the intended `v0.1.0` tag | Expected Linux amd64 binary |
+| Component | Exact source for the `v0.1.0` tag | Expected Linux amd64 binary |
 | --- | --- | --- |
-| Keymaker | `a713cc346db980e0a97affe3e5466d2ca4dc60b0` | 7,365,001 bytes; owner-supplied digest prefix **`f336ee8c` only** |
+| Keymaker | `a713cc346db980e0a97affe3e5466d2ca4dc60b0` | 7,365,001 bytes; `f336ee8c56cb22bf110626882ce461d47238cc902ac5df02f1c4b442f3925780` |
 | Registrar | `4494323068bb969a0c3c14b2e44e174217fc7c56` | 11,668,143 bytes; `8b3c3f18d71a8350de406e6dae2bf58d9073c0af371c5143d61cadac4cde2e7b` |
 
 Release **option B**: build from verified signed source; no published binary.
-The release tag signer must be **Ivan's platform release key, explicitly named
-by Ivan or the authorized lead**. Its identity/fingerprint is still missing.
-An agent commit key, Relux Zion's key and curator-spec allowed signers confer no
-platform release authority. This unit creates neither tag nor release.
-The Keymaker source recipe contains a candidate full digest, but this handoff
-does not promote it to an owner-approved W0 pin. Obtain the full approved
-64-hex digest; prefix comparison alone must never permit installation.
+Both `v0.1.0` tags have verified SSH signatures by `ivan@relux.works` in
+namespace `git`, using the owner's platform release key:
+**`SHA256:x3t8hOxl+PixTw1eTqV+qCqSp88Vw7AEMrmGUvs213I`**.
+Their peeled targets are the exact source commits in the table above.
+Verify the signatures against that independently trusted key before use; this
+document's commit signer confers no platform release authority.
+Compare the full approved 64-hex binary digests and sizes, never a digest prefix.
+These confirmed release pins do not qualify the VM demo or replace its remaining
+operator, enrollment and runtime evidence. This recipe creates neither tag nor
+release and performs no build or installation.
 
 ## Before the VM operator starts
 
@@ -78,9 +81,13 @@ here. P2 dispatcher belongs to its separate lane; P4 broker remains on hold.
 ## Dry-run intake
 
 Use `manifest.example.json` as an intentionally incomplete public inventory.
-Null values mean missing inputs. Fill it only with public references, hashes,
-numeric identity pins and paths, never secret contents. The planner does not
-open any referenced file, inspect accounts or verify any evidence reference.
+Null values mean missing inputs. Copy the confirmed full Keymaker digest and
+platform release-key fingerprint above into their corresponding fields, and
+record independently verified public evidence references. The template remains
+intentionally incomplete for the remaining operator inputs. Fill it only with
+public references, hashes, numeric identity pins and paths, never secret contents.
+The planner does not open any referenced file, inspect accounts or verify any
+evidence reference.
 
 ```sh
 python3 docs/p3-demo/plan.py docs/p3-demo/manifest.example.json

@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "release": {
+    "option": "B",
+    "tag": "v0.1.0",
+    "keymaker_commit": "a713cc346db980e0a97affe3e5466d2ca4dc60b0",
+    "registrar_commit": "4494323068bb969a0c3c14b2e44e174217fc7c56",
+    "keymaker_sha256": null,
+    "registrar_sha256": "8b3c3f18d71a8350de406e6dae2bf58d9073c0af371c5143d61cadac4cde2e7b"
+  },
+  "evidence": {
+    "ivan_release_key_decision": null,
+    "platform_release_key_fingerprint": null,
+    "signed_tags": null,
+    "two_independent_builds": null,
+    "zero_called_vulnerabilities": null,
+    "vm_operator_approval": null,
+    "vm_available": null,
+    "precreated_accounts": null,
+    "service_layout": null,
+    "q6_root_procedure": null,
+    "trusted_time": null,
+    "ivan_first_signed_enrollment": null,
+    "operator_approval": null,
+    "uid_map": null,
+    "name_registry": null
+  },
+  "operator": {"uid": null, "generation": null},
+  "enrollment": {
+    "config": "/etc/swarma-keymaker/enrollment-pins.json",
+    "operator_approval_file": null,
+    "object_format": null,
+    "signed_revision": null,
+    "state_sha256": null,
+    "mode": null,
+    "state_evidence": null
+  },
+  "accounts": [
+    {
+      "account": null, "uid": null, "generation": null,
+      "home": null, "workspace": null, "owner": null,
+      "names": {"purpose": "agent-identity", "product": null, "project": null, "agent": null},
+      "public_key_file": null, "allowed_signers_file": null
+    },
+    {
+      "account": null, "uid": null, "generation": null,
+      "home": null, "workspace": null, "owner": null,
+      "names": {"purpose": "agent-identity", "product": null, "project": null, "agent": null},
+      "public_key_file": null, "allowed_signers_file": null
+    }
+  ]
+}

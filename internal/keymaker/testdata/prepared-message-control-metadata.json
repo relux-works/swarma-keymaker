@@ -1,0 +1,21 @@
+{
+  "transaction": "00112233445566778899aabbccddeeff",
+  "binding": {
+    "uid": 30001,
+    "generation": "fixture-generation",
+    "registration_number": 1,
+    "master_epoch": "fixture-epoch",
+    "owner": "fixture-owner",
+    "path": "m/4'/1'/1'/1'"
+  },
+  "key_id": "ed25519:x9YMXZPDxHir3Zcu5nA_FozcIg0tEoL0D7RGkuayYMQ",
+  "issuer_policy": {
+    "path": "m/5'/1'/1'/1'",
+    "key": "ed25519:yXyVR7ggsQql_M7JJ2DDwaybQ0UP_fQ9AV43gruLoqU",
+    "master_epoch": "fixture-epoch",
+    "registry_revision": "fixture-revision",
+    "lifetime_seconds": 3600
+  },
+  "envelope": "eyJib2R5Ijp7ImFjdGlvbnMiOlsibWVzc2FnZS5zaWduIl0sImJpbmRpbmciOnsiZ2VuZXJhdGlvbiI6ImZpeHR1cmUtZ2VuZXJhdGlvbiIsIm1hc3Rlcl9lcG9jaCI6ImZpeHR1cmUtZXBvY2giLCJvd25lciI6ImZpeHR1cmUtb3duZXIiLCJwYXRoIjoibS80Jy8xJy8xJy8xJyIsInJlZ2lzdHJhdGlvbl9udW1iZXIiOjEsInVpZCI6MzAwMDF9LCJleHAiOiIyMDI2LTEwLTI0VDEzOjAwOjAwWiIsImlhdCI6IjIwMjYtMTAtMjRUMTI6MDA6MDBaIiwiaXNzdWVyIjoiZWQyNTUxOTp5WHlWUjdnZ3NRcWxfTTdKSjJERHdheWJRMFVQX2ZROUFWNDNncnVMb3FVIiwia2V5X2NsYXNzIjoiYWdlbnQiLCJwdXJwb3NlIjoic3dhcm1hLW1zZyIsInJvbGVzIjpbImF1dGhvciJdLCJzdWJqZWN0Ijp7ImFsZ29yaXRobSI6IkVkMjU1MTkiLCJrZXlfaWQiOiJlZDI1NTE5Ong5WU1YWlBEeEhpcjNaY3U1bkFfRm96Y0lnMHRFb0wwRDdSR2t1YXlZTVEiLCJwdWJsaWNfYnl0ZXMiOiJ4OVlNWFpQRHhIaXIzWmN1NW5BX0ZvemNJZzB0RW9MMEQ3UkdrdWF5WU1RIn0sInR5cGUiOiJhdHRlc3RhdGlvbi8xIn0sImlkIjoic2hhMjU2OmFmMDMxZTU3NWUzYzcyNDg3OTBiM2EwZDgzZDkzNDM0MWYxYTQ5Njg0MDJhNzk3ZTA0YWM0MzQxNjFmNWE4NzEiLCJzaWduYXR1cmVzIjpbeyJrZXkiOiJlZDI1NTE5OnlYeVZSN2dnc1FxbF9NN0pKMkREd2F5YlEwVVBfZlE5QVY0M2dydUxvcVUiLCJyb2xlIjoiYXV0aG9yIiwic2lnIjoiOFpHNXJjTW81ckJFcFRoamdQeVNCQW94UjN5eEhqbU5SdkFxRkFJUllHUU1LY05Ha0FQd2pkVTJFYmFEUDFTdWE5VXJUNV9YRTZUVm1Xcy1XNHVlQVEifV0sInZlcnNpb24iOiJzd2FybS1lbnZlbG9wZS8yIn0",
+  "content_id": "sha256:af031e575e3c7248790b3a0d83d934341f1a4968402a797e04ac434161f5a871"
+}

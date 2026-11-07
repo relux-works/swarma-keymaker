@@ -85,6 +85,26 @@ class Checks(unittest.TestCase):
                     self.assertEqual(s["environment"]["SSH_AUTH_SOCK"], "/run/swarma-keymaker/agent.sock")
             self.assertEqual(len(ids), len(set(ids)))
 
+    def test_nested_station_home_refuses_beside_disjoint_control(self):
+        m = fake_manifest(2)
+        before = copy.deepcopy(m)
+        result, code = plan.plan(m)
+        self.assertEqual(m, before)
+        self.assertEqual(code, 0)
+        self.assertEqual(result["status"], "UNEXECUTED_PLAN_REQUIRES_OPERATOR_VERIFICATION")
+        self.assertFalse(result["qualified"])
+        self.assertFalse(result["evidence_authenticated"])
+
+        candidate = copy.deepcopy(m)
+        nested = candidate["accounts"][1]
+        nested["home"] = candidate["accounts"][0]["home"] + "/nested-station"
+        nested["workspace"] = nested["home"] + "/demo"
+        nested["public_key_file"] = nested["home"] + "/bound-key.pub"
+        before = copy.deepcopy(candidate)
+        with self.assertRaisesRegex(plan.Invalid, "^station homes must not be nested$"):
+            plan.plan(candidate)
+        self.assertEqual(candidate, before)
+
     def test_restart_never_emits_bootstrap(self):
         m = fake_manifest()
         m["enrollment"]["mode"] = "reconcile"

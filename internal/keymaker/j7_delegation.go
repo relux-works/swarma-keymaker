@@ -134,11 +134,11 @@ func j7ParseDelegation(v j7SignParams) (j7Plan, Code) {
 	if code != "" {
 		return p, code
 	}
-	if pc.Profile != "swarma-trust-contract/2" || cc.Profile != "swarma-trust-contract/2" {
-		return p, "operation_unsupported"
-	}
 	if code = j7ChildParentIdentity(pc, cc, g.ID()); code != "" {
 		return p, code
+	}
+	if pc.Profile != "swarma-trust-contract/2" || cc.Profile != "swarma-trust-contract/2" {
+		return p, "operation_unsupported"
 	}
 	p.evidence, code = j7DecodeEvidence(v.Evidence, true)
 	if code != "" {

@@ -101,7 +101,8 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 				return failure("invalid J7 state pins")
 			}
 			p := parsed.J7State
-			if !filepath.IsAbs(p.Path) || filepath.Clean(p.Path) != p.Path || !j7StateSchema(p.Minimum) || p.ExpectedVersion == 0 || p.ExpectedVersion > j7SafeInteger || !validDigest(p.ExpectedDigest) {
+			// Configuration stays pinned to4/5; trusted internal state6 is separate.
+			if !filepath.IsAbs(p.Path) || filepath.Clean(p.Path) != p.Path || (p.Minimum != 4 && p.Minimum != 5) || p.ExpectedVersion == 0 || p.ExpectedVersion > j7SafeInteger || !validDigest(p.ExpectedDigest) {
 				return failure("invalid J7 state pins")
 			}
 		}

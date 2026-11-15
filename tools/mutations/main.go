@@ -18,10 +18,10 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing or j7-delegation controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation or j7-delegation-r2 controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -120,6 +120,16 @@ func main() {
 			{"j7-delegation-no-unknown", "j7_release.go", `record.Release = "handoff_unknown"
 		if r.Method == "j7_enroll" {`, `// Plant: skip pre-callback unknown commitment.
         if r.Method == "j7_enroll" {`, "^TestJ7DelegationPartialWrite$", "--- FAIL: TestJ7DelegationPartialWrite", "unknown missing"},
+		}
+	}
+
+	if *group == "j7-delegation-r2" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-r2-created-at", "j7_sign.go", `if !p.eventTimeValid(now) {`, `if false && !p.eventTimeValid(now) {`, "^TestJ7DelegationCreationTimeBoundary$", "--- FAIL: TestJ7DelegationCreationTimeBoundary", "out-of-window creation retained or signed a result"},
+			{"j7-r2-retained-window", "j7_release.go", `if !ok || code != "" || !valid || !p.eventTimeValid(event.CreatedAt) {`, `if !ok || code != "" || !valid || false && !p.eventTimeValid(event.CreatedAt) {`, "^TestJ7DelegationRetainedWindowRelease$", "--- FAIL: TestJ7DelegationRetainedWindowRelease", "out-of-window retained event reached callback"},
+			{"j7-r2-config-floor", "config_linux.go", `(p.Minimum != 4 && p.Minimum != 5)`, `!j7StateSchema(p.Minimum)`, "^TestJ7ConfigReaderFloorPin$", "--- FAIL: TestJ7ConfigReaderFloorPin", "configuration admitted unapproved reader floor 6"},
+			{"j7-r2-parent-order", "j7_delegation.go", `if code = j7ChildParentIdentity(pc, cc, g.ID()); code != "" {`, `if pc.Profile != "swarma-trust-contract/2" || cc.Profile != "swarma-trust-contract/2" { return p, "operation_unsupported" }
+ if code = j7ChildParentIdentity(pc, cc, g.ID()); code != "" {`, "^TestJ7DelegationProfile1ParentOrder$", "--- FAIL: TestJ7DelegationProfile1ParentOrder", "want NOT_DELEGABLE"},
 		}
 	}
 
@@ -373,7 +383,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "j7-delegation" {
+		if *group == "j7-delegation" || *group == "j7-delegation-r2" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{

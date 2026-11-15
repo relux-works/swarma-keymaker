@@ -66,6 +66,17 @@ func (a *j7RequestCustody) WithActive(ctx context.Context, peer control.Peer, r 
 		if e != nil || string(encoded) != string(prior.Result) || j7Hash(encoded) != record.ResultHash {
 			return "request_conflict"
 		}
+		// Recheck retained event time even when today's clock is in-window.
+		// Invalid history is evidence to preserve and fence, never a retry permit.
+		if r.Method == "j7_sign" {
+			encoded, ok := result["signed_object_b64"].(string)
+			raw, code := j7Decode64(encoded, 16384)
+			event, valid := j7ValidateEventForSchema(raw, s.schema)
+			if !ok || code != "" || !valid || !p.eventTimeValid(event.CreatedAt) {
+				s.failed = true
+				return "j7_state_fenced"
+			}
+		}
 		if key, ok := result["public_key"].(string); ok && key != public {
 			return "custody_unavailable"
 		}

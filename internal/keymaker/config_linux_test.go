@@ -5,7 +5,9 @@ package keymaker
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -217,5 +219,25 @@ func TestGenerationJournalConfig(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Protected configuration admits only4/5 despite the internal Store reader6.
+// Byte parsing of nearby numeric/type cases creates no runtime authority.
+func TestJ7ConfigReaderFloorPin(t *testing.T) {
+	for _, role := range []string{j7RequestRole, j7DelegationRole} {
+		for _, floor := range []string{"4", "5", "0", "2", "3", "6", "7", "-1", "4.5", "\"5\"", "null", "true"} {
+			t.Run(string(role)+"/"+floor, func(t *testing.T) {
+				raw := strings.TrimSuffix(j7Config(role), "}") + `,"j7_state":{"path":"/protected/state","minimum_reader_schema":` + floor + `,"expected_version":1,"expected_digest":"` + strings.Repeat("a", 64) + `"}}`
+				cfg, e := ParseConfig(strings.NewReader(raw))
+				if floor == "4" || floor == "5" {
+					if e != nil || cfg.J7State == nil || fmt.Sprint(cfg.J7State.Minimum) != floor {
+						t.Fatal("valid explicit config floor refused", floor, e)
+					}
+				} else if e == nil {
+					t.Fatal("configuration admitted unapproved reader floor", floor)
+				}
+			})
+		}
 	}
 }

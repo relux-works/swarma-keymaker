@@ -94,6 +94,12 @@ type j7Plan struct {
 	delegation  *j7DelegationPlan
 }
 
+// Validate the exact signed timestamp, not an earlier clock observation.
+// First consent may precede its contract start; parent-bound operations may not.
+func (p j7Plan) eventTimeValid(at int64) bool {
+	return at >= 1 && at <= j7MaxTime && at < p.contract.NotAfter && (p.operation == "consent_v3" || at >= p.contract.NotBefore)
+}
+
 func j7ParseRequest(r control.Request) (j7Plan, Code) {
 	var p j7Plan
 	if r.Method == "j7_pubkey" {
@@ -487,6 +493,9 @@ func (a *j7RequestCustody) Handle(ctx context.Context, peer control.Peer, r cont
 			now, c := a.now(ctx)
 			if c != "" {
 				return c
+			}
+			if !p.eventTimeValid(now) {
+				return "delegation_evidence_unavailable"
 			}
 			event = rental.Event{Pubkey: public, CreatedAt: now, Content: ""}
 			switch p.operation {

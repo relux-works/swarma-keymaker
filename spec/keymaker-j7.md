@@ -216,6 +216,9 @@ The row key is `{kind,event_id,grant_id}`: an exact admission pair or the distin
 owner-command key with both IDs empty. Tip/mode/command remain in the immutable
 run record rather than widening this row key.
 
+Deny affects Use; Delegate remains a separate permission. The same parent may
+be listed in Delegate and Deny without giving it Use authority.
+
 Use/delegate/deny members are exact lowercase 64-hex IDs. Consent entries have
 exactly `{contract_sha256,booking_sha256,privacy_sha256,and_use}`: three exact
 64-hex hashes and a Boolean. Unknown, missing, null, duplicate or mis-cased
@@ -557,6 +560,12 @@ kind 8186 with empty content and exactly five ordered two-string tags:
 `t=swarma-delegation-request-v1`, `parent=P.ID()`, `contract=SHA256(child bytes)`,
 `ordinal` as canonical decimal and `nonce` as 32 fresh random bytes/64 lowercase hex.
 Creation time is inside P's window; a nested child may start in the future.
+The exact construction timestamp is checked before secret signing and durable
+preparation. Before every first or retry callback, the retained event's own
+window is checked again, even if the clock has stepped backwards into the
+window. Invalid retained bytes are preserved and fenced, never silently repaired
+or disclosed. Consent may precede its contract start but must precede its end;
+parent-bound envelope and delegation events require both bounds.
 Standard NIP01 preimage and BIP340 apply without any new signed domain. The
 four-field signed result uses the descriptive local profile
 `swarma-delegation-request-v1/draft`, outside signed bytes. Kind8186 remains Draft,

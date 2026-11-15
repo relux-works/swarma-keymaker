@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -966,4 +967,300 @@ func TestJ7DelegationAggregateAndFrameCaps(t *testing.T) {
 	if j7DelegationCount(f) != before+2 {
 		t.Fatal("over-cap frame retained result")
 	}
+}
+
+// The one exceptional read targets construction after the guarded clock read.
+// All other reads are inside the parent window, including release after a step
+// backwards. The atomic counter is a clock fixture, not a time provider proof.
+type j7ConstructionClock struct {
+	base, exception int64
+	at              int32
+	reads           atomic.Int32
+}
+
+func (c *j7ConstructionClock) UTC() (time.Time, bool) {
+	value := c.base
+	if c.reads.Add(1) == c.at {
+		value = c.exception
+	}
+	return time.Unix(value, 0), true
+}
+func j7WindowFixture(t *testing.T, operation string, fence control.ReleaseFence) (*j7SignFixture, *net.UnixConn, control.Object) {
+	t.Helper()
+	var f *j7SignFixture
+	if operation == "delegation_request_v3" {
+		f = j7DelegationSetup(t)
+	} else {
+		f = j7SigningSetup(t)
+	}
+	// Make the lower boundary a representable trusted time, rather than Unix0.
+	f.contract.NotBefore = 1700000000
+	if operation == "delegation_request_v3" {
+		f.raw = []byte(strings.Replace(string(f.raw), `"not_before":1,`, `"not_before":1700000000,`, 1))
+	} else {
+		f.raw, _ = j7Compact(f.contract)
+	}
+	table := j7SigningPolicy(t, f, 3)
+	triple := j7ConsentTriple(f.raw)
+	triple.AndUse = true
+	table.Rows[0].Consent = []j7ConsentPermission{triple}
+	f.f.publish(t, table)
+	if fence != nil {
+		if probe, ok := fence.(*j7RetainedWindowFence); ok {
+			probe.a = f.a
+		}
+		f.stop()
+		<-f.done
+		j7DelegationServe(t, f, fence)
+	}
+	c := f.dial(t, 1)
+	f.bind(t, c, 2, f.f.origin, f.f.uid+200)
+	if operation == "consent_v3" {
+		return f, c, f.consent(t)
+	}
+	g, _, ev := j7DelegationIssue(t, f, c)
+	if operation == "delegation_request_v3" {
+		j7DelegationList(t, f, g.ID(), 4, false, true)
+		return f, c, j7DelegationParams(t, f, g, ev)
+	}
+	j7Call(t, c, 4, "j7_enroll", j7GrantParams(t, f, g, ev), "")
+	return f, c, j7EnvelopeParams(t, f, g, ev)
+}
+
+// Exact construction timestamps, not merely an earlier clock observation, must
+// obey the upper bound for all signers and the lower bound for grant operations.
+// Consent-before-start is intentionally valid; each rejection has an independent
+// in-window control and retains/signs nothing. These are real Unix/W fixtures.
+func TestJ7DelegationCreationTimeBoundary(t *testing.T) {
+	for _, operation := range []string{"consent_v3", "envelope_v3", "delegation_request_v3"} {
+		for _, position := range []string{"end", "just-inside", "below-start", "at-start"} {
+			t.Run(operation+"/"+position, func(t *testing.T) {
+				f, c, p := j7WindowFixture(t, operation, nil)
+				base, _ := f.a.clock.UTC()
+				value := f.contract.NotAfter
+				switch position {
+				case "just-inside":
+					value--
+				case "below-start":
+					value = f.contract.NotBefore - 1
+				case "at-start":
+					value = f.contract.NotBefore
+				}
+				at := int32(4)
+				if operation == "consent_v3" {
+					at = 3
+				}
+				clock := &j7ConstructionClock{base: base.Unix(), exception: value, at: at}
+				f.a.clock = clock
+				before := j7DelegationCount(f)
+				counter := &j7DelegationCountingReader{source: rand.Reader}
+				f.a.key.mu.Lock()
+				f.a.key.entropy = counter
+				f.a.key.mu.Unlock()
+				nativeSend(t, c, nativeRequest(20, "j7_sign", p))
+				response := nativeReceive(t, c)
+				valid := position != "end" && (position != "below-start" || operation == "consent_v3")
+				if !valid {
+					if j7DelegationCount(f) != before || counter.calls.Load() != 0 {
+						t.Fatal("out-of-window creation retained or signed a result")
+					}
+					nativeResponse(t, response, nativeID(20), "delegation_evidence_unavailable")
+					f.f.store.mu.Lock()
+					e := f.f.store.validateJ7()
+					f.f.store.mu.Unlock()
+					if e != nil {
+						t.Fatal("creation refusal corrupted retained state", e)
+					}
+					// The same ID works after a trusted backward step and launcher rebind;
+					// no invalid prepared event exists for a retry to disclose.
+					f.a.clock = j7SigningClock{base, true}
+					f.f.store.mu.Lock()
+					run := f.f.store.j7.Runs[0].ID
+					f.f.store.mu.Unlock()
+					c = j7DelegationReconnect(t, f, c, 30, run)
+					j7ResultEvent(t, j7Call(t, c, 20, "j7_sign", p, ""))
+				} else {
+					event := j7ResultEvent(t, nativeResponse(t, response, nativeID(20), ""))
+					if event.CreatedAt != value {
+						t.Fatal("construction timestamp changed", event.CreatedAt, value)
+					}
+					j7DelegationWaitReleased(t, f, 20)
+				}
+				if clock.reads.Load() < at {
+					t.Fatal("exceptional construction read was not exercised")
+				}
+			})
+		}
+	}
+}
+
+type j7RetainedWindowFence struct {
+	a         *j7RequestCustody
+	operation string
+	plant     func(control.Object)
+	callbacks atomic.Int64
+}
+
+func (f *j7RetainedWindowFence) WithActive(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) control.Code {
+	if r.Params["operation"] != f.operation {
+		return f.a.WithActive(ctx, peer, r, result, release)
+	}
+	if f.plant != nil {
+		f.plant(result)
+	}
+	return f.a.WithActive(ctx, peer, r, result, func(ctx context.Context) control.Code { f.callbacks.Add(1); return release(ctx) })
+}
+
+// Plant a correctly signed but invalid-window retained fixture. This models
+// legacy corrupt history only, never an operator recovery or a production API.
+func j7PlantRetainedWindow(t *testing.T, f *j7SignFixture, id int, result control.Object, at int64) []byte {
+	t.Helper()
+	event := j7ResultEvent(t, result)
+	event.CreatedAt = at
+	event.ID = j7EventID(event)
+	digestBytes, _ := hex.DecodeString(event.ID)
+	var digest [32]byte
+	copy(digest[:], digestBytes)
+	signature, e := f.a.key.request(f.f.store, f.f.binding, &digest)
+	if e != nil {
+		t.Fatal("synthetic fault signature", e)
+	}
+	event.Sig = hex.EncodeToString(signature)
+	erase(signature)
+	changed := j7SignedResult(event, result["profile"].(string))
+	j7ResultEvent(t, changed)
+	for k := range result {
+		delete(result, k)
+	}
+	for k, v := range changed {
+		result[k] = v
+	}
+	s := f.f.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rec := s.j7SigningRecord(f.a.launcher, nativeID(id))
+	index, ok := s.requestIndex[requestKey{f.a.launcher, nativeID(id)}]
+	if rec == nil || !ok {
+		t.Fatal("missing fault target")
+	}
+	encoded, e := control.Marshal(result)
+	if e != nil {
+		t.Fatal(e)
+	}
+	s.requests[index].Result = encoded
+	rec.ResultHash = j7Hash(encoded)
+	rec.EventID = event.ID
+	if code := s.commitJ7(t.Context()); code != "" {
+		t.Fatal("retained fixture fault persistence", code)
+	}
+	if s.validateJ7Signing() == nil {
+		t.Fatal("fault did not violate stored time invariant")
+	}
+	raw, e := os.ReadFile(f.f.path + "/bindings.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	return raw
+}
+
+// Correctly signed, hash-associated retained data must still obey its ORIGINAL
+// event window before first/retry callback. A backward clock and new launcher
+// channel cannot release invalid history. The explicit fixture fault remains
+// preserved and fenced; an ordinary call/retry with valid bytes is the control.
+func TestJ7DelegationRetainedWindowRelease(t *testing.T) {
+	for _, operation := range []string{"consent_v3", "envelope_v3", "delegation_request_v3"} {
+		for _, retry := range []bool{false, true} {
+			positions := []string{"end"}
+			if operation != "consent_v3" {
+				positions = append(positions, "below-start")
+			}
+			for _, position := range positions {
+				t.Run(fmt.Sprintf("%s/%s/retry-%v", operation, position, retry), func(t *testing.T) {
+					probe := &j7RetainedWindowFence{operation: operation}
+					f, c, p := j7WindowFixture(t, operation, probe)
+					probe.a = f.a
+					valid := j7Call(t, c, 10, "j7_sign", p, "")
+					j7ResultEvent(t, valid)
+					j7DelegationWaitReleased(t, f, 10)
+					if got := j7Call(t, c, 10, "j7_sign", p, ""); !reflect.DeepEqual(got, valid) {
+						t.Fatal("valid retry changed bytes")
+					}
+					j7DelegationWaitReleased(t, f, 10)
+					callbacks := probe.callbacks.Load()
+					at := f.contract.NotAfter
+					if position == "below-start" {
+						at = f.contract.NotBefore - 1
+					}
+					id := 20
+					var before []byte
+					if retry {
+						id = 10
+						f.a.clock = j7SigningClock{time.Unix(f.contract.NotAfter, 0), true}
+						j7PlantRetainedWindow(t, f, id, valid, at)
+						inside, _ := fixtureAuditClock{}.UTC()
+						f.a.clock = j7SigningClock{inside, true}
+						f.f.store.mu.Lock()
+						run := f.f.store.j7.Runs[0].ID
+						f.f.store.mu.Unlock()
+						c = j7DelegationReconnect(t, f, c, 30, run)
+						before, _ = os.ReadFile(f.f.path + "/bindings.json")
+					} else {
+						probe.plant = func(result control.Object) { before = j7PlantRetainedWindow(t, f, id, result, at) }
+					}
+					nativeSend(t, c, nativeRequest(id, "j7_sign", p))
+					response := nativeReceive(t, c)
+					if probe.callbacks.Load() != callbacks {
+						t.Fatal("out-of-window retained event reached callback")
+					}
+					nativeResponse(t, response, nativeID(id), "j7_state_fenced")
+					after, e := os.ReadFile(f.f.path + "/bindings.json")
+					if e != nil || !reflect.DeepEqual(before, after) {
+						t.Fatal("invalid retained fixture was rewritten", e)
+					}
+					f.f.store.mu.Lock()
+					failed := f.f.store.failed
+					f.f.store.mu.Unlock()
+					if !failed {
+						t.Fatal("invalid retained state was not fenced")
+					}
+				})
+			}
+		}
+	}
+}
+
+// Profile1 is a real signed W parent, not an incomplete/ID-only negative.
+// Frozen parent-ID/depth ordering wins without admitting delegation. A nearby
+// genuine profile2 parent signs; schema5's unsupported surface stays separate.
+func TestJ7DelegationProfile1ParentOrder(t *testing.T) {
+	f := j7SigningSetup(t)
+	f.stop()
+	<-f.done
+	if code := f.f.store.migrateJ7Delegation(t.Context(), j7Head(t, f.f.store)); code != "" {
+		t.Fatal(code)
+	}
+	j7DelegationServe(t, f, nil)
+	c := f.dial(t, 1)
+	f.bind(t, c, 2, f.f.origin, f.f.uid+200)
+	g, _, evidence := j7DelegationIssue(t, f, c)
+	j7DelegationList(t, f, g.ID(), 3, false, true)
+	now, _ := f.a.clock.UTC()
+	if code := f.a.evidence.check(t.Context(), g, evidence, now.Unix()); code != "" {
+		t.Fatal("profile1 full W control", code)
+	}
+	p := j7DelegationParams(t, f, g, evidence)
+	before := j7DelegationCount(f)
+	t.Run("correct-parent", func(t *testing.T) { j7Call(t, c, 20, "j7_sign", p, "NOT_DELEGABLE") })
+	input := j7DelegationInput(t, p)
+	raw, _ := j7Decode64(input.ChildContract, 8192)
+	input.ChildContract = j7Encode64([]byte(strings.Replace(string(raw), g.ID(), strings.Repeat("f", 64), 1)))
+	t.Run("different-parent", func(t *testing.T) {
+		j7Call(t, c, 21, "j7_sign", j7DelegationWithInput(t, p, input), "PARENT_ID_MISMATCH")
+	})
+	if j7DelegationCount(f) != before {
+		t.Fatal("profile1 refusal retained a signature")
+	}
+	positive, conn, _, _, params := j7DelegationReady(t)
+	j7ResultEvent(t, j7Call(t, conn, 20, "j7_sign", params, ""))
+	j7DelegationWaitReleased(t, positive, 20)
 }

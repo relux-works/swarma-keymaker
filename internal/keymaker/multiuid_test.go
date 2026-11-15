@@ -96,9 +96,7 @@ func windowClient() int {
 	}
 	return 0
 }
-func runWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *runningFixture, public []byte, refused bool) {
-	t.Helper()
-
+func windowClientArguments(w testwindow.Window, user string, uid uint32, socket string, public []byte, refused bool, executable, token string) []string {
 	expected := "0"
 	if refused {
 		expected = "1"
@@ -106,7 +104,13 @@ func runWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32,
 	// Test expectations are environment inputs only; the service uses SO_PEERCRED.
 	// sudo may reset environment. Explicit env arguments carry only public test
 	// expectations; no -E privilege or policy change is required.
-	args := []string{"-n", "-u", user, "--", "/usr/bin/env", "KEYMAKER_TEST_CLIENT=1", "KEYMAKER_CLIENT_UID=" + strconv.FormatUint(uint64(uid), 10), "KEYMAKER_CLIENT_SOCKET=" + f.server.Path, "KEYMAKER_CLIENT_PUBLIC=" + base64.StdEncoding.EncodeToString(public), "KEYMAKER_CLIENT_REFUSED=" + expected, os.Args[0], "-keymaker-window-token=" + *windowToken}
+	args := w.ClientArgs(user, "", "KEYMAKER_TEST_CLIENT=1", "KEYMAKER_CLIENT_UID="+strconv.FormatUint(uint64(uid), 10), "KEYMAKER_CLIENT_SOCKET="+socket, "KEYMAKER_CLIENT_PUBLIC="+base64.StdEncoding.EncodeToString(public), "KEYMAKER_CLIENT_REFUSED="+expected, executable, "-keymaker-window-token="+token)
+	return args
+}
+func runWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *runningFixture, public []byte, refused bool) {
+	t.Helper()
+
+	args := windowClientArguments(w, user, uid, f.server.Path, public, refused, os.Args[0], *windowToken)
 	cmd := exec.Command("sudo", args...)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
 	if output, e := cmd.CombinedOutput(); e != nil {
@@ -299,16 +303,20 @@ func windowNativeError(response control.Object, id, code string) bool {
 	e, ok := response["error"].(control.Object)
 	return ok && len(response) == 2 && response["request_id"] == id && len(e) == 2 && e["code"] == code && e["retryable"] == false
 }
-func runNativeWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *nativeFixture, public []byte, code string, deny bool, helper ...bool) {
-	t.Helper()
+func nativeWindowClientArguments(w testwindow.Window, user string, uid uint32, socket string, public []byte, code string, deny, helper bool, executable, token string) []string {
 	denied := "0"
 	if deny {
 		denied = "1"
 	}
-	args := []string{"-n", "-u", user, "--", "/usr/bin/env", "KEYMAKER_TEST_CLIENT=1", "KEYMAKER_CLIENT_SURFACE=control", "KEYMAKER_CLIENT_UID=" + strconv.FormatUint(uint64(uid), 10), "KEYMAKER_CLIENT_SOCKET=" + f.server.ControlPath, "KEYMAKER_CLIENT_PUBLIC=" + base64.StdEncoding.EncodeToString(public), "KEYMAKER_CLIENT_CODE=" + code, "KEYMAKER_CLIENT_CONNECT_DENIED=" + denied, os.Args[0], "-keymaker-window-token=" + *windowToken}
-	if len(helper) > 0 && helper[0] {
+	args := w.ClientArgs(user, "", "KEYMAKER_TEST_CLIENT=1", "KEYMAKER_CLIENT_SURFACE=control", "KEYMAKER_CLIENT_UID="+strconv.FormatUint(uint64(uid), 10), "KEYMAKER_CLIENT_SOCKET="+socket, "KEYMAKER_CLIENT_PUBLIC="+base64.StdEncoding.EncodeToString(public), "KEYMAKER_CLIENT_CODE="+code, "KEYMAKER_CLIENT_CONNECT_DENIED="+denied, executable, "-keymaker-window-token="+token)
+	if helper {
 		args = append(args[:len(args)-2], append([]string{"KEYMAKER_CLIENT_METHOD=sign_registration"}, args[len(args)-2:]...)...)
 	}
+	return args
+}
+func runNativeWindowClient(t *testing.T, w testwindow.Window, user string, uid uint32, f *nativeFixture, public []byte, code string, deny bool, helper ...bool) {
+	t.Helper()
+	args := nativeWindowClientArguments(w, user, uid, f.server.ControlPath, public, code, deny, len(helper) > 0 && helper[0], os.Args[0], *windowToken)
 	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sudo", args...)
@@ -340,7 +348,7 @@ func TestMultiUIDControl(t *testing.T) {
 	if uint32(os.Getgid()) != w.GroupID {
 		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 		defer cancel()
-		args := []string{"-n", "-u", w.Runner, "-g", w.Group, "--", "/usr/bin/env", "KEYMAKER_WINDOW_CONFIG=" + os.Getenv("KEYMAKER_WINDOW_CONFIG"), "KEYMAKER_WINDOW_SCRATCH=" + os.Getenv("KEYMAKER_WINDOW_SCRATCH"), "TMPDIR=" + os.Getenv("TMPDIR"), os.Args[0], "-test.run=^TestMultiUIDControl$", "-test.timeout=30s", "-test.v", "-keymaker-window-token=" + *windowToken}
+		args := windowGroupArguments(w, "TestMultiUIDControl", "30s", os.Getenv("KEYMAKER_WINDOW_CONFIG"), os.Getenv("KEYMAKER_WINDOW_SCRATCH"), os.Getenv("TMPDIR"), os.Args[0], *windowToken)
 		cmd := exec.CommandContext(ctx, "sudo", args...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
 		var output bytes.Buffer
@@ -431,7 +439,7 @@ func TestMultiUIDHelper(t *testing.T) {
 	if uint32(os.Getgid()) != w.GroupID {
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
-		args := []string{"-n", "-u", w.Runner, "-g", w.Group, "--", "/usr/bin/env", "KEYMAKER_WINDOW_CONFIG=" + os.Getenv("KEYMAKER_WINDOW_CONFIG"), "KEYMAKER_WINDOW_SCRATCH=" + os.Getenv("KEYMAKER_WINDOW_SCRATCH"), "TMPDIR=" + os.Getenv("TMPDIR"), os.Args[0], "-test.run=^TestMultiUIDHelper$", "-test.timeout=40s", "-test.v", "-keymaker-window-token=" + *windowToken}
+		args := windowGroupArguments(w, "TestMultiUIDHelper", "40s", os.Getenv("KEYMAKER_WINDOW_CONFIG"), os.Getenv("KEYMAKER_WINDOW_SCRATCH"), os.Getenv("TMPDIR"), os.Args[0], *windowToken)
 		cmd := exec.CommandContext(ctx, "sudo", args...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
 		var output bytes.Buffer
@@ -494,4 +502,8 @@ func TestMultiUIDHelper(t *testing.T) {
 			}
 		})
 	}
+}
+
+func windowGroupArguments(w testwindow.Window, test, timeout, config, scratch, tmp, executable, token string) []string {
+	return w.ClientArgs(w.Runner, w.Group, "KEYMAKER_WINDOW_CONFIG="+config, "KEYMAKER_WINDOW_SCRATCH="+scratch, "TMPDIR="+tmp, executable, "-test.run=^"+test+"$", "-test.timeout="+timeout, "-test.v", "-keymaker-window-token="+token)
 }

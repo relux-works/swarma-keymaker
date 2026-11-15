@@ -79,7 +79,7 @@ func TestMultiUIDJ7PolicyProtection(t *testing.T) {
 		name string
 		uid  uint32
 	}{{window.A, window.AID}, {window.B, window.BID}} {
-		cmd := exec.Command("sudo", "-n", "-u", client.name, "--", "/usr/bin/env", "KEYMAKER_J7_POLICY_CLIENT=1", "KEYMAKER_J7_EXPECTED_UID="+strconv.FormatUint(uint64(client.uid), 10), "KEYMAKER_J7_POLICY_PATH="+path, exe, "-test.run=^TestMultiUIDJ7PolicyProtection$", "-test.timeout=10s", "-keymaker-window-token="+*windowToken)
+		cmd := exec.Command("sudo", windowPolicyArguments(window, client.name, client.uid, path, exe, *windowToken)...)
 		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
 		var output bytes.Buffer
 		cmd.Stdout = &output
@@ -100,4 +100,8 @@ func TestMultiUIDJ7PolicyProtection(t *testing.T) {
 	if c := p.publish(t.Context(), j7PolicyRaw(t, next)); c != "" {
 		t.Fatal("holder publication after refusals", c)
 	}
+}
+
+func windowPolicyArguments(w testwindow.Window, user string, uid uint32, path, executable, token string) []string {
+	return w.ClientArgs(user, "", "KEYMAKER_J7_POLICY_CLIENT=1", "KEYMAKER_J7_EXPECTED_UID="+strconv.FormatUint(uint64(uid), 10), "KEYMAKER_J7_POLICY_PATH="+path, executable, "-test.run=^TestMultiUIDJ7PolicyProtection$", "-test.timeout=10s", "-keymaker-window-token="+token)
 }

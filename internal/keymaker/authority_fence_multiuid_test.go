@@ -75,7 +75,7 @@ func TestMultiUIDPC2FenceIdentity(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "sudo", "-n", "-u", w.A, "--", "/usr/bin/env", "KEYMAKER_PC2_FOREIGN_FENCE=1", "KEYMAKER_PC2_EXPECT_OWNER="+strconv.FormatUint(uint64(w.UID), 10), "TMPDIR="+scratch, os.Args[0], "-test.run=^TestMultiUIDPC2FenceIdentity$", "-test.timeout=8s", "-keymaker-window-token="+*windowToken)
+	cmd := exec.CommandContext(ctx, "sudo", windowFenceArguments(w, scratch, os.Args[0], *windowToken)...)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
 	var output bytes.Buffer
 	cmd.Stdout = &output
@@ -87,4 +87,8 @@ func TestMultiUIDPC2FenceIdentity(t *testing.T) {
 	if e = cmd.Wait(); e != nil {
 		t.Fatalf("foreign owner/mode qualification: %v %s", e, output.Bytes())
 	}
+}
+
+func windowFenceArguments(w testwindow.Window, scratch, executable, token string) []string {
+	return w.ClientArgs(w.A, "", "KEYMAKER_PC2_FOREIGN_FENCE=1", "KEYMAKER_PC2_EXPECT_OWNER="+strconv.FormatUint(uint64(w.UID), 10), "TMPDIR="+scratch, executable, "-test.run=^TestMultiUIDPC2FenceIdentity$", "-test.timeout=8s", "-keymaker-window-token="+token)
 }

@@ -164,6 +164,15 @@ checker needs Bash and uses `/usr/sbin/visudo` when installed. Multi-UID
 qualification additionally requires the owner's
 pre-provisioned test accounts and noninteractive sudo permissions.
 
+The test-window JSON optionally accepts unique lowercase `id_path` and
+`env_path` fields for clean absolute executable paths. Omission preserves
+`/usr/bin/id` and `/usr/bin/env`; explicit malformed/empty/null/duplicate fields
+refuse before commands, and unavailable explicit executables remain PENDING
+without fallback. All identity probes and tagged client/reexec routes use the
+selected paths from the same configuration. This checks availability, not root
+custody or sudo policy matching; the owner window remains a separate gate.
+See [the configuration contract](docs/linux-testing.md#reusable-multi-uid-window).
+
 The full-path policy test additionally requires holder-owned private `TMPDIR`
 under root/holder-owned ancestors without group/other write or access/default
 ACLs. Use an authorized protected scratch location; do not change shared modes
@@ -241,6 +250,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go 1.26.10 | `go run ./tools/mutations -group j7-signing -scratch "$SCRATCH"`; `-only NAME` selects one plant | Private overlays and exact test exit codes in the supplied scratch directory; kills require the named forbidden successful endpoint result |
 | Go | Custody response/audit regressions: `go test -race ./internal/keymaker -run '^Test(CustodyAudit|CustodySign|CustodyUnavailable|MasterUnavailable)' -count=1 -p=1`; `go run ./tools/mutations/main.go -group core -scratch "$SCRATCH"` | Real-socket byte-equal refusals, local cause enumeration, open signing controls; logs/overlays under private scratch |
 | Go | Build daemon: `go build -o "$SCRATCH/keymaker" ./cmd/keymaker`; run `"$SCRATCH/keymaker" version` or `"$SCRATCH/keymaker" serve --config "$CONFIG"` | Binary; version or readiness refusal on stderr |
+| Go | Harness-only checks: `go test ./internal/testwindow ./cmd/keymaker-window -count=1`; tagged argv unit: `go test -tags multiuid ./internal/keymaker -run '^TestWindowConfiguredClientArguments$' -count=1` | Private temporary files and fake command/argument controls only; no sudo, native body or custody qualification |
 | Go | Build canonical window runner: `go build -o "$SCRATCH/keymaker-window" ./cmd/keymaker-window` | Runner binary in scratch |
 | Window runner | Qualify: `"$SCRATCH/keymaker-window" -config "$WINDOW_CONFIG"`; append `-check` for preflight only | Exact status below; retained report outside its own fixture directory |
 | Make | Convenience wrapper: `make test-multiuid SCRATCH="$SCRATCH" WINDOW_CONFIG="$WINDOW_CONFIG"` | Prints runner status; make may normalize nonzero to 2 |

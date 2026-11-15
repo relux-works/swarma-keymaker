@@ -252,6 +252,44 @@ and runner-as-self with the test group. Optional `runner_uid`, `client_a_uid`,
 the test window only; it never supplies generation authority to the daemon.
 The runner does not create or remove accounts, groups or sudoers entries.
 
+Optional `id_path` and `env_path` select explicit utility executable paths. For
+example, an owner-reviewed configuration may add:
+
+```json
+{
+  "id_path": "/opt/example-window/bin/id",
+  "env_path": "/opt/example-window/bin/env"
+}
+```
+
+These are additional fields in the same configuration, not a separate input.
+Omitting them preserves `/usr/bin/id` and `/usr/bin/env`. New tool field names
+must be unique and exactly lowercase; duplicate or case-alias declarations,
+empty/null values, relative or non-clean paths and control characters are
+configuration errors (status 2) before any command. Paths are literal executable
+names, never shell commands; spaces do not introduce additional arguments.
+
+Before commands, explicit tools must resolve to available regular files with
+executable mode bits. A missing, nonregular or nonexecutable explicit path is
+PENDING (status 3), with no fallback to a system utility. Default paths retain
+the existing command-driven availability checks. Actual lookup or sudo failures
+retain their existing failure/PENDING handling. The canonical runner preserves
+its exact PENDING stderr line.
+
+The selected id is used for all account lookups and sudo identity/group probes.
+The selected env is used for every tagged client and group reexec, including
+PC2 and J7; the original configuration file is passed through the existing
+runner/reexec flow. Runas, group, environment assignment order, test selectors,
+timeouts and provenance token arguments are unchanged.
+
+Availability is not custody verification: the harness does not establish root
+ownership, single-link identity, hashes, ACLs or protected canonical ancestry.
+Those checks and exact sudo policy matching remain prerequisites of the
+separately reviewed owner window. Configured paths do not relax that policy or
+authorize copying/installing tools, provisioning accounts or executing a native
+qualification. Unit command fakes and argument builders prove no real UID/sudo
+behavior.
+
 The scratch parent must already allow both clients to traverse to the fixture
 socket and execute the test binary. Private home-directory ancestors may prevent
 this; the runner never changes their permissions. Fixture master/state paths

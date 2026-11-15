@@ -36,7 +36,8 @@ generates the bind result's run ID. Current principal/binding/policy, trusted
 parent selection, authentic Source origin and isolation remain external duties.
 
 `EncodeResponseFrame(expected Request, Response)` and
-`DecodeResponseFrame(expected Request, []byte)` use the outstanding request.
+`DecodeResponseFrame(expected Request, []byte)` require the consumer to supply ONLY its own outstanding request. The consumer
+MUST NOT construct or select that context from the response.
 A response has exactly one of `Version *int64`, `Run *RunResult`, or
 `Refusal *Refusal`. Hello success is `{request_id,result:{version:1}}`;
 bind/rebind result is `{run_id,state:"live"}`; end result is exactly the
@@ -55,6 +56,10 @@ commit. A decoded refusal returns nil Go error; inspect `Refusal` before using
 any result. Local failures use `ErrFrameTooLarge`, `ErrFrameMalformed`,
 `ErrFrameTruncated`, `ErrTrailingData`, `ErrCanonical`, `ErrRequest` or
 `ErrResponse`, return no bytes/zero value, and are never new wire codes.
+
+`FrameLength(header [4]byte) (int,error)` validates the advertised1–65536-byte
+body length before the caller allocates body storage; invalid headers return0
+and the specific frame-size/zero-length sentinel. It performs no read.
 
 ## Bounds and ownership
 

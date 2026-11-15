@@ -3,7 +3,7 @@
   "compatibility_base": "2e207dc53526a236cb198d94a9a09b50564cad61",
   "inspected_base": "dee83bdee21617ac11e2178f85d529b17395ef0b",
   "payload": "vectors.json",
-  "bytes": 22376,
-  "sha256": "18c34d3e8a7409f52290c8beff00be7b58531e913e7014fd0e4b85fd30cb64cf",
+  "bytes": 23676,
+  "sha256": "658471bd67e9d4b01b8869036fd4936942019a3598f5594b8f523d67ef48dda0",
   "limits": "Synthetic inert wire fixtures only. No peer, generation, Source admission, input isolation, effect outcome or continuous-channel qualification. The consumer pins the reviewed delivery commit externally; this manifest does not hash itself."
 }

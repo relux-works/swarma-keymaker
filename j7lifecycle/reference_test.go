@@ -137,9 +137,17 @@ type vectorCase struct {
 	Verdict   string `json:"verdict"`
 	Error     string `json:"error"`
 }
+type lengthCase struct {
+	Name      string `json:"name"`
+	HeaderHex string `json:"header_hex"`
+	Length    int    `json:"length"`
+	Error     string `json:"error"`
+}
+
 type vectorSet struct {
-	Format string       `json:"format"`
-	Cases  []vectorCase `json:"cases"`
+	Lengths []lengthCase `json:"lengths"`
+	Format  string       `json:"format"`
+	Cases   []vectorCase `json:"cases"`
 }
 type corpusManifest struct {
 	Format            string `json:"format"`
@@ -187,6 +195,25 @@ func TestLifecycleWireReference(t *testing.T) {
 	strictFixture(t, data, &set)
 	if set.Format != m.Format || len(set.Cases) < 12 {
 		t.Fatal("corpus identity")
+	}
+	for _, c := range set.Lengths {
+		t.Run("length/"+c.Name, func(t *testing.T) {
+			b, e := hex.DecodeString(c.HeaderHex)
+			if e != nil || len(b) != 4 {
+				t.Fatal("header fixture")
+			}
+			n, e := wire.FrameLength([4]byte(b))
+			want := map[string]error{"": nil, "frame_malformed": wire.ErrFrameMalformed, "frame_too_large": wire.ErrFrameTooLarge}[c.Error]
+			if c.Error != "" && want == nil {
+				t.Fatal("unknown header verdict")
+			}
+			if n != c.Length || e != want {
+				t.Fatalf("header length mismatch: %d %v want %d %v", n, e, c.Length, want)
+			}
+			if c.Error == "" && (n < 1 || n > 65536) {
+				t.Fatal("reference length range")
+			}
+		})
 	}
 	seen := map[string]bool{}
 	for _, c := range set.Cases {

@@ -227,7 +227,9 @@ func EncodeResponseFrame(expected Request, r Response) ([]byte, error) {
 }
 
 // DecodeResponseFrame checks the ID, closed result schema and known run/state
-// against expected. Null-ID refusals remain uncorrelated data, never success.
+// against expected. Consumers MUST supply only their own outstanding Request,
+// never context constructed from the response. Null-ID refusals remain
+// uncorrelated data, never success. Bind/rebind methods are not echoed on wire.
 func DecodeResponseFrame(expected Request, frame []byte) (Response, error) {
 	o, err := decodeFrame(frame)
 	if err != nil {
@@ -403,21 +405,32 @@ func members(o control.Object, names ...string) bool {
 	}
 	return true
 }
+
+// FrameLength validates a header before the caller allocates its body buffer.
+// It does no I/O, interpretation of body bytes or authority checking.
+func FrameLength(header [4]byte) (int, error) {
+	n := binary.BigEndian.Uint32(header[:])
+	if n > MaxFrame {
+		return 0, ErrFrameTooLarge
+	}
+	if n == 0 {
+		return 0, ErrFrameMalformed
+	}
+	return int(n), nil
+}
+
 func decodeFrame(frame []byte) (control.Object, error) {
 	if len(frame) < 4 {
 		return nil, ErrFrameTruncated
 	}
-	n := binary.BigEndian.Uint32(frame[:4])
-	if n > MaxFrame {
-		return nil, ErrFrameTooLarge
+	n, err := FrameLength([4]byte(frame[:4]))
+	if err != nil {
+		return nil, err
 	}
-	if n == 0 {
-		return nil, ErrFrameMalformed
-	}
-	if len(frame)-4 < int(n) {
+	if len(frame)-4 < n {
 		return nil, ErrFrameTruncated
 	}
-	if len(frame)-4 > int(n) {
+	if len(frame)-4 > n {
 		return nil, ErrTrailingData
 	}
 	o, err := control.Decode(frame[4:])

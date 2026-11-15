@@ -288,6 +288,53 @@
       "frame_hex": "000000677b226572726f72223a7b22636f6465223a2272756e5f62696e645f756e6b6e6f776e222c22726574727961626c65223a66616c73657d2c22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031227d",
       "verdict": "reject",
       "error": "response"
+    },
+    {
+      "name": "rebind-success-as-end",
+      "direction": "response",
+      "context": "end",
+      "body": "{\"request_id\":\"00000000000000000000000000000001\",\"result\":{\"run_id\":\"11111111111111111111111111111111\",\"state\":\"live\"}}",
+      "frame_hex": "000000777b22726571756573745f6964223a223030303030303030303030303030303030303030303030303030303030303031222c22726573756c74223a7b2272756e5f6964223a223131313131313131313131313131313131313131313131313131313131313131222c227374617465223a226c697665227d7d",
+      "verdict": "reject",
+      "error": "response"
+    }
+  ],
+  "lengths": [
+    {
+      "name": "zero",
+      "header_hex": "00000000",
+      "length": 0,
+      "error": "frame_malformed"
+    },
+    {
+      "name": "normal",
+      "header_hex": "00000002",
+      "length": 2,
+      "error": ""
+    },
+    {
+      "name": "minimum",
+      "header_hex": "00000001",
+      "length": 1,
+      "error": ""
+    },
+    {
+      "name": "maximum",
+      "header_hex": "00010000",
+      "length": 65536,
+      "error": ""
+    },
+    {
+      "name": "first-over-cap",
+      "header_hex": "00010001",
+      "length": 0,
+      "error": "frame_too_large"
+    },
+    {
+      "name": "uint32-maximum",
+      "header_hex": "ffffffff",
+      "length": 0,
+      "error": "frame_too_large"
     }
   ]
 }

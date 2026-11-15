@@ -323,3 +323,19 @@ func TestLifecycleWireFailureZeroValue(t *testing.T) {
 		t.Fatal("decode aliases input or prior value")
 	}
 }
+
+// Header validation lets a consumer reject an advertised size before allocating
+// body storage; this pure function does not read a socket or allocate the body.
+func TestLifecycleFrameLength(t *testing.T) {
+	for _, c := range []struct {
+		value  uint32
+		length int
+		err    error
+	}{{0, 0, wire.ErrFrameMalformed}, {1, 1, nil}, {85, 85, nil}, {65536, 65536, nil}, {65537, 0, wire.ErrFrameTooLarge}, {^uint32(0), 0, wire.ErrFrameTooLarge}} {
+		var header [4]byte
+		binary.BigEndian.PutUint32(header[:], c.value)
+		if n, e := wire.FrameLength(header); n != c.length || e != c.err {
+			t.Fatalf("header verdict: %d %v", n, e)
+		}
+	}
+}

@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -350,6 +352,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		var output bytes.Buffer
 		cmd.Stdout, cmd.Stderr = &output, &output
 		pid := 0
+		started := time.Now().UTC()
 		e = cmd.Start()
 		if e == nil {
 			pid = cmd.Process.Pid
@@ -370,6 +373,23 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
+		if *group == "j7-delegation" {
+			// Bind every new bounded plant's real child command and output to its own
+			// receipt; an applied setup/compile failure still cannot count as a kill.
+			receipt, err := json.MarshalIndent(map[string]any{
+				"argv": cmd.Args, "executable": cmd.Path, "cwd": root, "pid": pid,
+				"start": started.Format(time.RFC3339Nano), "end": time.Now().UTC().Format(time.RFC3339Nano),
+				"actual_exit": status, "applied": true, "killed": killed, "test": c.test,
+				"witness": c.witness, "log": log, "output_sha256": fmt.Sprintf("%x", sha256.Sum256(out)),
+				"plant_sha256":   fmt.Sprintf("%x", sha256.Sum256([]byte(plant(c.name, string(raw), c.old, c.new)))),
+				"overlay_sha256": fmt.Sprintf("%x", sha256.Sum256(mapping)),
+			}, "", "  ")
+			if err != nil || os.WriteFile(filepath.Join(dir, c.name+".receipt.json"), append(receipt, '\n'), 0600) != nil {
+				fmt.Fprintln(os.Stderr, c.name, "receipt unavailable")
+				os.Exit(2)
+			}
+		}
+
 		fmt.Printf("mutant=%s test=%s actual_exit=%d killed=%t pid=%d log=%s\n", c.name, c.test, status, killed, pid, log)
 		if !killed {
 			fmt.Fprintln(os.Stderr, string(out))

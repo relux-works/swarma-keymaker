@@ -105,6 +105,8 @@ func (c j7SigningClock) UTC() (time.Time, bool) { return c.value, c.trusted }
 // Real custody/clock/generation and adopted node-verifier failures disclose no
 // signed object and keep no signing result. Each has a valid neighboring call;
 // injected generation evidence is not distinct-UID/native qualification.
+// Launcher mutation/restoration use the Store gate shared by the idle probe;
+// the per-operation refusal and subsequent valid signing control remain required.
 func TestJ7SigningAuthorityFailures(t *testing.T) {
 	for _, mode := range []string{"clock", "expired", "launcher-role", "custody", "closed", "unloaded", "purpose8", "node", "issuer-pin", "entropy", "retired"} {
 		t.Run(mode, func(t *testing.T) {

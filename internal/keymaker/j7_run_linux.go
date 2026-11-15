@@ -125,7 +125,7 @@ func (l *j7Lifecycle) Scope(ctx context.Context, conn net.Conn) (context.Context
 // No Store, policy or generation lock is held across the transport's read.
 func (l *j7Lifecycle) BoundChannel(ctx context.Context, conn net.Conn, peer control.Peer) bool {
 	ch := j7ChannelFrom(ctx)
-	if ch == nil || ch.conn != conn || !ch.active() || nativePrincipal(peer) != l.launcher {
+	if ch == nil || ch.conn != conn || !ch.active() {
 		return false
 	}
 	if !l.store.mu.LockContext(ctx) {
@@ -133,7 +133,9 @@ func (l *j7Lifecycle) BoundChannel(ctx context.Context, conn net.Conn, peer cont
 	}
 	defer l.store.mu.Unlock()
 	s := l.store
-	if s.failed || s.j7 == nil || s.j7.Pending || !ch.active() || !ch.ever || ch.run == "" || l.channels[ch.run] != ch {
+	// Production configuration is immutable; fixture launcher transitions share
+	// this gate with the between-request probe, not just request handling.
+	if nativePrincipal(peer) != l.launcher || s.failed || s.j7 == nil || s.j7.Pending || !ch.active() || !ch.ever || ch.run == "" || l.channels[ch.run] != ch {
 		return false
 	}
 	row := l.run(ch.run)

@@ -203,6 +203,8 @@ func TestJ7RunOriginAndRebind(t *testing.T) {
 
 // The real peer UID is compared with the configured launcher, and active
 // generation evidence is rechecked. Kernel identity never comes from params.
+// Live fixture transitions share the Store gate with the background idle probe;
+// the following request must still refuse without creating a retained run.
 func TestJ7RunWrongPeerAndGeneration(t *testing.T) {
 	for _, mode := range []string{"wrong-role", "wrong-generation", "inactive-input", "same-uid", "wrong-input-generation"} {
 		t.Run(mode, func(t *testing.T) {
@@ -212,9 +214,13 @@ func TestJ7RunWrongPeerAndGeneration(t *testing.T) {
 			want := Code("role_not_permitted")
 			switch mode {
 			case "wrong-role":
+				f.f.store.mu.Lock()
 				f.life.launcher.UID++
+				f.f.store.mu.Unlock()
 			case "wrong-generation":
+				f.f.store.mu.Lock()
 				f.life.launcher.Generation = "other"
+				f.f.store.mu.Unlock()
 			case "inactive-input":
 				f.gen.set(args.Input.UID, "retiring", args.Input.Generation)
 				want = "generation_inactive"

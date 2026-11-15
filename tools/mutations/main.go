@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state or j7-state controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state or j7-continuity controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -108,6 +108,21 @@ func main() {
 			{"j7-policy-acl", "j7_policy_linux.go", `if !j7NoACL(int(f.Fd()), false) {`, `if false {`, "^TestJ7PolicyProtection$", "--- FAIL: TestJ7PolicyProtection", "ACL accepted"},
 			{"j7-policy-ancestor", "j7_policy_linux.go", `st.Mode&022 != 0`, `false`, "^TestJ7PolicyProtection$", "--- FAIL: TestJ7PolicyProtection", "writable ancestry accepted"},
 			{"j7-policy-row-capacity", "j7_policy_linux.go", `len(p.Rows) > j7PolicyRows`, `false`, "^TestJ7PolicyCapacity$", "--- FAIL: TestJ7PolicyCapacity", "row overflow"},
+		}
+	}
+
+	if *group == "j7-continuity" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-canceled-channel-authority", "j7_run_linux.go", `func (c *j7Channel) active() bool { return c.ctx.Err() == nil }`, `func (c *j7Channel) active() bool { return true }`, "^TestJ7RunCanceledCapabilityBoundaries$/^handling-after-admission$", "--- FAIL: TestJ7RunCanceledCapabilityBoundaries/handling-after-admission", "canceled channel changed durable state"},
+			{"j7-terminal-channel-authority", "j7_run_linux.go", `s := l.store
+			if !ch.active() {`, `s := l.store
+			if false {`, "^TestJ7RunCanceledCapabilityBoundaries$/^handling-in-evidence$", "--- FAIL: TestJ7RunCanceledCapabilityBoundaries/handling-in-evidence", "canceled channel changed durable state"},
+			{"j7-terminal-release-authority", "j7_run_linux.go", `defer s.mu.Unlock()
+			if !ch.releasePermitted(nativePrincipal(peer), r) {`, `defer s.mu.Unlock()
+			if false {`, "^TestJ7RunCanceledCapabilityBoundaries$/^release-in-evidence$", "--- FAIL: TestJ7RunCanceledCapabilityBoundaries/release-in-evidence", "canceled capability released a response"},
+			{"j7-repeat-end-release", "j7_run_linux.go", `ch.endReply = nil
+					defer ch.conn.Close()`, `defer ch.conn.Close()`, "^TestJ7RunSelfEndReleasePermit$", "--- FAIL: TestJ7RunSelfEndReleasePermit", "self-end permit reused"},
+			{"j7-migration-digest", "j7_state.go", `d == e.Digest`, `d != ""`, "^TestJ7RecoveryUnmigratedMigrationAuthority$", "--- FAIL: TestJ7RecoveryUnmigratedMigrationAuthority", "wrong unmigrated head accepted"},
 		}
 	}
 

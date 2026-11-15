@@ -187,7 +187,11 @@ or retained bind-result retry on another connection adopts a run. An unknown
 lost bind response remains held for operator inspection/reconciliation of the
 retained record; the launcher must not expose input before successful binding. End is durable
 and idempotent, invalidates the former connection before subsequent effects,
-and cannot be undone by retry/rebind. EOF discards the volatile association;
+and cannot be undone by retry/rebind. Self-end preserves only a one-use internal
+permit for its exact committed acknowledgement, then closes the connection.
+Admission, mutation and release recheck channel lifetime; this permit grants no
+new mutation and cannot survive EOF or later generation/binding retirement.
+A fresh launcher channel may recover the retained end result. EOF discards the volatile association;
 restart reconstructs none. Input/launcher/station retirement and station binding
 withdrawal cancel the run context and close the actual connection. A canceled
 connection never gains another run.

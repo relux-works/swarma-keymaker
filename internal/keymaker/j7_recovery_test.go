@@ -300,8 +300,8 @@ func TestJ7RecoveryMessageCoexistence(t *testing.T) {
 	}
 }
 
-// Migration requires the exact paired operator expectation and a real existing
-// identity. Invalid expectations cannot append a commit or reset any state.
+// An already migrated participant refuses repeat migration without file effects.
+// This does not exercise wrong expectations on an unmigrated store.
 func TestJ7RecoveryMigrationAuthority(t *testing.T) {
 	f := j7StateSetup(t)
 	before := recoveryFiles(t, f.path)
@@ -504,4 +504,101 @@ func TestJ7RecoveryRetainedCapacity(t *testing.T) {
 	if s.journal.binding != commit || !reflect.DeepEqual(before, recoveryFiles(t, f.path)) {
 		t.Fatal("retained preflight wrote state")
 	}
+}
+
+// Wrong version AND same-version wrong digest on genuinely unmigrated schema2
+// have no file or in-memory effects. Exact-head migration then preserves prior
+// message/native bytes and immutable artifacts through current-reader restart.
+func TestJ7RecoveryUnmigratedMigrationAuthority(t *testing.T) {
+	f := messageStateSetup(t)
+	s := f.store
+	if _, c := f.service.issue(t.Context(), f.binding); c != "" {
+		t.Fatal("message positive", c)
+	}
+	entry := retainedRequest{Caller: fixtureOperator, ID: strings.Repeat("7", 32), Method: "hello", Arguments: "{}", Status: "committed", Result: []byte(`{"version":1}`)}
+	s.mu.Lock()
+	s.appendRequest(entry)
+	code := s.persistContext(t.Context())
+	s.mu.Unlock()
+	if code != "" {
+		t.Fatal("native positive", code)
+	}
+	if s.schema != 2 || s.j7 != nil {
+		t.Fatal("fixture already migrated")
+	}
+	head := j7Head(t, s)
+	before := recoveryFiles(t, f.path)
+	messages, e := canonical(s.messages)
+	if e != nil {
+		t.Fatal(e)
+	}
+	native, e := canonical(s.requests)
+	if e != nil {
+		t.Fatal(e)
+	}
+	bindings, e := canonical(s.records)
+	if e != nil {
+		t.Fatal(e)
+	}
+	wrongVersion := head
+	wrongVersion.Version++
+	wrongDigest := head
+	wrongDigest.Digest = strings.Repeat("f", 64)
+	for _, wrong := range []j7Expectation{wrongVersion, wrongDigest} {
+		if c := s.migrateJ7(t.Context(), wrong, strings.Repeat("1", 32), f.binding.Number); c != "j7_state_fenced" {
+			t.Fatal("wrong unmigrated head accepted", c)
+		}
+		if s.schema != 2 || s.j7 != nil || s.failed || j7Head(t, s) != head || !reflect.DeepEqual(before, recoveryFiles(t, f.path)) {
+			t.Fatal("wrong migration head changed state")
+		}
+	}
+	if c := s.migrateJ7(t.Context(), head, strings.Repeat("1", 32), f.binding.Number); c != "" {
+		t.Fatal("exact migration positive", c)
+	}
+	preserved := func(s *Store) {
+		t.Helper()
+		m, e := canonical(s.messages)
+		if e != nil {
+			t.Fatal(e)
+		}
+		n, e := canonical(s.requests)
+		if e != nil {
+			t.Fatal(e)
+		}
+		b, e := canonical(s.records)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if s.schema != j7Schema || s.j7 == nil || s.j7.BaseSchema != 2 || !bytes.Equal(messages, m) || !bytes.Equal(native, n) || !bytes.Equal(bindings, b) {
+			t.Fatal("migration lost prior participant")
+		}
+		after := recoveryFiles(t, f.path)
+		artifacts := 0
+		for path, value := range before {
+			if strings.HasPrefix(path, filepath.Join(f.path, "message-tx")+string(os.PathSeparator)) {
+				artifacts++
+				if after[path] != value {
+					t.Fatal("migration changed prior message artifact", path)
+				}
+			}
+		}
+		if artifacts == 0 {
+			t.Fatal("missing prior artifact controls")
+		}
+		if e := s.validateMessages(); e != nil {
+			t.Fatal("message validation", e)
+		}
+	}
+	preserved(s)
+	expected := j7Head(t, s)
+	if e := s.Close(); e != nil {
+		t.Fatal(e)
+	}
+	f.store = nil
+	reopened, e := openJ7Store(f.dir, uint32(os.Getuid()), fixtureAuditClock{}, expected)
+	if e != nil {
+		t.Fatal("restart positive", e)
+	}
+	defer reopened.Close()
+	preserved(reopened)
 }

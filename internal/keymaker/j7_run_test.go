@@ -4,12 +4,17 @@ package keymaker
 
 import (
 	"context"
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -488,5 +493,295 @@ func TestJ7RunCapacityPreservesState(t *testing.T) {
 	defer s.mu.Unlock()
 	if !reflect.DeepEqual(before, s.j7) || s.journal.binding != commit || len(s.requests) != count || s.failed {
 		t.Fatal("preflight refusal changed live run or committed state")
+	}
+}
+
+// A state witness covers the complete retained body, installed snapshot and
+// binding commitment. Ordinary permitted refusal audit is intentionally separate.
+type j7RunWitness struct {
+	Body, Snapshot string
+	Commit         bindingCommit
+	Failed         bool
+}
+
+func j7RunWitnessOf(t *testing.T, f *j7RunFixture) j7RunWitness {
+	t.Helper()
+	s := f.f.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw, e := canonical(s.disk(s.version, s.journal.binding))
+	if e != nil {
+		t.Fatal(e)
+	}
+	onDisk, e := os.ReadFile(filepath.Join(f.f.path, "bindings.json"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	return j7RunWitness{string(raw), string(onDisk), s.journal.binding, s.failed}
+}
+func j7ActualChannel(t *testing.T, f *j7RunFixture, id string) (context.Context, *j7Channel) {
+	t.Helper()
+	f.f.store.mu.Lock()
+	ch := f.life.channels[id]
+	f.f.store.mu.Unlock()
+	if ch == nil {
+		t.Fatal("actual accepted channel missing")
+	}
+	return context.WithValue(t.Context(), j7ChannelKey{}, ch), ch
+}
+
+// After a delivered self-end acknowledgement, another mutation on that real
+// socket must specifically refuse or see a clean close, never a timeout/partial
+// response. A fresh launcher can recover the end and clean up another live run.
+// This tests native connection lifetime, not external per-UID/FD isolation.
+func TestJ7RunEndedChannelCannotMutateOtherRun(t *testing.T) {
+	f := j7RunSetup(t)
+	a := f.dial(t, 1)
+	idA := j7Call(t, a, 2, "j7_run_bind", j7Params(t, f.args()), "")["run_id"].(string)
+	b := f.dial(t, 3)
+	args := f.args()
+	args.Input = Principal{f.f.uid + 201, "input-b"}
+	idB := j7Call(t, b, 4, "j7_run_bind", j7Params(t, args), "")["run_id"].(string)
+	result := j7Call(t, a, 5, "j7_run_end", control.Object{"run_id": idA}, "")
+	if result["state"] != "ended" {
+		t.Fatal("self-end acknowledgement not delivered", result)
+	}
+	before := j7RunWitnessOf(t, f)
+	a.SetDeadline(time.Now().Add(time.Second))
+	raw, e := control.Marshal(nativeRequest(6, "j7_run_end", control.Object{"run_id": idB}))
+	if e != nil {
+		t.Fatal(e)
+	}
+	e = writeResponse(a, Packet(raw))
+	if e != nil {
+		if !errors.Is(e, syscall.EPIPE) && !errors.Is(e, syscall.ECONNRESET) {
+			t.Fatal("unexpected post-end write failure", e)
+		}
+	} else {
+		var header [4]byte
+		n, err := io.ReadFull(a, header[:])
+		if err != nil {
+			if n != 0 || !errors.Is(err, io.EOF) && !errors.Is(err, syscall.ECONNRESET) {
+				t.Fatal("post-end close was not clean", err)
+			}
+		} else {
+			n := binary.BigEndian.Uint32(header[:])
+			if n == 0 || n > 4096 {
+				t.Fatal("unexpected post-end frame length", n)
+			}
+			body := make([]byte, n)
+			if _, e := io.ReadFull(a, body); e != nil {
+				t.Fatal("partial post-end response", e)
+			}
+			obj, e := control.Decode(body)
+			if e != nil {
+				t.Fatal(e)
+			}
+			nativeResponse(t, obj, nativeID(6), "run_identity_unavailable")
+		}
+	}
+	if after := j7RunWitnessOf(t, f); after != before {
+		t.Fatal("ended channel changed durable state")
+	}
+	f.f.store.mu.Lock()
+	state := f.life.run(idB).State
+	f.f.store.mu.Unlock()
+	if state != "live" {
+		t.Fatal("ended channel ended other run")
+	}
+	fresh := f.dial(t, 7)
+	if recovered := j7Call(t, fresh, 5, "j7_run_end", control.Object{"run_id": idA}, ""); !reflect.DeepEqual(recovered, result) {
+		t.Fatal("fresh end recovery changed result")
+	}
+	j7Call(t, fresh, 8, "j7_run_end", control.Object{"run_id": idB}, "")
+	before = j7RunWitnessOf(t, f)
+	j7Call(t, fresh, 8, "j7_run_end", control.Object{"run_id": idB}, "")
+	if after := j7RunWitnessOf(t, f); after != before {
+		t.Fatal("fresh idempotent end changed retained state")
+	}
+}
+
+// The fixture injects cancellation after authoritative evidence entry, so a
+// pre-admission check alone cannot satisfy the terminal no-effects control.
+type j7EvidenceInterruption struct {
+	GenerationSource
+	before func()
+}
+
+func (g j7EvidenceInterruption) WithEvidence(ctx context.Context, conditions []GenerationCondition, fn func(context.Context) Code) Code {
+	return g.GenerationSource.WithEvidence(ctx, conditions, func(ctx context.Context) Code { g.before(); return fn(ctx) })
+}
+
+// These direct adapter controls retain a capability from an actual accepted
+// native connection, then cancel it between stages. Admission is not authority
+// for a later mutation or release. They do not claim a second kernel identity.
+func TestJ7RunCanceledCapabilityBoundaries(t *testing.T) {
+	for _, phase := range []string{"admission", "handling-after-admission", "handling-in-evidence", "release-after-handling", "release-in-evidence", "hello-release"} {
+		t.Run(phase, func(t *testing.T) {
+			f := j7RunSetup(t)
+			a := f.dial(t, 1)
+			idA := j7Call(t, a, 2, "j7_run_bind", j7Params(t, f.args()), "")["run_id"].(string)
+			b := f.dial(t, 3)
+			args := f.args()
+			args.Input = Principal{f.f.uid + 201, "input-b"}
+			idB := j7Call(t, b, 4, "j7_run_bind", j7Params(t, args), "")["run_id"].(string)
+			ctx, ch := j7ActualChannel(t, f, idA)
+			peer := control.Peer{UID: f.life.launcher.UID, Generation: f.life.launcher.Generation}
+			r := control.Request{ID: nativeID(5), Method: "j7_run_end", Params: control.Object{"run_id": idB}}
+			if c := f.life.Admit(ctx, peer, r); c != "" {
+				t.Fatal("valid admission positive", c)
+			}
+			var result control.Object
+			if phase == "release-after-handling" || phase == "release-in-evidence" {
+				var c control.Code
+				result, c = f.life.Handle(ctx, peer, r)
+				if c != "" {
+					t.Fatal("valid handling positive", c)
+				}
+			} else if phase == "hello-release" {
+				r.Method, r.Params = "hello", control.Object{}
+				result = control.Object{"version": int64(1)}
+			}
+			before := j7RunWitnessOf(t, f)
+			if phase == "handling-in-evidence" || phase == "release-in-evidence" {
+				f.life.generations = j7EvidenceInterruption{f.gen, ch.cancel}
+			} else {
+				ch.cancel()
+			}
+			var code control.Code
+			switch phase {
+			case "admission":
+				code = f.life.Admit(ctx, peer, r)
+			case "handling-after-admission", "handling-in-evidence":
+				_, code = f.life.Handle(ctx, peer, r)
+			default:
+				released := false
+				code = f.life.WithActive(ctx, peer, r, result, func(context.Context) control.Code { released = true; return "" })
+				if released {
+					t.Fatal("canceled capability released a response")
+				}
+			}
+			if after := j7RunWitnessOf(t, f); after != before {
+				t.Fatal("canceled channel changed durable state")
+			}
+			if code != "run_identity_unavailable" {
+				t.Fatal("canceled capability refusal", code)
+			}
+		})
+	}
+}
+
+// A self-end has one internal permit for its exact committed acknowledgement,
+// never for changed arguments/ID, hello, or a second release. The real wire
+// delivery control is TestJ7RunEndedChannelCannotMutateOtherRun above.
+func TestJ7RunSelfEndReleasePermit(t *testing.T) {
+	f := j7RunSetup(t)
+	a := f.dial(t, 1)
+	id := j7Call(t, a, 2, "j7_run_bind", j7Params(t, f.args()), "")["run_id"].(string)
+	ctx, _ := j7ActualChannel(t, f, id)
+	peer := control.Peer{UID: f.life.launcher.UID, Generation: f.life.launcher.Generation}
+	r := control.Request{ID: nativeID(3), Method: "j7_run_end", Params: control.Object{"run_id": id}}
+	result, code := f.life.Handle(ctx, peer, r)
+	if code != "" {
+		t.Fatal("self-end prepare positive", code)
+	}
+	before := j7RunWitnessOf(t, f)
+	for _, variant := range []string{"id", "arguments", "hello", "result"} {
+		changed := r
+		supplied := result
+		switch variant {
+		case "id":
+			changed.ID = nativeID(4)
+		case "arguments":
+			changed.Params = control.Object{"run_id": strings.Repeat("f", 32)}
+		case "hello":
+			changed.Method, changed.Params = "hello", control.Object{}
+		case "result":
+			supplied = control.Object{"run_id": id, "state": "live"}
+		}
+		released := false
+		code := f.life.WithActive(ctx, peer, changed, supplied, func(context.Context) control.Code { released = true; return "" })
+		want := control.Code("run_identity_unavailable")
+		if variant == "result" {
+			want = "request_conflict"
+		}
+		if code != want || released {
+			t.Fatal("self-end permit accepted changed request/result", variant, code)
+		}
+		if after := j7RunWitnessOf(t, f); after != before {
+			t.Fatal("changed acknowledgement changed durable state")
+		}
+	}
+	count := 0
+	if c := f.life.WithActive(ctx, peer, r, result, func(context.Context) control.Code { count++; return "" }); c != "" || count != 1 {
+		t.Fatal("exact self-end acknowledgement refused", c, count)
+	}
+	if c := f.life.WithActive(ctx, peer, r, result, func(context.Context) control.Code { count++; return "" }); c != "run_identity_unavailable" || count != 1 {
+		t.Fatal("self-end permit reused", c, count)
+	}
+}
+
+// An outstanding exact self-end reply cannot survive later account/binding
+// retirement or EOF. Fresh launcher recovery after input retirement remains
+// permitted; cancellation is never turned into new mutation authority.
+func TestJ7RunSelfEndPermitRetirement(t *testing.T) {
+	for _, phase := range []string{"input", "station", "launcher", "binding", "eof"} {
+		t.Run(phase, func(t *testing.T) {
+			f := j7RunSetup(t)
+			a := f.dial(t, 1)
+			id := j7Call(t, a, 2, "j7_run_bind", j7Params(t, f.args()), "")["run_id"].(string)
+			ctx, ch := j7ActualChannel(t, f, id)
+			peer := control.Peer{UID: f.life.launcher.UID, Generation: f.life.launcher.Generation}
+			r := control.Request{ID: nativeID(3), Method: "j7_run_end", Params: control.Object{"run_id": id}}
+			result, c := f.life.Handle(ctx, peer, r)
+			if c != "" {
+				t.Fatal("prepare positive", c)
+			}
+			want := control.Code("generation_inactive")
+			switch phase {
+			case "input":
+				f.gen.set(f.args().Input.UID, "retiring", f.args().Input.Generation)
+			case "station":
+				f.gen.set(f.f.binding.UID, "retiring", f.f.binding.Generation)
+			case "launcher":
+				f.gen.set(f.life.launcher.UID, "retiring", f.life.launcher.Generation)
+			case "binding":
+				if c := f.f.store.Unbind(fixtureOperator, fixtureOperator, f.f.binding.UID, f.f.binding.Generation); c != "" {
+					t.Fatal("withdrawal", c)
+				}
+				want = "binding_not_found"
+			case "eof":
+				a.Close()
+				until := time.Now().Add(time.Second)
+				for {
+					ch.watchMu.Lock()
+					closed := ch.closed
+					ch.watchMu.Unlock()
+					if closed {
+						break
+					}
+					if time.Now().After(until) {
+						t.Fatal("scope cleanup did not retire channel")
+					}
+					time.Sleep(time.Millisecond)
+				}
+				want = "run_identity_unavailable"
+			}
+			before := j7RunWitnessOf(t, f)
+			released := false
+			c = f.life.WithActive(ctx, peer, r, result, func(context.Context) control.Code { released = true; return "" })
+			if c != want || released {
+				t.Fatal("retired self-end permit released", phase, c, want)
+			}
+			if after := j7RunWitnessOf(t, f); after != before {
+				t.Fatal("retired permit changed durable state")
+			}
+			if phase == "input" {
+				fresh := f.dial(t, 4)
+				if got := j7Call(t, fresh, 3, "j7_run_end", control.Object{"run_id": id}, ""); !reflect.DeepEqual(got, result) {
+					t.Fatal("fresh retired-input cleanup refused")
+				}
+			}
+		})
 	}
 }

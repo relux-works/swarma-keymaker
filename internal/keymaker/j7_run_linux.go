@@ -17,14 +17,38 @@ import (
 
 type j7ChannelKey struct{}
 type j7Channel struct {
-	conn    net.Conn
-	run     string // all selection/assignment accesses are under Store's gate
-	ever    bool
-	ctx     context.Context
-	cancel  context.CancelFunc
-	watchMu sync.Mutex
-	stops   []func()
-	closed  bool
+	conn     net.Conn
+	run      string // all selection/assignment accesses are under Store's gate
+	ever     bool
+	ctx      context.Context
+	cancel   context.CancelFunc
+	watchMu  sync.Mutex
+	stops    []func()
+	closed   bool
+	endReply *retainedRequest // Store gate; one exact self-end release, no mutation authority
+}
+
+func (c *j7Channel) active() bool { return c.ctx.Err() == nil }
+
+// Wire lifetime outlasts self-end authority only for its committed acknowledgement.
+// The permit belongs to this accepted connection and is consumed at final release.
+// EOF/Scope cleanup invalidates it even if an internal caller retained the scope.
+func (c *j7Channel) releasePermitted(peer Principal, r control.Request) bool {
+	c.watchMu.Lock()
+	closed := c.closed
+	c.watchMu.Unlock()
+	if closed {
+		return false
+	}
+	if c.active() {
+		return true
+	}
+	end := c.endReply
+	if end == nil || r.Method != "j7_run_end" || end.Caller != peer || end.ID != r.ID {
+		return false
+	}
+	args, code := requestArguments(r)
+	return code == "" && end.Arguments == string(args)
 }
 
 func (c *j7Channel) stop() {
@@ -81,11 +105,15 @@ func newJ7Lifecycle(s *Store, p *j7Policy, g GenerationSource, launcher Principa
 func (l *j7Lifecycle) Scope(ctx context.Context, conn net.Conn) (context.Context, func()) {
 	runCtx, cancel := context.WithCancel(ctx)
 	c := &j7Channel{conn: conn, ctx: runCtx, cancel: cancel}
+	// Keep the wire context alive for the current self-end reply. Every adapter
+	// boundary separately checks authority; only its exact one-use reply survives.
 	return context.WithValue(ctx, j7ChannelKey{}, c), func() {
 		l.store.mu.Lock()
 		if c.run != "" && l.channels[c.run] == c {
 			delete(l.channels, c.run)
 		}
+		c.endReply = nil
+		c.cancel()
 		l.store.mu.Unlock()
 		c.stop()
 	}
@@ -134,7 +162,8 @@ func (l *j7Lifecycle) Refuse(ctx context.Context, conn net.Conn, peer *control.P
 	return refusal
 }
 func (l *j7Lifecycle) Admit(ctx context.Context, peer control.Peer, r control.Request) control.Code {
-	if j7ChannelFrom(ctx) == nil {
+	ch := j7ChannelFrom(ctx)
+	if ch == nil || !ch.active() {
 		return "run_identity_unavailable"
 	}
 	if r.Method != "hello" && !j7LifecycleMethod(r.Method) {
@@ -147,6 +176,9 @@ func (l *j7Lifecycle) Admit(ctx context.Context, peer control.Peer, r control.Re
 		return control.DeadlineExceeded
 	}
 	defer l.store.mu.Unlock()
+	if !ch.active() {
+		return "run_identity_unavailable"
+	}
 	_, code := l.store.retained(nativePrincipal(peer), r)
 	return control.Code(code)
 }
@@ -175,7 +207,7 @@ func j7DecodeArgs(params control.Object, v any) Code {
 }
 func (l *j7Lifecycle) Handle(ctx context.Context, peer control.Peer, r control.Request) (control.Object, control.Code) {
 	ch := j7ChannelFrom(ctx)
-	if ch == nil {
+	if ch == nil || !ch.active() {
 		return nil, "run_identity_unavailable"
 	}
 	if !j7LifecycleMethod(r.Method) {
@@ -206,6 +238,10 @@ func (l *j7Lifecycle) Handle(ctx context.Context, peer control.Peer, r control.R
 	}
 	if !l.store.mu.LockContext(ctx) {
 		return nil, control.DeadlineExceeded
+	}
+	if !ch.active() {
+		l.store.mu.Unlock()
+		return nil, "run_identity_unavailable"
 	}
 	if l.store.failed || l.store.j7 == nil {
 		l.store.mu.Unlock()
@@ -260,6 +296,9 @@ func (l *j7Lifecycle) Handle(ctx context.Context, peer control.Peer, r control.R
 	code := l.generations.WithEvidence(ctx, conditions, func(ctx context.Context) Code {
 		effect := func(_ *j7PolicyTable) Code {
 			s := l.store
+			if !ch.active() {
+				return "run_identity_unavailable"
+			}
 			if s.failed || s.j7 == nil || s.j7.Pending {
 				return "j7_state_fenced"
 			}
@@ -377,7 +416,9 @@ func (l *j7Lifecycle) Handle(ctx context.Context, peer control.Peer, r control.R
 			if ended != nil {
 				delete(l.channels, id)
 				ended.cancel()
-				if ended != ch {
+				if ended == ch {
+					ch.endReply = &entry
+				} else {
 					_ = ended.conn.Close()
 				}
 			}
@@ -447,7 +488,12 @@ func (l *j7Lifecycle) WithActive(ctx context.Context, peer control.Peer, r contr
 	if !l.store.mu.LockContext(ctx) {
 		return control.DeadlineExceeded
 	}
-	if r.Method != "hello" && r.Method != "j7_run_end" {
+	if !ch.releasePermitted(nativePrincipal(peer), r) {
+		l.store.mu.Unlock()
+		return "run_identity_unavailable"
+	}
+	selfEnd := ch.endReply != nil
+	if r.Method != "hello" && (r.Method != "j7_run_end" || selfEnd) {
 		id, _ := result["run_id"].(string)
 		row := l.run(id)
 		if row == nil {
@@ -464,6 +510,9 @@ func (l *j7Lifecycle) WithActive(ctx context.Context, peer control.Peer, r contr
 				return "request_deadline_exceeded"
 			}
 			defer s.mu.Unlock()
+			if !ch.releasePermitted(nativePrincipal(peer), r) {
+				return "run_identity_unavailable"
+			}
 			if s.failed || s.j7 == nil || s.j7.Pending {
 				return "j7_state_fenced"
 			}
@@ -480,8 +529,8 @@ func (l *j7Lifecycle) WithActive(ctx context.Context, peer control.Peer, r contr
 				if row == nil {
 					return "run_identity_unavailable"
 				}
-				if r.Method != "j7_run_end" {
-					if row.State != "live" || ch.run != id || l.channels[id] != ch || ch.ctx.Err() != nil {
+				if r.Method != "j7_run_end" || selfEnd {
+					if !selfEnd && (row.State != "live" || ch.run != id || l.channels[id] != ch || !ch.active()) {
 						return "run_identity_unavailable"
 					}
 					b, c := s.lookup(row.Binding.UID, row.Binding.Generation)
@@ -499,6 +548,13 @@ func (l *j7Lifecycle) WithActive(ctx context.Context, peer control.Peer, r contr
 				encoded, err := control.Marshal(result)
 				if err != nil || string(prior.Result) != string(encoded) {
 					return "request_conflict"
+				}
+				if selfEnd {
+					// Consumption precedes the callback, including its error path.
+					// Input/station generation and binding checks above also prevent
+					// this reply permit from surviving subsequent retirement.
+					ch.endReply = nil
+					defer ch.conn.Close()
 				}
 			} else {
 				args, c := requestArguments(r)

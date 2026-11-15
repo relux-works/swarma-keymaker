@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
@@ -502,7 +503,25 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 	if err := os.Remove(filepath.Join(recipe.o.repo, "keymaker")); err != nil {
 		t.Fatal(err)
 	}
-	unix := filepath.Join(moduleCache, "golang.org", "x", "sys@v0.38.0", "unix")
+	// Resolve the recipe source's selected module under the same clean offline
+	// configuration, never a stale go.sum version or the first cached directory.
+	selected := exec.CommandContext(ctx, "go", "list", "-mod=readonly", "-m", "-json", "golang.org/x/sys")
+	selected.Dir = recipe.o.repo
+	selected.Env = []string{
+		"PATH=" + os.Getenv("PATH"), "HOME=" + home, "TMPDIR=" + os.TempDir(),
+		"GOMODCACHE=" + moduleCache,
+		"GOPROXY=" + (&url.URL{Scheme: "file", Path: filepath.Join(strings.TrimSpace(string(cacheOutput)), "cache", "download")}).String(),
+		"GOENV=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOSUMDB=off", "GONOPROXY=none", "GOTELEMETRY=off",
+		"CGO_ENABLED=0", "GOOS=linux", "GOARCH=amd64", "GOAMD64=v1", "GOFLAGS=-mod=readonly",
+	}
+	metadata, err := selected.CombinedOutput()
+	if err != nil {
+		t.Fatalf("recipe selected module: %v: %s", err, metadata)
+	}
+	unix, err := recipeUnixDirectory(moduleCache, metadata)
+	if err != nil {
+		t.Fatal("recipe selected unix directory", err)
+	}
 	if err := os.Chmod(unix, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -515,6 +534,106 @@ func compareDocumentedRecipe(t *testing.T, ctx context.Context, bundle fixture) 
 	}
 	absent(t, filepath.Join(recipe.o.repo, "keymaker"))
 	t.Logf("modified seeded cache refused before binary creation: %s", output)
+}
+
+// Metadata must describe exactly one selected, unreplaced x/sys directory in
+// this isolated cache. Missing, stale or redirected paths cannot skip poisoning.
+func recipeUnixDirectory(cache string, metadata []byte) (string, error) {
+	var module struct {
+		Path, Version, Dir string
+		Replace, Error     *json.RawMessage
+	}
+	decoder := json.NewDecoder(bytes.NewReader(metadata))
+	if err := decoder.Decode(&module); err != nil {
+		return "", fmt.Errorf("selected module metadata: %w", err)
+	}
+	var extra any
+	if decoder.Decode(&extra) != io.EOF || module.Path != "golang.org/x/sys" || module.Version == "" || strings.ContainsAny(module.Version, "/\\") || module.Replace != nil || module.Error != nil {
+		return "", fmt.Errorf("expected one selected unreplaced x/sys module")
+	}
+	want := filepath.Join(cache, "golang.org", "x", "sys@"+module.Version)
+	if !filepath.IsAbs(cache) || filepath.Clean(cache) != cache || module.Dir != want || !inside(cache, module.Dir) {
+		return "", fmt.Errorf("selected module escaped cache or differs from selected version")
+	}
+	unix := filepath.Join(module.Dir, "unix")
+	resolved, err := filepath.EvalSymlinks(unix)
+	if err != nil || resolved != unix {
+		return "", fmt.Errorf("selected unix directory missing or redirected: %v", err)
+	}
+	info, err := os.Stat(unix)
+	if err != nil || !info.IsDir() {
+		return "", fmt.Errorf("selected unix directory unavailable: %v", err)
+	}
+	return unix, nil
+}
+
+// A real selected directory is accepted even beside a stale cached version;
+// malformed/ambiguous/replaced/missing/non-selected/redirected inputs refuse.
+// The heavy recipe test separately proves real Go selection and cache refusal.
+func TestReleaseRecipeSelectedUnix(t *testing.T) {
+	cache := t.TempDir()
+	selected := filepath.Join(cache, "golang.org", "x", "sys@v1.0.0")
+	stale := filepath.Join(cache, "golang.org", "x", "sys@v0.9.0")
+	for _, path := range []string{selected, stale} {
+		if err := os.MkdirAll(filepath.Join(path, "unix"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	redirected := filepath.Join(cache, "golang.org", "x", "sys@v2.0.0")
+	if err := os.Symlink(selected, redirected); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"valid", "stale-dir", "outside", "missing", "redirected", "wrong-module", "unversioned", "replaced", "error", "ambiguous", "malformed"} {
+		t.Run(name, func(t *testing.T) {
+			module := map[string]any{"Path": "golang.org/x/sys", "Version": "v1.0.0", "Dir": selected}
+			switch name {
+			case "stale-dir":
+				module["Dir"] = stale
+			case "outside":
+				module["Dir"] = filepath.Dir(cache)
+			case "missing":
+				module["Version"], module["Dir"] = "v9.0.0", filepath.Join(cache, "golang.org", "x", "sys@v9.0.0")
+			case "redirected":
+				module["Version"], module["Dir"] = "v2.0.0", redirected
+			case "wrong-module":
+				module["Path"] = "example.invalid/other"
+			case "unversioned":
+				module["Version"] = ""
+			case "replaced":
+				module["Replace"] = map[string]any{}
+			case "error":
+				module["Error"] = map[string]any{"Err": "unavailable"}
+			}
+			raw, err := json.Marshal(module)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name == "ambiguous" {
+				raw = append(raw, raw...)
+			} else if name == "malformed" {
+				raw = []byte("{")
+			}
+			dir, err := recipeUnixDirectory(cache, raw)
+			if name == "valid" {
+				if err != nil || dir != filepath.Join(selected, "unix") {
+					t.Fatal("selected module refused or stale directory chosen", dir, err)
+				}
+			} else {
+				want := "expected one selected unreplaced x/sys module"
+				switch name {
+				case "stale-dir", "outside":
+					want = "selected module escaped cache or differs from selected version"
+				case "missing", "redirected":
+					want = "selected unix directory missing or redirected"
+				case "malformed":
+					want = "selected module metadata"
+				}
+				if err == nil || dir != "" || !strings.Contains(err.Error(), want) {
+					t.Fatal("invalid module path lost intended refusal", name, dir, err)
+				}
+			}
+		})
+	}
 }
 
 // A supplied valid pin configuration is copied and checksummed in a real

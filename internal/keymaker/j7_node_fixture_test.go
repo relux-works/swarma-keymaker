@@ -8,6 +8,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -224,7 +227,12 @@ func j7IssueFixture(t *testing.T, f *j7SignFixture, event rental.Event) (rental.
 		tx := &su.Transaction{Version: 0x7100, Inputs: []su.Input{{Point: su.Point{TxID: strings.Repeat(fmt.Sprint(i+1), 64), Vout: 0}, Sequence: 0xffffffff}}, Outputs: []su.Output{{Value: 1000000, Script: su.NameUpdateScript(v.name, v.value, []byte{0x51})}}}
 		n.add(tx, tx.Bytes(), 1, v.name, v.value)
 	}
-	state := t.TempDir()
+	// testing.TempDir's numbered child is masked by the caller's umask. The
+	// verifier requires its own exact private root, independent of that umask.
+	state := filepath.Join(t.TempDir(), "rental-state")
+	if e := os.Mkdir(state, 0700); e != nil {
+		t.Fatal(e)
+	}
 	if old := f.a.evidence; old != nil {
 		if prior, ok := old.policies[f.contract.Agent]; ok {
 			state = prior.StateDir
@@ -236,4 +244,61 @@ func j7IssueFixture(t *testing.T, f *j7SignFixture, event rental.Event) (rental.
 	f.f.store.mu.Unlock()
 	evidence := j7Evidence{Format: "keymaker-j7-evidence/1", Issuance: issuance.ID()}
 	return signed, n, evidence
+}
+
+// The real verifier accepts the complete fixture with its private state root,
+// then refuses an unsafe mode before RPC or state-file changes. This is an
+// offline node model, not live chain or custody qualification.
+func TestJ7NodeFixturePrivateState(t *testing.T) {
+	f := j7SigningSetup(t)
+	c := f.dial(t, 1)
+	f.bind(t, c, 2, f.f.origin, f.f.uid+200)
+	event := j7ResultEvent(t, j7Call(t, c, 3, "j7_sign", f.consent(t), ""))
+	grant, node, evidence := j7IssueFixture(t, f, event)
+	policy := f.a.evidence.policies[grant.Grant.AgentName]
+	raw, err := json.Marshal(rental.GrantPresentation{SignedGrant: grant, Issuance: rental.IssuanceProof{TxID: evidence.Issuance}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	at, _ := (fixtureAuditClock{}).UTC()
+	check := func() rental.Receipt {
+		return rental.Check(t.Context(), node, policy, raw, grant.Grant.AgentName, grant.Grant.GranteeKey, at.Unix())
+	}
+	if info, err := os.Stat(policy.StateDir); err != nil || info.Mode().Perm() != 0700 {
+		t.Fatal("fixture state root is not private", err)
+	}
+	if receipt := check(); receipt.Verdict != "live" || receipt.Reason != "LIVE" || receipt.GrantID != grant.ID() || receipt.Closed {
+		t.Fatalf("complete fixture refused: %+v", receipt)
+	}
+	snapshot := func() map[string]string {
+		files := map[string]string{}
+		entries, err := os.ReadDir(policy.StateDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			raw, err := os.ReadFile(filepath.Join(policy.StateDir, entry.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			files[entry.Name()] = string(raw)
+		}
+		return files
+	}
+	before := snapshot()
+	node.mu.Lock()
+	calls := node.calls
+	node.mu.Unlock()
+	if err := os.Chmod(policy.StateDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if receipt := check(); receipt.Verdict != "refused" || receipt.Reason != "PRIVATE_STATE_ROOT" {
+		t.Fatalf("unsafe state root did not refuse: %+v", receipt)
+	}
+	node.mu.Lock()
+	unchangedCalls := node.calls == calls
+	node.mu.Unlock()
+	if !unchangedCalls || !reflect.DeepEqual(before, snapshot()) {
+		t.Fatal("unsafe-root refusal reached RPC or changed verifier state files")
+	}
 }

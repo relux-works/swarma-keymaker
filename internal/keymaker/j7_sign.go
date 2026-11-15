@@ -58,7 +58,7 @@ type j7RequestCustody struct {
 
 func (*j7RequestCustody) RunRequestSigning() {}
 func newJ7RequestCustody(l *j7Lifecycle, k *j7Key, clock AuditClock, evidence *j7RentalAuthority) (*j7RequestCustody, error) {
-	if l == nil || k == nil || k.role != j7RequestRole || k.instance != l.store.j7.Instance || clock == nil || l.store.schema != j7SigningSchema || l.store.validateJ7() != nil {
+	if l == nil || k == nil || k.role != j7RequestRole || k.instance != l.store.j7.Instance || clock == nil || !j7SigningStateSchema(l.store.schema) || l.store.validateJ7() != nil {
 		return nil, failure("J7 request custody unavailable")
 	}
 	return &j7RequestCustody{j7Lifecycle: l, key: k, clock: clock, evidence: evidence, entropy: rand.Reader}, nil
@@ -91,6 +91,7 @@ type j7Plan struct {
 	envelope    *j7EnvelopeInput
 	instruction []byte
 	consent     j7ConsentPermission
+	delegation  *j7DelegationPlan
 }
 
 func j7ParseRequest(r control.Request) (j7Plan, Code) {
@@ -245,7 +246,7 @@ func (a *j7RequestCustody) selectedLocked(ch *j7Channel, peer Principal) (j7Run,
 		return j7Run{}, "role_not_permitted"
 	}
 	s := a.store
-	if s.failed || s.j7Signing == nil || s.schema != j7SigningSchema || s.j7UnknownHandoff() {
+	if s.failed || s.j7Signing == nil || !j7SigningStateSchema(s.schema) || s.j7UnknownHandoff() {
 		return j7Run{}, "j7_state_fenced"
 	}
 	row := a.run(ch.run)
@@ -364,6 +365,12 @@ func (a *j7RequestCustody) permissionLocked(table *j7PolicyTable, run j7Run, p j
 		return "request_malformed"
 	}
 	id := p.grant.ID()
+	if p.operation == "delegation_request_v3" {
+		if row == nil || !j7Listed(row.Delegate, id) {
+			return "GRANT_NOT_FOR_RUN"
+		}
+		return ""
+	}
 	for _, d := range a.store.j7.Denials {
 		if d.Origin == run.Origin.key() && d.Grant == id {
 			return "GRANT_NOT_FOR_RUN"
@@ -427,7 +434,7 @@ func (a *j7RequestCustody) Handle(ctx context.Context, peer control.Peer, r cont
 	if !j7SigningMethod(r.Method) {
 		return a.j7Lifecycle.Handle(ctx, peer, r)
 	}
-	p, c := j7ParseRequest(r)
+	p, c := j7ParseRequestForSchema(r, a.store.schema)
 	if c != "" {
 		return nil, control.Code(c)
 	}
@@ -444,6 +451,9 @@ func (a *j7RequestCustody) Handle(ctx context.Context, peer control.Peer, r cont
 		if c = a.evidence.check(ctx, *p.grant, p.evidence, now); c != "" {
 			return nil, control.Code(c)
 		}
+	}
+	if c = p.childFits(); c != "" {
+		return nil, control.Code(c)
 	}
 	var result control.Object
 	c = a.withRun(ctx, peer, r, p, func(run j7Run, table *j7PolicyTable, public string, sign func(*[32]byte) ([]byte, error)) Code {
@@ -490,6 +500,16 @@ func (a *j7RequestCustody) Handle(ctx context.Context, peer control.Peer, r cont
 						rec.Consent = v
 					}
 				}
+			case "delegation_request_v3":
+				var nonce [32]byte
+				if a.entropy == nil {
+					return "entropy_unavailable"
+				}
+				if _, e := io.ReadFull(a.entropy, nonce[:]); e != nil {
+					return "entropy_unavailable"
+				}
+				event = p.delegationEvent(public, now, nonce[:])
+				profile = "swarma-delegation-request-v1/draft"
 			case "envelope_v3":
 				var nonce [32]byte
 				if a.entropy == nil {

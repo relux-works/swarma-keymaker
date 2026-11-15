@@ -75,3 +75,60 @@ func TestJ7VectorCheckerControl(t *testing.T) {
 		}
 	}
 }
+
+// The new corpus checker detects a one-nibble wrong literal preimage, with all
+// other bytes preserved. A green neighboring child proves setup reached checker.
+func TestJ7DelegationVectorCheckerControl(t *testing.T) {
+	if os.Getenv("KEYMAKER_J7_DELEGATION_VECTOR_CONTROL") == "1" {
+		checkJ7DelegationVectors()
+		return
+	}
+	raw, e := os.ReadFile("../../vectors/j7/delegation.json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	var f delegationVectorFile
+	if json.Unmarshal(raw, &f) != nil || len(f.Positive) != 2 {
+		t.Fatal("corpus")
+	}
+	exe, e := os.Executable()
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, bad := range []bool{false, true} {
+		root := t.TempDir()
+		dir := filepath.Join(root, "vectors", "j7")
+		if e := os.MkdirAll(dir, 0700); e != nil {
+			t.Fatal(e)
+		}
+		data := raw
+		if bad {
+			preimage := f.Positive[0].Preimage
+			replacement := "0" + preimage[1:]
+			if replacement == preimage {
+				replacement = "1" + preimage[1:]
+			}
+			data = bytes.Replace(raw, []byte(preimage), []byte(replacement), 1)
+			if bytes.Equal(raw, data) {
+				t.Fatal("preimage plant not applied")
+			}
+		}
+		if e := os.WriteFile(filepath.Join(dir, "delegation.json"), data, 0600); e != nil {
+			t.Fatal(e)
+		}
+		cmd := exec.Command(exe, "-test.run=^TestJ7DelegationVectorCheckerControl$")
+		cmd.Dir = root
+		cmd.Env = []string{"KEYMAKER_J7_DELEGATION_VECTOR_CONTROL=1"}
+		output, e := cmd.CombinedOutput()
+		if !bad {
+			if e != nil || !strings.Contains(string(output), "J7 delegation fixtures: 2 positives/17 negatives") {
+				t.Fatalf("positive checker %v %s", e, output)
+			}
+		} else {
+			exit, ok := e.(*exec.ExitError)
+			if !ok || exit.ExitCode() != 1 || !strings.Contains(string(output), "J7 delegation fixture bytes drift") {
+				t.Fatalf("wrong preimage not detected %v %s", e, output)
+			}
+		}
+	}
+}

@@ -12,7 +12,7 @@ import (
 
 const j7SigningSchema = 5
 
-func j7StateSchema(schema int) bool { return schema == j7Schema || schema == j7SigningSchema }
+func j7StateSchema(schema int) bool { return schema == j7Schema || j7SigningStateSchema(schema) }
 func j7SigningMethod(method string) bool {
 	return method == "j7_sign" || method == "j7_pubkey" || method == "j7_enroll"
 }
@@ -90,7 +90,7 @@ func (s *Store) j7UnknownHandoff() bool {
 }
 func (s *Store) validateJ7Signing() error {
 	j := s.j7Signing
-	if s.schema != j7SigningSchema {
+	if !j7SigningStateSchema(s.schema) {
 		if j != nil {
 			return failure("unexpected signing participant")
 		}
@@ -128,8 +128,8 @@ func (s *Store) validateJ7Signing() error {
 		if err != nil {
 			return failure("invalid signing input")
 		}
-		plan, code := j7ParseRequest(control.Request{Method: r.Method, Params: params})
-		if code != "" || plan.operation != r.Operation {
+		plan, code := j7ParseRequestForSchema(control.Request{Method: r.Method, Params: params}, s.schema)
+		if code != "" || plan.childFits() != "" || plan.operation != r.Operation {
 			return failure("invalid retained operation")
 		}
 		obj, err := control.Decode(prior.Result)
@@ -165,9 +165,12 @@ func (s *Store) validateJ7Signing() error {
 			if c != "" {
 				return failure("invalid retained signature")
 			}
-			event, ok := j7ValidateEvent(raw)
+			event, ok := j7ValidateEventForSchema(raw, s.schema)
 			if !ok || event.ID != r.EventID || obj["public_key"] != event.Pubkey || obj["object_id"] != event.ID || event.Pubkey != plan.contract.Grantee || event.CreatedAt >= plan.contract.NotAfter {
 				return failure("changed retained signature")
+			}
+			if r.Operation == "delegation_request_v3" && (!plan.validDelegationEvent(event, obj["profile"]) || r.Consent != (j7ConsentPermission{})) {
+				return failure("changed retained delegation request")
 			}
 			if r.Operation == "consent_v3" {
 				if event.Kind != 8181 || obj["profile"] != "swarma-rental-consent-v1" || event.Tags[1][1] != plan.consent.Contract || event.Tags[2][1] != plan.consent.Booking || event.Tags[3][1] != plan.consent.Privacy || r.Consent.Contract != plan.consent.Contract || r.Consent.Booking != plan.consent.Booking || r.Consent.Privacy != plan.consent.Privacy {
@@ -189,7 +192,7 @@ func (s *Store) validateJ7Signing() error {
 				return failure("invalid signing authority")
 			}
 		}
-		if r.Method == "j7_sign" && (!validDigest(r.EventID) || r.Operation != "consent_v3" && r.Operation != "envelope_v3") {
+		if r.Method == "j7_sign" && (!validDigest(r.EventID) || r.Operation != "consent_v3" && r.Operation != "envelope_v3" && !(s.schema == j7DelegationSchema && r.Operation == "delegation_request_v3")) {
 			return failure("invalid signed profile")
 		}
 		if r.Operation == "consent_v3" && (!validDigest(r.Consent.Contract) || !validDigest(r.Consent.Booking) || !validDigest(r.Consent.Privacy)) {

@@ -76,11 +76,11 @@ func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
 	_, messages := fields["messages"]
 	_, j7 := fields["j7"]
 	_, signing := fields["j7_signing"]
-	if signing != (string(fields["schema_version"]) == "5") || signing && bytes.Equal(bytes.TrimSpace(fields["j7_signing"]), []byte("null")) {
+	if signing != (string(fields["schema_version"]) == "5" || string(fields["schema_version"]) == "6") || signing && bytes.Equal(bytes.TrimSpace(fields["j7_signing"]), []byte("null")) {
 		return failure("invalid J7 signing schema")
 	}
 	if j7 || string(fields["schema_version"]) == "4" || signing {
-		if !j7 || (string(fields["schema_version"]) != "4" && string(fields["schema_version"]) != "5") || bytes.Equal(bytes.TrimSpace(fields["j7"]), []byte("null")) {
+		if !j7 || (string(fields["schema_version"]) != "4" && string(fields["schema_version"]) != "5" && string(fields["schema_version"]) != "6") || bytes.Equal(bytes.TrimSpace(fields["j7"]), []byte("null")) {
 			return failure("invalid J7 schema")
 		}
 	} else if schema || messages {

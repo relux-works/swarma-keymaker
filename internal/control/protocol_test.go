@@ -153,3 +153,18 @@ func TestJ7EvidenceRefusalCode(t *testing.T) {
 		t.Fatal("unpublished evidence verdict admitted")
 	}
 }
+
+// The new typed profile's explicit semantic codes survive the closed wire
+// filter and remain nonretryable; free-form or misspelled diagnostics do not.
+func TestJ7DelegationRefusalCodes(t *testing.T) {
+	for _, code := range []Code{"CONTRACT_ENCODING", "CONTRACT_PROFILE", "CONTRACT_FIELD", "CONTRACT_ACTIONS", "CONTRACT_REPOS", "CONTRACT_BUDGET", "CONTRACT_NOTE", "CONTRACT_PARENT", "CONTRACT_DELEGATE", "DELEGATE_NO_NOTARY", "CONTRACT_HASH", "CONTRACT_MISMATCH", "SCOPE_MISMATCH", "BUDGET_MISMATCH", "CONSENT_TAGS", "PARENT_ID_MISMATCH", "CHAIN_DEPTH", "NOT_DELEGABLE", "SUBJECT_MISMATCH", "CHILD_ORDINAL", "CHILD_AGENT_NOT_ALLOWED", "CHILD_GRANTEE_NOT_ALLOWED", "CHILD_ACTIONS_WIDER", "CHILD_REPOS_WIDER", "CHILD_BUDGET_OVER", "CHILD_WINDOW_NOT_NESTED", "DELEGATION_REQUEST"} {
+		if !validCode(code) || retryable(code) {
+			t.Fatal("typed refusal lost or retryable", code)
+		}
+	}
+	for _, code := range []Code{"contract_parent", "CHILD_UNCHECKED", "LIVE", "internal node failure"} {
+		if validCode(code) {
+			t.Fatal("foreign diagnostic reached wire", code)
+		}
+	}
+}

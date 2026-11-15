@@ -16,7 +16,7 @@ func (a *j7RequestCustody) WithActive(ctx context.Context, peer control.Peer, r 
 	if !j7SigningMethod(r.Method) {
 		return a.j7Lifecycle.WithActive(ctx, peer, r, result, release)
 	}
-	p, c := j7ParseRequest(r)
+	p, c := j7ParseRequestForSchema(r, a.store.schema)
 	if c != "" {
 		return control.Code(c)
 	}
@@ -35,6 +35,9 @@ func (a *j7RequestCustody) WithActive(ctx context.Context, peer control.Peer, r 
 		if c = a.evidence.check(ctx, *p.grant, p.evidence, checked); c != "" {
 			return control.Code(c)
 		}
+	}
+	if c = p.childFits(); c != "" {
+		return control.Code(c)
 	}
 	c = a.withRun(ctx, peer, r, p, func(run j7Run, table *j7PolicyTable, public string, _ func(*[32]byte) ([]byte, error)) Code {
 		s := a.store

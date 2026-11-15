@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/relux-works/swarma-chain-lab/experiments/rental"
 	su "github.com/relux-works/swarma-chain-lab/experiments/single-use"
@@ -284,10 +285,16 @@ func checkPairs() {
 	fmt.Printf("fixture structure: %d negative/control pairs; no service policy exercised\n", len(r.Negative))
 }
 func main() {
+	delegation := flag.Bool("write-j7-delegation", false, "regenerate only generic draft delegation request fixtures")
 	signing := flag.Bool("write-j7-signing", false, "regenerate only synthetic J7 draft signing fixture")
 	check := flag.Bool("check", false, "verify fixtures without writes")
 	write := flag.Bool("write", false, "regenerate path expectations only")
 	flag.Parse()
+	if *delegation {
+		require(!*check && !*write && !*signing && flag.NArg() == 0, "exclusive delegation writer flag")
+		fail(os.WriteFile("vectors/j7/delegation.json", delegationVectorBytes(), 0644))
+		return
+	}
 	if *signing {
 		require(!*check && !*write && flag.NArg() == 0, "exclusive signing writer flag")
 		fail(os.WriteFile("vectors/j7/signing.json", signingVectorBytes(), 0644))
@@ -298,6 +305,7 @@ func main() {
 	checkPairs()
 	checkJ7Vectors()
 	checkJ7SigningVectors()
+	checkJ7DelegationVectors()
 	checkAuthorityVectors()
 	var p Paths
 	original := read("vectors/keymaker-paths.json", &p)
@@ -843,4 +851,148 @@ func checkJ7SigningVectors() {
 	fail(e)
 	require(bytes.Equal(raw, signingVectorBytes()), "J7 signing fixture bytes drift")
 	fmt.Println("J7 signing fixtures: exact 5 positive and 8 negative draft profile/1 byte/signature controls; live authority NOT qualified")
+}
+
+// All bytes below belong to a new generic synthetic corpus. No old seed/domain
+// or vector file is rewritten, and no installation key/node/state is accessed.
+type delegationVectorCase struct {
+	ID       string `json:"id"`
+	Event    string `json:"event_b64"`
+	Preimage string `json:"preimage_hex"`
+	Expected string `json:"expected"`
+}
+type delegationVectorFile struct {
+	Format         string                 `json:"format"`
+	TestOnly       bool                   `json:"test_only"`
+	Source         string                 `json:"source"`
+	Note           string                 `json:"note"`
+	ParentContract string                 `json:"parent_contract_b64"`
+	ParentGrant    string                 `json:"parent_grant_b64"`
+	ChildContract  string                 `json:"child_contract_b64"`
+	Consent        string                 `json:"consent_event_b64"`
+	Funding        string                 `json:"funding_tx_hex"`
+	Seal           string                 `json:"seal_tx_hex"`
+	Issuance       string                 `json:"issuance_tx_hex"`
+	IssuanceID     string                 `json:"issuance_txid"`
+	Positive       []delegationVectorCase `json:"positive"`
+	Negative       []delegationVectorCase `json:"negative"`
+}
+
+func delegationFixture() delegationVectorFile {
+	key := func(n byte) *btcec.PrivateKey {
+		var b [32]byte
+		b[31] = n
+		k, _ := btcec.PrivKeyFromBytes(b[:])
+		return k
+	}
+	parent, issuer, child, notary, fund := key(23), key(29), key(31), key(37), key(41)
+	defer parent.Zero()
+	defer issuer.Zero()
+	defer child.Zero()
+	defer notary.Zero()
+	defer fund.Zero()
+	public := func(k *btcec.PrivateKey) string { return hex.EncodeToString(schnorr.SerializePubKey(k.PubKey())) }
+	sign := func(k *btcec.PrivateKey, id string) string {
+		var aux [32]byte
+		s, e := schnorr.Sign(k, decodeHex(id), schnorr.CustomNonce(aux))
+		fail(e)
+		return hex.EncodeToString(s.Serialize())
+	}
+	preimage := func(e rental.Event) []byte {
+		return authorityBytes([]any{0, e.Pubkey, e.CreatedAt, e.Kind, e.Tags, e.Content})
+	}
+	finish := func(e rental.Event, k *btcec.PrivateKey) rental.Event {
+		e.ID = authorityHash(preimage(e))
+		e.Sig = sign(k, e.ID)
+		return e
+	}
+	witness := func(tx *su.Transaction, previous su.Output) []byte {
+		hash, e := su.WitnessSignatureHash(tx, 0, previous)
+		fail(e)
+		signature := append(ecdsa.Sign(fund, hash).Serialize(), 1)
+		return (&su.WTransaction{Body: tx, Stacks: [][][]byte{{signature, fund.PubKey().SerializeCompressed()}}}).Bytes()
+	}
+	wscript, e := su.WitnessKeyScript(fund.PubKey().SerializeCompressed())
+	fail(e)
+	funding := &su.Transaction{Version: 1, Inputs: []su.Input{{Point: su.Point{TxID: strings.Repeat("0", 64), Vout: 0xffffffff}, Sequence: 0xffffffff}}, Outputs: []su.Output{{Value: 100000, Script: wscript}, {Value: 100000, Script: wscript}}}
+	sealScript, e := rental.GrantSealScript(public(issuer))
+	fail(e)
+	seal := &su.Transaction{Version: 1, Inputs: []su.Input{{Point: su.Point{TxID: funding.ID(), Vout: 0}, Sequence: 0xffffffff}}, Outputs: []su.Output{{Value: 50000, Script: decodeHex(sealScript)}}}
+	sealRaw := witness(seal, funding.Outputs[0])
+	// Synthetic name/pin identity only, not a registration/history/J3 owner proof.
+	pinTx := &su.Transaction{Version: 0x7100, Inputs: []su.Input{{Point: su.Point{TxID: funding.ID(), Vout: 1}, Sequence: 0xffffffff}}, Outputs: []su.Output{{Value: 100000, Script: su.NameUpdateScript("id/example-notary", `{"fixture":"pin-only"}`, wscript)}}}
+	pc := []byte(fmt.Sprintf(`{"profile":"swarma-trust-contract/2","network":"regtest","landlord_name":"id/example-owner","agent_name":"id/example-executor","grantee_key":"%s","actions":["instruct","land","review"],"repos":["https://git.example/team/project"],"spend_budget":0,"not_before":1700000000,"not_after":1700003600,"scope_text_sha256":"","parent_grant_id":"","ordinal":0,"delegate":{"depth":1,"actions":["instruct","land"],"budget":0,"slots":[{"executor":"id/example-worker","grantee":"%s","cap":0,"notary":"id/example-notary"}],"notaries":[{"name":"id/example-notary","registration":{"txid":"%s","vout":0},"owner":"%s"}],"checkpoint":"%s"},"note":"Generic synthetic root"}`, public(parent), public(child), pinTx.ID(), hex.EncodeToString(notary.PubKey().SerializeCompressed()), authorityHash([]byte("synthetic buried block, not an active-chain assertion"))))
+	hash := authorityHash(pc)
+	consent := finish(rental.Event{Pubkey: public(parent), CreatedAt: 1700000001, Kind: 8181, Tags: [][]string{{"t", "swarma-rental-consent-v1"}, {"contract", hash}, {"booking", authorityHash(append(append([]byte{}, pc...), []byte("booking")...))}, {"privacy", authorityHash([]byte("swarma-trust-privacy-v1"))}}, Content: ""}, parent)
+	g := rental.Grant{Version: 3, Network: "regtest", Genesis: su.RegtestGenesis, AgentName: "id/example-executor", LandlordName: "id/example-owner", IssuerKey: public(issuer), GranteeKey: public(parent), ContractSHA256: hash, Scope: []string{"repository.push"}, NotBefore: 1700000000, NotAfter: 1700003600, Seal: rental.Point{TxID: seal.ID(), Vout: 0}, Consent: rental.GrantConsent{ContractSHA256: hash, ConsentEvent: consent, LandlordSig: sign(issuer, hash)}}
+	digest, e := g.SigningHash()
+	fail(e)
+	signed := rental.SignedGrant{Grant: g, Signature: sign(issuer, digest)}
+	grantRaw := authorityBytes(signed)
+	commit, e := rental.IssuanceCommitment(signed)
+	fail(e)
+	issuance := &su.Transaction{Version: 1, Inputs: []su.Input{{Point: su.Point{TxID: funding.ID(), Vout: 1}, Sequence: 0xffffffff}}, Outputs: []su.Output{{Value: 0, Script: append([]byte{0x6a, 0x20}, decodeHex(commit)...)}, {Value: 90000, Script: wscript}}}
+	issuanceRaw := witness(issuance, funding.Outputs[1])
+	cc := []byte(fmt.Sprintf(`{"profile":"swarma-trust-contract/2","network":"regtest","landlord_name":"id/example-owner","agent_name":"id/example-worker","grantee_key":"%s","actions":["land"],"repos":["https://git.example/team/project"],"spend_budget":0,"not_before":1700000100,"not_after":1700003500,"scope_text_sha256":"","parent_grant_id":"%s","ordinal":1,"delegate":{"depth":0,"actions":[],"budget":0,"slots":[],"notaries":[],"checkpoint":""},"note":"Generic synthetic child terms"}`, public(child), signed.ID()))
+	base := rental.Event{Pubkey: public(parent), CreatedAt: 1700000002, Kind: 8186, Tags: [][]string{{"t", "swarma-delegation-request-v1"}, {"parent", signed.ID()}, {"contract", authorityHash(cc)}, {"ordinal", "1"}, {"nonce", strings.Repeat("3f", 32)}}, Content: ""}
+	enc := base64.RawURLEncoding.EncodeToString
+	row := func(id string, event rental.Event, expected string) delegationVectorCase {
+		return delegationVectorCase{id, enc(authorityBytes(event)), hex.EncodeToString(preimage(event)), expected}
+	}
+	f := delegationVectorFile{Format: "keymaker-j7-delegation-vectors/1", TestOnly: true, Source: "swarma-link-spec d0b2dcc6465fc856e334ddeef7a22f3e1dceb81b LIP-0014 sections2..5 and J1/J3; published BIP340 algorithm, new synthetic scalars23/29/31/37/41", Note: "New generic bytes, NOT byte-identical to the private151+39 corpus. Draft kind8186 is not an allocated external interoperability claim. Complete signed parent and W transaction IDs are computed from synthetic bytes; no LIVE node, J3 name-history/issuer admission, custody, native qualification or landlord ordinal/nonce reservation is asserted. Pin/checkpoint are syntax fixtures only.", ParentContract: enc(pc), ParentGrant: enc(grantRaw), ChildContract: enc(cc), Consent: enc(authorityBytes(consent)), Funding: hex.EncodeToString(funding.Bytes()), Seal: hex.EncodeToString(sealRaw), Issuance: hex.EncodeToString(issuanceRaw), IssuanceID: issuance.ID(), Positive: []delegationVectorCase{}, Negative: []delegationVectorCase{}}
+	f.Positive = append(f.Positive, row("request", finish(base, parent), "valid"))
+	zero := base
+	zero.Tags = append([][]string{}, base.Tags...)
+	zero.Tags[4] = []string{"nonce", strings.Repeat("0", 64)}
+	f.Positive = append(f.Positive, row("zero-spelling-is-structural", finish(zero, parent), "valid"))
+	mutations := []struct {
+		id     string
+		change func(*rental.Event)
+	}{
+		{"wrong-kind", func(e *rental.Event) { e.Kind = 8185 }},
+		{"wrong-tag-order", func(e *rental.Event) { e.Tags[1], e.Tags[2] = e.Tags[2], e.Tags[1] }},
+		{"extra-tag", func(e *rental.Event) { e.Tags = append(e.Tags, []string{"extra", "x"}) }},
+		{"missing-tag", func(e *rental.Event) { e.Tags = e.Tags[:4] }},
+		{"wrong-parent", func(e *rental.Event) {
+			e.Tags[1] = []string{"parent", authorityHash([]byte("different complete parent"))}
+		}},
+		{"wrong-contract", func(e *rental.Event) {
+			e.Tags[2] = []string{"contract", authorityHash([]byte("different child terms"))}
+		}},
+		{"ordinal-leading-zero", func(e *rental.Event) { e.Tags[3] = []string{"ordinal", "01"} }},
+		{"ordinal-wrong-row", func(e *rental.Event) { e.Tags[3] = []string{"ordinal", "2"} }},
+		{"nonce-short", func(e *rental.Event) { e.Tags[4] = []string{"nonce", "3f"} }},
+		{"nonce-uppercase", func(e *rental.Event) { e.Tags[4] = []string{"nonce", strings.Repeat("3F", 32)} }},
+		{"nonce-nonhex", func(e *rental.Event) { e.Tags[4] = []string{"nonce", strings.Repeat("z", 64)} }},
+		{"time-before-parent", func(e *rental.Event) { e.CreatedAt = 1699999999 }},
+		{"time-at-end", func(e *rental.Event) { e.CreatedAt = 1700003600 }},
+		{"content", func(e *rental.Event) { e.Content = "caller-supplied" }},
+	}
+	for _, m := range mutations {
+		v := base
+		v.Tags = append([][]string{}, base.Tags...)
+		m.change(&v)
+		f.Negative = append(f.Negative, row(m.id, finish(v, parent), "DELEGATION_REQUEST"))
+	}
+	wrong := base
+	wrong.Pubkey = public(child)
+	f.Negative = append(f.Negative, row("wrong-key", finish(wrong, child), "DELEGATION_REQUEST"))
+	forged := finish(base, parent)
+	forged.Sig = strings.Repeat("0", 128)
+	f.Negative = append(f.Negative, row("forged-signature", forged, "DELEGATION_REQUEST"))
+	stale := finish(base, parent)
+	stale.ID = authorityHash([]byte("wrong NIP01 preimage"))
+	f.Negative = append(f.Negative, row("forged-event-id", stale, "DELEGATION_REQUEST"))
+	return f
+}
+func delegationVectorBytes() []byte {
+	b, e := json.MarshalIndent(delegationFixture(), "", "  ")
+	fail(e)
+	return append(b, '\n')
+}
+func checkJ7DelegationVectors() {
+	raw, e := os.ReadFile("vectors/j7/delegation.json")
+	fail(e)
+	require(bytes.Equal(raw, delegationVectorBytes()), "J7 delegation fixture bytes drift")
+	fmt.Println("J7 delegation fixtures: 2 positives/17 negatives, new generic complete synthetic request bytes; no live/native claim")
 }

@@ -1,7 +1,7 @@
 # Request and child-delegation key custody
 
 Status: internal custody, protected lifecycle/policy and opt-in profile/1 typed
-request signing. Production role startup remains closed. No installation,
+request signing, plus stopped-schema 6 profile/2 v3 requests. Production role startup remains closed. No installation,
 external kind8185 interoperability, child service or enforcing activation.
 
 ## Purposes and selection
@@ -245,7 +245,7 @@ Policy schema is exactly `keymaker-j7-policy/1`, holder matches service UID,
 instance matches the role and identity is positive/safe. `minimum_reader_schema`
 is `4` for schema-4 lifecycle state and `5` for schema-5 request-signing state.
 It must match the explicitly migrated participant and its independently retained
-exact version/body head; `4` does not admit schema5, and startup never migrates
+exact version/body head; `4` does not admit schema 5, and startup never migrates
 state or substitutes empty signing history. Expected version/digest pins are
 nonempty safe-integer/64-hex values. Both paths are absolute and clean. These
 optional objects are rejected by legacy config. Parsing pins does not open a
@@ -461,12 +461,12 @@ withdrawn. Durable origin/grant denial wins until a newer explicit operator use.
 
 The new outer schema is **5**, with required separate
 `j7_signing:{format:"keymaker-j7-signing-state/1",records,enrollments}`.
-Schema4 and its closed `keymaker-j7-state/1` participant are unchanged; schema5
+Schema4 and its closed `keymaker-j7-state/1` participant are unchanged; schema 5
 preserves that participant and every prior binding, native result, message
 artifact and recovery commitment. Only an explicit stopped-operator **4->5**
 migration with an independently retained exact version/body digest is admitted.
 No startup/RPC migration or missing-means-empty history exists. Old readers
-refuse schema5 without authoritative writes. Schema3 remains separately reserved.
+refuse schema 5 without authoritative writes. Schema3 remains separately reserved.
 
 Each signing/public-key/enrollment record binds kernel peer/requestID, exact
 protected run/binding/origin, canonical params/evidence and exact result digest.
@@ -503,7 +503,7 @@ qualification passed by these fixtures:
 | Row | Source evidence and remaining boundary |
 | --- | --- |
 | S7-1 | Same-key cross-origin endpoint denial and valid owner/origin controls; real separate-run custody remains PENDING. |
-| S7-2 | Profile/2, delegation and interior delegation-proof paths are out of this slice and explicitly closed. |
+| S7-2 | Schema5 stays closed to profile/2. Explicit schema 6 adds only the typed v3 request/root-consent prerequisite below; child/v4 and native delegation remain closed. |
 | S7-3 | Caller selectors and borrowed channel/run IDs refuse in real Unix fixtures; stolen/inherited descriptor and actual broker isolation qualification is PENDING. |
 | S7-4 | True first consent, full externally signed fixture grant, exact released-consent enrollment and envelope pass the actual adopted verifier; production issuer/node qualification is PENDING. |
 | S7-5 | Retained full origin is immutable across spawn/rebind in lifecycle tests; concrete admission-source integration is PENDING. |
@@ -512,13 +512,104 @@ qualification passed by these fixtures:
 | S7-8 | Independent offline byte/receiver checks do not prove ambient Git-token or wallet-RPC exclusion; actual ambient-credential and receiver deployment qualification is PENDING. |
 | S7-9 | Policy publication serializes with first/retry/enrollment and actual response-write state; real distinct-UID withdrawal and crash/power-loss qualification are PENDING. |
 
-### Explicit profile/2 gap
+### Profile/2 v3 request side and schema 6
 
-`delegation_request_v3`, `swarma-trust-contract/2` and kind8186 are explicitly
-`operation_unsupported` by name, with adjacent profile/1 positive controls. There
-is no profile/2 parser/builder, alias, permissive fallback or child signing route.
-LIP-0014 uses the **same profile/2 string** for its base §2/§3 seven-member
-delegate set and the J1/J3 §§7.1/9.1 slots/notary/checkpoint replacements. A single
-frozen target is absent. Byte selection and a separately authorized reviewed
-delegation change belong to their specification owners; this candidate neither
-chooses an encoding nor begins that future implementation.
+The exact target is Draft LIP-0014 at link-spec
+`d0b2dcc6465fc856e334ddeef7a22f3e1dceb81b`, sections 2–5 and adopted J1/J3.
+There is one fifteen-member profile and one six-member delegate object. Old
+seven-member delegate forms, bare notary names and future optional-notary or
+recipient-class forms are not accepted. Pending J2/J4/J5 rules do not silently
+change the active v3 rules. No equality rule for scope-text hashes is added.
+
+Only the trusted Store's explicit **schema 6** enables the new request variant.
+The native method remains `j7_sign`, with exact
+`{operation:"delegation_request_v3",object_b64,evidence_b64}`. Decoded object is
+exactly `{parent_contract_b64,parent_grant_b64,child_contract_b64}`: both COMPLETE
+contracts at most 8192 bytes each and COMPLETE canonical signed parent at most
+16384 bytes. The combined decoded object remains bounded by 32768 bytes; evidence
+by 1024, event result by 16384 and native frame by 65536. Individual maxima are
+ceilings and need not fit together under the aggregate cap. Canonical unpadded
+base64url is required at every layer. No chunking, batch, asserted LIVE, supplied
+hash/event/kind/key/origin/run/time/nonce or caller-selected reader floor exists.
+
+The evidence is the existing complete `keymaker-j7-evidence/1` bundle with its
+issuance transaction locator. Its locator confers no authority. The holder runs
+actual pinned `rental.Check` on the complete signed parent and trusted own-node
+policy before preparation and again before first or retained-result disclosure.
+Contract hashes, full consent, derived scope/budget, subject and row fit are
+computed locally. Genesis is pinned by the signed parent/network, not a new
+contract field. Parent ID/depth precede live-parent observation; remaining
+subject/ordinal/row/actions/repos/budget/window comparisons follow it. The
+ordinal is bounds-checked before indexing. D12 forbids delegated spend, with
+zero delegate budget/caps; counterfactual spend vectors never lift that rule.
+
+The exact current origin's **Delegate** list must explicitly contain the actual
+parent grant ID. Use and consent/enrollment `and_use` do not grant delegation.
+Use denials remain use/enrollment denials; withdrawing Use leaves a separately
+listed Delegate permission intact. Removing Delegate blocks first and retried
+release even if Use remains. Policy rollback/equivocation/unavailability cannot
+restore authority. There is no requester-side ordinal reservation or issuance
+accounting: the landlord independently owns unused ordinal/nonce admission and
+its durable reservation before it signs the child.
+
+Purpose7 must equal **P.grantee_key**, not the child's recipient. Keymaker builds
+kind 8186 with empty content and exactly five ordered two-string tags:
+`t=swarma-delegation-request-v1`, `parent=P.ID()`, `contract=SHA256(child bytes)`,
+`ordinal` as canonical decimal and `nonce` as 32 fresh random bytes/64 lowercase hex.
+Creation time is inside P's window; a nested child may start in the future.
+Standard NIP01 preimage and BIP340 apply without any new signed domain. The
+four-field signed result uses the descriptive local profile
+`swarma-delegation-request-v1/draft`, outside signed bytes. Kind8186 remains Draft,
+not an external allocation or interoperability claim.
+
+A narrowly bounded prerequisite allows schema 6 `consent_v3` for a canonical /2
+ROOT only: empty parent,ordinal 0,delegate.depth 1. It uses the same complete
+contract input, consent triple, current-origin entry, bound purpose7 key and
+durable exact-event release. A canonical /2 child or nondelegable root stays
+unsupported for this consent variant. After actual consent release the issuer
+creates the full parent; only a later explicit operator Delegate listing admits
+a request. Profile/2 `j7_enroll` and `envelope_v3` stay unavailable. Existing /1
+routes and schema 5 parser/event wrappers retain their behavior.
+
+Schema 6 preserves all required schema 5 participant fields/formats and every
+retained signing/result/enrollment/run/origin/policy/denial, base0/2 binding,
+message and recovery participant. Only a stopped explicit **5->6** migration
+under the lifetime lock and independently retained exact version/body digest is
+admitted. No startup/RPC upgrade, downgrade, missing-file bootstrap or mutable
+service-owned floor is added. Actual unchanged reader 5 accepts its old state and
+rejects even empty schema 6; it cannot drop unknown history and write authority.
+Schema3 PC2 remains separate. Whole-store rollback detection still depends on
+independent history and exclusion of old/restored serving instances.
+
+The existing `prepared -> handoff_unknown -> released` transaction and final
+**generation -> policy -> Store -> custody -> audit -> actual socket callback**
+barriers apply. No RPC runs under those terminal locks. Unknown is committed
+before every callback, including exact retries, and final durability follows the
+write. Withdrawal may leave a private prepared signature but releases no success
+bytes. A terminal fence refusal ends that connection; recovery requires a fresh
+trusted launcher rebind. Retries retain exact nonce/time/signature and recheck
+current authority. Concurrent runs sharing an ID retain at most one result;
+imported verifier-journal contention may refuse evidence before the other run
+reaches request_conflict. This is not a promise of one immediate successful
+transport response. After contention, other-run or changed-body reuse conflicts.
+
+The new operation exposes the frozen `CONTRACT_*`, `DELEGATE_NO_NOTARY`,
+parent/depth/subject and `CHILD_*` codes in their ordered rules. Parent binding
+uses `CONTRACT_HASH`, `CONTRACT_MISMATCH`, `SCOPE_MISMATCH`, `BUDGET_MISMATCH`,
+`CONSENT_TAGS`. Existing malformed signed-parent and transport inputs remain
+`request_malformed`; unavailable/unproved/non-LIVE own-node authority remains
+`delegation_evidence_unavailable`, not a free-form dependency diagnostic. These
+semantic/authority refusals are nonretryable. Historical /1 route errors do not
+change. Retained-event integrity is not fresh live authority.
+
+The exact 151+39 public contract/pair corpus and original /1 reference sources
+remain privately hash-bound; no /2 checker was published at that pin. New
+[generic complete fixtures](../vectors/j7/delegation-README.md) have different
+bytes and use a separate test-only byte-grammar reference reader. They do not
+prove J3 notary-name history, issuer J3.9 compliance, child attestation admission,
+landlord reservation, native isolation or external interoperability. At child
+admission, J3 checkpoint/name-history/writer checks precede attestation-key
+comparison; this request endpoint has no child attestation and does not implement
+that separate verifier. Purpose8 supplies nothing on v3. Child/v4 wire inputs,
+own-node closures, P17, production origins, ambient credential exclusion,
+distinct-UID and enforcing/native qualification stay separate gates.

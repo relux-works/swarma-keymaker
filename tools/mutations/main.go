@@ -16,10 +16,10 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity or j7-signing controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing or j7-delegation controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -98,6 +98,29 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "j7-delegation" {
+		// Requirement-derived controls; setup/compile failures are never kills.
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-delegation-as-use", "j7_sign.go", `row == nil || !j7Listed(row.Delegate, id)`, `row == nil || !j7Listed(row.Use, id)`, "^TestJ7DelegationRootConsentBootstrap$", "--- FAIL: TestJ7DelegationRootConsentBootstrap", "want GRANT_NOT_FOR_RUN"},
+			{"j7-delegation-any-row", "j7_profile2.go", `row := p.Delegate.Slots[c.Ordinal-1]`, `row := p.Delegate.Slots[c.Ordinal-1]
+ for _, candidate := range p.Delegate.Slots { if candidate.Executor == c.Agent { row = candidate; break } }`, "^TestJ7DelegationChildFit$", "--- FAIL: TestJ7DelegationChildFit", "want CHILD_AGENT_NOT_ALLOWED"},
+			{"j7-delegation-child-key", "j7_sign.go", `if p.operation != "" && p.contract.Grantee != public {`, `required := p.contract.Grantee
+ if p.delegation != nil { required = p.delegation.child.Grantee }
+ if p.operation != "" && required != public {`, "^TestJ7DelegationRootConsentBootstrap$", "--- FAIL: TestJ7DelegationRootConsentBootstrap", "native success result missing"},
+			{"j7-delegation-no-release-proof", "j7_release.go", `if c = a.evidence.check(ctx, *p.grant, p.evidence, checked); c != "" {`, `if c = Code(""); c != "" {`, "^TestJ7DelegationFreshProofBeforeCallback$", "--- FAIL: TestJ7DelegationFreshProofBeforeCallback", "want delegation_evidence_unavailable"},
+			{"j7-delegation-no-final-delegate", "j7_release.go", `c = a.withRun(ctx, peer, r, p, func(run j7Run`, `finalPlan := p
+ if p.delegation != nil { finalPlan.operation = "envelope_v3" }
+ c = a.withRun(ctx, peer, r, finalPlan, func(run j7Run`, "^TestJ7DelegationWithdrawalInsideFinalEvidence$", "--- FAIL: TestJ7DelegationWithdrawalInsideFinalEvidence", "want GRANT_NOT_FOR_RUN"},
+			{"j7-delegation-resign-retained", "j7_sign.go", `if prior != nil {
+			rec := s.j7SigningRecord`, `if false && prior != nil {
+			rec := s.j7SigningRecord`, "^TestJ7DelegationRetainedSigningInvocation$", "--- FAIL: TestJ7DelegationRetainedSigningInvocation", "retained request invoked signing again"},
+			{"j7-delegation-schema5-widen", "j7_delegation.go", `if schema != j7DelegationSchema || r.Method != "j7_sign" {`, `if schema != j7DelegationSchema && schema != j7SigningSchema || r.Method != "j7_sign" {`, "^TestJ7DelegationSchemaFloorPairedEndpoint$", "--- FAIL: TestJ7DelegationSchemaFloorPairedEndpoint", "want operation_unsupported"},
+			{"j7-delegation-no-unknown", "j7_release.go", `record.Release = "handoff_unknown"
+		if r.Method == "j7_enroll" {`, `// Plant: skip pre-callback unknown commitment.
+        if r.Method == "j7_enroll" {`, "^TestJ7DelegationPartialWrite$", "--- FAIL: TestJ7DelegationPartialWrite", "unknown missing"},
+		}
+	}
+
 	if *group == "j7-state" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
 			{"j7-owner-row-selection", "j7_policy_linux.go", `row := j7PolicyRowFor(table, origin.key())`, `row := j7PolicyRowFor(table, j7OriginKey{Kind:"owner_command"})`, "^TestJ7PolicyOriginPermissions$", "--- FAIL: TestJ7PolicyOriginPermissions", "foreign origin grant admitted"},

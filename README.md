@@ -12,11 +12,16 @@ role startups remain closed; launcher isolation, node/custody deployment and
 native qualification are pending. Draft kind8185 vectors establish offline
 bytes, not external network interoperability.
 
-`delegation_request_v3`, `swarma-trust-contract/2` and kind8186 remain explicitly
-`operation_unsupported`. Profile/2 currently names both the base seven-member
-delegate set and the J1/J3 slots/notary/checkpoint replacements in LIP-0014;
-there is no single frozen target. Selecting bytes and authorizing delegation is
-separate work. This candidate enables no production or enforcing mode.
+Explicit stopped schema-6 migration adds typed profile/2 v3
+`delegation_request_v3` (kind 8186) and bounded delegable-root `consent_v3` only,
+against Draft LIP-0014 at `d0b2dcc6465fc856e334ddeef7a22f3e1dceb81b`.
+The parent must be explicitly listed in the current origin's `delegate` set;
+`use` and consent `and_use` confer no delegation. Schema 5 keeps its historical
+unsupported-profile behavior. Profile/2 envelopes/enrollment, child signatures,
+purpose8/v4 and production activation remain unavailable. The
+[generic complete request fixtures](vectors/j7/delegation-README.md) and
+independent test reader establish synthetic bytes, not live interoperability.
+This candidate enables no production or enforcing mode.
 
 Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
@@ -246,6 +251,9 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
 | gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
 | Go 1.26.10 | J7 typed request controls: `GOTOOLCHAIN=local GOMAXPROCS=2 go test -p=1 ./internal/keymaker -run '^TestJ7(Signing\|Enrollment\|FirstConsent\|Objects)' -count=1`; use `-race` for the same narrow scope | Private protected TMPDIR required; source/Unix fixture tests, no tagged native body or full suite |
+| Go 1.26.10 | `go test ./internal/keymaker -run '^TestJ7(Delegation\|Profile2)' -count=1`; add `-race -p=1` for the affected fixture paths | Unprivileged request/codec/recovery fixtures; private `TMPDIR` and Go caches. Native qualification remains pending |
+| Go 1.26.10 | `go run ./tools/vectors/main.go -check`; `go run ./tools/vectors/main.go -write-j7-delegation` explicitly regenerates only the new generic request corpus | `vectors/j7/delegation.json`; complete synthetic objects/preimages/signatures, without rewriting historical seeds/vectors |
+| Go 1.26.10 | `go run ./tools/mutations/main.go -group j7-delegation -scratch "$SCRATCH"`; `-only NAME` selects one plant | Eight requirement-derived overlays and named failing tests under private scratch; a setup/compile failure is not a kill |
 | Go 1.26.10 | `go run ./tools/vectors -check`; `go run ./tools/vectors -write-j7-signing` explicitly regenerates only the synthetic draft signing corpus | `vectors/j7/signing.json`; original signed domains, seeds and historical vectors are preserved |
 | Go 1.26.10 | `go run ./tools/mutations -group j7-signing -scratch "$SCRATCH"`; `-only NAME` selects one plant | Private overlays and exact test exit codes in the supplied scratch directory; kills require the named forbidden successful endpoint result |
 | Go | Custody response/audit regressions: `go test -race ./internal/keymaker -run '^Test(CustodyAudit|CustodySign|CustodyUnavailable|MasterUnavailable)' -count=1 -p=1`; `go run ./tools/mutations/main.go -group core -scratch "$SCRATCH"` | Real-socket byte-equal refusals, local cause enumeration, open signing controls; logs/overlays under private scratch |

@@ -37,7 +37,7 @@ func (s *Store) validateRequests() error {
 		return failure("retained request budget exceeded")
 	}
 	for i, r := range s.requests {
-		if !validGeneration(r.Caller.Generation) || len(r.ID) != 32 || (r.Method != "hello" && r.Method != "pubkey" && !mutation(r.Method) && r.Method != "sign_registration" && !(j7StateSchema(s.schema) && (j7LifecycleMethod(r.Method) || s.schema == j7SigningSchema && j7SigningMethod(r.Method)))) {
+		if !validGeneration(r.Caller.Generation) || len(r.ID) != 32 || (r.Method != "hello" && r.Method != "pubkey" && !mutation(r.Method) && r.Method != "sign_registration" && !(j7StateSchema(s.schema) && (j7LifecycleMethod(r.Method) || j7SigningStateSchema(s.schema) && j7SigningMethod(r.Method)))) {
 			return failure("invalid retained request")
 		}
 		for _, c := range r.ID {

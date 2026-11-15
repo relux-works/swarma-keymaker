@@ -476,9 +476,14 @@ The opt-in internal profile/1 adapter now supplies consent/envelope, bound
 public-key/enrollment and explicit schema-5 consent/result/handoff history.
 Conservative unknown-handoff restart refusal has no automatic reconciliation
 endpoint. Full independent review and actual node/time/custody/broker/native
-qualification remain pending. `delegation_request_v3`, profile/2 and kind8186
-remain explicitly unsupported: the same profile/2 string names the base
-seven-member delegate set and J1/J3 slots/notary/checkpoint replacements, with
-no single frozen target. No dual parser or fallback is selected. The
-BIP-340 dependency's rare challenge-at-least-order fail-closed availability edge
+qualification remain pending. Explicit stopped schema6 adds only the frozen
+profile/2 v3 delegation-request side and bounded delegable-root consent
+prerequisite; schema5 remains unchanged. Profile/2 enrollment/envelopes,
+purpose8/v4 child signing, issuer/notary/landlord duties and production/native
+activation remain closed. The exact current parser target is link-spec
+`d0b2dcc6465fc856e334ddeef7a22f3e1dceb81b`; later recipient/notary changes need
+separate adoption. Private exact upstream corpus/reference provenance and new
+generic public fixture bytes are distinct. Independent /2 review, actual broker
+origin/credential isolation and external kind8186 interoperability remain open.
+The BIP-340 dependency's rare challenge-at-least-order fail-closed availability edge
 remains a signing limit, without a feasible natural reproduction here.

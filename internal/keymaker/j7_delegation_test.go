@@ -5,6 +5,7 @@ package keymaker
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -923,5 +924,46 @@ func TestJ7DelegationAuthorityFailures(t *testing.T) {
 			}
 			j7ResultEvent(t, j7Call(t, c, 20, "j7_sign", p, ""))
 		})
+	}
+}
+
+// The complete valid three-object collection remains accepted at32767/32768
+// aggregate bytes (padding only its JSON wrapper, not signed P/C/grant bytes).
+// The adjacent aggregate and frame ceilings reject without another result.
+// This does not claim all individual maxima fit together under the aggregate.
+func TestJ7DelegationAggregateAndFrameCaps(t *testing.T) {
+	f, c, _, _, p := j7DelegationReady(t)
+	raw, code := j7Decode64(p["object_b64"].(string), j7ObjectLimit)
+	if code != "" {
+		t.Fatal(code)
+	}
+	before := j7DelegationCount(f)
+	for i, size := range []int{32767, 32768, 32769} {
+		if len(raw) > size {
+			t.Fatal("positive collection exceeds intended boundary")
+		}
+		padded := append(append([]byte{}, raw...), []byte(strings.Repeat(" ", size-len(raw)))...)
+		bounded := control.Object{"operation": p["operation"], "object_b64": j7Encode64(padded), "evidence_b64": p["evidence_b64"]}
+		want := Code("")
+		if size > 32768 {
+			want = "request_malformed"
+		}
+		result := j7Call(t, c, 20+i, "j7_sign", bounded, want)
+		if want == "" {
+			j7ResultEvent(t, result)
+			j7DelegationWaitReleased(t, f, 20+i)
+		}
+	}
+	if j7DelegationCount(f) != before+2 {
+		t.Fatal("over-cap aggregate retained result")
+	}
+	var header [4]byte
+	binary.BigEndian.PutUint32(header[:], 65537)
+	if n, e := c.Write(header[:]); e != nil || n != 4 {
+		t.Fatal("frame plant setup", n, e)
+	}
+	nativeResponse(t, nativeReceive(t, c), nil, "frame_too_large")
+	if j7DelegationCount(f) != before+2 {
+		t.Fatal("over-cap frame retained result")
 	}
 }

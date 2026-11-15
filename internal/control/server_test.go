@@ -954,3 +954,43 @@ func TestAcceptedTupleBeforeHello(t *testing.T) {
 		})
 	}
 }
+
+type delayedUnboundProbe struct {
+	Handler
+	started chan time.Time
+	release <-chan struct{}
+}
+
+func (p *delayedUnboundProbe) BoundChannel(ctx context.Context, _ net.Conn, _ Peer) bool {
+	p.started <- time.Now()
+	select {
+	case <-p.release:
+	case <-ctx.Done():
+	}
+	return false
+}
+
+// A negative-only metadata probe must consume the original unbound read budget,
+// rather than reset it after lock contention. This instrument uses a real Unix
+// FD and fixture peers; actual J7 bound authority is exercised in keymaker tests.
+func TestUnboundProbeReadBudget(t *testing.T) {
+	started := make(chan time.Time, 1)
+	release := make(chan struct{})
+	source := &delayedUnboundProbe{Handler: handlerFunc(func(context.Context, Peer, string, Object) (Object, Code) { return Object{"ok": true}, "" }), started: started, release: release}
+	s := testServer(t, source, nil, nil)
+	deadlines := make(chan time.Time, 4)
+	c, _ := client(t, s, func(n net.Conn) net.Conn { return deadlineRecordConn{n, deadlines} })
+	<-deadlines // existing absolute hello window
+	negotiate(t, c)
+	began := <-started
+	time.Sleep(500 * time.Millisecond)
+	close(release)
+	select {
+	case d := <-deadlines:
+		if d.IsZero() || d.After(began.Add(frameBudget+150*time.Millisecond)) {
+			t.Fatal("unbound probe extended original frame budget", d.Sub(began))
+		}
+	case <-time.After(time.Second):
+		t.Fatal("unbound read deadline missing after probe")
+	}
+}

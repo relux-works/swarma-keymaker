@@ -18,10 +18,10 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2 or j7-lifecycle-wire controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire or j7-idle controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -100,6 +100,15 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "j7-idle" {
+		// Each plant weakens an actual changed read-state/budget boundary.
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-bound-idle-deadline", "../control/server.go", "if bound {\n\t\t// Clear the prior frame deadline", "if false && bound {\n\t\t// Clear the prior frame deadline", "^TestJ7LifecycleBoundIdle$", "--- FAIL: TestJ7LifecycleBoundIdle", "bound idle channel lost"},
+			{"j7-unbound-idle-exemption", "../control/server.go", `bound = source.BoundChannel(probe, conn, state.accepted)`, `bound = source.BoundChannel(probe, conn, state.accepted) || state.negotiated`, "^TestJ7LifecycleUnboundIdle$/^hello$", "--- FAIL: TestJ7LifecycleUnboundIdle/hello", "unbound channel received indefinite read deadline"},
+			{"j7-unbound-probe-budget", "../control/server.go", `readDeadline := readStarted.Add(frameBudget)`, `_ = readStarted; readDeadline := time.Now().Add(frameBudget)`, "^TestUnboundProbeReadBudget$", "--- FAIL: TestUnboundProbeReadBudget", "unbound probe extended original frame budget"},
+			{"j7-obsolete-idle-exemption", "j7_run_linux.go", `l.channels[ch.run] != ch`, `false && l.channels[ch.run] != ch`, "^TestJ7LifecycleSingleIdleChannel$/^obsolete-map$", "--- FAIL: TestJ7LifecycleSingleIdleChannel/obsolete-map", "obsolete channel received indefinite read deadline"},
+		}
+	}
 	if *group == "j7-lifecycle-wire" {
 		pkg = "./j7lifecycle"
 		// Only changed wire/bridge gates are planted. Each requires its named
@@ -366,7 +375,11 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		if *group == "genjournal" {
 			args = append(args, "-tags", "genjournal_testseam")
 		}
-		args = append(args, pkg, "-run", c.test, "-count=1", "-v")
+		testPackage := pkg
+		if *group == "j7-idle" && c.name == "j7-unbound-probe-budget" {
+			testPackage = "./internal/control"
+		}
+		args = append(args, testPackage, "-run", c.test, "-count=1", "-v")
 		cmd := exec.Command("go", args...)
 		if dependencyWorkspace != "" {
 			cmd.Env = append(cmd.Environ(), "GOWORK="+dependencyWorkspace)
@@ -400,7 +413,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" {
+		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{

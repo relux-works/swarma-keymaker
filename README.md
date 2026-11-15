@@ -303,14 +303,16 @@ vectors. It supplies no socket client or launcher record. Existing lifecycle and
 request-custody adapters are exercised through their existing real Unix seams;
 no composition factory or production startup was added. Nonlegacy startup,
 configuration reader floors, signing and legacy behavior remain unchanged.
-The server's current two-second idle frame-read limit remains; these bytes do
-not qualify continuous bound-channel operation or distinct-UID input isolation.
+The holder now separates proved-bound no-byte waiting from the unchanged
+started-frame two-second budget. Hello/unbound/legacy reads stay bounded;
+withdrawal, EOF and final-release fences remain. This source/fixture evidence
+does not qualify deployed continuous runs or distinct-UID input isolation.
 
 | Tool | Exact command / entry point | Outputs and limits |
 | --- | --- | --- |
 | Go1.26.10 | `GOTOOLCHAIN=local GOMAXPROCS=2 go test -p=1 ./j7lifecycle -count=1`; `go build ./j7lifecycle` | Inert value/reference checks and build cache; no runtime authority |
 | Go | `go test -p=1 ./internal/control -run '^TestValidRefusal$' -count=1`; `go test -p=1 ./internal/keymaker -run '^TestJ7Lifecycle' -count=1`; add `-race -parallel=2` for scoped races | Real Unix fixture interoperability, refusal/no-effects and interrupted acknowledgement controls; protected private TMPDIR/caches required |
-| Mutation tool | `go run ./tools/mutations/main.go -group j7-lifecycle-wire -scratch "$SCRATCH"` | Named changed-gate overlays, intended failing tests, child receipts/logs in supplied private scratch; setup failures are not kills |
+| Mutation tool | `go run ./tools/mutations/main.go -group j7-lifecycle-wire -scratch "$SCRATCH"`; use `-group j7-idle` for bound/unbound read-state controls | Named changed-gate overlays, intended failing tests, child receipts/logs in supplied private scratch; setup failures are not kills |
 
 Use the pinned SDK and site-approved resource wrapper for heavy checks. Corpus
 manifest/payload hashes are public byte expectations; consumers pin the reviewed

@@ -84,11 +84,26 @@ launcher connection to recover its retained exact acknowledgement. Local teardow
 always runs; an unacknowledged end remains ending/fenced with retry intent.
 EOF only drops volatile association, never durably ends a run.
 
-The current server bounds every next frame read to two seconds, including
-no-byte idle waiting after bind. This package changes neither that lifetime nor
-hello/timeouts. It adds no heartbeat or reconnect workaround and does not qualify
-long-idle operation. The existing holder rebind method is represented as data;
-a launcher policy may forbid it, as the current v1 policy does.
+The reviewed transport contract separates no-byte waiting from started frames.
+An authenticated, actually bound J7 channel may await the next byte without an
+idle deadline, subject to the server's parent deadline/cancellation. Once the
+first byte arrives, one two-second budget covers the remaining header and body.
+Hello, unbound/pre-bind and legacy connections retain their existing finite
+read budgets; started RPCs retain independent1–2000ms deadlines. A successful
+hello/end reply or a role marker alone supplies no bound association. Actual
+connection/map/live-row/launcher/binding state is checked each iteration; no
+metadata lock spans a socket read. Withdrawal closes that connection and EOF
+still only drops volatile association. Refusal audit/report/write budgets remain
+separate; the frame-read budget is not a claim of closure exactly two seconds
+later. No heartbeat or reconnect workaround was added.
+
+This is source/fixture coverage, not continuous-run deployment qualification.
+The existing holder rebind method remains represented as data; the current v1
+launcher policy never calls it. The existing8 active-request slots and65536
+retained run-history limit are unchanged; there is no new per-launcher idle
+channel quota. Only the active actual channel for a live run is exempt: a
+competing connection or obsolete map association keeps the finite read deadline.
+Runtime startup and independent native isolation gates stay closed.
 
 ## Vectors and checks
 
@@ -116,4 +131,10 @@ GOTOOLCHAIN=local go run ./tools/mutations/main.go -group j7-lifecycle-wire -scr
 Logs, compile-valid overlay plants and child receipts belong in caller-supplied
 private scratch, never the public corpus. A kill requires the named intended
 assertion and real test exit1; setup failures and survivors remain failures.
-These checks do not run a service or qualify Source/launcher/deployment behavior.
+For the holder read-state controls, run the scoped Unix tests with
+`go test -p=1 ./internal/keymaker -run '^TestJ7Lifecycle' -count=1` and the
+`j7-idle` mutation group using the same scratch flag. Tests include a delayed
+negative-only probe check in `./internal/control` to prevent extending unbound
+budgets. The restoring-idle-deadline plant must fail the named actual-socket
+idle positive. These checks do not run an installed service or qualify
+Source/launcher/deployment behavior.

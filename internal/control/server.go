@@ -1,8 +1,10 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -47,6 +49,15 @@ type RunRequestHandler interface{ RunRequestSigning() }
 // supply or replace the connection. Legacy handlers need not implement it.
 type ConnectionScope interface {
 	Scope(context.Context, net.Conn) (context.Context, func())
+}
+
+// BoundChannelSource proves a live J7 association for the actual accepted
+// connection and authenticated hello tuple. This metadata predicate permits only
+// next-frame no-byte waiting; it grants no request authority. Implementations
+// must honor ctx and release all locks before returning. Legacy and unbound
+// connections retain bounded framing; a marker or successful reply is no proof.
+type BoundChannelSource interface {
+	BoundChannel(context.Context, net.Conn, Peer) bool
 }
 
 // RequestIDs admits IDs in the caller's UID+generation scope, including hello.
@@ -218,17 +229,61 @@ type connectionState struct {
 }
 
 func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionState) bool {
-	readDeadline := time.Now().Add(frameBudget)
+	readStarted := time.Now()
+	bound := false
+	if state.negotiated && state.pinned {
+		if source, ok := s.handler.(BoundChannelSource); ok {
+			// Bound only the metadata/Store-lock probe, never the subsequent idle
+			// read. A canceled/expired probe cannot grant an indefinite wait.
+			probe, cancel := context.WithTimeout(ctx, frameBudget)
+			bound = source.BoundChannel(probe, conn, state.accepted)
+			expired := probe.Err() != nil
+			cancel()
+			if expired {
+				return false
+			}
+		}
+	}
+	// Metadata lock admission consumes the original unbound read window.
+	readDeadline := readStarted.Add(frameBudget)
 	if !state.negotiated {
 		readDeadline = state.helloDeadline
 	}
-	if parent, ok := ctx.Deadline(); ok && parent.Before(readDeadline) {
+	if bound {
+		// Clear the prior frame deadline only for a real live association.
+		readDeadline = time.Time{}
+	}
+	if parent, ok := ctx.Deadline(); ok && (readDeadline.IsZero() || parent.Before(readDeadline)) {
 		readDeadline = parent
 	}
 	if conn.SetReadDeadline(readDeadline) != nil {
 		return false
 	}
-	body, code := readFrame(conn)
+	var body []byte
+	var code Code
+	if bound {
+		var first [1]byte
+		n, err := io.ReadFull(conn, first[:])
+		if n == 0 && errors.Is(err, io.EOF) {
+			return false
+		}
+		if err != nil {
+			code = readCode(err)
+		} else {
+			// One started-frame budget covers the remaining header AND body.
+			// The existing framer consumes the already-read one-byte prefix.
+			startedDeadline := time.Now().Add(frameBudget)
+			if parent, ok := ctx.Deadline(); ok && parent.Before(startedDeadline) {
+				startedDeadline = parent
+			}
+			if conn.SetReadDeadline(startedDeadline) != nil {
+				return false
+			}
+			body, code = readFrame(io.MultiReader(bytes.NewReader(first[:]), conn))
+		}
+	} else {
+		body, code = readFrame(conn)
+	}
 	completed := time.Now()
 	if ctx.Err() != nil {
 		return false

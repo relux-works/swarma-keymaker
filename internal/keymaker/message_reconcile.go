@@ -220,7 +220,7 @@ func (m *messageMaintenance) reconcile(ctx context.Context, expected messageReco
 				return code
 			}
 		}
-		s.records, s.requests, s.next, s.version, s.auditSeq, s.auditHash, s.schema, s.messages, s.j7 = candidate.records, candidate.requests, candidate.next, candidate.version, candidate.auditSeq, candidate.auditHash, candidate.schema, candidate.messages, candidate.j7
+		s.records, s.requests, s.next, s.version, s.auditSeq, s.auditHash, s.schema, s.messages, s.j7, s.j7Signing = candidate.records, candidate.requests, candidate.next, candidate.version, candidate.auditSeq, candidate.auditHash, candidate.schema, candidate.messages, candidate.j7, candidate.j7Signing
 		s.requestIndex = candidate.requestIndex
 	}
 	tx := s.messageTx(expected.Transaction)
@@ -346,7 +346,7 @@ func (s *Store) messageRecoverySnapshot(commit bindingCommit, id string) (*Store
 	}
 	candidate := NewStore()
 	candidate.dir, candidate.uid, candidate.journal = s.dir, s.uid, s.journal
-	candidate.schema, candidate.messages, candidate.j7 = disk.SchemaVersion, disk.Messages, disk.J7
+	candidate.schema, candidate.messages, candidate.j7, candidate.j7Signing = disk.SchemaVersion, disk.Messages, disk.J7, disk.J7Signing
 	candidate.records, candidate.requests, candidate.next = disk.Records, disk.Requests, disk.Next
 	candidate.version, candidate.auditSeq, candidate.auditHash = disk.Version, disk.AuditSeq, disk.AuditHash
 	if candidate.validate() != "" || candidate.validateRequests() != nil || !candidate.matchesCommit(commit) || candidate.validateMessages() != nil || candidate.j7 != nil && candidate.validateJ7() != nil {

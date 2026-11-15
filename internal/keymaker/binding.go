@@ -59,18 +59,20 @@ type Binding struct {
 	RegistryRevision string    `json:"registry_revision"`
 }
 type bindingDisk struct {
-	SchemaVersion int               `json:"schema_version,omitempty"`
-	Messages      *messageInventory `json:"messages,omitempty"`
-	J7            *j7Inventory      `json:"j7,omitempty"`
-	Next          uint64            `json:"next_registration_number"`
-	Records       []Binding         `json:"records"`
-	Requests      []retainedRequest `json:"requests"`
-	Version       uint64            `json:"version"`
-	AuditSeq      uint64            `json:"audit_seq"`
-	AuditHash     string            `json:"audit_hash"`
+	SchemaVersion int                 `json:"schema_version,omitempty"`
+	Messages      *messageInventory   `json:"messages,omitempty"`
+	J7            *j7Inventory        `json:"j7,omitempty"`
+	J7Signing     *j7SigningInventory `json:"j7_signing,omitempty"`
+	Next          uint64              `json:"next_registration_number"`
+	Records       []Binding           `json:"records"`
+	Requests      []retainedRequest   `json:"requests"`
+	Version       uint64              `json:"version"`
+	AuditSeq      uint64              `json:"audit_seq"`
+	AuditHash     string              `json:"audit_hash"`
 }
 type Store struct {
 	j7           *j7Inventory
+	j7Signing    *j7SigningInventory
 	j7Fault      func(string) Code
 	messageLock  *os.File
 	schema       int
@@ -165,7 +167,7 @@ func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Stor
 		}
 		// The paired opener will commit bootstrap journal-first. Any artifact
 		// left before that completes fences the next attempt.
-		if floor == 2 || floor == j7Schema {
+		if floor == 2 || j7StateSchema(floor) {
 			return nil, failure("message schema requires explicit migration")
 		}
 		s.initialized = true
@@ -176,8 +178,8 @@ func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Stor
 	if StrictJSON(f, &disk) != nil {
 		return nil, failure("invalid binding journal")
 	}
-	s.schema, s.messages, s.j7 = disk.SchemaVersion, disk.Messages, disk.J7
-	if (s.schema == 2 && floor != 2) || (floor == 2 && s.schema != 2 && !recovery) || (s.schema == j7Schema && floor != j7Schema) || (floor == j7Schema && s.schema != j7Schema && !recovery) {
+	s.schema, s.messages, s.j7, s.j7Signing = disk.SchemaVersion, disk.Messages, disk.J7, disk.J7Signing
+	if (s.schema == 2 && floor != 2) || (floor == 2 && s.schema != 2 && !recovery) || (j7StateSchema(s.schema) && floor != s.schema) || (j7StateSchema(floor) && s.schema != floor && !recovery) {
 		return nil, failure("message schema floor mismatch")
 	}
 	s.records = disk.Records
@@ -242,7 +244,7 @@ func validateBindings(records []Binding, next uint64) Code {
 }
 func (s *Store) persist() Code { return s.persistContext(context.Background()) }
 func (s *Store) persistContext(ctx context.Context) Code {
-	if s.schema == j7Schema {
+	if j7StateSchema(s.schema) {
 		return s.persistJ7ParticipantContext(ctx)
 	}
 	if s.schema == 2 {
@@ -327,7 +329,7 @@ func (s *Store) Register(caller, operator Principal, b Binding) (Binding, Code) 
 		return Binding{}, c
 	}
 	if c := s.persist(); c != "" {
-		if (s.schema == 2 || s.schema == j7Schema) && c == "state_capacity_exceeded" {
+		if (s.schema == 2 || j7StateSchema(s.schema)) && c == "state_capacity_exceeded" {
 			// Schema-2 capacity is checked before every durable write.
 			s.records = s.records[:len(s.records)-1]
 			s.next--
@@ -376,7 +378,7 @@ func (s *Store) Revoke(ctx context.Context, caller, operator Principal, number u
 		if b.Number == number {
 			s.records[i].Status = "revoked"
 			if c := s.persist(); c != "" {
-				if (s.schema == 2 || s.schema == j7Schema) && c == "state_capacity_exceeded" {
+				if (s.schema == 2 || j7StateSchema(s.schema)) && c == "state_capacity_exceeded" {
 					s.records[i] = b
 					return c
 				}
@@ -477,7 +479,7 @@ func (s *Store) Unbind(caller, operator Principal, uid uint32, generation string
 		if b.UID == uid && b.Generation == generation && b.Status == "active" {
 			s.records[i].Status = "unbound"
 			if c := s.persist(); c != "" {
-				if (s.schema == 2 || s.schema == j7Schema) && c == "state_capacity_exceeded" {
+				if (s.schema == 2 || j7StateSchema(s.schema)) && c == "state_capacity_exceeded" {
 					s.records[i] = b
 					return c
 				}

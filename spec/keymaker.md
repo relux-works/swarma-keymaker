@@ -706,6 +706,15 @@ restoring protected custody before a new admission attempt.
 | Native `sign_message` on B (unimplemented candidate) | Purpose 4, active peer's author message sibling | Landed-S0-aligned exact `swarma-msg/2` + LF + canonical signed record: `key` and `body.author` equal that peer's active attested purpose-4 key ID; `body.author_attestation` equals its service-resolved current attestation content ID, under `with_active` through release and on retries |
 | Internal message-key certification (internal S2 only; no production constructor) | Purpose 5, owner-pinned certification root | Only waggle `swarma-attestation attestation/1` + LF + service-built signed record for agent keys, with validity at most 24 hours; never `revocation/1`, whose agent-withdrawal snapshots use the separately pinned registry-owner revocation root |
 
+An additional opt-in **internal** purpose-7 request adapter supports complete
+profile/1 kind8181 consent and draft kind8185 envelopes, plus bound public-key
+and enrollment methods. It uses standard NIP-01 IDs, not SSHSIG or a general
+byte-signing route. Production role startup remains closed. The
+[J7 supplement](keymaker-j7.md#profile1-typed-request-adapter-internal-unactivated)
+defines its exact native schemas, schema5 migration, released-consent enrollment,
+current-authority retry and socket-handoff fence. Profile/2/kind8186 and purpose8
+remain unsupported; all deployment and native qualification gates remain.
+
 The last three rows summarize unactivated proposals, not current signing
 capabilities. See the [witness supplement](keymaker-witness.md#31-protected-identity-and-purpose-separation)
 and [message supplement](keymaker-msg.md#1-purpose-registry-and-domain-separation).

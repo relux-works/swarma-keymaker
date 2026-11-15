@@ -149,6 +149,8 @@ func TestJ7RunChannelIsolation(t *testing.T) {
 	altered.Input = Principal{f.f.uid + 201, "input-b"}
 	j7Call(t, b, 6, "j7_run_bind", j7Params(t, altered), "request_malformed")
 	j7Call(t, b, 7, "j7_sign", control.Object{}, "operation_unsupported")
+	j7Call(t, b, 70, "j7_pubkey", control.Object{}, "operation_unsupported")
+	j7Call(t, b, 71, "j7_enroll", control.Object{}, "operation_unsupported")
 	if len(f.f.store.j7.Runs) != before {
 		t.Fatal("refused channel changed runs")
 	}
@@ -382,7 +384,7 @@ func TestJ7RunLegacySurfaceStaysClosed(t *testing.T) {
 	conn := nativeDial(t, f.server.ControlPath)
 	nativeNegotiate(t, conn, 1)
 	before := f.store.Snapshot()
-	for i, method := range []string{"j7_run_bind", "j7_run_end", "j7_run_rebind", "j7_sign", "j7_pubkey"} {
+	for i, method := range []string{"j7_run_bind", "j7_run_end", "j7_run_rebind", "j7_sign", "j7_pubkey", "j7_enroll"} {
 		j7Call(t, conn, i+2, method, control.Object{}, "operation_unsupported")
 	}
 	j7Call(t, conn, 1, "j7_run_bind", control.Object{}, "operation_unsupported")

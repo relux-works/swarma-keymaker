@@ -138,7 +138,7 @@ func (s *Store) readMessageArtifact(id string, ref messageArtifact, v any) Code 
 // artifacts. There is deliberately no published/active acceptance path here.
 func (s *Store) validateMessages() error {
 	m := s.messages
-	if (s.schema != 2 && s.schema != j7Schema) || m == nil || len(m.Transactions) > messageHistoryLimit || len(m.Associations) > messageHistoryLimit || len(m.Certificates) > messageHistoryLimit || len(m.Publications) != 0 {
+	if (s.schema != 2 && !j7StateSchema(s.schema)) || m == nil || len(m.Transactions) > messageHistoryLimit || len(m.Associations) > messageHistoryLimit || len(m.Certificates) > messageHistoryLimit || len(m.Publications) != 0 {
 		return failure("invalid message state")
 	}
 	txs := map[string]bool{}

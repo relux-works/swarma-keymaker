@@ -37,7 +37,7 @@ func (s *Store) validateRequests() error {
 		return failure("retained request budget exceeded")
 	}
 	for i, r := range s.requests {
-		if !validGeneration(r.Caller.Generation) || len(r.ID) != 32 || (r.Method != "hello" && r.Method != "pubkey" && !mutation(r.Method) && r.Method != "sign_registration" && !(s.schema == j7Schema && j7LifecycleMethod(r.Method))) {
+		if !validGeneration(r.Caller.Generation) || len(r.ID) != 32 || (r.Method != "hello" && r.Method != "pubkey" && !mutation(r.Method) && r.Method != "sign_registration" && !(j7StateSchema(s.schema) && (j7LifecycleMethod(r.Method) || s.schema == j7SigningSchema && j7SigningMethod(r.Method)))) {
 			return failure("invalid retained request")
 		}
 		for _, c := range r.ID {
@@ -58,6 +58,9 @@ func (s *Store) validateRequests() error {
 			}
 		} else {
 			return failure("invalid retained status")
+		}
+		if j7SigningMethod(r.Method) && s.j7SigningRecord(r.Caller, r.ID) == nil {
+			return failure("lost signing record")
 		}
 		key := requestKey{r.Caller, r.ID}
 		if _, ok := s.requestIndex[key]; ok {
@@ -106,11 +109,11 @@ func (s *Store) fitsState(records []Binding, next uint64, requests []retainedReq
 	if len(requests) > maxRetainedRequests {
 		return false
 	}
-	b, err := json.Marshal(bindingDisk{Next: next, Records: records, Requests: requests, Version: 9007199254740991, AuditSeq: 9007199254740991, AuditHash: string(bytes.Repeat([]byte("0"), 64)), SchemaVersion: s.schema, Messages: s.messages, J7: s.j7})
+	b, err := json.Marshal(bindingDisk{Next: next, Records: records, Requests: requests, Version: 9007199254740991, AuditSeq: 9007199254740991, AuditHash: string(bytes.Repeat([]byte("0"), 64)), SchemaVersion: s.schema, Messages: s.messages, J7: s.j7, J7Signing: s.j7Signing})
 	if err != nil || len(b) > stateBudget {
 		return false
 	}
-	if s.schema == j7Schema && s.messages == nil {
+	if j7StateSchema(s.schema) && s.messages == nil {
 		if len(b) > stateBudget/3 || s.dir == nil {
 			return false
 		}

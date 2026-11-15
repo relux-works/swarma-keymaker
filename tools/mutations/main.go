@@ -15,10 +15,11 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state or j7-continuity controls")
+	only := flag.String("only", "", "run one named plant within the selected group")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity or j7-signing controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -104,10 +105,24 @@ func main() {
 			{"j7-policy-rollback", "j7_policy_linux.go", `if table.Version < j.Version {`, `if false {`, "^TestJ7PolicyRollbackAfterRestart$", "--- FAIL: TestJ7PolicyRollbackAfterRestart", "policy verdict , want GRANT_NOT_FOR_RUN"},
 			{"j7-omit-denial", "j7_policy_linux.go", `next.Denials = reconcileJ7Denials(j.Policy, table, j.Denials)`, `next.Denials = []j7Denial{}`, "^TestJ7PolicyWithdrawalContinuity$", "--- FAIL: TestJ7PolicyWithdrawalContinuity", "withdrawal denial lost"},
 			{"j7-reuse-connection", "j7_run_linux.go", `ch.ever || ch.run != "" || l.run(id) != nil`, `l.run(id) != nil`, "^TestJ7RunChannelIsolation$", "--- FAIL: TestJ7RunChannelIsolation", "want run_identity_unavailable"},
-			{"j7-drop-snapshot-participant", "message_state.go", `J7: s.j7}`, `J7: nil}`, "^TestJ7RecoveryReaderAndExpectedHead$", "--- FAIL: TestJ7RecoveryReaderAndExpectedHead", "exact head positive"},
+			{"j7-drop-snapshot-participant", "message_state.go", `J7: s.j7, J7Signing: s.j7Signing}`, `J7: nil, J7Signing: s.j7Signing}`, "^TestJ7RecoveryReaderAndExpectedHead$", "--- FAIL: TestJ7RecoveryReaderAndExpectedHead", "exact head positive"},
 			{"j7-policy-acl", "j7_policy_linux.go", `if !j7NoACL(int(f.Fd()), false) {`, `if false {`, "^TestJ7PolicyProtection$", "--- FAIL: TestJ7PolicyProtection", "ACL accepted"},
 			{"j7-policy-ancestor", "j7_policy_linux.go", `st.Mode&022 != 0`, `false`, "^TestJ7PolicyProtection$", "--- FAIL: TestJ7PolicyProtection", "writable ancestry accepted"},
 			{"j7-policy-row-capacity", "j7_policy_linux.go", `len(p.Rows) > j7PolicyRows`, `false`, "^TestJ7PolicyCapacity$", "--- FAIL: TestJ7PolicyCapacity", "row overflow"},
+		}
+	}
+
+	if *group == "j7-signing" {
+		// Every plant must produce the forbidden successful socket result in
+		// its named endpoint test; setup errors or unrelated refusals do not kill it.
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-signing-owner-origin", "j7_sign.go", `row := j7PolicyRowFor(table, run.Origin.key())
+	if p.operation == "consent_v3" {`, `row := j7PolicyRowFor(table, j7OriginKey{Kind:"owner_command"})
+	if p.operation == "consent_v3" {`, "^TestJ7SigningGrantOrigin$", "--- FAIL: TestJ7SigningGrantOrigin", "result:map["},
+			{"j7-signing-final-withdrawal", "j7_release.go", `c = a.withRun(ctx, peer, r, p, func(run j7Run, table *j7PolicyTable, public string, _ func(*[32]byte) ([]byte, error)) Code {`, `c = a.withRun(ctx, peer, r, j7Plan{}, func(run j7Run, table *j7PolicyTable, public string, _ func(*[32]byte) ([]byte, error)) Code {`, "^TestJ7SigningWithdrawalAfterEvidence$", "--- FAIL: TestJ7SigningWithdrawalAfterEvidence", "result:map["},
+			{"j7-signing-durable-deny", "j7_policy_linux.go", `next.Denials = reconcileJ7Denials(j.Policy, table, j.Denials)`, `next.Denials = []j7Denial{}`, "^TestJ7SigningDurableDenyAndStandingConsent$", "--- FAIL: TestJ7SigningDurableDenyAndStandingConsent", "result:map["},
+			{"j7-signing-unreleased-enrollment", "j7_sign.go", `r.Release != "released" || r.Origin.key() != run.Origin.key()`, `false || r.Origin.key() != run.Origin.key()`, "^TestJ7EnrollmentRequiresReleasedConsent$", "--- FAIL: TestJ7EnrollmentRequiresReleasedConsent", "result:map["},
+			{"j7-signing-altered-retry", "request_ids.go", `prior.Method != r.Method || prior.Arguments != string(args)`, `prior.Method != r.Method || false && prior.Arguments != string(args)`, "^TestJ7SigningRetryInput$", "--- FAIL: TestJ7SigningRetryInput", "result:map["},
 		}
 	}
 
@@ -268,7 +283,12 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		}...)
 	}
 	good := true
+	selected := 0
 	for _, c := range controls {
+		if *only != "" && *only != c.name {
+			continue
+		}
+		selected++
 		source := filepath.Join(root, pkg, c.file)
 		if strings.HasPrefix(c.file, "@genjournal/") {
 			source = filepath.Join(dependencySource, strings.TrimPrefix(c.file, "@genjournal/"))
@@ -332,6 +352,10 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			fmt.Fprintln(os.Stderr, string(out))
 			good = false
 		}
+	}
+	if selected == 0 {
+		fmt.Fprintln(os.Stderr, "no matching plant")
+		os.Exit(2)
 	}
 	if !good {
 		os.Exit(1)

@@ -151,6 +151,11 @@ func (k *j7Key) withPath(path string, message *[32]byte) ([]byte, error) {
 	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	return k.withPathLocked(path, message)
+}
+
+// withPathLocked requires the custody gate; arithmetic and nonce profile are unchanged.
+func (k *j7Key) withPathLocked(path string, message *[32]byte) ([]byte, error) {
 	if k.closed || len(k.seed) != 32 {
 		return nil, errJ7Key
 	}

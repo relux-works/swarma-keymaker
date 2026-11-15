@@ -1,7 +1,8 @@
 # Request and child-delegation key custody
 
-Status: internal cryptographic custody and role configuration only. No new
-native/SSH method, service, run admission, signing profile or activation.
+Status: internal custody, protected lifecycle/policy and opt-in profile/1 typed
+request signing. Production role startup remains closed. No installation,
+external kind8185 interoperability, child service or enforcing activation.
 
 ## Purposes and selection
 
@@ -15,8 +16,8 @@ Request custody derives exactly `m/7'/product'/project'/agent'` from the exact
 current active identity binding's purpose-1 sibling. It reselects that entire
 binding under the Store lock and compares its epoch and registry revision with
 the immutable loaded pins. No arbitrary caller path or key selector is accepted.
-The internal capability is not caller/run authentication: future admission must
-hold its independently validated generation/run barrier through actual release.
+The internal capability is not caller/run authentication: the internal request adapter holds
+its generation/run and policy barriers through actual release.
 
 Delegation custody uses **a separate instance and independently generated root**
 at `m/8'/product'/project'/parent_slot'`. All four components are hardened;
@@ -50,7 +51,7 @@ The [BIP-340](https://bips.dev/340/) primitive accepts a **32-byte application
 digest**, emits x-only 32-byte public keys and strictly verifies 64-byte
 signatures, including r/s bounds and even-Y reconstruction. It does not define
 an application's digest/domain, signed object or wire encoding. Complete typed
-objects and locally recomputed domains remain mandatory for future signers;
+objects and locally recomputed domains are mandatory for the request adapter;
 there is no public raw-digest operation.
 
 Signing supplies fresh 32-byte auxiliary entropy using the library's CustomNonce
@@ -135,9 +136,9 @@ and platform qualification duties remain; none are performed by a unit fixture.
 There are no seed/private/chain-code accessors or agent import/export operations.
 Custody diagnostics are redacted and serialization refuses. Tests cover public
 crypto vectors, retries, entropy, exact binding/role selection and isolated
-filesystem failures. The fixture checker adds no production authority. Native
-run binding, typed profiles/consent, durable J7 state, child admission, packaging
-and real multi-user qualification remain separate work; unrelated witness,
+filesystem failures. The fixture checker adds no production authority. Production
+run ownership, custody/node integration, child admission, packaging and real
+multi-user qualification remain separate work; unrelated witness,
 persistent-revoke and purpose-6 gates are not reopened or prerequisites here.
 
 ## Protected lifecycle and operator policy
@@ -277,14 +278,14 @@ enrollment cannot. Absence from an otherwise unchanged explicit use list is
 not itself withdrawal of an enrolled grant. Consent removal stops future consent
 and does not remove existing enrolled grants. These retained denial transitions
 are implemented; PR2 creates no consent event, enrollment or fabricated grant.
-Exact signed consent/enrollment history requires a later versioned extension.
+The separate schema-5 extension below records exact signed consent/enrollment history.
 
 Lock order is authoritative generation evidence -> policy publication gate ->
-Store/J7 -> private custody (unused here) -> audit journal. There is no
-Store-to-generation acquisition or node RPC. A future typed signing/release path
-must derive origin from the connection capability and hold this same publication
-gate through its final recheck and actual socket-write callback. PR2 supplies
-no signature release and claims no such acceptance.
+Store/J7 -> private custody -> audit journal. There is no reverse
+Store-to-generation acquisition or node RPC under these final locks. The typed
+adapter below derives origin from the connection capability and holds this same
+publication gate through its final recheck and actual socket-write callback.
+The lifecycle-only adapter continues to expose no signing method.
 
 ### State participant and explicit migration
 
@@ -317,9 +318,8 @@ there is no automatic reset, downgrade, repair or replay of unknown effects.
 A matched rollback of all local files is detectable only relative to an
 independently retained later expectation. Joint loss/restore of that expectation
 is outside local detection. Lost consent/enrollment continuity cannot become an
-empty enrolled set with restored authority. The future consent participant and
-real broker/host exclusion remain separate duties, without waiting for an
-unrelated witness feature.
+empty enrolled set with restored authority. The schema-5 participant below retains consent continuity; real broker/host
+exclusion remains an independent duty.
 
 ### Verification boundaries
 
@@ -340,5 +340,181 @@ edge when its challenge hash is at least the curve order. No feasible natural
 reproduction is claimed, and this lifecycle slice changes no crypto. The fixed
 32-byte message profile, honest-holder/root boundary, optional locking and
 best-effort erasure limits above remain in force. Full integration review,
-launcher ownership/isolation, typed consent/signing, independent native custody
+launcher ownership/isolation, independent native custody
 qualification and deployment/enforcing acceptance remain outside these fixtures.
+
+## Profile/1 typed request adapter (internal, unactivated)
+
+Only the internal request-custody constructor opts into `j7_sign`, `j7_pubkey`
+and `j7_enroll`. It uses the actual isolated purpose-7 key, trusted clock,
+generation source, exact current binding and protected launcher connection.
+Legacy Native and the lifecycle-only adapter refuse these methods before effects.
+No caller run/origin/UID/key/purpose/path/kind/event-ID/hash/nonce selector exists.
+Purpose 8, child-grant signing, v4, transport signing, raw digests and batches
+remain unavailable. Both production role startups still refuse.
+
+The existing control protocol, hello, canonical wrapper, 65536-byte frame,
+request deadlines and slot budgets apply. Params are exact closed objects:
+
+| Method | Required params |
+| --- | --- |
+| `j7_pubkey` | `{}` |
+| `j7_sign` | `{operation,object_b64,evidence_b64}` |
+| `j7_enroll` | `{object_b64,evidence_b64}` |
+
+Encoded fields are canonical **unpadded base64url**, never paths or references
+to files. Objects are strict JSON with every named member present, no nulls,
+unknown members or duplicate names. `object_b64` decodes to at most 32768 bytes.
+The evidence bundle is exactly
+`{format:"keymaker-j7-evidence/1",issuance_txid}` (at most 1024 decoded bytes).
+Consent's issuance locator is the empty string; grant operations require a
+lowercase 32-byte transaction ID. This bundle supplies only an untrusted locator,
+never an asserted live verdict or trusted policy.
+
+### Complete objects and signing bytes
+
+`consent_v3` accepts exactly `{contract_b64}`. The complete contract is the
+fixed-order eleven-member `swarma-trust-contract/1` from LIP-0013 §§2.1–2.5,
+limited to 8192 bytes, printable ASCII, ordered unique actions/repos, explicit
+budget/window/note and the bound request public key. No hash-only consent or
+placeholder grant is accepted. Booking is SHA256(contract bytes || ASCII
+`booking`); privacy is SHA256(ASCII `swarma-trust-privacy-v1`). The exact triple
+must be listed in the immutable origin's consent entry. No separate booking or
+privacy document is invented. Consent can precede the grant and NotBefore.
+
+Keymaker builds kind8181, empty content and four ordered tags:
+`t=swarma-rental-consent-v1`, `contract`, `booking`, `privacy`.
+`envelope_v3` accepts exactly
+`{contract_b64,grant_b64,instruction_b64,transport,to,action,room,mxid,repo,amount}`.
+The instruction contains 1–8192 complete octets. Transport is `matrix`, `to` is
+the contract's executor name, room/mxid are bounded Matrix identifiers. The
+complete canonical signed v3 grant must bind the exact contract, grantee,
+counterparties, window, scope, budget and signed consent triple.
+
+| Action | Additional exact constraints and final ordered tag |
+| --- | --- |
+| `instruct`, `review` | `repo=""`, `amount=0`; no ninth tag |
+| `land` | repo in contract's allowed repos, `amount=0`; ninth tag `repo` |
+| `spend` | `repo=""`, positive amount <= contract budget; ninth tag `amount` as unsigned canonical decimal |
+
+The kind8185 draft has empty content and ordered tags
+`t=swarma-instruction-v1`, `to`, `grant`, `action`, `body`, `room`, `mxid`,
+`nonce`, followed only by the action's ninth tag. Body is SHA256(instruction
+octets). Keymaker draws the 32-byte nonce and trusted creation time itself.
+For both events the ID is standard NIP-01
+SHA256(JSON `[0,pubkey,created_at,kind,tags,content]`), with compact JSON and no
+HTML escaping. There is **no J7 prefix or tagged-author preimage**. BIP-340 signs
+that 32-byte ID; the signature is exactly 128 lowercase hex characters.
+
+Signed success is exactly
+`{profile,signed_object_b64,object_id,public_key}`. The complete event retains
+`id,pubkey,created_at,kind,tags,content,sig` order. Profiles are
+`swarma-rental-consent-v1` and `swarma-instruction-v1/draft`. Pubkey returns only
+`{profile:"j7-request-public/1",public_key}`. Enrollment returns `{grant_id}`.
+Refusals contain neither signed result nor permission/content from another
+origin. `delegation_evidence_unavailable` is a closed nonretryable refusal;
+existing run/state/consent/grant/conflict codes retain their spellings.
+
+### Validator and live-evidence authority
+
+The public import is
+`github.com/relux-works/swarma-chain-lab/experiments/rental`
+`v0.5.1-0.20261114210947-e70a35a41dec`, commit
+`e70a35a41dec5948d5452f1f898f4d26977372d7`. `ParseSignedGrant` checks canonical
+complete signed-grant bytes, the issuer signature and kind8181 consent.
+The concrete internal authority additionally runs **actual `rental.Check`**
+against its trusted Node and Policy pins: names, issuer, network/genesis,
+issuance commitment, W transaction graph/signatures, seal, closure and durable
+history. Caller-supplied liveness or policy is never sufficient. Missing,
+uncertain or non-LIVE evidence refuses before disclosure.
+
+Node work runs outside final locks, including a fresh repeated observation
+before release. The final barrier rechecks run/generation/binding, policy,
+durable denial and trusted time, with at most two seconds of local observation
+age. That bound does not independently qualify node/header freshness, host time
+or deployment. Chain observation is not atomic with a subsequent chain effect;
+receivers must independently admit the complete grant and message. No production
+node constructor is wired here.
+
+Contract/8185 codecs follow the supplied LIP and independently checked public
+`tools/trustcheck` source at link-spec commit
+`45054797ee9ad3e38213e067051dfbd3eb2a21a1`. That tool is package main, not an
+importable library. Own generic positive/negative
+[`signing vectors`](../vectors/j7/signing.json) carry complete consent/grant and
+all four draft envelope actions. Their synthetic grant has no issuance proof.
+They prove offline bytes/signatures, **not external kind8185 interoperability**.
+
+### Enrollment, retries and release continuity
+
+Enrollment accepts exactly `{contract_b64,grant_b64}` plus the evidence bundle.
+It never signs, edits policy or lifts a deny. The full validated grant must
+contain the **exact event actually released** under this origin, identity,
+consent entry/triple and `and_use`. Durable-but-unreleased consent does not count.
+A current matching and-use entry is required for new enrollment. Removing consent
+stops new consent and new enrollment, but does not revoke already enrolled use.
+Standing and-use can admit a genuinely new consent/grant after an old grant was
+withdrawn. Durable origin/grant denial wins until a newer explicit operator use.
+
+The new outer schema is **5**, with required separate
+`j7_signing:{format:"keymaker-j7-signing-state/1",records,enrollments}`.
+Schema4 and its closed `keymaker-j7-state/1` participant are unchanged; schema5
+preserves that participant and every prior binding, native result, message
+artifact and recovery commitment. Only an explicit stopped-operator **4->5**
+migration with an independently retained exact version/body digest is admitted.
+No startup/RPC migration or missing-means-empty history exists. Old readers
+refuse schema5 without authoritative writes. Schema3 remains separately reserved.
+
+Each signing/public-key/enrollment record binds kernel peer/requestID, exact
+protected run/binding/origin, canonical params/evidence and exact result digest.
+Consent adds its complete event and entry/triple/and-use association. Enrollment
+links exact released consent event/result hashes. Records, associations, results
+and release states participate in the committed body and capacity accounting.
+Changed input or run conflicts; exact retries recheck current authority and then
+reuse original time/nonce/signature bytes. A prior signature never authorizes
+retained-result disclosure after withdrawal.
+
+Release states are `prepared` -> `handoff_unknown` -> `released`. The first
+commit retains the exact signature. Unknown is durable **before** the actual
+socket callback, including retries. Current generation/policy/Store/custody
+barriers remain held through that callback. Released becomes durable only after
+its success and a following commit. Enrollment is installed on that same gate;
+withdrawal ordered first suppresses its effect and disclosure. Zero/partial
+writes, a full write followed by failed final commit and process interruption
+leave unknown/fenced continuity. They never become enrollment evidence or an
+automatic retry. This deliberately trades availability for conservative safety.
+
+Restart needs the independently reconciled exact current head and refuses
+unknown handoff, lost/corrupt histories or an unmatched journal/snapshot. There
+is no implemented unknown-handoff reconciliation endpoint: preserve all exact
+records, socket-handoff evidence, policy versions and independent head for a
+separately authorized stopped-operator decision. Never delete/reset unknown or
+reinitialize to recover availability. Full-suite independent review, P17 concrete
+Curator launcher/a2a Source hooks, distinct-UID/ambient-credential isolation,
+real node/time/custody, crash/restore/exclusion and enforcing deployment remain
+PENDING. Unit graph/Unix fixtures and compile-only evidence close none of them.
+
+The plan's S7 rows retain the following precise limits; none is a production
+qualification passed by these fixtures:
+
+| Row | Source evidence and remaining boundary |
+| --- | --- |
+| S7-1 | Same-key cross-origin endpoint denial and valid owner/origin controls; real separate-run custody remains PENDING. |
+| S7-2 | Profile/2, delegation and interior delegation-proof paths are out of this slice and explicitly closed. |
+| S7-3 | Caller selectors and borrowed channel/run IDs refuse in real Unix fixtures; stolen/inherited descriptor and actual broker isolation qualification is PENDING. |
+| S7-4 | True first consent, full externally signed fixture grant, exact released-consent enrollment and envelope pass the actual adopted verifier; production issuer/node qualification is PENDING. |
+| S7-5 | Retained full origin is immutable across spawn/rebind in lifecycle tests; concrete admission-source integration is PENDING. |
+| S7-6 | EOF/rebind and connection/run checks are exercised with real launcher sockets and fixture generations; isolated launcher-created per-run channels are PENDING. |
+| S7-7 | Exact-head restart, retained denial and required trusted rebind have source tests; independent restore/exclusion and deployed restart qualification are PENDING. |
+| S7-8 | Independent offline byte/receiver checks do not prove ambient Git-token or wallet-RPC exclusion; actual ambient-credential and receiver deployment qualification is PENDING. |
+| S7-9 | Policy publication serializes with first/retry/enrollment and actual response-write state; real distinct-UID withdrawal and crash/power-loss qualification are PENDING. |
+
+### Explicit profile/2 gap
+
+`delegation_request_v3`, `swarma-trust-contract/2` and kind8186 are explicitly
+`operation_unsupported` by name, with adjacent profile/1 positive controls. There
+is no profile/2 parser/builder, alias, permissive fallback or child signing route.
+LIP-0014 uses the **same profile/2 string** for its base §2/§3 seven-member
+delegate set and the J1/J3 §§7.1/9.1 slots/notary/checkpoint replacements. A single
+frozen target is absent. Byte selection and a separately authorized reviewed
+delegation change belong to their specification owners; this candidate neither
+chooses an encoding nor begins that future implementation.

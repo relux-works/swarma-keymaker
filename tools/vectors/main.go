@@ -282,13 +282,20 @@ func checkPairs() {
 	fmt.Printf("fixture structure: %d negative/control pairs; no service policy exercised\n", len(r.Negative))
 }
 func main() {
+	signing := flag.Bool("write-j7-signing", false, "regenerate only synthetic J7 draft signing fixture")
 	check := flag.Bool("check", false, "verify fixtures without writes")
 	write := flag.Bool("write", false, "regenerate path expectations only")
 	flag.Parse()
+	if *signing {
+		require(!*check && !*write && flag.NArg() == 0, "exclusive signing writer flag")
+		fail(os.WriteFile("vectors/j7/signing.json", signingVectorBytes(), 0644))
+		return
+	}
 	require(*check != *write && flag.NArg() == 0, "use exactly one of -check or -write from repository root")
 	checkPublished()
 	checkPairs()
 	checkJ7Vectors()
+	checkJ7SigningVectors()
 	checkAuthorityVectors()
 	var p Paths
 	original := read("vectors/keymaker-paths.json", &p)

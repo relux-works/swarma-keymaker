@@ -606,9 +606,16 @@ func TestJ7NoSecretExport(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, method := range []string{`"j7_sign"`, `"sign_child_grant"`} {
+		// PR3's opt-in control dispatch is authorized. Legacy Native still
+		// exposes neither typed signing nor child signing; all control handlers
+		// keep child signing closed. Executable adapter tests cover the marker.
+		methods := []string{`"sign_child_grant"`}
+		if name == "native.go" {
+			methods = append(methods, `"j7_sign"`)
+		}
+		for _, method := range methods {
 			if bytes.Contains(b, []byte(method)) {
-				t.Fatal("new transport route registered")
+				t.Fatal("forbidden transport route registered")
 			}
 		}
 	}

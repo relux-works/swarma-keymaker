@@ -2,17 +2,21 @@
 
 Role: per-station key custody. Lore name: Keymaker.
 
-The [request/child-delegation custody contract](spec/keymaker-j7.md) adds isolated
-internal BIP-340 primitives, hardened secp256k1 derivation, explicit fresh-root
-initialization and closed service-role configuration for purposes 7/8. Existing
-Ed25519 APIs and vectors remain unchanged. The new profiles have no native/SSH
-sign route and explicitly refuse startup pending their separate integration;
-this is no usable signer or deployment/activation claim. A separate
-lifecycle-only adapter now supplies protected run bind/end/rebind, a shared
-operator-policy publication fence and an explicitly migrated schema-4 state
-participant. It needs no signing key and remains disconnected from production
-role startup; real broker/input isolation and distinct-UID qualification remain
-pending.
+The [request/child-delegation custody contract](spec/keymaker-j7.md) supplies
+isolated internal BIP-340 custody for purposes 7/8 and protected run/policy
+lifecycle. Its opt-in internal request adapter now implements profile/1
+`consent_v3`, `envelope_v3`, bound `j7_pubkey` and `j7_enroll`, with an explicitly
+migrated schema-5 signing history and fences through the actual response write.
+Existing Ed25519 APIs and historical vectors remain unchanged. Both production
+role startups remain closed; launcher isolation, node/custody deployment and
+native qualification are pending. Draft kind8185 vectors establish offline
+bytes, not external network interoperability.
+
+`delegation_request_v3`, `swarma-trust-contract/2` and kind8186 remain explicitly
+`operation_unsupported`. Profile/2 currently names both the base seven-member
+delegate set and the J1/J3 slots/notary/checkpoint replacements in LIP-0014;
+there is no single frozen target. Selecting bytes and authorizing delegation is
+separate work. This candidate enables no production or enforcing mode.
 
 Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
@@ -232,6 +236,9 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go | Refusal audit deadline regressions: `GOMAXPROCS=2 go test -race ./internal/keymaker -run '^Test(ReviewAdmissionQueuedAuditDeadline\|NativeAdmissionStartedAuditDeadline\|NativeOrdinaryRefusalAuditDeadline\|JournalCancelledBeforeAppend\|JournalDeadlineDuringPreparation)$' -count=1 -p=1` | Journal contention abandons only unstarted appends, releases slots and closes without late audit; started sync completes exactly once; healthy same-daemon controls |
 | Go | Static checks: `go vet ./internal/keymaker ./cmd/keymaker ./internal/testwindow ./cmd/keymaker-window ./tools/mutations` | Diagnostics |
 | gofmt | Format check: `gofmt -l cmd internal tools/mutations` | Unformatted paths, if any |
+| Go 1.26.10 | J7 typed request controls: `GOTOOLCHAIN=local GOMAXPROCS=2 go test -p=1 ./internal/keymaker -run '^TestJ7(Signing\|Enrollment\|FirstConsent\|Objects)' -count=1`; use `-race` for the same narrow scope | Private protected TMPDIR required; source/Unix fixture tests, no tagged native body or full suite |
+| Go 1.26.10 | `go run ./tools/vectors -check`; `go run ./tools/vectors -write-j7-signing` explicitly regenerates only the synthetic draft signing corpus | `vectors/j7/signing.json`; original signed domains, seeds and historical vectors are preserved |
+| Go 1.26.10 | `go run ./tools/mutations -group j7-signing -scratch "$SCRATCH"`; `-only NAME` selects one plant | Private overlays and exact test exit codes in the supplied scratch directory; kills require the named forbidden successful endpoint result |
 | Go | Custody response/audit regressions: `go test -race ./internal/keymaker -run '^Test(CustodyAudit|CustodySign|CustodyUnavailable|MasterUnavailable)' -count=1 -p=1`; `go run ./tools/mutations/main.go -group core -scratch "$SCRATCH"` | Real-socket byte-equal refusals, local cause enumeration, open signing controls; logs/overlays under private scratch |
 | Go | Build daemon: `go build -o "$SCRATCH/keymaker" ./cmd/keymaker`; run `"$SCRATCH/keymaker" version` or `"$SCRATCH/keymaker" serve --config "$CONFIG"` | Binary; version or readiness refusal on stderr |
 | Go | Build canonical window runner: `go build -o "$SCRATCH/keymaker-window" ./cmd/keymaker-window` | Runner binary in scratch |

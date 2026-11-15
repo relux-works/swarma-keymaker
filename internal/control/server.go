@@ -38,6 +38,9 @@ type Handler interface {
 // never changes legacy ID admission or dispatch behavior.
 type RunLifecycleHandler interface{ RunLifecycleOnly() }
 
+// RunRequestHandler opts only the separate internal purpose-7 adapter into typed operations.
+type RunRequestHandler interface{ RunRequestSigning() }
+
 // ConnectionScope is an optional internal connection capability hook. The server
 // calls it exactly once with the actual accepted object, before request dispatch.
 // Its cleanup invalidates volatile state at EOF/cancellation; no wire field can
@@ -309,6 +312,10 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 		if code == "" {
 			switch req.Method {
 			case "hello", "pubkey", "register", "revoke", "sign_registration":
+			case "j7_sign", "j7_pubkey", "j7_enroll":
+				if _, ok := s.handler.(RunRequestHandler); !ok {
+					code = OperationUnsupported
+				}
 			case "j7_run_bind", "j7_run_end", "j7_run_rebind":
 				if _, ok := s.handler.(RunLifecycleHandler); !ok {
 					code = OperationUnsupported

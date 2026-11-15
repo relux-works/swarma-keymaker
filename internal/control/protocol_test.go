@@ -142,3 +142,14 @@ func TestFrameWriter(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Grant-evidence uncertainty has one closed terminal code. An invented alias
+// remains invalid; this does not grant a handler or a retry fallback.
+func TestJ7EvidenceRefusalCode(t *testing.T) {
+	if !validCode("delegation_evidence_unavailable") || retryable("delegation_evidence_unavailable") {
+		t.Fatal("grant evidence refusal lost terminal spelling")
+	}
+	if validCode("delegation_live") || validCode("delegation_evidence_pending") {
+		t.Fatal("unpublished evidence verdict admitted")
+	}
+}

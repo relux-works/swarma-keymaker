@@ -82,7 +82,7 @@ func cloneJ7(j *j7Inventory) *j7Inventory {
 }
 func (s *Store) validateJ7() error {
 	j := s.j7
-	if s.schema != j7Schema || j == nil || j.Format != "keymaker-j7-state/1" || (j.BaseSchema != 0 && j.BaseSchema != 2) || !validJ7Instance(j.Instance) || j.Identity == 0 || j.Version > j7SafeInteger || j.Pending || len(j.Runs) > j7HistoryLimit || len(j.Denials) > j7HistoryLimit {
+	if !j7StateSchema(s.schema) || j == nil || j.Format != "keymaker-j7-state/1" || (j.BaseSchema != 0 && j.BaseSchema != 2) || !validJ7Instance(j.Instance) || j.Identity == 0 || j.Version > j7SafeInteger || j.Pending || len(j.Runs) > j7HistoryLimit || len(j.Denials) > j7HistoryLimit {
 		return failure("invalid J7 state")
 	}
 	if (j.BaseSchema == 2) != (s.messages != nil) {
@@ -148,6 +148,12 @@ func (s *Store) validateJ7() error {
 		}
 		denials[key] = true
 	}
+	if err := s.validateJ7Signing(); err != nil {
+		return err
+	}
+	if s.j7UnknownHandoff() {
+		return failure("unknown signing handoff")
+	}
 	return nil
 }
 
@@ -209,7 +215,7 @@ func (s *Store) j7Point(point string) Code {
 	return ""
 }
 func (s *Store) commitJ7(ctx context.Context) Code {
-	if s.failed || s.schema != j7Schema || s.j7 == nil {
+	if s.failed || !j7StateSchema(s.schema) || s.j7 == nil {
 		return "j7_state_fenced"
 	}
 	code := s.persistContext(ctx)
@@ -251,7 +257,7 @@ func (s *Store) persistJ7ParticipantContext(ctx context.Context) Code {
 	return s.persistJ7Context(ctx)
 }
 func (s *Store) j7SnapshotFailure(code Code) Code {
-	if s.schema == j7Schema && code == "audit_unavailable" {
+	if j7StateSchema(s.schema) && code == "audit_unavailable" {
 		return "j7_state_fenced"
 	}
 	return code

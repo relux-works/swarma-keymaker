@@ -472,6 +472,13 @@ migration and exact independently retained startup expectations. Production role
 startup, actual broker ownership/isolation and the tagged distinct-UID/protected
 path gate remain closed. A legitimate newer state head requires explicit
 operator reconciliation before restart; no service-owned pin resets that duty.
-Signed consent/enrollment continuity needs a later participant extension. The
+The opt-in internal profile/1 adapter now supplies consent/envelope, bound
+public-key/enrollment and explicit schema-5 consent/result/handoff history.
+Conservative unknown-handoff restart refusal has no automatic reconciliation
+endpoint. Full independent review and actual node/time/custody/broker/native
+qualification remain pending. `delegation_request_v3`, profile/2 and kind8186
+remain explicitly unsupported: the same profile/2 string names the base
+seven-member delegate set and J1/J3 slots/notary/checkpoint replacements, with
+no single frozen target. No dual parser or fallback is selected. The
 BIP-340 dependency's rare challenge-at-least-order fail-closed availability edge
 remains a signing limit, without a feasible natural reproduction here.

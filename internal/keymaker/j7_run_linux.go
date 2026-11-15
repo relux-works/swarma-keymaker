@@ -97,7 +97,7 @@ type j7Lifecycle struct {
 func (*j7Lifecycle) RunLifecycleOnly() {}
 
 func newJ7Lifecycle(s *Store, p *j7Policy, g GenerationSource, launcher Principal) (*j7Lifecycle, error) {
-	if s == nil || s.journal == nil || s.dir == nil || s.schema != j7Schema || s.validateJ7() != nil || p == nil || p.store != s || g == nil || !validGeneration(launcher.Generation) {
+	if s == nil || s.journal == nil || s.dir == nil || !j7StateSchema(s.schema) || s.validateJ7() != nil || p == nil || p.store != s || g == nil || !validGeneration(launcher.Generation) {
 		return nil, failure("J7 lifecycle unavailable")
 	}
 	return &j7Lifecycle{store: s, policy: p, generations: g, launcher: launcher, channels: map[string]*j7Channel{}, slots: make(chan struct{}, 8), entropy: rand.Reader}, nil
@@ -143,10 +143,13 @@ func (l *j7Lifecycle) Enter(ctx context.Context, conn net.Conn) (func(), control
 	}
 }
 func (l *j7Lifecycle) Refuse(ctx context.Context, conn net.Conn, peer *control.Peer, r control.Request, body []byte, refusal control.Code) control.Code {
+	return l.refuseWithCustodyCause(ctx, conn, peer, r, body, refusal, "")
+}
+func (l *j7Lifecycle) refuseWithCustodyCause(ctx context.Context, conn net.Conn, peer *control.Peer, r control.Request, body []byte, refusal control.Code, custody custodyCause) control.Code {
 	cause := Code(refusal)
 	domain := "control"
 	digest := messageHash(body)
-	record := AuditRecord{Surface: "control", Operation: "j7_lifecycle", Domain: &domain, PayloadDigest: &digest, Result: "refused", RefusalCode: &cause}
+	record := AuditRecord{Surface: "control", Operation: "j7_lifecycle", Domain: &domain, PayloadDigest: &digest, Result: "refused", RefusalCode: &cause, CustodyCause: auditCustodyCause(cause, custody)}
 	if r.ID != "" {
 		record.RequestID = &r.ID
 	}

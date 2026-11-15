@@ -43,6 +43,11 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 // that load separate permits unprivileged tests of the readiness gate without
 // an alternate configuration owner policy or a production fixture switch.
 func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.Writer, generation GenerationSource) error {
+	if cfg.ServiceRole != "" && cfg.ServiceRole != "legacy" {
+		// Role configuration is frozen, but new profile serving is not wired.
+		// Refuse before legacy custody/state, time, generation or socket access.
+		return Code("operation_unsupported")
+	}
 	if generation == nil && cfg.GenerationJournal == nil {
 		return Code("generation_source_unavailable")
 	}
@@ -59,6 +64,9 @@ func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.W
 
 // The injected provider seam exercises startup without a production fixture flag.
 func serveWithClock(ctx context.Context, cfg productionConfig, status io.Writer, generation GenerationSource, clock *timeconf.Provider) error {
+	if cfg.ServiceRole != "" && cfg.ServiceRole != "legacy" {
+		return Code("operation_unsupported")
+	}
 	uid := uint32(os.Getuid())
 	if timeconfidence.Start(ctx, clock) != nil {
 		return Code("clock_untrusted")

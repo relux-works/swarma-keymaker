@@ -4,6 +4,7 @@ package keymaker
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"path/filepath"
 	"time"
@@ -21,6 +22,9 @@ type generationJournalConfig struct {
 }
 
 type Config struct {
+	ServiceRole       string                   `json:"service_role,omitempty"`
+	J7KeyFile         string                   `json:"j7_key_file,omitempty"`
+	InstanceID        string                   `json:"instance_id,omitempty"`
 	TimePolicy        *timeconf.Policy         `json:"time_policy,omitempty"`
 	GenerationJournal *generationJournalConfig `json:"generation_journal,omitempty"`
 	Registration      *registrationConfig      `json:"registration_helper,omitempty"`
@@ -37,7 +41,37 @@ type Config struct {
 }
 
 func (cfg *Config) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper", "generation_journal", "time_policy")
+	// Closed role variants prevent a new profile from carrying legacy master,
+	// helper or socket settings. Omission remains the unchanged legacy schema.
+	var role struct {
+		ServiceRole string `json:"service_role"`
+	}
+	if json.Unmarshal(raw, &role) != nil {
+		return failure("invalid service role")
+	}
+	var rawFields map[string]json.RawMessage
+	if json.Unmarshal(raw, &rawFields) != nil {
+		return failure("invalid service role")
+	}
+	if _, exists := rawFields["service_role"]; exists && role.ServiceRole == "" {
+		return failure("invalid service role")
+	}
+	if role.ServiceRole != "" && role.ServiceRole != "legacy" {
+		if !validJ7Role(role.ServiceRole) {
+			return failure("unknown service role")
+		}
+		if _, err := objectMembers(raw, []string{"service_role", "j7_key_file", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision"}); err != nil {
+			return err
+		}
+		type plain Config
+		var parsed plain
+		if StrictJSON(bytes.NewReader(raw), &parsed) != nil || !validJ7Instance(parsed.InstanceID) || parsed.Epoch == "" || parsed.RegistryRevision == "" || !filepath.IsAbs(parsed.J7KeyFile) || filepath.Clean(parsed.J7KeyFile) != parsed.J7KeyFile {
+			return failure("invalid key role configuration")
+		}
+		*cfg = Config(parsed)
+		return nil
+	}
+	fields, err := objectMembers(raw, []string{"socket_dir", "state_dir", "master_file", "registry_file", "service_uid", "service_gid", "control_gid", "operator_principal", "master_epoch", "registry_revision"}, "registration_helper", "generation_journal", "time_policy", "service_role")
 	if err != nil {
 		return failure("invalid service configuration members")
 	}

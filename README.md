@@ -2,6 +2,13 @@
 
 Role: per-station key custody. Lore name: Keymaker.
 
+The [request/child-delegation custody contract](spec/keymaker-j7.md) adds isolated
+internal BIP-340 primitives, hardened secp256k1 derivation, explicit fresh-root
+initialization and closed service-role configuration for purposes 7/8. Existing
+Ed25519 APIs and vectors remain unchanged. The new profiles have no native/SSH
+sign route and explicitly refuse startup pending their separate integration;
+this is no usable signer or deployment/activation claim.
+
 Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
 generation. Private identity keys never enter station processes.
@@ -141,7 +148,8 @@ prove whole-program purity or establish runtime authority.
 ## Tools
 
 Linux and Go 1.26.10 are required. Enrollment validation uses the pinned registrar
-packages below; the core, wire layer and offline tools use the Go standard library.
+packages below; the isolated BIP-340 primitives additionally use the pinned
+`btcec/v2` library. The wire layer uses the Go standard library.
 The single-UID integration needs Git and OpenSSH (`ssh-keygen`). The runbook
 checker needs Bash and uses `/usr/sbin/visudo` when installed. Multi-UID
 qualification additionally requires the owner's
@@ -155,6 +163,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Isolated request/delegation custody: `go test ./internal/keymaker -run 'TestJ7Key\|TestJ7Purpose\|TestJ7NoSecretExport' -count=1`; fixture checker control: `go test ./tools/vectors -run '^TestJ7VectorCheckerControl$' -count=1` | Private filesystem/entropy fixtures and checker positive/negative controls; no service, durable parent allocation or runtime qualification |
 | Release recipe | [v0.1.0 linux/amd64 build and verification](packaging/RELEASE.md): `go build -trimpath -buildvcs=false -mod=readonly -ldflags=-buildid= -o keymaker ./cmd/keymaker` with the documented Go 1.26.10 environment | `keymaker` and its SHA-256; no installation or activation |
 | Go | Pure station-caller wire codecs: `go test ./stationcaller -count=1`; `go build ./stationcaller` | Inert byte fixtures and build cache; no socket, signer or native activation |
 | GitHub Actions | Linux CI on pull requests and pushes to main: `.github/workflows/linux-ci.yml`, Ubuntu 26.04, Go 1.26.10; `go mod verify`, `go mod tidy -diff`, `go mod download`, `go build ./...`, `go vet ./...`, `bash -eo pipefail .github/scripts/check-format.sh`, `python3 .github/scripts/check-hygiene.py`, `bash -eo pipefail .github/scripts/check-controls.sh`, `bash -eo pipefail .github/scripts/check-pending-controls.sh`, `go test ./... -count=1 -timeout=25m -v` | Actions logs and private temporary fixtures; controls require stale-checksum, vet and format refusals (including broken Windows-only syntax), and four generic attribution refusals. Full checkout history preserves parent-tree provenance tests. `go vet -tags multiuid ./internal/keymaker`, `go vet -tags qualifiedtime ./internal/enrollment ./internal/registration ./internal/keymaker` and `bash -eo pipefail .github/scripts/report-pending.sh` compile and dynamically list both configured tag/pattern inventories as PENDING without executing their bodies. `pending-inventories.txt` supplies tag/pattern/package sets; `pending-rows.txt` is a required lower bound, never the report source: new matching rows appear automatically, and removing an expected gate requires reviewing that baseline. Real-Go controls reject missing rows, empty inventories, removed tags and compile failures; command-boundary controls preserve exact failure statuses. The provisioned window and qualified-time external inputs remain separate qualification gates; no runtime test gate or name-based skip |

@@ -1,0 +1,64 @@
+{
+  "bip340_32byte_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14
+  ],
+  "bip340_sha256": "34c9d1d9c3a88d524bc80778540dc43f8306ec249a7485293063c376db851c2d",
+  "bip340_source": "https://github.com/bitcoin/bips/blob/200f9b26fe0a2f235a2af8b30c4be9f12f6bc9cb/bip-0340/test-vectors.csv",
+  "bip340_variable_message_indices": [
+    15,
+    16,
+    17,
+    18
+  ],
+  "cases": [
+    {
+      "path": "m/7'/1'/2'/3'",
+      "public_x_hex": "d342634466f9a3a84b9ab60e89b80e49b355e554ed34f6fe1762026b32a6ee6a",
+      "role": "j7-request"
+    },
+    {
+      "path": "m/8'/1'/2'/1'",
+      "public_x_hex": "feba908fa9ffc728c7589c092002ee76251e83fe05a56243ef4c505b4b4ed624",
+      "role": "delegation"
+    },
+    {
+      "path": "m/8'/1'/2'/2'",
+      "public_x_hex": "312fe5b8b926aef74d3671fcd25aa08e5f4fddd3ed1be0471be3823549cb9281",
+      "role": "delegation"
+    }
+  ],
+  "format": "keymaker-j7-keys/1",
+  "note": "Synthetic/public fixture material only. Never provision these roots. No deployed custody or lifecycle qualification.",
+  "slip_nodes": [
+    {
+      "chain_code_hex": "873dff81c02f525623fd1fe5167eac3a55a049de3d314bb42ee227ffed37d508",
+      "path": "m",
+      "private_hex": "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35",
+      "public_compressed_hex": "0339a36013301597daef41fbe593a02cc513d0b55527ec2df1050e2e8ff49c85c2"
+    },
+    {
+      "chain_code_hex": "47fdacbd0f1097043b78c63c20c34ef4ed9a111d980047ad16282c7ae6236141",
+      "path": "m/0'",
+      "private_hex": "edb2e14f9ee77d26dd93b4ecede8d16ed408ce149b6cd80b0715a2d911a0afea",
+      "public_compressed_hex": "035a784662a4a20a65bf6aab9ae98a6c068a81c52e4b032c0fb5400c706cfccc56"
+    }
+  ],
+  "slip_seed_hex": "000102030405060708090a0b0c0d0e0f",
+  "slip_source": "https://github.com/satoshilabs/slips/blob/a00312491693714d9bc1b6e4cb5b2e356e6c511e/slip-0010.md",
+  "synthetic_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "test_only": true
+}

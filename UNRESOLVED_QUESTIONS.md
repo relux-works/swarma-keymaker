@@ -454,3 +454,15 @@ propose **owner budget decisions**, not qualified or active endpoints:
 | E-I whole command | Decide <=60 seconds from original command entry before configuration, locking, inspection, human confirmation or output, through complete durable approval/ledger/bootstrap publication, fence cleanup with parent sync and committed issue-use outcome. Both existing 10-second inspections consume the same allowance; ten-minute approval TTL is independent. Implement/qualify the deadline-enforced endpoint, conservative L_issue encoding and durable original occurrence/use state. Current code has neither the command deadline nor that transaction. |
 | E-C reload through swap | Decide <=10 seconds from original Reload entry before reloadMu/pause, or initial authority-open entry before load, through validation, consumed-ID/high-water/use durability, final gated candidate swap and admission opening. The existing 10-second load subdeadline and shorter caller deadline only shorten it. Review the exact prepare-to-Store/barrier handover and owning use/epoch transaction; today load and later swap have no common enforced endpoint. |
 | Once-only recovery and qualification | Review formats/migration, capacity, exact issuer/consumer visibility, original/witness custody and independent old/restored-instance exclusion. Preserve durable invalidation on every refusal; unknown issue/consumption/use/swap outcomes remain held, never re-issue or re-open from a new Run/H/Epoch. The profiles list paired timely/late, post-read pause, second-read, unknown-retry and handover controls as PENDING / NOT RUN. No code or wire member is added; native Linux/macOS activation and custody/time qualification stay closed. |
+
+## Request and child-delegation integration
+
+The [custody contract](spec/keymaker-j7.md) fixes purposes 7/8, independent roots,
+the cryptographic dependency/profile and closed role configuration. Runtime
+request/delegation profiles remain unavailable pending protected run/channel
+binding, durable consent/denial/policy state, complete typed signing domains,
+retained never-reused parent-slot allocation, own-node child admission and actual
+multi-user custody/recovery qualification. No generic digest route, fake
+delegation service, independent-custodian proof or enforcing-mode acceptance is
+supplied by isolated primitives or public vectors. Other open feature gates
+remain independent and are not prerequisites for this custody unit.

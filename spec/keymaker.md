@@ -242,6 +242,13 @@ purpose `station-caller = 6`, following reservations 3–5, with typed caller
 signing and a default-closed qualification gate. It allocates no index or method
 and does not change this section's current purpose allowlist.
 
+The separate [request and child-delegation custody contract](keymaker-j7.md)
+allocates secp256k1 purposes `j7-request = 7` and `child-delegation = 8` with
+independent per-instance roots. Legacy Ed25519 Master/registry/registration
+allowlists remain unchanged. Closed role configuration is not a native signer:
+both new runtime profiles refuse before legacy custody or socket startup until
+their own serving integration is implemented and qualified.
+
 ### 4.2 Exact name-to-index mapping
 
 Unbounded names cannot be injected into 31 bits by truncating a hash without

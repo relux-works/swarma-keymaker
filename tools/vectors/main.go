@@ -21,6 +21,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
 type Agent struct {
@@ -285,6 +288,7 @@ func main() {
 	require(*check != *write && flag.NArg() == 0, "use exactly one of -check or -write from repository root")
 	checkPublished()
 	checkPairs()
+	checkJ7Vectors()
 	checkAuthorityVectors()
 	var p Paths
 	original := read("vectors/keymaker-paths.json", &p)
@@ -324,6 +328,96 @@ func main() {
 		require(bytes.Equal(original, b), "Keymaker path fixtures differ; inspect before -write")
 		fmt.Printf("Keymaker path controls: %d exact matches\n", len(p.Vectors))
 	}
+}
+
+// These are public fixture bytes only. Production custody/signing is not called.
+// Published SLIP nodes anchor the fixture derivation; role siblings are local
+// reproducible controls, not an independent deployment or key-isolation proof.
+func checkJ7Vectors() {
+	var f struct {
+		Format     string `json:"format"`
+		TestOnly   bool   `json:"test_only"`
+		Note       string `json:"note"`
+		BIPSource  string `json:"bip340_source"`
+		BIPSHA     string `json:"bip340_sha256"`
+		BIPIndices []int  `json:"bip340_32byte_indices"`
+		Outside    []int  `json:"bip340_variable_message_indices"`
+		SLIPSource string `json:"slip_source"`
+		Seed       string `json:"slip_seed_hex"`
+		Nodes      []struct {
+			Path    string `json:"path"`
+			Chain   string `json:"chain_code_hex"`
+			Private string `json:"private_hex"`
+			Public  string `json:"public_compressed_hex"`
+		} `json:"slip_nodes"`
+		Synthetic string `json:"synthetic_seed_hex"`
+		Cases     []struct {
+			Role   string `json:"role"`
+			Path   string `json:"path"`
+			Public string `json:"public_x_hex"`
+		} `json:"cases"`
+	}
+	read("vectors/j7/keys.json", &f)
+	require(f.Format == "keymaker-j7-keys/1" && f.TestOnly && f.Note != "" && len(f.Nodes) == 2 && len(f.Cases) == 3, "public secp fixture contract")
+	bip, err := os.ReadFile("vectors/j7/bip340.csv")
+	fail(err)
+	require(f.BIPSHA == "34c9d1d9c3a88d524bc80778540dc43f8306ec249a7485293063c376db851c2d" && authorityHash(bip) == f.BIPSHA, "official BIP-340 fixture identity")
+	require(len(f.BIPIndices) == 15 && len(f.Outside) == 4 && strings.HasPrefix(f.BIPSource, "https://github.com/bitcoin/bips/blob/") && strings.HasPrefix(f.SLIPSource, "https://github.com/satoshilabs/slips/blob/"), "secp fixture source/scope")
+	for i, n := range f.BIPIndices {
+		require(i == n, "BIP-340 profile index")
+	}
+	for i, n := range f.Outside {
+		require(i+15 == n, "BIP-340 excluded profile index")
+	}
+	for _, v := range f.Nodes {
+		node := j7FixtureNode(decodeHex(f.Seed), v.Path)
+		key, _ := btcec.PrivKeyFromBytes(node[:32])
+		require(hex.EncodeToString(node[:32]) == v.Private && hex.EncodeToString(node[32:]) == v.Chain && hex.EncodeToString(key.PubKey().SerializeCompressed()) == v.Public, "published secp node: "+v.Path)
+		key.Zero()
+		clear(node)
+	}
+	seen := map[string]bool{}
+	for _, v := range f.Cases {
+		purpose := map[string]string{"j7-request": "m/7'", "delegation": "m/8'"}[v.Role]
+		require(purpose != "" && strings.HasPrefix(v.Path, purpose+"/") && len(strings.Split(v.Path, "/")) == 5, "secp role/path")
+		node := j7FixtureNode(decodeHex(f.Synthetic), v.Path)
+		key, _ := btcec.PrivKeyFromBytes(node[:32])
+		public := hex.EncodeToString(schnorr.SerializePubKey(key.PubKey()))
+		require(public == v.Public && !seen[public], "secp sibling public: "+v.Path)
+		seen[public] = true
+		key.Zero()
+		clear(node)
+	}
+	fmt.Println("secp fixture integrity: 2 published hardened SLIP nodes, 3 role siblings, official BIP-340 corpus identity; custody/runtime NOT qualified")
+}
+
+func j7FixtureNode(seed []byte, path string) []byte {
+	parts := strings.Split(path, "/")
+	require(parts[0] == "m", "secp fixture root")
+	node := mac([]byte("Bitcoin seed"), seed)
+	var parent btcec.ModNScalar
+	require(!parent.SetByteSlice(node[:32]) && !parent.IsZero(), "invalid secp fixture master")
+	defer parent.Zero()
+	for _, part := range parts[1:] {
+		require(strings.HasSuffix(part, "'"), "nonhardened secp fixture")
+		n, err := strconv.ParseUint(strings.TrimSuffix(part, "'"), 10, 31)
+		fail(err)
+		data := make([]byte, 37)
+		copy(data[1:33], node[:32])
+		binary.BigEndian.PutUint32(data[33:], uint32(n)|0x80000000)
+		child := mac(node[32:], data)
+		var tweak btcec.ModNScalar
+		require(!tweak.SetByteSlice(child[:32]), "invalid secp fixture child")
+		tweak.Add(&parent)
+		require(!tweak.IsZero(), "zero secp fixture sum")
+		parent.Set(&tweak)
+		tweak.Zero()
+		parent.PutBytesUnchecked(child[:32])
+		clear(node)
+		clear(data)
+		node = child
+	}
+	return node
 }
 
 // These fixture checks prove byte/hash/domain and mutation-pair integrity.

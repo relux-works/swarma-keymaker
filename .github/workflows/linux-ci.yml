@@ -35,9 +35,7 @@ jobs:
           import errno
           import json
           import os
-          import shutil
           import stat
-          import tempfile
 
           def protected(path):
               if not os.path.isabs(path) or os.path.normpath(path) != path or "\n" in path or "\r" in path:
@@ -75,23 +73,105 @@ jobs:
               finally:
                   os.close(fd)
 
-          # A private child cannot repair unsafe RUNNER_TEMP ancestors. Validate
-          # the actual HOME first; never change an existing ancestor's permissions.
-          home = os.environ["HOME"]
-          protected(home)
-          scratch = tempfile.mkdtemp(prefix="keymaker.", dir=home)
+          import subprocess
+          import sys
+
+          # The measured hosted /home default ACL cannot satisfy this fixture contract.
+          # Use exactly one new root child in the disposable VM, without repairing /home.
+          run = os.environ["GITHUB_RUN_ID"]
+          attempt = os.environ["GITHUB_RUN_ATTEMPT"]
+          if any(not v.isascii() or not v.isdecimal() or len(v) > 20 or int(v) <= 0 for v in (run, attempt)):
+              raise ValueError("invalid CI run identity")
+          uid, gid = os.getuid(), os.getgid()
+          if uid == 0 or gid == 0:
+              raise ValueError("an unprivileged runner identity is required")
+          expected = f"/keymaker-ci-{int(run)}-{int(attempt)}"
+          protected("/")
+          for tool in ("/usr/bin/sudo", "/usr/bin/python3", "/usr/bin/setfacl"):
+              if not os.access(tool, os.X_OK):
+                  raise ValueError("required hosted CI tool unavailable: " + tool)
+          create = r'''
+          import errno, json, os, stat, subprocess, sys
+          if os.geteuid() != 0:
+              raise ValueError("CI creation requires the documented hosted-runner privilege")
+          values = sys.argv[1:]
+          if len(values) != 4 or any(not v.isascii() or not v.isdecimal() or len(v) > 20 or int(v) <= 0 for v in values):
+              raise ValueError("invalid numeric CI identity")
+          uid, gid, run, attempt = map(int, values)
+          if uid >= 2**32 or gid >= 2**32:
+              raise ValueError("invalid runner identity")
+          name = f"keymaker-ci-{run}-{attempt}"
+          flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+          def inspect(fd, owner):
+              info = os.fstat(fd)
+              if info.st_uid != owner or info.st_mode & 0o022:
+                  raise ValueError("unsafe CI directory custody")
+              for attribute in ("system.posix_acl_access", "system.posix_acl_default"):
+                  try:
+                      os.getxattr(fd, attribute)
+                  except OSError as error:
+                      if error.errno not in (errno.ENODATA, errno.ENOTSUP):
+                          raise
+                  else:
+                      raise ValueError("ACL on CI directory")
+              return info
+          root = os.open("/", flags)
+          created = False
           try:
-              protected(scratch)
-              info = os.stat(scratch, follow_symlinks=False)
-              if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
-                  raise ValueError("scratch child must be holder-owned0700")
-              with open(os.environ["GITHUB_ENV"], "a") as output:
-                  output.write(f"TMPDIR={scratch}\n")
-              with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-                  output.write(f"path={scratch}\n")
+              inspect(root, 0)
+              os.mkdir(name, 0o700, dir_fd=root)  # Exclusive: never adopt/chown an existing path.
+              created = True
+              child = os.open(name, flags, dir_fd=root)
+              try:
+                  initial = os.fstat(child)
+                  if initial.st_uid != 0 or initial.st_mode & 0o022:
+                      raise ValueError("new CI inode custody changed")
+                  before_acl = []
+                  for attribute in ("system.posix_acl_access", "system.posix_acl_default"):
+                      try:
+                          os.getxattr(child, attribute)
+                      except OSError as error:
+                          if error.errno not in (errno.ENODATA, errno.ENOTSUP):
+                              raise
+                      else:
+                          before_acl.append(attribute)
+                  print(json.dumps({"new_fixture_before": "/" + name, "uid": initial.st_uid,
+                                    "gid": initial.st_gid, "mode": f"{stat.S_IMODE(initial.st_mode):04o}",
+                                    "acls": before_acl}), file=sys.stderr)
+                  subprocess.run(["/usr/bin/setfacl", "-b", "-k", "--", f"/proc/self/fd/{child}"],
+                                 pass_fds=(child,), check=True)
+                  inspect(child, 0)
+                  os.fchown(child, uid, gid)  # Only the just-created, descriptor-pinned inode.
+                  os.fchmod(child, 0o700)
+                  info = inspect(child, uid)
+                  if info.st_gid != gid or stat.S_IMODE(info.st_mode) != 0o700:
+                      raise ValueError("incorrect final CI fixture identity")
+                  print(json.dumps({"path": "/" + name, "dev": info.st_dev, "ino": info.st_ino}))
+              finally:
+                  os.close(child)
           except BaseException:
-              shutil.rmtree(scratch)
+              if created:
+                  try:
+                      os.rmdir(name, dir_fd=root)  # Empty new inode only; never recursive root cleanup.
+                  except OSError:
+                      print("new CI fixture retained after failed setup", file=sys.stderr)
               raise
+          finally:
+              os.close(root)
+          '''
+          command = ["/usr/bin/sudo", "-n", "--", "/usr/bin/python3", "-I", "-", str(uid), str(gid), run, attempt]
+          result = subprocess.run(command, input=create, text=True, stdout=subprocess.PIPE, check=True)
+          receipt = json.loads(result.stdout)
+          if set(receipt) != {"path", "dev", "ino"} or receipt["path"] != expected or type(receipt["dev"]) is not int or type(receipt["ino"]) is not int:
+              raise ValueError("unexpected CI fixture receipt")
+          protected(expected)
+          info = os.stat(expected, follow_symlinks=False)
+          if info.st_uid != uid or info.st_gid != gid or stat.S_IMODE(info.st_mode) != 0o700 or (info.st_dev, info.st_ino) != (receipt["dev"], receipt["ino"]):
+              raise ValueError("CI fixture receipt does not match created inode")
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write(f"TMPDIR={expected}\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"path={expected}\ndev={info.st_dev}\nino={info.st_ino}\n")
           PY
       - name: Verify modules
         run: go mod verify
@@ -99,6 +179,9 @@ jobs:
         run: go mod tidy -diff
       - name: Download offline fixture dependencies
         run: go mod download
+      # Exercise the unchanged production pathname guard before broader checks.
+      - name: Verify protected test path
+        run: go test ./internal/keymaker -run '^TestJ7PolicyProtectedPath$' -count=1 -timeout=90s -v
       - name: Build
         run: go build ./...
       - name: Vet
@@ -123,19 +206,84 @@ jobs:
         if: ${{ always() }}
         env:
           KEYMAKER_CI_SCRATCH: ${{ steps.scratch.outputs.path }}
+          KEYMAKER_CI_DEV: ${{ steps.scratch.outputs.dev }}
+          KEYMAKER_CI_INO: ${{ steps.scratch.outputs.ino }}
         run: |
           python3 - <<'PY'
+          import errno
+          import json
           import os
-          import shutil
           import stat
 
+          def protected(path):
+              if not os.path.isabs(path) or os.path.normpath(path) != path or "\n" in path or "\r" in path:
+                  raise ValueError("scratch ancestry must be absolute and canonical")
+              parts = path.removeprefix("/").split("/") if path != "/" else []
+              if len(parts) > 64:
+                  raise ValueError("scratch ancestry exceeds diagnostic bound")
+              flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+              fd = os.open("/", flags)
+              prefix = "/"
+              try:
+                  for part in [None, *parts]:
+                      if part is not None:
+                          prefix = os.path.join(prefix, part)
+                          child = os.open(part, flags, dir_fd=fd)
+                          os.close(fd)
+                          fd = child
+                      info = os.fstat(fd)
+                      acls = []
+                      for name in ("system.posix_acl_access", "system.posix_acl_default"):
+                          try:
+                              os.getxattr(fd, name)
+                          except OSError as error:
+                              if error.errno not in (errno.ENODATA, errno.ENOTSUP):
+                                  raise
+                          else:
+                              acls.append(name)
+                      print(json.dumps({"scratch_ancestor": prefix, "uid": info.st_uid,
+                                        "gid": info.st_gid, "mode": f"{stat.S_IMODE(info.st_mode):04o}",
+                                        "acls": acls}), flush=True)
+                      if info.st_uid not in (0, os.geteuid()) or info.st_mode & 0o022 or acls:
+                          raise ValueError(f"unsafe scratch ancestry: {prefix}")
+              except OSError as error:
+                  raise RuntimeError(f"scratch ancestry inspection failed at {prefix}: errno={error.errno}") from error
+              finally:
+                  os.close(fd)
+
+          import shutil
+
           scratch = os.environ.get("KEYMAKER_CI_SCRATCH", "")
-          if scratch:
-              home = os.environ["HOME"]
-              if os.path.dirname(scratch) != home or not os.path.basename(scratch).startswith("keymaker."):
-                  raise ValueError("refuse cleanup outside the prepared private child")
-              info = os.lstat(scratch)
-              if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) != 0o700:
-                  raise ValueError("refuse cleanup of changed scratch identity or permissions")
-              shutil.rmtree(scratch)
+          if not scratch:
+              if os.environ.get("KEYMAKER_CI_DEV") or os.environ.get("KEYMAKER_CI_INO"):
+                  raise ValueError("partial CI fixture receipt")
+              raise SystemExit(0)
+          run, attempt = os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"]
+          values = (run, attempt, os.environ["KEYMAKER_CI_DEV"], os.environ["KEYMAKER_CI_INO"])
+          if any(not v.isascii() or not v.isdecimal() or len(v) > 20 for v in values) or min(int(run), int(attempt), int(values[3])) <= 0:
+              raise ValueError("invalid CI cleanup receipt")
+          expected = f"/keymaker-ci-{int(run)}-{int(attempt)}"
+          if scratch != expected:
+              raise ValueError("refuse cleanup outside this run's exact fixture")
+          protected("/")
+          protected(expected)
+          uid, gid = os.getuid(), os.getgid()
+          flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+          child = os.open(expected, flags)
+          try:
+              info = os.fstat(child)
+              if (info.st_dev, info.st_ino, info.st_uid, info.st_gid, stat.S_IMODE(info.st_mode)) != (int(values[2]), int(values[3]), uid, gid, 0o700):
+                  raise ValueError("refuse cleanup of changed fixture identity")
+              if not shutil.rmtree.avoids_symlink_attacks:
+                  raise ValueError("descriptor-safe cleanup unavailable")
+              for name in os.listdir(child):
+                  if stat.S_ISDIR(os.stat(name, dir_fd=child, follow_symlinks=False).st_mode):
+                      shutil.rmtree(name, dir_fd=child)
+                  else:
+                      os.unlink(name, dir_fd=child)
+              if os.listdir(child):
+                  raise ValueError("fixture contents changed during cleanup")
+          finally:
+              os.close(child)
+          print(f"Empty fixture retained until disposable VM teardown: {expected}")
           PY

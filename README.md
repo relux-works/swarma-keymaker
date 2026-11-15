@@ -165,6 +165,14 @@ under root/holder-owned ancestors without group/other write or access/default
 ACLs. Use an authorized protected scratch location; do not change shared modes
 or treat this single-UID control as the pending distinct-UID qualification.
 
+Hosted Linux CI creates one new run-specific fixture directory directly under
+verified root ancestry using the disposable runner's existing provisioning
+privileges. It hands that inode to the unprivileged runner, verifies its receipt
+and removes only its contents unprivileged at cleanup. The empty top-level
+fixture remains until VM teardown; see `.github/workflows/linux-ci.yml`.
+Before broader checks, `go test ./internal/keymaker -run '^TestJ7PolicyProtectedPath$' -count=1 -timeout=90s -v`
+exercises the unchanged production pathname guard with that fixture.
+
 Run from the repository root. Set `SCRATCH` to an existing absolute scratch
 path outside tracked files; export `TMPDIR="$SCRATCH"` so Go test fixtures
 follow it. A canonical path without `..` or symlink components is required by

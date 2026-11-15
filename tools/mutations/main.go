@@ -120,8 +120,8 @@ func main() {
 			{"j7-terminal-release-authority", "j7_run_linux.go", `defer s.mu.Unlock()
 			if !ch.releasePermitted(nativePrincipal(peer), r) {`, `defer s.mu.Unlock()
 			if false {`, "^TestJ7RunCanceledCapabilityBoundaries$/^release-in-evidence$", "--- FAIL: TestJ7RunCanceledCapabilityBoundaries/release-in-evidence", "canceled capability released a response"},
-			{"j7-repeat-end-release", "j7_run_linux.go", `ch.endReply = nil
-					defer ch.conn.Close()`, `defer ch.conn.Close()`, "^TestJ7RunSelfEndReleasePermit$", "--- FAIL: TestJ7RunSelfEndReleasePermit", "self-end permit reused"},
+			{"j7-end-reply-retirement", "j7_run_linux.go", `ch.endReply = nil
+					defer ch.conn.Close()`, `// Mutation: leave the exact reply permit and wire lifetime outstanding.`, "^TestJ7RunSelfEndReleasePermit$", "--- FAIL: TestJ7RunSelfEndReleasePermit", "self-end permit reused"},
 			{"j7-migration-digest", "j7_state.go", `d == e.Digest`, `d != ""`, "^TestJ7RecoveryUnmigratedMigrationAuthority$", "--- FAIL: TestJ7RecoveryUnmigratedMigrationAuthority", "wrong unmigrated head accepted"},
 		}
 	}

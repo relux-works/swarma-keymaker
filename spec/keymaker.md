@@ -712,8 +712,10 @@ and enrollment methods. It uses standard NIP-01 IDs, not SSHSIG or a general
 byte-signing route. Production role startup remains closed. The
 [J7 supplement](keymaker-j7.md#profile1-typed-request-adapter-internal-unactivated)
 defines its exact native schemas, schema5 migration, released-consent enrollment,
-current-authority retry and socket-handoff fence. Profile/2/kind8186 and purpose8
-remain unsupported; all deployment and native qualification gates remain.
+current-authority retry and socket-handoff fence. Profile/2/kind8186 and
+purpose8 signing routes, including its child endpoint, remain closed. Existing
+independent purpose8 custody, derivation and role contracts remain unchanged;
+all deployment and native qualification gates remain.
 
 The last three rows summarize unactivated proposals, not current signing
 capabilities. See the [witness supplement](keymaker-witness.md#31-protected-identity-and-purpose-separation)

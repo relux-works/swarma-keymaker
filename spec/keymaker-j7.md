@@ -242,10 +242,14 @@ j7_state:{path,minimum_reader_schema,expected_version,expected_digest}
 ```
 
 Policy schema is exactly `keymaker-j7-policy/1`, holder matches service UID,
-instance matches the role, identity is positive/safe, reader minimum is 4, and
-the expected version/head are nonempty safe/64-hex pins. Both paths are absolute
-and clean. These optional objects are rejected by legacy config. Parsing pins
-does not open a store, publish policy, enable a profile or establish protection.
+instance matches the role and identity is positive/safe. `minimum_reader_schema`
+is `4` for schema-4 lifecycle state and `5` for schema-5 request-signing state.
+It must match the explicitly migrated participant and its independently retained
+exact version/body head; `4` does not admit schema5, and startup never migrates
+state or substitutes empty signing history. Expected version/digest pins are
+nonempty safe-integer/64-hex values. Both paths are absolute and clean. These
+optional objects are rejected by legacy config. Parsing pins does not open a
+store, publish policy, enable a profile or establish protection.
 
 ### Publication, withdrawal and the common fence
 

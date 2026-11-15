@@ -139,3 +139,202 @@ filesystem failures. The fixture checker adds no production authority. Native
 run binding, typed profiles/consent, durable J7 state, child admission, packaging
 and real multi-user qualification remain separate work; unrelated witness,
 persistent-revoke and purpose-6 gates are not reopened or prerequisites here.
+
+## Protected lifecycle and operator policy
+
+A lifecycle-only internal native adapter implements `j7_run_bind`,
+`j7_run_end` and `j7_run_rebind`. It has no Master or signing dependency. The
+normal daemon still refuses both new profiles: this adapter is exercised with
+isolated Unix fixtures and is not installed broker integration or qualification.
+Legacy Native rejects these methods and all J7 signing/public-key methods.
+
+The transport creates a private connection scope exactly once from the accepted
+`net.Conn`. Every operation uses that scope through ID admission, handling and
+actual response-write fencing. A UID map, caller label, process ID or request
+handle cannot create a scope. Kernel credentials and current authoritative
+account-generation evidence authenticate the exact configured launcher principal;
+control-group membership supplies no launcher role. There is one upstream
+connection per run, retained by the trusted launcher/broker, not given to an
+agent. Input must use a distinct active OS principal from the launcher and
+station identity, and cannot share a UID with another retained live run.
+
+The service generates a 16-byte random run ID. The retained record contains the
+exact station Binding, launcher/input principals, immutable origin, parent and
+`live`/`ended` state. Bind arguments are exactly:
+
+```text
+{identity_registration_number, input_principal:{uid,generation},
+ origin, parent_run}
+```
+
+For an initial run, `parent_run` is empty and `origin` is a complete object with
+all six members `{kind,event_id,grant_id,tip_hash,mode,command_id}`. Admission
+uses `kind:"admission"`, exact lowercase 64-hex event/grant/tip hashes,
+`mode:"enforcing"` and an empty command ID. An authenticated owner command is a
+different variant: `kind:"owner_command"`, exact 64-hex command ID, with the
+other four strings empty. These are local retained references, not new wire
+bytes for any signed object or proof that admission actually happened.
+
+Spawn uses `origin:null` and names a retained live parent in `parent_run`.
+The service inherits its complete origin; a supplied replacement origin refuses.
+End/rebind accept exactly `{run_id}` and remain privileged launcher operations.
+A currently configured launcher can end stale history after an explicitly
+approved launcher-incarnation change; it cannot adopt that old launcher's run,
+change its origin or rewrite its original principal.
+Rebind requires a fresh, never-assigned connection and a live retained record
+with the same launcher. It changes neither origin nor identity. No reconnect
+or retained bind-result retry on another connection adopts a run. An unknown
+lost bind response remains held for operator inspection/reconciliation of the
+retained record; the launcher must not expose input before successful binding. End is durable
+and idempotent, invalidates the former connection before subsequent effects,
+and cannot be undone by retry/rebind. EOF discards the volatile association;
+restart reconstructs none. Input/launcher/station retirement and station binding
+withdrawal cancel the run context and close the actual connection. A canceled
+connection never gains another run.
+
+The launcher is responsible for the real per-run input, descriptor/process
+isolation, origin admission and teardown. A supplied input principal does not
+prove these facts. Same-UID handle/FD theft or shared broker access is not solved
+by SO_PEERCRED, CLOEXEC or a local unit test. Such a deployment remains refused
+until its own isolation and lifecycle evidence is qualified. Per-run input
+accounts are not duplicate purpose-1 registrations: the record refers to the
+one existing station binding and preserves its uniqueness.
+
+### Policy format and protection
+
+The holder-owned unsigned table has exactly
+`{format,instance,identity_registration_number,version,rows}` with
+`format:"keymaker-j7-policy/1"`. Instance/identity equal the protected pins;
+version is an integer 1 through 9007199254740991. Each row has exactly
+`{origin,use,delegate,consent,deny}`, all arrays present even when empty.
+The row key is `{kind,event_id,grant_id}`: an exact admission pair or the distinct
+owner-command key with both IDs empty. Tip/mode/command remain in the immutable
+run record rather than widening this row key.
+
+Use/delegate/deny members are exact lowercase 64-hex IDs. Consent entries have
+exactly `{contract_sha256,booking_sha256,privacy_sha256,and_use}`: three exact
+64-hex hashes and a Boolean. Unknown, missing, null, duplicate or mis-cased
+members, duplicate keys/rows/permissions/triples, use+deny conflicts,
+noncanonical/unsafe numeric values and wrong pins refuse. No TTL or authority
+normalization is added. Limits are inclusive: 1 MiB raw bytes, 4096 rows and
+16384 aggregate permission entries. These simultaneous limits can make a full
+row/permission-count bound unreachable for a particular serialized table.
+
+The table is regular 0600, single-link, in a holder-owned 0700 directory.
+Descriptor walking refuses symlinks, group/other-writable or foreign-owned
+ancestors, and access/default ACLs. The table uses O_NOFOLLOW, O_CLOEXEC,
+O_NONBLOCK, fstat owner/type/mode/link checks, ACL rejection and bounded reading.
+A strict pathname constructor is separate from fixtures that explicitly supply
+an already-open protected directory inode. Such fixtures do not qualify the
+production path walk or a real untrusted UID.
+
+Root-owned protected role configuration may additionally supply:
+
+```text
+j7_policy:{path,holder_uid,schema,instance,identity_registration_number,
+           launcher_principal:{uid,generation}}
+j7_state:{path,minimum_reader_schema,expected_version,expected_digest}
+```
+
+Policy schema is exactly `keymaker-j7-policy/1`, holder matches service UID,
+instance matches the role, identity is positive/safe, reader minimum is 4, and
+the expected version/head are nonempty safe/64-hex pins. Both paths are absolute
+and clean. These optional objects are rejected by legacy config. Parsing pins
+does not open a store, publish policy, enable a profile or establish protection.
+
+### Publication, withdrawal and the common fence
+
+A trusted holder-only Go publication boundary, with no native update RPC, shares
+one cancellable gate and directory-inode flock with every reader. Independently
+opened publisher/reader descriptors use this same protocol. The protected
+policy directory itself must not be replaced, and raw edits outside the protocol
+are unsupported. Candidate parsing occurs outside Store's terminal lock; a
+bounded exact-byte reread under the gate rejects a stale parse.
+
+Publication durably records the new floor, raw-byte digest, explicit lists and
+denials with `publication_pending:true` before file effects. It exclusively
+creates `.<filename>.next`, writes/syncs complete bytes, renames and syncs the
+directory, then commits pending=false before the version is usable. Unknown
+staging or any uncertain phase fences; nothing deletes intent to retry blindly.
+A newly observed operator table is synced and its version/withdrawals committed
+under the same gate before a reader can use it.
+
+Same version/same bytes is idempotent; a lower version or same-version changed
+bytes is unreadable and cannot lower the floor. Missing, unsafe, corrupt,
+wrong-instance or unreadable policy and missing rows are empty authority, never
+a cached allow table or owner-row fallback. Permission checks return exactly
+`GRANT_NOT_FOR_RUN` or `CONSENT_NOT_FOR_RUN`, without row content. Bounded local
+audit causes distinguish policy rollback, equivocation and unavailability.
+
+Removing an explicitly listed use grant records a durable origin/grant denial.
+The explicit deny set can withdraw a grant admitted through later enrollment
+without first listing it. Only a newer explicit operator use lifts a denial;
+enrollment cannot. Absence from an otherwise unchanged explicit use list is
+not itself withdrawal of an enrolled grant. Consent removal stops future consent
+and does not remove existing enrolled grants. These retained denial transitions
+are implemented; PR2 creates no consent event, enrollment or fabricated grant.
+Exact signed consent/enrollment history requires a later versioned extension.
+
+Lock order is authoritative generation evidence -> policy publication gate ->
+Store/J7 -> private custody (unused here) -> audit journal. There is no
+Store-to-generation acquisition or node RPC. A future typed signing/release path
+must derive origin from the connection capability and hold this same publication
+gate through its final recheck and actual socket-write callback. PR2 supplies
+no signature release and claims no such acceptance.
+
+### State participant and explicit migration
+
+Schema 4 has the required `j7` participant, `format:"keymaker-j7-state/1"`:
+instance/identity, original base schema, accepted policy version/digest/table,
+pending publication, immutable run history and origin/grant denials. Reader 3
+remains reserved for the separate authority-root format. Legacy schema-0/2 bytes
+remain unchanged until an explicit stopped-operator migration. Base schema 2
+retains its complete message inventory, artifacts and recovery-copy accounting;
+base schema 0 has no fabricated message inventory.
+
+Migration requires an existing reconciled binding/audit pair, an active station
+identity and an independently retained exact version/body head. Restart likewise
+requires that exact operator expectation. A changed legitimate descendant needs
+operator reconciliation of the new expected head; the service never writes its
+own independent pin. Missing floor, participant, snapshot or journal is never
+initialization evidence. Schema-0/2 readers refuse the new state before opening
+an audit writer. Preview/clone/body/native-request capacity and message-recovery
+paths preserve the participant.
+
+State space and audit budget are reserved before durable effects. Commits cover
+the complete versioned body through the existing journal-first binding commit;
+an ordinary lifecycle audit line cannot substitute. Complete snapshot write,
+file sync, rename and directory sync follow the journal commitment. Uncertain
+state fences with `j7_state_fenced`; unavailable audit reports
+`audit_unavailable`. Interrupted pending publication cannot serve even if its
+new file survived. Recovery retains evidence and requires operator reconciliation;
+there is no automatic reset, downgrade, repair or replay of unknown effects.
+
+A matched rollback of all local files is detectable only relative to an
+independently retained later expectation. Joint loss/restore of that expectation
+is outside local detection. Lost consent/enrollment continuity cannot become an
+empty enrolled set with restored authority. The future consent participant and
+real broker/host exclusion remain separate duties, without waiting for an
+unrelated witness feature.
+
+### Verification boundaries
+
+Default tests exercise actual Unix connections/kernel launcher peers and injected
+account-generation evidence; they do not establish distinct-UID broker input
+isolation. `TestMultiUIDJ7PolicyProtection` is a concrete tagged PENDING gate for
+real agent policy-write/replace denial plus full protected-path/holder controls.
+It needs an operator-reviewed existing window, protected scratch root and
+readable tagged binary; absent inputs are not a passing or skipped qualification.
+Crash witnesses cover retained process interruption, not host power loss.
+Run and denial histories have inclusive 65536-entry retention bounds; byte and
+retained-request budgets can refuse earlier. Dense-history native latency at
+production deadlines is unqualified. Capacity preflight and durable-state tests
+do not establish that transport performance.
+
+The pinned BIP-340 library also has an exceptionally rare fail-closed availability
+edge when its challenge hash is at least the curve order. No feasible natural
+reproduction is claimed, and this lifecycle slice changes no crypto. The fixed
+32-byte message profile, honest-holder/root boundary, optional locking and
+best-effort erasure limits above remain in force. Full integration review,
+launcher ownership/isolation, typed consent/signing, independent native custody
+qualification and deployment/enforcing acceptance remain outside these fixtures.

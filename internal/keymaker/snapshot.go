@@ -10,7 +10,7 @@ import (
 // References are excluded from the committed body to avoid a circular hash.
 // Version, all binding bytes and the next issued number are committed together.
 func (s *Store) contentDigest(version uint64) (string, error) {
-	if s.schema == 2 {
+	if s.schema == 2 || s.schema == j7Schema {
 		body, e := s.messageBody(version)
 		if e != nil {
 			return "", e
@@ -65,7 +65,7 @@ func objectMembers(raw []byte, required []string, optional ...string) (map[strin
 // UnmarshalJSON requires every persisted member, including explicit empty
 // records. Typed strict decoding also rejects unknown fields at every level.
 func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records", "schema_version", "messages")
+	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records", "schema_version", "messages", "j7")
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,12 @@ func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
 	}
 	_, schema := fields["schema_version"]
 	_, messages := fields["messages"]
-	if schema || messages {
+	_, j7 := fields["j7"]
+	if j7 || string(fields["schema_version"]) == "4" {
+		if !j7 || string(fields["schema_version"]) != "4" || bytes.Equal(bytes.TrimSpace(fields["j7"]), []byte("null")) {
+			return failure("invalid J7 schema")
+		}
+	} else if schema || messages {
 		if !schema || !messages || string(fields["schema_version"]) != "2" || bytes.Equal(bytes.TrimSpace(fields["messages"]), []byte("null")) {
 			return failure("invalid message schema")
 		}
@@ -114,7 +119,15 @@ func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
 		}
 	}
 	type plain bindingDisk
-	return StrictJSON(bytes.NewReader(raw), (*plain)(disk))
+	if err := StrictJSON(bytes.NewReader(raw), (*plain)(disk)); err != nil {
+		return err
+	}
+	if disk.SchemaVersion == j7Schema {
+		if disk.J7 == nil || (disk.J7.BaseSchema == 2) != messages || messages && disk.Messages == nil {
+			return failure("invalid J7 message participant")
+		}
+	}
+	return nil
 }
 
 func (s *Store) matchesCommit(commit bindingCommit) bool {

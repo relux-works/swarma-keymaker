@@ -15,10 +15,10 @@ import (
 
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key or message-state controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state or j7-state controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -97,6 +97,20 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "j7-state" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-owner-row-selection", "j7_policy_linux.go", `row := j7PolicyRowFor(table, origin.key())`, `row := j7PolicyRowFor(table, j7OriginKey{Kind:"owner_command"})`, "^TestJ7PolicyOriginPermissions$", "--- FAIL: TestJ7PolicyOriginPermissions", "foreign origin grant admitted"},
+			{"j7-spawn-origin", "j7_run_linux.go", `origin = parent.Origin`, `origin = j7Origin{Kind:"owner_command",Command:"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}`, "^TestJ7RunOriginAndRebind$", "--- FAIL: TestJ7RunOriginAndRebind", "spawn changed origin"},
+			{"j7-policy-rollback", "j7_policy_linux.go", `if table.Version < j.Version {`, `if false {`, "^TestJ7PolicyRollbackAfterRestart$", "--- FAIL: TestJ7PolicyRollbackAfterRestart", "policy verdict , want GRANT_NOT_FOR_RUN"},
+			{"j7-omit-denial", "j7_policy_linux.go", `next.Denials = reconcileJ7Denials(j.Policy, table, j.Denials)`, `next.Denials = []j7Denial{}`, "^TestJ7PolicyWithdrawalContinuity$", "--- FAIL: TestJ7PolicyWithdrawalContinuity", "withdrawal denial lost"},
+			{"j7-reuse-connection", "j7_run_linux.go", `ch.ever || ch.run != "" || l.run(id) != nil`, `l.run(id) != nil`, "^TestJ7RunChannelIsolation$", "--- FAIL: TestJ7RunChannelIsolation", "want run_identity_unavailable"},
+			{"j7-drop-snapshot-participant", "message_state.go", `J7: s.j7}`, `J7: nil}`, "^TestJ7RecoveryReaderAndExpectedHead$", "--- FAIL: TestJ7RecoveryReaderAndExpectedHead", "exact head positive"},
+			{"j7-policy-acl", "j7_policy_linux.go", `if !j7NoACL(int(f.Fd()), false) {`, `if false {`, "^TestJ7PolicyProtection$", "--- FAIL: TestJ7PolicyProtection", "ACL accepted"},
+			{"j7-policy-ancestor", "j7_policy_linux.go", `st.Mode&022 != 0`, `false`, "^TestJ7PolicyProtection$", "--- FAIL: TestJ7PolicyProtection", "writable ancestry accepted"},
+			{"j7-policy-row-capacity", "j7_policy_linux.go", `len(p.Rows) > j7PolicyRows`, `false`, "^TestJ7PolicyCapacity$", "--- FAIL: TestJ7PolicyCapacity", "row overflow"},
+		}
+	}
+
 	if *group == "message-state" {
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
 			{"message-capacity-drops-recovery-snapshot", "message_state.go", `recovery := int64(rawBytes) * int64(transitions)`, `recovery := int64(0)`, "^TestMsgCapacityCommitAfterRefusal$", "--- FAIL: TestMsgCapacityCommitAfterRefusal", "capacity admitted simultaneous snapshot copies"},

@@ -18,7 +18,7 @@ func openCustodyState(state *os.File, uid uint32) (*Store, *Journal, *os.File, e
 func openCustodyStateClock(state *os.File, uid uint32, clock AuditClock) (*Store, *Journal, *os.File, error) {
 	return openCustodyStateMessage(state, uid, clock, 0, false)
 }
-func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor int, recovery bool) (*Store, *Journal, *os.File, error) {
+func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor int, recovery bool, expected ...j7Expectation) (*Store, *Journal, *os.File, error) {
 	s, err := loadStoreMessage(state, uid, floor, recovery)
 	if err != nil {
 		return nil, nil, nil, err
@@ -54,12 +54,25 @@ func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor
 		if !s.matchesCommit(j.binding) && !recovery {
 			return failure("binding journal recovery mismatch")
 		}
-		if s.schema == 2 && !recovery {
+		if s.j7 != nil && !recovery {
+			if err := s.validateJ7(); err != nil {
+				return err
+			}
+		}
+		if s.messages != nil && !recovery {
 			s.journal = j
 			err := s.validateMessages()
 			s.journal = nil
 			if err != nil {
 				return err
+			}
+		}
+		if len(expected) > 0 {
+			s.journal = j
+			ok := s.j7HeadMatches(expected[0])
+			s.journal = nil
+			if !ok {
+				return failure("J7 expected head mismatch")
 			}
 		}
 		for _, request := range s.requests {

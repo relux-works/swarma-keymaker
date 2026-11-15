@@ -23,13 +23,27 @@ type PeerSource interface {
 	Identify(ctx context.Context, conn net.Conn) (Peer, Code)
 }
 
-// Handler executes only pubkey, register, revoke and sign_registration. It must
-// validate the exact method-specific schema and current authority, honor ctx,
+// Handler executes its closed admitted method set: legacy custody operations
+// or a separately configured lifecycle-only adapter. It must validate exact
+// method-specific schema and current authority, honor ctx,
 // prepare audited results and recover durable results for admitted retries.
 // The ReleaseFence, rather than this return boundary, covers actual wire release.
 // It must not implement a generic signing operation behind these method names.
 type Handler interface {
 	Handle(ctx context.Context, peer Peer, request Request) (Object, Code)
+}
+
+// RunLifecycleHandler opts an internal lifecycle-only adapter into the three
+// fixed administrative methods. Merely adding their names to this transport
+// never changes legacy ID admission or dispatch behavior.
+type RunLifecycleHandler interface{ RunLifecycleOnly() }
+
+// ConnectionScope is an optional internal connection capability hook. The server
+// calls it exactly once with the actual accepted object, before request dispatch.
+// Its cleanup invalidates volatile state at EOF/cancellation; no wire field can
+// supply or replace the connection. Legacy handlers need not implement it.
+type ConnectionScope interface {
+	Scope(context.Context, net.Conn) (context.Context, func())
 }
 
 // RequestIDs admits IDs in the caller's UID+generation scope, including hello.
@@ -178,6 +192,14 @@ func (s *Server) ServeConnRefused(ctx context.Context, conn net.Conn, peer Peer,
 
 func (s *Server) serveConn(ctx context.Context, conn net.Conn, state connectionState) {
 	defer conn.Close()
+	if scope, ok := s.handler.(ConnectionScope); ok {
+		var closeScope func()
+		ctx, closeScope = scope.Scope(ctx, conn)
+		if ctx == nil || closeScope == nil {
+			return
+		}
+		defer closeScope()
+	}
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
 	state.helloDeadline = time.Now().Add(frameBudget)
@@ -287,6 +309,10 @@ func (s *Server) serveOne(ctx context.Context, conn net.Conn, state *connectionS
 		if code == "" {
 			switch req.Method {
 			case "hello", "pubkey", "register", "revoke", "sign_registration":
+			case "j7_run_bind", "j7_run_end", "j7_run_rebind":
+				if _, ok := s.handler.(RunLifecycleHandler); !ok {
+					code = OperationUnsupported
+				}
 			default:
 				code = OperationUnsupported
 			}

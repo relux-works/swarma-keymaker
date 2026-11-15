@@ -7,7 +7,12 @@ internal BIP-340 primitives, hardened secp256k1 derivation, explicit fresh-root
 initialization and closed service-role configuration for purposes 7/8. Existing
 Ed25519 APIs and vectors remain unchanged. The new profiles have no native/SSH
 sign route and explicitly refuse startup pending their separate integration;
-this is no usable signer or deployment/activation claim.
+this is no usable signer or deployment/activation claim. A separate
+lifecycle-only adapter now supplies protected run bind/end/rebind, a shared
+operator-policy publication fence and an explicitly migrated schema-4 state
+participant. It needs no signing key and remains disconnected from production
+role startup; real broker/input isolation and distinct-UID qualification remain
+pending.
 
 Keymaker derives hardened Ed25519 keys and performs narrowly permitted
 operations for Unix peers identified by the kernel and an active account
@@ -155,6 +160,11 @@ checker needs Bash and uses `/usr/sbin/visudo` when installed. Multi-UID
 qualification additionally requires the owner's
 pre-provisioned test accounts and noninteractive sudo permissions.
 
+The full-path policy test additionally requires holder-owned private `TMPDIR`
+under root/holder-owned ancestors without group/other write or access/default
+ACLs. Use an authorized protected scratch location; do not change shared modes
+or treat this single-UID control as the pending distinct-UID qualification.
+
 Run from the repository root. Set `SCRATCH` to an existing absolute scratch
 path outside tracked files; export `TMPDIR="$SCRATCH"` so Go test fixtures
 follow it. A canonical path without `..` or symlink components is required by
@@ -163,6 +173,8 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 
 | Tool | Purpose and exact command | Outputs |
 | --- | --- | --- |
+| Go | Run/policy/recovery fixtures: `go test -p=1 ./internal/keymaker -run '^TestJ7(Policy\|Run\|Recovery)' -count=1`; scoped races: add `-race -parallel=2`; narrowing controls: `go run ./tools/mutations/main.go -group j7-state -scratch "$SCRATCH"` | Actual Unix connection, strict policy and journal/snapshot fixtures; overlay logs/PIDs under private scratch, not native qualification |
+| Go | Compile pending distinct-UID gate only: `go test -p=1 -tags multiuid ./internal/keymaker -run '^$'`; qualified invocation: `KEYMAKER_WINDOW_CONFIG="$WINDOW_CONFIG" KEYMAKER_J7_PROTECTED_TEST_ROOT="$PROTECTED_SCRATCH" "$TEST_BINARY" -test.run '^TestMultiUIDJ7PolicyProtection$' -keymaker-window-token="$WINDOW_TOKEN"` | Compile-only is not a test pass. Body needs reviewed existing window/permissions, holder-owned protected scratch ancestry, readable tagged binary and non-secret provenance token; missing inputs remain PENDING |
 | Go | Isolated request/delegation custody: `go test ./internal/keymaker -run 'TestJ7Key\|TestJ7Purpose\|TestJ7NoSecretExport' -count=1`; fixture checker control: `go test ./tools/vectors -run '^TestJ7VectorCheckerControl$' -count=1` | Private filesystem/entropy fixtures and checker positive/negative controls; no service, durable parent allocation or runtime qualification |
 | Release recipe | [v0.1.0 linux/amd64 build and verification](packaging/RELEASE.md): `go build -trimpath -buildvcs=false -mod=readonly -ldflags=-buildid= -o keymaker ./cmd/keymaker` with the documented Go 1.26.10 environment | `keymaker` and its SHA-256; no installation or activation |
 | Go | Pure station-caller wire codecs: `go test ./stationcaller -count=1`; `go build ./stationcaller` | Inert byte fixtures and build cache; no socket, signer or native activation |

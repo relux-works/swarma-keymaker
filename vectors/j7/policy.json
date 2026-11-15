@@ -1,0 +1,269 @@
+{
+  "format": "keymaker-j7-policy-vectors/1",
+  "identity_registration_number": 1,
+  "instance": "11111111111111111111111111111111",
+  "negative": [
+    {
+      "expected": "unreadable",
+      "id": "wrong-instance",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "22222222222222222222222222222222",
+        "rows": [
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          }
+        ],
+        "version": 1
+      }
+    },
+    {
+      "expected": "unreadable",
+      "id": "zero-version",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "11111111111111111111111111111111",
+        "rows": [
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          }
+        ],
+        "version": 0
+      }
+    },
+    {
+      "expected": "unreadable",
+      "id": "duplicate-row",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "11111111111111111111111111111111",
+        "rows": [
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          },
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          }
+        ],
+        "version": 1
+      }
+    },
+    {
+      "expected": "unreadable",
+      "id": "use-deny-conflict",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "11111111111111111111111111111111",
+        "rows": [
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          }
+        ],
+        "version": 1
+      }
+    },
+    {
+      "expected": "unreadable",
+      "id": "missing-and-use",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "11111111111111111111111111111111",
+        "rows": [
+          {
+            "consent": [
+              {
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          }
+        ],
+        "version": 1
+      }
+    },
+    {
+      "expected": "unreadable",
+      "id": "null-rows",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "11111111111111111111111111111111",
+        "rows": null,
+        "version": 1
+      }
+    }
+  ],
+  "note": "Synthetic local policy codec/permission fixtures only; no signatures, enrollment, independent host custody or qualification.",
+  "positive": [
+    {
+      "id": "distinct-admission-owner-rows",
+      "policy": {
+        "format": "keymaker-j7-policy/1",
+        "identity_registration_number": 1,
+        "instance": "11111111111111111111111111111111",
+        "rows": [
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "grant_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "kind": "admission"
+            },
+            "use": [
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ]
+          },
+          {
+            "consent": [
+              {
+                "and_use": true,
+                "booking_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "contract_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+                "privacy_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+              }
+            ],
+            "delegate": [
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            ],
+            "deny": [],
+            "origin": {
+              "event_id": "",
+              "grant_id": "",
+              "kind": "owner_command"
+            },
+            "use": [
+              "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+            ]
+          }
+        ],
+        "version": 1
+      }
+    }
+  ]
+}

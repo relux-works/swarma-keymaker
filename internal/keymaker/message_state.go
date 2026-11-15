@@ -275,7 +275,7 @@ func (s *Store) messageFitsTransitions(rawBytes, transitions int, artifacts int6
 // messagePreview deliberately copies only sizing/serialization inputs, never
 // the Store gate, watchers or request index. Caller already holds Store's gate.
 func (s *Store) messagePreview() *Store {
-	return &Store{dir: s.dir, uid: s.uid, schema: s.schema, messages: s.messages,
+	return &Store{dir: s.dir, uid: s.uid, schema: s.schema, messages: s.messages, j7: s.j7,
 		records: s.records, requests: s.requests, next: s.next, version: s.version, journal: s.journal}
 }
 
@@ -316,7 +316,7 @@ func (c *messageCertification) issue(ctx context.Context, selected Binding) (str
 		if b != selected {
 			return "binding_conflict"
 		}
-		if s.schema != 2 || s.messages == nil || s.dir == nil {
+		if (s.schema != 2 && s.schema != j7Schema) || s.messages == nil || s.dir == nil {
 			return "key_not_enrolled"
 		}
 		mb := messageBindingOf(b)
@@ -434,6 +434,11 @@ func (c *messageCertification) issue(ctx context.Context, selected Binding) (str
 	return id, code
 }
 func (s *Store) messagePoint(point string) Code {
+	if s.schema == j7Schema {
+		if code := s.j7Point(point); code != "" {
+			return code
+		}
+	}
 	if s.messageFault != nil {
 		return s.messageFault(point)
 	}
@@ -487,7 +492,7 @@ func (s *Store) messageBody(version uint64) ([]byte, error) {
 	return canonical(obj)
 }
 func (s *Store) disk(version uint64, commit bindingCommit) bindingDisk {
-	return bindingDisk{Next: s.next, Records: s.records, Requests: s.requests, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash, SchemaVersion: s.schema, Messages: s.messages}
+	return bindingDisk{Next: s.next, Records: s.records, Requests: s.requests, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash, SchemaVersion: s.schema, Messages: s.messages, J7: s.j7}
 }
 func (s *Store) readMessageIntent(tx *messageTransaction) (messageIntent, Code) {
 	var i messageIntent
@@ -499,7 +504,7 @@ func (s *Store) persistMessagesContext(ctx context.Context, ids ...string) Code 
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
 	}
-	if s.dir == nil || s.journal == nil || s.schema != 2 || s.messages == nil || s.version >= 9007199254740991 {
+	if s.dir == nil || s.journal == nil || (s.schema != 2 && s.schema != j7Schema) || s.messages == nil || s.version >= 9007199254740991 {
 		return "audit_unavailable"
 	}
 	id := "migration"
@@ -515,7 +520,7 @@ func (s *Store) persistMessagesContext(ctx context.Context, ids ...string) Code 
 		return "state_capacity_exceeded"
 	}
 	if code := s.writeMessageFile(ctx, id, "snapshot-"+strconv.FormatUint(version, 10), body); code != "" {
-		return code
+		return s.j7SnapshotFailure(code)
 	}
 	if code := s.messagePoint("before-commit"); code != "" {
 		return code
@@ -534,7 +539,7 @@ func (s *Store) persistMessagesContext(ctx context.Context, ids ...string) Code 
 		return "audit_unavailable"
 	}
 	if code = s.installMessageSnapshot(ctx, raw); code != "" {
-		return code
+		return s.j7SnapshotFailure(code)
 	}
 	s.version, s.auditSeq, s.auditHash = version, commit.Seq, commit.Hash
 	return ""

@@ -1,0 +1,322 @@
+{
+  "format": "keymaker-j7-state-vectors/1",
+  "negative": [
+    {
+      "expected": "fenced",
+      "id": "missing-j7",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    },
+    {
+      "expected": "fenced",
+      "id": "reserved-schema-three",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 0,
+          "denials": [],
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": false,
+          "runs": []
+        },
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 3,
+        "version": 3
+      }
+    },
+    {
+      "expected": "fenced",
+      "id": "lost-message-participant",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 2,
+          "denials": [],
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": false,
+          "runs": []
+        },
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    },
+    {
+      "expected": "fenced",
+      "id": "missing-run-array",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 0,
+          "denials": [],
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": false
+        },
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    },
+    {
+      "expected": "fenced",
+      "id": "missing-denial-array",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 0,
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": false,
+          "runs": []
+        },
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    },
+    {
+      "expected": "fenced",
+      "id": "pending-publication",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 0,
+          "denials": [],
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": true,
+          "runs": []
+        },
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    },
+    {
+      "expected": "fenced",
+      "id": "null-message-participant",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 0,
+          "denials": [],
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": false,
+          "runs": []
+        },
+        "messages": null,
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    }
+  ],
+  "note": "Synthetic codec/participant fixtures, not a journal commitment or an operator retained head. No reader may serve from these bytes alone.",
+  "positive": [
+    {
+      "id": "empty-explicitly-migrated-participant",
+      "snapshot": {
+        "audit_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "audit_seq": 3,
+        "j7": {
+          "base_schema": 0,
+          "denials": [],
+          "format": "keymaker-j7-state/1",
+          "identity_registration_number": 1,
+          "instance": "11111111111111111111111111111111",
+          "policy": null,
+          "policy_digest": "",
+          "policy_version": 0,
+          "publication_pending": false,
+          "runs": []
+        },
+        "next_registration_number": 2,
+        "records": [
+          {
+            "generation": "fixture-generation",
+            "lifetime": "ephemeral",
+            "master_epoch": "fixture-epoch",
+            "owner": "fixture-owner",
+            "path": "m/1'/1'/1'/1'",
+            "registrar_principal": {
+              "generation": "operator-generation",
+              "uid": 30003
+            },
+            "registration_number": 1,
+            "registry_revision": "fixture-registry",
+            "status": "active",
+            "uid": 30001
+          }
+        ],
+        "requests": [],
+        "schema_version": 4,
+        "version": 3
+      }
+    }
+  ]
+}

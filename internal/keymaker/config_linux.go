@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	"github.com/relux-works/swarma-credential-broker/timeconf"
@@ -21,7 +22,25 @@ type generationJournalConfig struct {
 	InitialFloor gj.Floor `json:"initial_floor"`
 }
 
+// J7 pins are configuration only; both new runtime profiles still refuse startup.
+// ProtectedConfig supplies the root-owner/ancestor boundary before runtime use.
+type j7PolicyConfiguration struct {
+	Path      string    `json:"path"`
+	HolderUID uint32    `json:"holder_uid"`
+	Schema    string    `json:"schema"`
+	Instance  string    `json:"instance"`
+	Identity  uint64    `json:"identity_registration_number"`
+	Launcher  Principal `json:"launcher_principal"`
+}
+type j7StateConfiguration struct {
+	Path            string `json:"path"`
+	Minimum         int    `json:"minimum_reader_schema"`
+	ExpectedVersion uint64 `json:"expected_version"`
+	ExpectedDigest  string `json:"expected_digest"`
+}
 type Config struct {
+	J7Policy          *j7PolicyConfiguration   `json:"j7_policy,omitempty"`
+	J7State           *j7StateConfiguration    `json:"j7_state,omitempty"`
 	ServiceRole       string                   `json:"service_role,omitempty"`
 	J7KeyFile         string                   `json:"j7_key_file,omitempty"`
 	InstanceID        string                   `json:"instance_id,omitempty"`
@@ -60,13 +79,31 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 		if !validJ7Role(role.ServiceRole) {
 			return failure("unknown service role")
 		}
-		if _, err := objectMembers(raw, []string{"service_role", "j7_key_file", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision"}); err != nil {
+		if _, err := objectMembers(raw, []string{"service_role", "j7_key_file", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision"}, "j7_policy", "j7_state"); err != nil {
 			return err
 		}
 		type plain Config
 		var parsed plain
 		if StrictJSON(bytes.NewReader(raw), &parsed) != nil || !validJ7Instance(parsed.InstanceID) || parsed.Epoch == "" || parsed.RegistryRevision == "" || !filepath.IsAbs(parsed.J7KeyFile) || filepath.Clean(parsed.J7KeyFile) != parsed.J7KeyFile {
 			return failure("invalid key role configuration")
+		}
+		if rawPolicy, ok := rawFields["j7_policy"]; ok {
+			if messageRequired(rawPolicy, reflect.TypeFor[j7PolicyConfiguration]()) != nil || parsed.J7Policy == nil {
+				return failure("invalid J7 policy pins")
+			}
+			p := parsed.J7Policy
+			if !filepath.IsAbs(p.Path) || filepath.Clean(p.Path) != p.Path || p.HolderUID != parsed.ServiceUID || p.Schema != "keymaker-j7-policy/1" || p.Instance != parsed.InstanceID || p.Identity == 0 || p.Identity > j7SafeInteger || !validGeneration(p.Launcher.Generation) {
+				return failure("invalid J7 policy pins")
+			}
+		}
+		if rawState, ok := rawFields["j7_state"]; ok {
+			if messageRequired(rawState, reflect.TypeFor[j7StateConfiguration]()) != nil || parsed.J7State == nil {
+				return failure("invalid J7 state pins")
+			}
+			p := parsed.J7State
+			if !filepath.IsAbs(p.Path) || filepath.Clean(p.Path) != p.Path || p.Minimum != j7Schema || p.ExpectedVersion == 0 || p.ExpectedVersion > j7SafeInteger || !validDigest(p.ExpectedDigest) {
+				return failure("invalid J7 state pins")
+			}
 		}
 		*cfg = Config(parsed)
 		return nil

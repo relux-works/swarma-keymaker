@@ -466,3 +466,12 @@ multi-user custody/recovery qualification. No generic digest route, fake
 delegation service, independent-custodian proof or enforcing-mode acceptance is
 supplied by isolated primitives or public vectors. Other open feature gates
 remain independent and are not prerequisites for this custody unit.
+
+The lifecycle-only run/policy participant is implemented with explicit schema-4
+migration and exact independently retained startup expectations. Production role
+startup, actual broker ownership/isolation and the tagged distinct-UID/protected
+path gate remain closed. A legitimate newer state head requires explicit
+operator reconciliation before restart; no service-owned pin resets that duty.
+Signed consent/enrollment continuity needs a later participant extension. The
+BIP-340 dependency's rare challenge-at-least-order fail-closed availability edge
+remains a signing limit, without a feasible natural reproduction here.

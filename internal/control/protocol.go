@@ -46,6 +46,12 @@ func retryable(code Code) bool {
 	return false
 }
 
+// ValidRefusal reports whether a code and retryability bit are an exact native
+// refusal pair. It validates wire data only, not authority or effect outcome.
+func ValidRefusal(code Code, retry bool) bool {
+	return validCode(code) && retryable(code) == retry
+}
+
 func readFrame(r io.Reader) ([]byte, Code) {
 	var header [4]byte
 	n, err := io.ReadFull(r, header[:])

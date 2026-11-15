@@ -18,10 +18,10 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation or j7-delegation-r2 controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2 or j7-lifecycle-wire controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -100,6 +100,23 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "j7-lifecycle-wire" {
+		pkg = "./j7lifecycle"
+		// Only changed wire/bridge gates are planted. Each requires its named
+		// intended assertion, not a compiler/setup failure or a fixed quota.
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"wire-frame-cap", "codec.go", `if n > MaxFrame {`, `if false && n > MaxFrame {`, "^TestLifecycleWireGrammarBounds$", "--- FAIL: TestLifecycleWireGrammarBounds", "cap header accepted"},
+			{"wire-open-bind", "codec.go", `if !members(p, "identity_registration_number", "input_principal", "origin", "parent_run") {`, `if false && !members(p, "identity_registration_number", "input_principal", "origin", "parent_run") {`, "^TestLifecycleWireGrammarBounds$", "--- FAIL: TestLifecycleWireGrammarBounds", "request refusal/zero value"},
+			{"wire-no-id", "codec.go", `r.ID != q.ID`, `false && r.ID != q.ID`, "^TestLifecycleWireResponseCorrelation$", "--- FAIL: TestLifecycleWireResponseCorrelation", "response refusal/zero value"},
+			{"wire-end-live", "codec.go", `r.Run.State == "ended" && r.Run.RunID == q.RunID`, `(r.Run.State == "ended" || r.Run.State == "live") && r.Run.RunID == q.RunID`, "^TestLifecycleWireResponseCorrelation$", "--- FAIL: TestLifecycleWireResponseCorrelation", "response refusal/zero value"},
+			{"wire-no-run-match", "codec.go", `return r.Run.State == "ended" && r.Run.RunID == q.RunID`, `return r.Run.State == "ended"`, "^TestLifecycleWireResponseCorrelation$", "--- FAIL: TestLifecycleWireResponseCorrelation", "response refusal/zero value"},
+			{"wire-timeout-widen", "codec.go", `r.TimeoutMS > MaxTimeoutMS`, `r.TimeoutMS > 5000`, "^TestLifecycleWireDeadlines$", "--- FAIL: TestLifecycleWireDeadlines", "timeout accepted: 2001"},
+			{"wire-retry-bit", "../internal/control/protocol.go", `return validCode(code) && retryable(code) == retry`, `return validCode(code)`, "^TestLifecycleWireRefusals$", "--- FAIL: TestLifecycleWireRefusals", "retry bit accepted"},
+			{"wire-free-code", "../internal/control/protocol.go", `return validCode(code) && retryable(code) == retry`, `return retryable(code) == retry`, "^TestLifecycleWireRefusals$", "--- FAIL: TestLifecycleWireRefusals", "free form"},
+			{"wire-origin-mode", "codec.go", `o.Mode == "enforcing"`, `(o.Mode == "enforcing" || o.Mode == "held")`, "^TestLifecycleWireClosedRequests$/^admission-mode$", "--- FAIL: TestLifecycleWireClosedRequests/admission-mode", "invalid typed request encoded"},
+			{"wire-generation-preflight", "codec.go", `len(b.InputPrincipal.Generation) > MaxFrame || `, ``, "^TestLifecycleWireGrammarBounds$", "--- FAIL: TestLifecycleWireGrammarBounds", "obvious oversize copied or allocated: generation"},
+		}
+	}
 	if *group == "j7-delegation" {
 		// Requirement-derived controls; setup/compile failures are never kills.
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
@@ -383,7 +400,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "j7-delegation" || *group == "j7-delegation-r2" {
+		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{

@@ -168,3 +168,27 @@ func TestJ7DelegationRefusalCodes(t *testing.T) {
 		}
 	}
 }
+
+// Each published native code accepts exactly its prescribed retry bit; foreign
+// strings accept neither bit. This is data validation, not an effect verdict.
+func TestValidRefusal(t *testing.T) {
+	retry := []Code{"rate_limited", "busy", "generation_source_unavailable", "enrollment_unavailable", "audit_unavailable", DeadlineExceeded}
+	terminal := []Code{FrameTooLarge, FrameTruncated, FrameMalformed, CCJNoncanonical, RequestMalformed, RequestConflict, VersionUnsupported, HelloRequired, HelloAlreadyNegotiated, OperationUnsupported,
+		"run_identity_unavailable", "j7_state_fenced", "delegation_evidence_unavailable", "GRANT_NOT_FOR_RUN", "CONSENT_NOT_FOR_RUN", "registration_malformed", "registration_signature_invalid", "registration_id_mismatch", "custody_unavailable", "peer_identity_unavailable", "generation_source_fenced", "generation_inactive", "generation_mismatch", "binding_not_found", "peer_binding_mismatch", "binding_conflict", "role_not_permitted", "identity_revoked", "persistent_revoke_requires_operator", "operator_record_unavailable", "operator_record_invalid", "path_not_hardened", "path_invalid", "purpose_unknown", "name_invalid", "name_unknown", "name_registry_invalid", "index_exhausted", "sign_data_not_sshsig", "sshsig_malformed", "namespace_not_permitted", "sign_key_mismatch", "sign_flags_unsupported", "agent_message_unsupported", "request_expired", "enrollment_unverified", "enrollment_unsupported", "host_revoked", "uid_map_required", "uid_not_permitted", "name_not_permitted", "audience_mismatch", "key_not_enrolled", "key_not_valid_now", "entropy_unavailable", "clock_untrusted", "state_capacity_exceeded",
+		"CONTRACT_ENCODING", "CONTRACT_PROFILE", "CONTRACT_FIELD", "CONTRACT_ACTIONS", "CONTRACT_REPOS", "CONTRACT_BUDGET", "CONTRACT_NOTE", "CONTRACT_PARENT", "CONTRACT_DELEGATE", "DELEGATE_NO_NOTARY", "CONTRACT_HASH", "CONTRACT_MISMATCH", "SCOPE_MISMATCH", "BUDGET_MISMATCH", "CONSENT_TAGS", "PARENT_ID_MISMATCH", "CHAIN_DEPTH", "NOT_DELEGABLE", "SUBJECT_MISMATCH", "CHILD_ORDINAL", "CHILD_AGENT_NOT_ALLOWED", "CHILD_GRANTEE_NOT_ALLOWED", "CHILD_ACTIONS_WIDER", "CHILD_REPOS_WIDER", "CHILD_BUDGET_OVER", "CHILD_WINDOW_NOT_NESTED", "DELEGATION_REQUEST"}
+	for _, row := range []struct {
+		codes []Code
+		bit   bool
+	}{{retry, true}, {terminal, false}} {
+		for _, code := range row.codes {
+			if !ValidRefusal(code, row.bit) || ValidRefusal(code, !row.bit) {
+				t.Fatalf("refusal pair mismatch: %s", code)
+			}
+		}
+	}
+	for _, code := range []Code{"", "LIVE", "run_bind_unknown", "run_end_unknown", "station_caller_unqualified", "free form diagnostic", "ROLE_NOT_PERMITTED"} {
+		if ValidRefusal(code, false) || ValidRefusal(code, true) {
+			t.Fatalf("foreign refusal accepted: %s", code)
+		}
+	}
+}

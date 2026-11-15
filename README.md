@@ -295,6 +295,27 @@ Make's own exit 2 does not distinguish failure from PENDING. CI and reviewers
 requiring that distinction call the compiled runner directly. A missing window
 is never a skipped or passing multi-UID qualification.
 
+## Public lifecycle wire package
+
+The [`j7lifecycle`](j7lifecycle/README.md) package provides inert closed native
+hello/bind/end/rebind types, canonical framed codecs and independent synthetic
+vectors. It supplies no socket client or launcher record. Existing lifecycle and
+request-custody adapters are exercised through their existing real Unix seams;
+no composition factory or production startup was added. Nonlegacy startup,
+configuration reader floors, signing and legacy behavior remain unchanged.
+The server's current two-second idle frame-read limit remains; these bytes do
+not qualify continuous bound-channel operation or distinct-UID input isolation.
+
+| Tool | Exact command / entry point | Outputs and limits |
+| --- | --- | --- |
+| Go1.26.10 | `GOTOOLCHAIN=local GOMAXPROCS=2 go test -p=1 ./j7lifecycle -count=1`; `go build ./j7lifecycle` | Inert value/reference checks and build cache; no runtime authority |
+| Go | `go test -p=1 ./internal/control -run '^TestValidRefusal$' -count=1`; `go test -p=1 ./internal/keymaker -run '^TestJ7Lifecycle' -count=1`; add `-race -parallel=2` for scoped races | Real Unix fixture interoperability, refusal/no-effects and interrupted acknowledgement controls; protected private TMPDIR/caches required |
+| Mutation tool | `go run ./tools/mutations/main.go -group j7-lifecycle-wire -scratch "$SCRATCH"` | Named changed-gate overlays, intended failing tests, child receipts/logs in supplied private scratch; setup failures are not kills |
+
+Use the pinned SDK and site-approved resource wrapper for heavy checks. Corpus
+manifest/payload hashes are public byte expectations; consumers pin the reviewed
+source head externally. No service, account, key or operator action is implied.
+
 ## Native wire layer
 
 The wire loop takes a caller-supplied listener or connection and enforces one

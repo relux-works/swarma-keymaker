@@ -543,6 +543,16 @@ true only for `rate_limited`, `busy`, `generation_source_unavailable`,
 `enrollment_unavailable`, `audit_unavailable` and `request_deadline_exceeded`;
 mutation retries MUST retain the original ID and arguments.
 
+After a negotiated hello, an unbound connection MUST deliver its next complete
+frame within 2 seconds, including any metadata probe time. Otherwise the server
+attempts an audited null-request-ID `request_deadline_exceeded` error and closes;
+if audit is unavailable it closes without an unaudited reply. Only a verified
+live bound-channel association permits an indefinite no-byte idle wait; once
+its next frame starts, framing is still bounded to 2 seconds.
+`generation_source_unavailable` and `audit_unavailable` close the connection,
+regardless of their retryability bit. See the framing, refusal and close rules
+in [`internal/control/server.go`](../internal/control/server.go).
+
 `pubkey` params is `{}`. Register params and result are exactly the row in
 section 5; `names` has the four named components, and all numeric UIDs fit
 uint32. Revoke params are the three members in section 5; its result is

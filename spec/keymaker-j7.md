@@ -136,10 +136,14 @@ Policy, state, socket, static-gate and generation stanzas are required for
 readiness. Missing role stanzas refuse `j7_configuration_incomplete`; a missing
 generation stanza refuses `generation_source_unavailable`. The launcher UID
 must differ from the service UID. Key, state, policy and socket directories
-must be distinct and nonoverlapping. Every path is absolute and clean.
+must be distinct and nonoverlapping. Opened directory device/inode pairs
+must also differ, so bind-mount aliases refuse `j7_configuration_conflict`
+before key use. Every path is absolute and clean.
 
-`head_file` is a separate root-owned, single-link regular file, mode 0600 or
-0640, under root-owned ancestors with no group/other write permission. It
+`head_file` is a separate root-owned, single-link regular file, exactly mode
+0640 with the service's primary group, under root-owned ancestors with no
+group/other write permission and no access/default ACLs. Root-owned 0600
+inputs are unreadable by this unprivileged service and are refused. It
 contains exactly compact `{"expected_version":V,"expected_digest":"D"}` in
 that member order, then exactly one LF: V is a canonical integer in
 1..2^53-1 and D is 64 lowercase hexadecimal digits. Other whitespace, BOMs,
@@ -168,17 +172,30 @@ table; key load last and derived public-key equality with the gate's expected
 request key; adapter composition; socket-directory lock and listener publication;
 then exactly one `j7-request control ready` status line. No initializer or
 migration runs in the service. A missing table refuses readiness; an existing
-empty authority table grants nothing. An absent static-gate implementation
-refuses `static_gate_unavailable`, before state, secret or socket access.
+empty authority table grants nothing. The production static gate implements
+[the Keymaker consumer rule](keymaker-static-gate.md#keymaker-consumer-note),
+including the binary/pre-start and derived-key split, exact file formats,
+closed section and trusted per-effect rechecks. The seven `STATIC_GATE_*`
+refusals are preserved on startup and on the wire. A missing implementation,
+static bytes or recheck capability refuses `static_gate_unavailable`, before
+state, secret or socket access. There is no startup-sweep hook in this profile;
+its transition and reachability after gate expiry require a separate ruling.
 
 The first-run method scope is lifecycle (`hello`, bind, end, rebind),
 `j7_pubkey` and `consent_v3`. No node is configured. Node-backed operations
 cannot succeed and refuse `delegation_evidence_unavailable` when their preceding
 schema, run and grant checks are satisfied; existing earlier refusals remain
-in force, including schema-5 `delegation_request_v3` refusal. The service
+in force. In particular, an unenrolled `envelope_v3` refuses
+`GRANT_NOT_FOR_RUN` and schema-5 `delegation_request_v3` refuses
+`operation_unsupported`, not `delegation_evidence_unavailable`. These codes
+name earlier checks; they do not make either node-backed operation available. The service
 provides no legacy SSH, master or registration-helper endpoint.
 
-Store or audit failure latches admission closed. Shutdown stops acceptance,
+Store or audit failure latches admission closed. An unexpected non-closing
+accept error is fatal and is returned to the service caller as `accept failed`,
+not reported as a clean stop. With no automatic restart, even a transient accept
+failure requires the reconciled head-export/root-install restart procedure.
+Shutdown stops acceptance,
 closes and drains connections, unlinks only its matching socket inode, closes
 the key, policy and Store, then releases the state lock. Socket admission is
 128 connections globally and 8 per peer UID; lifecycle has its existing eight
@@ -191,6 +208,9 @@ group. After creation, socket owner, group and mode 0660 are verified. Group
 membership enumeration belongs to a required root-owned S8 pre-start hook:
 on every unit start it verifies `binary_sha256`, `config_sha256` and that
 `getent group` lists exactly the holder and launcher, refusing otherwise.
+It must additionally enumerate account primary-GID assignments: no account
+may have the dedicated socket group as its primary group. Supplementary-group
+output alone cannot prove that there are no other kernel-effective members.
 The service does not enumerate other accounts. That hook remains an external
 prerequisite; the example unit names it without implementing it. Group
 membership is admission; kernel peer
@@ -730,11 +750,12 @@ keymaker j7 head           --service-uid U --state-dir D --schema 0|2|4|5
 
 Rules common to all four:
 
-- **Service user only.** The effective user must be the unprivileged user named
-  by `--service-uid`; root and every other user refuse `role_not_permitted`.
-  Every directory a command opens must already be owned by that user with mode
-  0700 under ancestors that only root or that user can write. No command
-  creates a directory or changes ownership.
+- **Service user only.** Real and effective UIDs must be equal and must be the
+  unprivileged user named by `--service-uid`; root and every other identity
+  refuse `role_not_permitted`. State, key and policy directories must already
+  be service-owned 0700 under protected root-or-service-owned ancestors.
+  The read-only policy input is the exception: its file and ancestors may be
+  root-owned as specified below. No command creates a directory or changes ownership.
 - **Stopped service only.** Each command takes the exclusive state lock on
   `--state-dir`, the lock the service holds for its whole Store lifetime, before
   any other effect and keeps it until it returns. While a service (or another
@@ -821,13 +842,20 @@ under protected root-or-holder-owned ancestors; it is read once without
 following a final symbolic link. It is validated against `--instance-id` and `--identity` before
 the store is opened; unknown, missing or foreign members refuse
 `request_malformed`. `--policy-file` is the table path the service reads; it is
-neither the input nor inside the state directory. Publication follows the
+neither the input nor inside the state directory. An existing target must be a
+protected policy table for the pinned instance and identity, or publication
+refuses `j7_policy_target_invalid` before the pending commit, file replacement
+or audit append. A seed, state snapshot, head pin, symlink or foreign-policy
+file is not an eligible target. Publication follows the
 pending-commit, write, rename and completion-commit order of "Publication,
 withdrawal and the common fence". Success reports the advanced head, which
 replaces the operator's retained expectation. Republishing the current bytes is
 idempotent and leaves the head unchanged. A rollback or equivocation is refused
 with the table and head unchanged. An interrupted publication keeps its pending
-intent, reports no head and needs operator reconciliation.
+intent, reports no head and needs operator reconciliation. Signal cancellation
+can leave this pending publication permanently fail-closed: neither republish
+nor `j7 head` can reopen it. Use the stopped evidence recovery procedure below;
+there is no completing command for a pending publication in this profile.
 
 ### `j7 head`
 
@@ -859,11 +887,17 @@ the host's state.
 ### Head file and restart
 
 The service's head file (`j7_state.head_file`) is **root-owned**, regular and
-single-link, mode 0600 or 0640, under root-owned ancestors without group or
-other write, using the protected-configuration reader's rules. It is distinct
+single-link, exactly mode 0640 with the service's primary group, under root-owned
+ancestors without group/other write or access/default ACLs, using the
+protected-configuration reader's rules. It is distinct
 from the configuration file, the Store and every service-writable directory.
 The operator reconciles a stopped `j7 head` export against independent evidence
 and installs those exact bytes as a separate privileged provisioning step.
+Root creates an exclusive temporary file in the protected destination directory,
+writes the full canonical bytes, sets final root ownership, service group and
+0640 mode without ACLs, fsyncs the file, renames it over the pin and fsyncs the
+parent directory. A torn or noncanonical install only refuses startup; never
+repair it in the running service.
 Neither a Keymaker subcommand nor the running service writes it or advances
 its own pin. The service refuses an absent, foreign-owned or unsafe pin before
 opening its Store. Root compromise defeats this pin; root is in the static
@@ -877,10 +911,26 @@ in HELD and operator recovery. The heads in `migrate` and `policy-publish`
 results are reconciliation aids; only a subsequent successful `j7 head`
 prints the exact installable bytes.
 
+### Stopped evidence recovery
+
+After an unknown signing handoff or pending publication: stop admission and
+the service, retain all snapshot/journal/staging evidence, and reconcile it
+against independently retained effects and outcomes. **No recovery command
+exists in this profile** for either condition; do not clear markers, guess
+release success, initialize a new history or merely reinstall a stale pin.
+An operator-approved, evidence-proven coherent state must first be restored
+through a separately reviewed offline recovery procedure. If that cannot be
+proved, remain stopped. Only after recovery permits a normal open may the
+operator export `j7 head`, reconcile and retain its exact bytes, have root
+install the pin durably as above, then restart. Specifying and qualifying that
+offline state recovery remains an owner gate.
+
 ### Provisioning order
 
-1. Create distinct service-owned key, state and policy directories with mode
-   0700, and the socket directory with mode 0755 as required by the runtime.
+1. Create distinct, disjoint and nonoverlapping service-owned key, state and
+   policy directories with mode 0700, and the socket directory with mode 0755
+   as required by the runtime. In particular, the key parent must not contain
+   the state directory even though `seed-init` alone accepts that layout.
 2. `j7 seed-init`.
 3. Place the reconciled legacy state, with its `generation.anchor` and audit
    journal, in the state directory; `j7 head --schema 0|2` verifies the

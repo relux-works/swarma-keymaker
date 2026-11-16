@@ -1,12 +1,12 @@
 # Static gate statement `swarma-s7 static-gate/1`
 
-Status: **format and verifier for review; not activated**. This document
+Status: **format, verifier and Linux Keymaker importer; deployment prerequisites remain**. This document
 defines one signed statement, the rule a consumer applies to it and the
 vectors that pin both. The [`staticgate`](../staticgate/README.md) package
-implements the rule as a pure function. No daemon reads a statement yet: no
-importer, native method, purpose allocation or deployment is enabled here, and
-purpose 6 of the [station-caller proposal](keymaker-station-caller.md) stays
-reserved and unallocated.
+implements the rule as a pure function. The Linux request-role service consumes
+it through the protected importer described below. This does not qualify a
+deployment or allocate a purpose; purpose 6 of the
+[station-caller proposal](keymaker-station-caller.md) stays reserved and unallocated.
 
 The key words MUST, MUST NOT and MAY are normative.
 The consumer-rule clarifications below amend the static-gate r2 format.
@@ -133,11 +133,17 @@ and the first failure decides the refusal code.
 1. **Pins and bounded parse.** The consumer reads the approver key and the
    SHA-256 of the preimage of the one G in use from its protected, root-owned
    install path, never from G, and performs these checks in this exact order:
-   - First, compute the digest over the raw bytes, before any parse or size
-     check, and refuse unless it equals the pinned digest:
+   - First, compute the digest of §3, formed from the raw, unparsed bytes
+     (tag, LF, then those bytes), before any parse or size check, and refuse
+     unless it equals the pinned digest:
      `STATIC_GATE_PIN`.
-   - Then bound the parse: a preimage over 8192 bytes, a codec refusal, or a
-     non-object value refuses with `STATIC_GATE_FORM`.
+   - Then bound the parse: a preimage over 8192 bytes, a codec refusal
+     (including the codec container-depth bound of 16), or a non-object value
+     refuses with `STATIC_GATE_FORM`. The format's depth bound of 8 is checked
+     only at step 2: with a correct pin, a wrong-key statement at depth 9–16
+     therefore refuses `STATIC_GATE_KEY`, while depth 17 or more refuses FORM.
+     Because the pure verifier hashes before its size check, the consumer's
+     protected reader must independently bound how many bytes it reads.
    - Then require `approver.key` to equal the pinned key:
      `STATIC_GATE_KEY`; an unreadable approver key refuses here too.
 
@@ -153,6 +159,8 @@ and the first failure decides the refusal code.
 5. **Window.** `not_before < not_after`, `not_after − not_before ≤ 72 h`, a
    non-zero `Now` for every class, and for class `start` (§5.1)
    `not_before ≤ now < not_after` on the host clock: `STATIC_GATE_WINDOW`.
+   Zero Now is refused here, after signature verification at step 3, not before
+   public-key signature computation. Refusal returns no usable statement.
 6. **Scope.** The consumer's own section, and `association` where the consumer
    consumes it, equal the expected canonical bytes from its protected
    configuration exactly: `STATIC_GATE_SCOPE_MISMATCH`.
@@ -162,7 +170,7 @@ cannot vouch for itself. Checking `binary_sha256` and `config_sha256` against
 the installed files is the installer's root-owned pre-start check, at install
 and again at every unit start.
 
-Every refusal happens before secret load and before the listener (Keymaker),
+Every startup refusal happens before secret load and before the listener (Keymaker),
 before dispatch (dispatcher) and before lease (broker), and leaves no partial
 state. All-zero pins, an all-zero machine-id digest, an unknown consumer and
 an empty expected section refuse. A zero `Now` is an unfilled input and
@@ -194,6 +202,44 @@ The following producer choices are ratified as r2 clarifications:
   sections refuse with `STATIC_GATE_FORM`, while values within an object
   remain opaque, including arrays, booleans and null.
 
+### Keymaker consumer note
+
+The Linux request-role importer reads four root-owned, single-link regular
+files of mode 0640 with the service's primary group, beneath protected
+root-owned ancestors. Access/default ACLs are refused. The approver key and
+digest files are exactly 64 lowercase hex characters plus one LF; the
+signature file is exactly 128 lowercase hex characters plus one LF. The
+statement is the exact CCJ-1 bytes with no LF. Reads are bounded before parsing.
+Unreadable, unsafe or malformed key, digest, statement and signature files
+refuse `STATIC_GATE_KEY`, `STATIC_GATE_PIN`, `STATIC_GATE_FORM` and
+`STATIC_GATE_SIGNATURE`, respectively. An unreadable or unsafe root-owned
+regular `/etc/machine-id` refuses `STATIC_GATE_HOST`; its exact content is
+hashed without trimming. A statement changed without updating its digest pin
+refuses `STATIC_GATE_PIN` before its content is parsed.
+
+The expected `keymaker` section is CCJ-1 of exactly
+`{"binary_sha256":B,"config_sha256":C,"j7_request_key":K,"service_uid":U}`.
+U is the checked service UID and C is SHA-256 of the exact protected config
+bytes. B and K come from the signed statement's own section, and must each be
+64 lowercase hex characters. The exact comparison pins U, C and the closed
+member set. The service does not hash itself: the root-owned S8 pre-start
+check must compare the installed binary with B. Only after every earlier
+startup precondition passes does custody load the key and compare its derived
+public key with K (`j7_request_key_mismatch` on disagreement). Keymaker does
+not consume association and supplies no expected association bytes.
+
+Startup verifies class `start` with the supplied trusted Now. The captured
+statement, signature and pins are immutable for the process lifetime; every
+bind, rebind, sign, consent and public-key effect verifies class `start`
+again with a fresh trusted sample. Run end and response release use class
+`end`. A request refusal is audited through the control observer and precedes
+the wrapped effect. File replacement after startup does not update authority;
+a reconciled restart is required. No host-clock fallback is used.
+
+The base lifecycle has no startup-sweep entry point. Adding that transition
+and specifying how it is reached when startup's required `start` check is
+expired remain unresolved; the importer does not invent a sweep.
+
 ### 5.1 Operation classes and the window end
 
 | Class | Operations | Step 5 |
@@ -207,7 +253,9 @@ quarantine. The bounds on the window itself (`not_before < not_after`, at most
 72 hours) are properties of G and are checked for both classes with
 `STATIC_GATE_WINDOW`; the signer applies the same width rule. This width
 rule is an r2 amendment: `end` skips only comparing `Now` with the window
-bounds, never the non-zero-`Now` requirement.
+bounds, never the non-zero-`Now` requirement. The retained
+`end-before-not-before` positive means only that window bounds are not compared;
+it does not mean an end is exempt from all clock checks.
 Any class other than `start` or `end` refuses with `STATIC_GATE_WINDOW`.
 
 ## 6. Caller authentication

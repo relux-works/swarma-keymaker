@@ -154,12 +154,22 @@ func reconcileJ7Denials(old, next *j7PolicyTable, denials []j7Denial) []j7Denial
 	return kept
 }
 func j7NoACL(fd int, directory bool) bool {
+	return j7NoACLQuery(func(name string) (int, error) { return unix.Fgetxattr(fd, name, nil) }, directory)
+}
+
+// Socket inodes cannot be opened for Fgetxattr. Lgetxattr on the retained
+// directory's descriptor path checks the inode without following a final link.
+func j7SocketNoACL(path string) bool {
+	return j7NoACLQuery(func(name string) (int, error) { return unix.Lgetxattr(path, name, nil) }, false)
+}
+
+func j7NoACLQuery(get func(string) (int, error), directory bool) bool {
 	names := []string{"system.posix_acl_access"}
 	if directory {
 		names = append(names, "system.posix_acl_default")
 	}
 	for _, name := range names {
-		_, err := unix.Fgetxattr(fd, name, nil)
+		_, err := get(name)
 		if err != unix.ENODATA && err != unix.ENOTSUP {
 			return false
 		}
@@ -364,6 +374,17 @@ func (p *j7Policy) publish(ctx context.Context, raw []byte) Code {
 		defer s.mu.Unlock()
 		if s.failed || s.j7 == nil || s.j7.Pending {
 			return "j7_state_fenced"
+		}
+		// Never rename over another holder artifact, even on an advancing
+		// version. Inspect before the pending commit under the publication lock.
+		var target unix.Stat_t
+		targetErr := unix.Fstatat(int(p.dir.Fd()), p.name, &target, unix.AT_SYMLINK_NOFOLLOW)
+		if targetErr != unix.ENOENT {
+			current, readErr := p.read()
+			_, decodeErr := decodeJ7Policy(current, p.instance, p.identity)
+			if targetErr != nil || readErr != nil || decodeErr != nil {
+				return "j7_policy_target_invalid"
+			}
 		}
 		if table.Version == s.j7.Version {
 			current, e := p.read()

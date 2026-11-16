@@ -202,7 +202,7 @@ func openJ7Socket(path string, uid, gid uint32, listen func(*os.File, uint32) (*
 	}
 	s := &j7Socket{dir: dir, listener: listener, inode: inode, device: device, connections: map[*net.UnixConn]uint32{}, counts: map[uint32]int{}}
 	st, err := os.Lstat(fmt.Sprintf("/proc/self/fd/%d/control.sock", dir.Fd()))
-	if err != nil || st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 {
+	if err != nil || st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || !j7SocketNoACL(fmt.Sprintf("/proc/self/fd/%d/control.sock", dir.Fd())) {
 		s.remove()
 		return nil, failure("unsafe control socket")
 	}

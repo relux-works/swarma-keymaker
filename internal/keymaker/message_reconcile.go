@@ -184,6 +184,8 @@ func (m *messageMaintenance) reconcile(ctx context.Context, expected messageReco
 		}
 		// Establish the surviving journal tail's durability before installing its exact
 		// already retained body. The commit supplies only audit linkage, no lost bytes.
+		// Message maintenance is eager-only: its opener must never be replaced
+		// with the J7 stopped-operator deferred-writer opener (file may be nil).
 		if s.journal.file.Sync() != nil || s.auditDir.Sync() != nil {
 			return "audit_unavailable"
 		}

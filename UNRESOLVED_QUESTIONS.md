@@ -25,6 +25,30 @@ The authoritative decision list and safe defaults are in
   enforcement capability. All matched rows with `exe` refuse locally, including
   matching procfs snapshots. No UID-only fallback is allowed.
 
+## Request-role stopped recovery and sweep
+
+An unknown signing handoff or cancelled pending policy publication fences
+normal open and head export. No recovery/completion command exists in this
+profile. The [stopped evidence recovery procedure](spec/keymaker-j7.md#stopped-evidence-recovery)
+is stop, preserve and independently reconcile evidence, obtain an approved
+coherent offline recovery, then export and reconcile the head and have root
+install it durably before restart. Defining and qualifying that offline state
+recovery remains an owner gate; clearing markers or installing a stale pin is
+not recovery.
+
+There is no startup-sweep implementation or hook in the current lifecycle.
+The sweep transition and how it can run after expiry while startup requires
+class `start` verification need an owner contract. Existing run-end and release
+paths use class `end`; this does not supply the missing sweep.
+
+The no-node service currently retains earlier schema/grant refusals:
+`delegation_request_v3` returns `operation_unsupported` at schema 5 and an
+unenrolled `envelope_v3` returns `GRANT_NOT_FOR_RUN`. Whether the first-run
+no-node rule must instead supersede those checks with
+`delegation_evidence_unavailable` needs an explicit refusal-precedence ruling.
+The operator specification names the actual behavior; it does not silently
+reorder those checks or claim the uniform code is implemented.
+
 ## Station-caller purpose proposal
 
 The [station-caller supplement](spec/keymaker-station-caller.md) records the

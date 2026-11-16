@@ -63,15 +63,18 @@ type J7OperatorResult struct {
 	Digest  string `json:"head_digest"`
 }
 
-// The seam is private: tests substitute only the audit clock. Stopped-operator
-// commits use no time source (see j7OperatorProduction).
+// The seam is private: no command argument selects an identity or clock source.
+// Stopped-operator commits use no time source (see j7OperatorProduction).
 type j7OperatorDeps struct {
-	clock AuditClock
+	clock    AuditClock
+	identity func() (uint32, uint32) // real and effective UID, for executable identity refusals
 }
 
 // A command argument must not select a time source, so operator commits are
 // recorded with a null time and the `unknown` result that replay accepts.
-func j7OperatorProduction() j7OperatorDeps { return j7OperatorDeps{clock: systemAuditClock{}} }
+func j7OperatorProduction() j7OperatorDeps {
+	return j7OperatorDeps{clock: systemAuditClock{}, identity: func() (uint32, uint32) { return uint32(os.Getuid()), uint32(os.Geteuid()) }}
+}
 
 // RunJ7Operator executes one stopped-operator command.
 func RunJ7Operator(ctx context.Context, req J7OperatorRequest) J7OperatorResult {
@@ -194,8 +197,12 @@ func j7OperatorRun(ctx context.Context, req J7OperatorRequest, deps j7OperatorDe
 	}
 	// Only the unprivileged service user operates its own custody. Root is
 	// refused too: it would create root-owned evidence the service cannot open.
-	euid := uint32(os.Geteuid())
-	if euid == 0 || euid != req.ServiceUID {
+	identity := deps.identity
+	if identity == nil {
+		identity = j7OperatorProduction().identity
+	}
+	ruid, euid := identity()
+	if euid == 0 || ruid != euid || euid != req.ServiceUID {
 		return j7Refuse("role_not_permitted", "command runs only as the service user")
 	}
 	uid := req.ServiceUID

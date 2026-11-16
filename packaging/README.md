@@ -36,7 +36,8 @@ checks still run in the daemon.
 
 ## Protected time policy
 
-The root-owned mode 0640 service configuration is the protected policy carrier.
+The root-owned mode 0640 service configuration, with the service's primary
+group and no extended ACL, is the protected policy carrier.
 `time_policy` stays an inline object; no second policy file is needed by the
 pinned provider. Use the same option-A policy as the registrar. The example
 below selects chrony with NTS sources and the platform limits (integer
@@ -263,20 +264,31 @@ key/state/policy are service-owned 0700 and runtime is 0755. The group
 service UID. The unit supplies holder supplementary membership solely to permit
 unprivileged socket group assignment; the launcher is the only non-holder
 member. A required root-owned S8 pre-start hook must refuse every unit start
-unless `getent group swarma-j7-launch` lists exactly those two accounts; it also
-verifies `binary_sha256` and `config_sha256`. Provisioning must check primary-group
-assignments for additional members. The unit names this required hook in a
+unless `getent group swarma-j7-launch` lists exactly those two accounts and
+no account has that dedicated group as its primary GID. It also verifies
+`binary_sha256` and `config_sha256`. The primary-group check is required on
+every start, not only provisioning; the group member list cannot reveal it. The unit names this required hook in a
 comment; it does not supply or execute an unimplemented privileged component.
 The process checks its own membership, not the membership of other accounts. The
 service is a different account from legacy custody; group admission does not
 replace the per-request kernel peer and generation checks.
 
 Configuration, static-gate inputs and the canonical one-LF head file are
-root-owned, read-only to the service. Only state, policy and runtime are writable
+root-owned, exactly mode 0640 with the service's primary group, single-link
+regular files, read-only to the service and without extended ACLs. Protected
+root-owned ancestors have no group/other write or access/default ACLs. A
+root-owned 0600 file is not a usable service input. Socket mode 0660 also
+requires no access ACL, and the socket directory must have no default ACL.
+Only state, policy and runtime are writable
 inside the unit sandbox; the key directory and head file are not writable.
 The unit deliberately has no automatic restart: each restart needs the stopped
 operator's reconciled head export and a separate root installation. A crash
 leaves HELD authority pending operator recovery. No node or network access is
-configured. The static-gate importer is a required later dependency; this source
-cut refuses `static_gate_unavailable` before opening state or loading the key.
-Packaging is not installation or native qualification.
+configured. The production static-gate importer verifies the protected signed
+statement before state or key access, and rechecks dependent effects with trusted
+time. The root pre-start hook and distinct-UID/native qualification remain
+external prerequisites. Unexpected accept errors are fatal and reported; with
+`Restart=no` they also require the reconciled restart procedure. Unknown
+signing handoff and cancelled pending publication require stopped evidence
+recovery; no recovery/completion command exists in this profile. Packaging is
+not installation or native qualification.

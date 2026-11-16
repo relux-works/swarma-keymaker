@@ -205,41 +205,9 @@ func ProtectedConfig(path string, v any) error {
 // protectedBytes returns the exact protected file bytes under the same owner,
 // ancestor, mode and size rules, for callers that also bind those static bytes.
 func protectedBytes(path string) ([]byte, error) {
-	path = filepath.Clean(path)
-	if !filepath.IsAbs(path) {
-		return nil, failure("configuration path must be absolute")
-	}
-	for d := filepath.Dir(path); ; d = filepath.Dir(d) {
-		st, err := os.Lstat(d)
-		if err != nil || !st.IsDir() || st.Mode().Perm()&022 != 0 || st.Sys().(*syscall.Stat_t).Uid != 0 {
-			return nil, failure("unsafe configuration parent")
-		}
-		if d == "/" {
-			break
-		}
-	}
-	dir, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return nil, failure("configuration unavailable")
-	}
-	defer dir.Close()
-	// root-readable configuration may be 0600 or group-readable 0640; never writable by peers.
-	var f *os.File
-	for _, mode := range []uint32{0600, 0640} {
-		f, err = openRelative(dir, filepath.Base(path), syscall.O_RDONLY, 0, mode)
-		if err == nil {
-			break
-		}
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	b, err := io.ReadAll(io.LimitReader(f, (256<<20)+1))
-	if err != nil || len(b) > 256<<20 {
-		return nil, failure("state capacity exceeded")
-	}
-	return b, nil
+	// The unprivileged service must be able to read root-owned inputs. Pin
+	// exactly its primary group, mode 0640 and no extended/default ACLs.
+	return protectedRead(path, 256<<20, 0, uint32(os.Getgid()), 0640)
 }
 
 // UnavailableGeneration never treats UID existence as account-incarnation authority.

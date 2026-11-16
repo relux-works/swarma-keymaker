@@ -21,6 +21,7 @@ import (
 	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/control"
 	wire "github.com/relux-works/swarma-keymaker/j7lifecycle"
+	"github.com/relux-works/swarma-keymaker/staticgate"
 	gj "github.com/relux-works/swarma-user-manager/tools/genjournal"
 	"golang.org/x/sys/unix"
 )
@@ -97,7 +98,7 @@ func (g *j7ServiceGate) verify(_ context.Context, in j7StaticGateInput) (j7Stati
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.inputs = append(g.inputs, in)
-	return j7StaticGateResult{RequestKey: g.key}, g.code
+	return j7StaticGateResult{RequestKey: g.key, check: func(time.Time, staticgate.Class) Code { return "" }}, g.code
 }
 
 type j7ServiceFixture struct {
@@ -589,7 +590,7 @@ func TestJ7ServiceRoleDispatch(t *testing.T) {
 	}
 	// Positive control: the complete request role passes role dispatch and its
 	// cross-field and identity steps; production then stops at untrusted time,
-	// and with trusted time at the still-unwired static gate.
+	// and with trusted time at the required static gate.
 	f := j7ServiceSetup(t, j7ServiceOptions{})
 	if e := serveValidatedConfig(context.Background(), f.cfg, &status, nil); e != Code("clock_untrusted") || status.Len() != 0 {
 		t.Fatal("request role next gate", e)
@@ -804,7 +805,7 @@ func TestJ7ServiceTrustedTimeBeforeGateStartup(t *testing.T) {
 			return func() { f.deps.clock = saved }
 		}},
 		{name: "gate-not-wired", want: "static_gate_unavailable", refusal: early, damage: func(_ *testing.T, f *j7ServiceFixture) func() {
-			f.deps.gate = productionJ7ServiceDeps().gate
+			f.deps.gate = nil
 			return func() { f.deps.gate = f.gate }
 		}},
 		{name: "no-static-bytes", want: "static_gate_unavailable", refusal: early, damage: func(_ *testing.T, f *j7ServiceFixture) func() {

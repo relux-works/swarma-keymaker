@@ -46,6 +46,9 @@ func NewDaemonServer(socketDir string, e *Engine, cfg NativeConfig, gid uint32, 
 // control listener. Existing entries are never removed to make startup work.
 func createControlSocket(dir *os.File, gid uint32) (*net.UnixListener, uint64, uint64, error) {
 	anchor := fmt.Sprintf("/proc/self/fd/%d", dir.Fd())
+	if !j7NoACL(int(dir.Fd()), true) {
+		return nil, 0, 0, failure("unsafe socket directory ACL")
+	}
 	if _, err := os.Lstat(anchor + "/control.sock"); !os.IsNotExist(err) {
 		return nil, 0, 0, failure("control socket already exists")
 	}
@@ -84,7 +87,7 @@ func createControlSocket(dir *os.File, gid uint32) (*net.UnixListener, uint64, u
 		return fail()
 	}
 	stat := st.Sys().(*syscall.Stat_t)
-	if st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || stat.Uid != uint32(os.Getuid()) || stat.Gid != gid {
+	if st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || stat.Uid != uint32(os.Getuid()) || stat.Gid != gid || !j7SocketNoACL(staged) {
 		return fail()
 	}
 	if syscall.Renameat(fd, "control.sock", int(dir.Fd()), "control.sock") != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/control"
 	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
+	"github.com/relux-works/swarma-keymaker/staticgate"
 )
 
 // j7StaticGateInput is everything the static gate may bind at startup: the
@@ -37,11 +38,11 @@ type j7StaticGateInput struct {
 // expects: 64 lowercase hex characters of the x-only key.
 type j7StaticGateResult struct {
 	RequestKey string
+	check      func(time.Time, staticgate.Class) Code
 }
 
-// j7StaticGate is the required startup seam for the signed static gate. The
-// verifier is a separate unit; until it is wired the production value is nil
-// and startup refuses static_gate_unavailable. A nil gate never passes.
+// j7StaticGate is the required startup seam for the signed static gate.
+// A nil gate or a verdict without a per-effect check never passes.
 type j7StaticGate interface {
 	verify(context.Context, j7StaticGateInput) (j7StaticGateResult, Code)
 }
@@ -63,8 +64,7 @@ type j7ServiceDeps struct {
 func productionJ7ServiceDeps() j7ServiceDeps {
 	var d j7ServiceDeps
 	d.clock = func(p *timeconf.Policy) (*timeconf.Provider, error) { return timeconf.Production(p, nil) }
-	// The static gate importer is not wired yet: readiness stays refused.
-	d.gate = nil
+	d.gate = productionJ7StaticGate()
 	d.ancestors = safeAncestors
 	d.head = protectedJ7Head
 	d.generation = func(s *Store, c generationJournalConfig) GenerationSource {
@@ -102,8 +102,8 @@ func decodeJ7Head(raw []byte) (j7Expectation, error) {
 }
 
 // protectedJ7Head reads the head pin under the protected-configuration rules:
-// root-owned 0600/0640 single-link file below root-owned ancestors that are
-// not group/other writable. The service account can read but never write it.
+// root-owned 0640 single-link file with the service's primary group below
+// protected root-owned ancestors, without ACLs. The service cannot write it.
 func protectedJ7Head(path string) (j7Expectation, error) {
 	raw, err := protectedBytes(path)
 	if err != nil {
@@ -157,8 +157,8 @@ func j7ServiceComplete(cfg Config) Code {
 	return ""
 }
 
-// j7ServiceCrossField adds the lexical cross-member rules. Later descriptor
-// walks refuse symlinks, so distinct clean paths stay distinct directories.
+// j7ServiceCrossField adds lexical cross-member rules. Descriptor identity is
+// checked separately before state-file/key access to refuse bind-mount aliases.
 func j7ServiceCrossField(cfg Config) Code {
 	if c := j7ServiceComplete(cfg); c != "" {
 		return c
@@ -184,6 +184,55 @@ func j7ServiceCrossField(cfg Config) Code {
 		}
 	}
 	return ""
+}
+
+// j7ServiceDirectoryIdentity opens only directories, never custody files. A
+// bind-mounted alias has a different path but the same device/inode pair.
+func j7ServiceDirectoryIdentity(cfg Config, uid uint32) error {
+	var dirs []*os.File
+	defer func() {
+		for _, dir := range dirs {
+			dir.Close()
+		}
+	}()
+	for i, path := range j7ServiceDirs(cfg) {
+		mode := uint32(0700)
+		if i == 3 {
+			mode = 0755
+		}
+		dir, err := OpenDirectory(path, uid, mode)
+		if err != nil {
+			if i == 0 {
+				return errJ7Key
+			}
+			return err
+		}
+		dirs = append(dirs, dir)
+	}
+	if !j7DistinctDirectoryIDs(dirs) {
+		return Code("j7_configuration_conflict")
+	}
+	return nil
+}
+
+func j7DistinctDirectoryIDs(dirs []*os.File) bool {
+	type identity struct {
+		device uint64
+		inode  uint64
+	}
+	seen := map[identity]bool{}
+	for _, dir := range dirs {
+		var st syscall.Stat_t
+		if syscall.Fstat(int(dir.Fd()), &st) != nil {
+			return false
+		}
+		id := identity{uint64(st.Dev), st.Ino}
+		if seen[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	return true
 }
 
 // j7ServiceStation selects the pinned station binding and checks the Store's
@@ -274,7 +323,7 @@ func startJ7Request(ctx context.Context, cfg Config, static []byte, status io.Wr
 	if code != "" {
 		return code
 	}
-	if !validDigest(verdict.RequestKey) {
+	if !validDigest(verdict.RequestKey) || verdict.check == nil {
 		return Code("static_gate_unavailable")
 	}
 	// Step 7: ancestors of every service directory.
@@ -291,6 +340,9 @@ func startJ7Request(ctx context.Context, cfg Config, static []byte, status io.Wr
 	expected, e := d.head(cfg.J7State.HeadFile)
 	if e != nil {
 		return Code("j7_head_pin_unavailable")
+	}
+	if err := j7ServiceDirectoryIdentity(cfg, uid); err != nil {
+		return err
 	}
 	// State directory, exclusive lock, then the exact-head Store.
 	state, e := OpenDirectory(cfg.J7State.Path, uid, 0700)
@@ -356,8 +408,15 @@ func startJ7Request(ctx context.Context, cfg Config, static []byte, status io.Wr
 	if e != nil {
 		return e
 	}
+	gated := &j7GatedHandler{j7ServiceAdapter: custody, check: verdict.check, now: func(ctx context.Context) (time.Time, Code) {
+		sample, err := timeconfidence.Sample(ctx, provider)
+		if err != nil {
+			return time.Time{}, "clock_untrusted"
+		}
+		return sample.Now, ""
+	}}
 	latch := newJ7Latch()
-	handler := &j7ServiceHandler{inner: custody, latch: latch, health: func() Code { return j7StoreHealth(store) }}
+	handler := &j7ServiceHandler{inner: gated, latch: latch, health: func() Code { return j7StoreHealth(store) }}
 	wire, e := control.New(handler, handler, handler, handler, handler)
 	if e != nil {
 		return e

@@ -6,8 +6,9 @@ This package applies the consumer rule of
 [`swarma-s7 static-gate/1`](../spec/keymaker-static-gate.md) to one signed
 statement. It is a pure function: it holds no signer and no private key, opens
 no file or socket, reads no clock and hashes no binary. The caller supplies
-every input. Nothing in this repository calls it yet; publishing it enables no
-daemon mode, method or purpose.
+every input. The Linux request-role service calls it through its protected
+static-gate importer at startup and before dependent effects. Deployment still
+requires the root-owned pre-start checks; no new purpose is allocated.
 
 ## API
 

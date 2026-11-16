@@ -1,0 +1,56 @@
+[
+  {
+    "Name": "identity",
+    "Kind": "request",
+    "Body": "{\"method\":\"message_author_identity\",\"params\":{},\"request_id\":\"0123456789abcdef0123456789abcdef\",\"timeout_ms\":2000}",
+    "Error": ""
+  },
+  {
+    "Name": "sign",
+    "Kind": "request",
+    "Body": "{\"method\":\"sign_message_author\",\"params\":{\"preimage\":\"Zml4dHVyZQ\"},\"request_id\":\"0123456789abcdef0123456789abcdef\",\"timeout_ms\":1}",
+    "Error": ""
+  },
+  {
+    "Name": "path-selector",
+    "Kind": "request",
+    "Body": "{\"method\":\"sign_message_author\",\"params\":{\"path\":\"m/9'/1'/2'/3'\",\"preimage\":\"Zml4dHVyZQ\"},\"request_id\":\"0123456789abcdef0123456789abcdef\",\"timeout_ms\":1}",
+    "Error": "ErrRequest"
+  },
+  {
+    "Name": "deadline",
+    "Kind": "request",
+    "Body": "{\"method\":\"sign_message_author\",\"params\":{\"preimage\":\"Zml4dHVyZQ\"},\"request_id\":\"0123456789abcdef0123456789abcdef\",\"timeout_ms\":2001}",
+    "Error": "ErrRequest"
+  },
+  {
+    "Name": "identity-result",
+    "Kind": "identity",
+    "Body": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"result\":{\"attestation\":\"e30\",\"author_attestation\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"key_id\":\"bip340:eb5mfvncu6xVoGKVzocLBwKb_NstzijZWfKBWxb4F5g\"}}",
+    "Error": ""
+  },
+  {
+    "Name": "signature-shape-only",
+    "Kind": "sign",
+    "Body": "{\"request_id\":\"0123456789abcdef0123456789abcdef\",\"result\":{\"key_id\":\"bip340:eb5mfvncu6xVoGKVzocLBwKb_NstzijZWfKBWxb4F5g\",\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}}",
+    "Error": ""
+  },
+  {
+    "Name": "wrong-id",
+    "Kind": "sign",
+    "Body": "{\"request_id\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"result\":{\"key_id\":\"bip340:eb5mfvncu6xVoGKVzocLBwKb_NstzijZWfKBWxb4F5g\",\"signature\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}}",
+    "Error": "ErrResponse"
+  },
+  {
+    "Name": "uncorrelated-busy",
+    "Kind": "sign",
+    "Body": "{\"error\":{\"code\":\"busy\",\"retryable\":true},\"request_id\":null}",
+    "Error": ""
+  },
+  {
+    "Name": "busy-bit",
+    "Kind": "sign",
+    "Body": "{\"error\":{\"code\":\"busy\",\"retryable\":false},\"request_id\":\"0123456789abcdef0123456789abcdef\"}",
+    "Error": "ErrResponse"
+  }
+]

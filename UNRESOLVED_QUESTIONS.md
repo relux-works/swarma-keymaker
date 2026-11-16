@@ -487,3 +487,17 @@ generic public fixture bytes are distinct. Independent /2 review, actual broker
 origin/credential isolation and external kind8186 interoperability remain open.
 The BIP-340 dependency's rare challenge-at-least-order fail-closed availability edge
 remains a signing limit, without a feasible natural reproduction here.
+
+## BIP-340 message-author activation
+
+Purpose9 is allocated in the [canonical catalog](spec/keymaker-purposes.md);
+the [message-author source unit](spec/keymaker-message-author.md) is
+**fixture-only, not live**. The two public codec methods remain unregistered.
+A separate live unit needs actual own-GEN/binding authority for an independent
+holder, purpose5 publication-backed current BIP-340 certificate selection, new
+reviewed durable state/config/custody profile, bounded exact retained retry/audit
+and final-write withdrawal barriers, crash/ack-loss qualification and the
+privileged operator/J7 real-key gate. Existing messageCurrent is unavailable;
+a readable certificate or public fixture does not fill it. No fleet export is
+needed: the carrier owns sender-carried A verification with per-host issuer pins
+and an owner-published registration-to-sender projection.

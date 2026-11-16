@@ -22,6 +22,10 @@ fixed local operations under continuous exclusion leases.
 Its combined message-state format/migration and joint qualification gates remain
 open; no existing file or callback is thereby promoted to PC2 authority.
 
+The [numeric purpose catalog](keymaker-purposes.md) is authoritative for allocation
+and reservation metadata, including the fixture-only purpose-9 message author.
+It does not widen this specification's runtime or legacy purpose allowlists.
+
 ## 1. Scope and public references
 
 Keymaker is a dedicated local key-custody service. It provides one bound

@@ -8,7 +8,7 @@ require golang.org/x/sys v0.47.0
 
 require github.com/relux-works/swarma-user-manager v0.0.0-20261024191358-505fb9f55a6d
 
-require github.com/relux-works/swarma-envelope v0.0.0-20261026200550-5636986d0de5
+require github.com/relux-works/swarma-envelope v0.0.0-20261114153213-065e25f69da8
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.5.1

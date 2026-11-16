@@ -18,10 +18,10 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire or j7-idle controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle or message-author controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -100,6 +100,25 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
+	if *group == "message-author" {
+		// Only new source gates are weakened. Each named assertion must fail;
+		// compiler/setup errors, timeouts and unplanted controls are not kills.
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"ma-wire-cap", "../../messageauthor/codec.go", `if n > MaxFrame {`, `if false && n > MaxFrame {`, "^TestMessageAuthorFrameLimits$", "--- FAIL: TestMessageAuthorFrameLimits", "cap header accepted"},
+			{"ma-wire-params", "../../messageauthor/codec.go", `if !members(p, "preimage") {`, `if false && !members(p, "preimage") {`, "^TestMessageAuthorClosedRequests$", "--- FAIL: TestMessageAuthorClosedRequests", "request refusal/zero"},
+			{"ma-wire-id", "../../messageauthor/codec.go", `r.ID != q.ID`, `false && r.ID != q.ID`, "^TestMessageAuthorResponseContext$", "--- FAIL: TestMessageAuthorResponseContext", "response refusal/zero"},
+			{"ma-wire-key", "../../messageauthor/codec.go", `&& record.ValidateKey(s) == nil`, ``, "^TestMessageAuthorResponseContext$", "--- FAIL: TestMessageAuthorResponseContext", "invalid identity accepted"},
+			{"ma-wire-preimage-cap", "../../messageauthor/codec.go", `return len(r.Preimage) <= MaxPreimage`, `return len(r.Preimage) <= MaxFrame`, "^TestMessageAuthorFrameLimits$", "--- FAIL: TestMessageAuthorFrameLimits", "oversize copied"},
+			{"ma-binding", "message_author_key.go", `current != b || `, ``, "^TestMessageAuthorBindingSelection$/^registration$", "--- FAIL: TestMessageAuthorBindingSelection/registration", "binding substitution public"},
+			{"ma-role", "message_author_key.go", `k.role != messageAuthorRole || `, ``, "^TestMessageAuthorCustodyNoRelease$/^wrong-role$", "--- FAIL: TestMessageAuthorCustodyNoRelease/wrong-role", "custody failure output"},
+			{"ma-entropy", "message_author_key.go", `if _, e := io.ReadFull(k.entropy, aux[:]); e != nil {`, `if _, e := io.ReadFull(k.entropy, aux[:]); false && e != nil {`, "^TestMessageAuthorCustodyNoRelease$/^short-entropy$", "--- FAIL: TestMessageAuthorCustodyNoRelease/short-entropy", "custody failure output"},
+			{"ma-double-hash", "message_author_key.go", `hash := sha256.Sum256(plan.original)`, `first := sha256.Sum256(plan.original); hash := sha256.Sum256(first[:])`, "^TestMessageAuthorEnvelopeProfile$", "--- FAIL: TestMessageAuthorEnvelopeProfile", "independent original preimage signature"},
+			{"ma-admission", "message_author_preimage.go", `if err != nil {`, `if false && err != nil {`, "^TestMessageAuthorPreimageAdmission$/^space$", "--- FAIL: TestMessageAuthorPreimageAdmission/space", "preimage refusal"},
+			{"ma-identity", "message_author_preimage.go", `MultiAgent: true, Check: true`, `MultiAgent: false, Check: false`, "^TestMessageAuthorCallerIdentity$/^attestation$", "--- FAIL: TestMessageAuthorCallerIdentity/attestation", "identity path accepted"},
+			{"ma-no-copy", "message_author_preimage.go", `original: append([]byte(nil), original...)`, `original: original`, "^TestMessageAuthorEnvelopeProfile$", "--- FAIL: TestMessageAuthorEnvelopeProfile", "preimage alias"},
+			{"ma-export", "message_author_key.go", `io.WriteString(s, "[message-author custody]")`, `fmt.Fprintf(s, "%x", k.seed)`, "^TestMessageAuthorCustodyNoRelease$", "--- FAIL: TestMessageAuthorCustodyNoRelease", "secret diagnostic"},
+		}
+	}
 	if *group == "j7-idle" {
 		// Each plant weakens an actual changed read-state/budget boundary.
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
@@ -376,6 +395,9 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			args = append(args, "-tags", "genjournal_testseam")
 		}
 		testPackage := pkg
+		if *group == "message-author" && strings.HasPrefix(c.name, "ma-wire-") {
+			testPackage = "./messageauthor"
+		}
 		if *group == "j7-idle" && c.name == "j7-unbound-probe-budget" {
 			testPackage = "./internal/control"
 		}
@@ -413,7 +435,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" {
+		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{

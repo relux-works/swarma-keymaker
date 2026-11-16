@@ -2,6 +2,15 @@
 
 Role: per-station key custody. Lore name: Keymaker.
 
+The [purpose catalog](spec/keymaker-purposes.md) allocates purpose9
+`message-author` as **fixture-only, not live**. The new inert
+[`messageauthor`](messageauthor/README.md) codec publishes self-only identity/sign
+request and reply grammar against exact envelope065. Public fixture roots and
+independent verifier/oracle controls establish source compatibility; there is no
+message-author runtime/config/state/current-certificate provider or live RPC.
+The [source contract](spec/keymaker-message-author.md) lists separate live
+coordinator and real-key/J7 prerequisites. Existing Ed25519/J7 gates are unchanged.
+
 The [request/child-delegation custody contract](spec/keymaker-j7.md) supplies
 isolated internal BIP-340 custody for purposes 7/8 and protected run/policy
 lifecycle. Its opt-in internal request adapter now implements profile/1
@@ -598,3 +607,20 @@ omission leaves it out. Parsing does not qualify installed ownership, registry
 signatures, snapshot freshness or operator reconciliation.
 The control socket uses the landed native schema. Production activation
 remains gated; this tool does not install or run a service.
+
+### Message-author source checks
+
+Use the pinned Go SDK and private offline module/build caches:
+
+```sh
+go test -p=1 ./messageauthor -count=1
+go test -p=1 -parallel=2 ./internal/keymaker -run '^TestMessageAuthor' -count=1
+go build -p=1 ./messageauthor ./internal/keymaker
+go vet -p=1 ./messageauthor ./internal/keymaker ./tools/mutations
+go run ./tools/mutations -group message-author -scratch <private-directory>
+```
+
+These exercise literal wire fixtures, public fixture custody, matched receivers
+and closed-runtime witnesses. The mutation tool records overlays, child logs and
+intended-failure receipts in a new mutation subdirectory. Go caches hold build
+outputs. These checks provide no service activation/native qualification.

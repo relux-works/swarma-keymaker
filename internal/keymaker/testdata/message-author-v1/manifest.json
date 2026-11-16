@@ -1,0 +1,8 @@
+{
+  "derivation": "Independent hardened HMAC-SHA512 plus integer-add reference, public fixture root 0x42 repeated32; no retry encountered. btcec public projection/signing; stdlib oracle independently verifies the signature in tests.",
+  "envelope_commit": "065e25f69da8b28cdf3ea35d9fcd7fc4aacc4d5e",
+  "format": "message-author-fixtures/1",
+  "test_only": true,
+  "upstream_context": "vectors/bip340/P-BIP-author.json; public test issuer waggle public test seed 5; historical /1 revocation fixture, not current /2 activation",
+  "vectors_sha256": "1c72f6e9d9b28fc19734030baf96302e8154d1118586dc151bf2a6e02f6d9eec"
+}

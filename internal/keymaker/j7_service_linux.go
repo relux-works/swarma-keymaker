@@ -38,7 +38,16 @@ type j7StaticGateInput struct {
 // expects: 64 lowercase hex characters of the x-only key.
 type j7StaticGateResult struct {
 	RequestKey string
-	check      func(time.Time, staticgate.Class) Code
+	check      func(j7GateTime, staticgate.Class) Code
+}
+
+// j7GateTime keeps the provider's point for audit and its complete trusted
+// uncertainty interval for START admission. END retains point-time semantics.
+type j7GateTime struct{ Now, Lower, Upper time.Time }
+
+func (at j7GateTime) startBoundsValid() bool {
+	return !at.Now.IsZero() && !at.Lower.IsZero() && !at.Upper.IsZero() &&
+		!at.Lower.After(at.Now) && !at.Now.After(at.Upper)
 }
 
 // j7StaticGate is the required startup seam for the signed static gate.
@@ -51,6 +60,7 @@ type j7StaticGate interface {
 // productionJ7ServiceDeps; no configuration member or flag selects another.
 // Tests substitute single members to reach later gates without privilege.
 type j7ServiceDeps struct {
+	identity   func() (uint32, uint32, uint32, uint32) // real/effective UID and GID; never configurable
 	clock      func(*timeconf.Policy) (*timeconf.Provider, error)
 	gate       j7StaticGate
 	ancestors  func(string, uint32) error
@@ -63,6 +73,9 @@ type j7ServiceDeps struct {
 
 func productionJ7ServiceDeps() j7ServiceDeps {
 	var d j7ServiceDeps
+	d.identity = func() (uint32, uint32, uint32, uint32) {
+		return uint32(os.Getuid()), uint32(os.Geteuid()), uint32(os.Getgid()), uint32(os.Getegid())
+	}
 	d.clock = func(p *timeconf.Policy) (*timeconf.Provider, error) { return timeconf.Production(p, nil) }
 	d.gate = productionJ7StaticGate()
 	d.ancestors = safeAncestors
@@ -290,8 +303,14 @@ func startJ7Request(ctx context.Context, cfg Config, static []byte, status io.Wr
 		return c
 	}
 	// Step 4: service identity.
-	uid := uint32(os.Getuid())
-	if uint32(os.Geteuid()) != uid || cfg.ServiceUID != uid || cfg.ServiceGID != uint32(os.Getgid()) {
+	if d.identity == nil {
+		return Code("role_not_permitted")
+	}
+	uid, euid, gid, egid := d.identity()
+	if uid == 0 || euid == 0 || gid == 0 || egid == 0 {
+		return Code("role_not_permitted")
+	}
+	if euid != uid || cfg.ServiceUID != uid || cfg.ServiceGID != gid {
 		return failure("configuration identity mismatch")
 	}
 	if !j7SocketGroupAvailable(cfg.J7Socket.Group) {
@@ -408,12 +427,16 @@ func startJ7Request(ctx context.Context, cfg Config, static []byte, status io.Wr
 	if e != nil {
 		return e
 	}
-	gated := &j7GatedHandler{j7ServiceAdapter: custody, check: verdict.check, now: func(ctx context.Context) (time.Time, Code) {
+	gated := &j7GatedHandler{j7ServiceAdapter: custody, check: verdict.check, now: func(ctx context.Context) (j7GateTime, Code) {
 		sample, err := timeconfidence.Sample(ctx, provider)
 		if err != nil {
-			return time.Time{}, "clock_untrusted"
+			return j7GateTime{}, "clock_untrusted"
 		}
-		return sample.Now, ""
+		lower, upper, ok := timeconfidence.Bounds(sample)
+		if !ok {
+			return j7GateTime{}, "clock_untrusted"
+		}
+		return j7GateTime{Now: sample.Now, Lower: lower, Upper: upper}, ""
 	}}
 	latch := newJ7Latch()
 	handler := &j7ServiceHandler{inner: gated, latch: latch, health: func() Code { return j7StoreHealth(store) }}
@@ -422,7 +445,15 @@ func startJ7Request(ctx context.Context, cfg Config, static []byte, status io.Wr
 		return e
 	}
 	// Step 13: socket directory lock and listener publication.
-	socket, e := openJ7Socket(cfg.J7Socket.Dir, uid, cfg.J7Socket.Group, d.listen)
+	// R-U2-5: the final sample is fresh after state/GEN/policy/key setup and
+	// socket-directory admission, immediately before listener publication.
+	publish := func(dir *os.File, group uint32) (*net.UnixListener, uint64, uint64, error) {
+		if code := gated.recheck(ctx, staticgate.ClassStart); code != "" {
+			return nil, 0, 0, Code(code)
+		}
+		return d.listen(dir, group)
+	}
+	socket, e := openJ7Socket(cfg.J7Socket.Dir, uid, cfg.J7Socket.Group, publish)
 	if e != nil {
 		return e
 	}

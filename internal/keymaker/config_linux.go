@@ -127,6 +127,9 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 		if StrictJSON(bytes.NewReader(raw), &parsed) != nil || !validJ7Instance(parsed.InstanceID) || parsed.Epoch == "" || parsed.RegistryRevision == "" || !filepath.IsAbs(parsed.J7KeyFile) || filepath.Clean(parsed.J7KeyFile) != parsed.J7KeyFile {
 			return failure("invalid key role configuration")
 		}
+		if request && (parsed.ServiceUID == 0 || parsed.ServiceGID == 0) {
+			return Code("role_not_permitted")
+		}
 		if rawPolicy, ok := rawFields["j7_policy"]; ok {
 			if messageRequired(rawPolicy, reflect.TypeFor[j7PolicyConfiguration]()) != nil || parsed.J7Policy == nil {
 				return failure("invalid J7 policy pins")

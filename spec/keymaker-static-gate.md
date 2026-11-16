@@ -217,7 +217,11 @@ refuse `STATIC_GATE_KEY`, `STATIC_GATE_PIN`, `STATIC_GATE_FORM` and
 `STATIC_GATE_SIGNATURE`, respectively. An unreadable or unsafe root-owned
 regular `/etc/machine-id` refuses `STATIC_GATE_HOST`; its exact content is
 hashed without trimming. A statement changed without updating its digest pin
-refuses `STATIC_GATE_PIN` before its content is parsed.
+refuses `STATIC_GATE_PIN` before its content is parsed. Combined-fault
+exception: after a readable, well-formed digest file, an oversized statement
+reports `STATIC_GATE_FORM` from the bounded importer read before any digest-pin
+comparison, even if its pin is wrong. An unsafe or malformed digest file still
+refuses PIN first. This importer bound precedes the pure verifier's ordering.
 
 The expected `keymaker` section is CCJ-1 of exactly
 `{"binary_sha256":B,"config_sha256":C,"j7_request_key":K,"service_uid":U}`.
@@ -230,28 +234,49 @@ startup precondition passes does custody load the key and compare its derived
 public key with K (`j7_request_key_mismatch` on disagreement). Keymaker does
 not consume association and supplies no expected association bytes.
 
-Startup verifies class `start` with the supplied trusted Now. The captured
-statement, signature and pins are immutable for the process lifetime; every
-bind, rebind, sign, consent and public-key effect verifies class `start`
-again with a fresh trusted sample. Run end and response release use class
-`end`. A request refusal is audited through the control observer and precedes
-the wrapped effect. File replacement after startup does not update authority;
-a reconciled restart is required. No host-clock fallback is used.
+R-U2-3 (decided 2026-11-16): the class follows the effect. Startup, hello
+(channel negotiation and durable state for new work), bind, rebind, sign,
+consent, public-key and enrollment effects are `start`. `WithActive` uses the
+request method's class both before entering the inner fence and at its held
+release callback; only run end and its release are `end`. No new signature
+may be released after `not_after`, while run ends still pass after expiry.
+
+R-U2-4 (decided 2026-11-16): every Keymaker `start` check calls
+`staticgate.Verify` at BOTH trusted-time bounds, Now = `Lower` and Now =
+`Upper`. Both must pass the half-open window. The provider's point Now stays
+for audit. `end` retains its point-time rule and skips only the window-bound
+comparison. Missing or invalid bounds never fall back to a point-only START.
+
+R-U2-5 (decided 2026-11-16): startup takes another fresh trusted START sample
+immediately before listener publication and readiness, after state, generation,
+policy, key setup and socket-directory admission. Expiry since the initial
+sample refuses by name with no socket or readiness line.
+
+The captured statement, signature and pins are immutable for the process
+lifetime; every check takes a fresh trusted sample. A request refusal is audited
+through the control observer. File replacement after startup does not update
+authority; a reconciled restart is required. No host-clock fallback is used.
 
 R-U2-1 (decided 2026-11-16): startup is a start-class effect, so a service whose
 window has expired does not start. This profile has no startup sweep and needs
 none: no claim outlives a stop; the launcher binds runs again after restart as
 start class. Authority held from before a stop is ended only by stopped-operator
 reconciliation, with the service stopped and outside the gate. Within one running
-process, run end and release are end-class and pass after expiry; all other
+process, run end and its release are end-class and pass after expiry; all other
 checks remain required.
 
 ### 5.1 Operation classes and the window end
 
 | Class | Operations | Step 5 |
 | --- | --- | --- |
-| `start` | Keymaker startup, run bind and sign, dispatcher dispatch, broker lease | the clock comparison is required: at or after `not_after`, `STATIC_GATE_WINDOW` |
-| `end` | Keymaker run end and response release, broker lease release, dispatcher owned-run cancel | only the window-bound comparison is skipped; non-zero `Now`, window width, and steps 1–4 and 6 still apply |
+| `start` | Keymaker startup, hello, bind, rebind, sign, pubkey, enroll and their releases; dispatcher dispatch; broker lease | the clock comparison is required: at or after `not_after`, `STATIC_GATE_WINDOW` |
+| `end` | Keymaker run end and its release, broker lease release, dispatcher owned-run cancel | only the window-bound comparison is skipped; non-zero `Now`, window width, and steps 1–4 and 6 still apply |
+
+For Keymaker, R-U2-3 classifies releases by their request method, R-U2-4
+requires both trusted bounds at each START check (point Now remains for audit),
+and R-U2-5 repeats START on a fresh sample immediately before publication and
+readiness. The consumer note above defines these dated owner rulings; other
+consumers' time-provider mapping is unchanged.
 
 A run bound inside the window may end after `not_after`; it gets no new
 signature or lease. Without this an expired gate would strand a run in

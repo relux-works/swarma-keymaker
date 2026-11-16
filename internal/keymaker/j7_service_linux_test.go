@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -98,7 +99,7 @@ func (g *j7ServiceGate) verify(_ context.Context, in j7StaticGateInput) (j7Stati
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.inputs = append(g.inputs, in)
-	return j7StaticGateResult{RequestKey: g.key, check: func(time.Time, staticgate.Class) Code { return "" }}, g.code
+	return j7StaticGateResult{RequestKey: g.key, check: func(j7GateTime, staticgate.Class) Code { return "" }}, g.code
 }
 
 type j7ServiceFixture struct {
@@ -224,6 +225,7 @@ func j7ServiceSetup(t *testing.T, o j7ServiceOptions) *j7ServiceFixture {
 	}
 	f.cfg, f.static = cfg, []byte(raw)
 	f.gate = &j7ServiceGate{trace: f.trace, key: f.public}
+	f.deps.identity = productionJ7ServiceDeps().identity
 	f.deps.clock = func(*timeconf.Policy) (*timeconf.Provider, error) {
 		f.trace.add("clock")
 		p, _, collector := fixtureTimeProvider(t, helperNow)
@@ -1762,5 +1764,71 @@ func TestJ7ServicePackagingConfiguration(t *testing.T) {
 	}
 	if _, e := ParseConfig(bytes.NewReader(bad)); e == nil {
 		t.Fatal("shipped example admitted inline moving head")
+	}
+}
+
+// Real/effective uid or gid zero refuses before clock, key, state or socket
+// access, even with matching configured zero IDs. Non-root serves unchanged.
+// The private identity seam avoids executing a root process or changing IDs.
+func TestJ7ServiceRootRefusal(t *testing.T) {
+	for _, which := range []string{"real-uid", "effective-uid", "real-gid", "effective-gid", "both-uids", "both-gids"} {
+		t.Run(which, func(t *testing.T) {
+			f := j7ServiceSetup(t, j7ServiceOptions{})
+			uid, euid, gid, egid := f.uid, f.uid, f.cfg.ServiceGID, f.cfg.ServiceGID
+			switch which {
+			case "real-uid":
+				uid = 0
+			case "effective-uid":
+				euid = 0
+			case "real-gid":
+				gid = 0
+			case "effective-gid":
+				egid = 0
+			case "both-uids":
+				uid, euid = 0, 0
+			case "both-gids":
+				gid, egid = 0, 0
+			}
+			oldUID, oldGID := f.cfg.ServiceUID, f.cfg.ServiceGID
+			f.cfg.ServiceUID, f.cfg.ServiceGID = uid, gid
+			f.deps.identity = func() (uint32, uint32, uint32, uint32) { return uid, euid, gid, egid }
+			f.refuses(t, "role_not_permitted", j7ServiceRefusal{absent: []string{"clock", "gate", "ancestors", "head", "generation", "policy"}})
+			f.cfg.ServiceUID, f.cfg.ServiceGID = oldUID, oldGID
+			f.deps.identity = productionJ7ServiceDeps().identity
+			f.serves(t)
+		})
+	}
+}
+
+// A zero service UID/GID is invalid in request-role configuration independently
+// of holder/launcher cross-field checks; the exact non-root configuration parses.
+func TestJ7ServiceConfigRootRefusal(t *testing.T) {
+	f := j7ServiceSetup(t, j7ServiceOptions{})
+	for _, field := range []string{"service_uid", "service_gid"} {
+		t.Run(field, func(t *testing.T) {
+			var fields map[string]json.RawMessage
+			if e := json.Unmarshal(f.static, &fields); e != nil {
+				t.Fatal(e)
+			}
+			fields[field] = json.RawMessage("0")
+			if field == "service_uid" {
+				var policy map[string]json.RawMessage
+				if e := json.Unmarshal(fields["j7_policy"], &policy); e != nil {
+					t.Fatal(e)
+				}
+				policy["holder_uid"] = json.RawMessage("0")
+				fields["j7_policy"], _ = json.Marshal(policy)
+			}
+			bad, e := json.Marshal(fields)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if _, e := ParseConfig(bytes.NewReader(bad)); e == nil || e.Error() != "keymaker: invalid configuration" {
+				t.Fatal("root config admitted", e)
+			}
+			if _, e := ParseConfig(bytes.NewReader(f.static)); e != nil {
+				t.Fatal("non-root config refused", e)
+			}
+		})
 	}
 }

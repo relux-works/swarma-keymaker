@@ -140,9 +140,16 @@ func (g j7ProductionGate) verify(_ context.Context, in j7StaticGateInput) (j7Sta
 	// Preserve Verify's PIN/FORM/KEY ordering before interpreting the opaque
 	// owner section. This first pass uses a nonempty placeholder; only a scope
 	// mismatch may proceed to building the expected section below.
-	inputs.Now, inputs.Class, inputs.Section = in.Now, staticgate.ClassStart, []byte("{}")
-	if _, err := staticgate.Verify(raw, sig, inputs); err != nil && !errors.Is(err, staticgate.ErrScopeMismatch) {
-		return empty, j7GateCode(err)
+	inputs.Class, inputs.Section = staticgate.ClassStart, []byte("{}")
+	at := j7GateTime{Now: in.Now, Lower: in.Lower, Upper: in.Upper}
+	if !at.startBoundsValid() {
+		return empty, Code(staticgate.CodeWindow)
+	}
+	for _, now := range []time.Time{at.Lower, at.Upper} {
+		inputs.Now = now
+		if _, err := staticgate.Verify(raw, sig, inputs); err != nil && !errors.Is(err, staticgate.ErrScopeMismatch) {
+			return empty, j7GateCode(err)
+		}
 	}
 	value, err := ccj.Parse(raw, ccj.RegistrationMalformed)
 	if err != nil {
@@ -165,13 +172,24 @@ func (g j7ProductionGate) verify(_ context.Context, in j7StaticGateInput) (j7Sta
 	// Own the immutable bytes, including across requests; no install file is
 	// re-read after startup and no association is supplied by this consumer.
 	raw, sig = append([]byte(nil), raw...), append([]byte(nil), sig...)
-	check := func(now time.Time, class staticgate.Class) Code {
-		current := inputs
-		current.Now, current.Class = now, class
-		_, err := staticgate.Verify(raw, sig, current)
-		return j7GateCode(err)
+	check := func(at j7GateTime, class staticgate.Class) Code {
+		points := []time.Time{at.Now}
+		if class == staticgate.ClassStart {
+			if !at.startBoundsValid() {
+				return Code(staticgate.CodeWindow)
+			}
+			points = []time.Time{at.Lower, at.Upper}
+		}
+		for _, now := range points {
+			current := inputs
+			current.Now, current.Class = now, class
+			if _, err := staticgate.Verify(raw, sig, current); err != nil {
+				return j7GateCode(err)
+			}
+		}
+		return ""
 	}
-	if c := check(in.Now, staticgate.ClassStart); c != "" {
+	if c := check(at, staticgate.ClassStart); c != "" {
 		return empty, c
 	}
 	return j7StaticGateResult{RequestKey: requestKey, check: check}, ""
@@ -182,8 +200,8 @@ func (g j7ProductionGate) verify(_ context.Context, in j7StaticGateInput) (j7Sta
 // control, which invokes Refuse once before emitting the error.
 type j7GatedHandler struct {
 	j7ServiceAdapter
-	check func(time.Time, staticgate.Class) Code
-	now   func(context.Context) (time.Time, Code)
+	check func(j7GateTime, staticgate.Class) Code
+	now   func(context.Context) (j7GateTime, Code)
 }
 
 func (h *j7GatedHandler) recheck(ctx context.Context, class staticgate.Class) control.Code {
@@ -194,24 +212,37 @@ func (h *j7GatedHandler) recheck(ctx context.Context, class staticgate.Class) co
 	return control.Code(h.check(now, class))
 }
 
-func (h *j7GatedHandler) Handle(ctx context.Context, peer control.Peer, r control.Request) (control.Object, control.Code) {
-	class := staticgate.ClassStart
-	if r.Method == "j7_run_end" {
-		class = staticgate.ClassEnd
+// R-U2-3: classification follows the effect, including negotiation and the
+// final response handoff. Only run end and its release are END.
+func j7GateClass(method string) staticgate.Class {
+	if method == "j7_run_end" {
+		return staticgate.ClassEnd
 	}
-	if code := h.recheck(ctx, class); code != "" {
+	return staticgate.ClassStart
+}
+
+func (h *j7GatedHandler) Handle(ctx context.Context, peer control.Peer, r control.Request) (control.Object, control.Code) {
+	if code := h.recheck(ctx, j7GateClass(r.Method)); code != "" {
 		return nil, code
 	}
 	return h.j7ServiceAdapter.Handle(ctx, peer, r)
 }
 
 func (h *j7GatedHandler) WithActive(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) control.Code {
-	// Release is end-class even for a result prepared before window expiry.
-	// Check before the inner fence, which itself may touch custody.
-	if code := h.recheck(ctx, staticgate.ClassEnd); code != "" {
+	// Release repeats the class of the prepared effect, so START bytes cannot
+	// cross the window end even if handling began inside it.
+	// Check before the inner fence, which itself may touch custody, then again
+	// at its callback: acquiring those barriers may outlast the first sample.
+	class := j7GateClass(r.Method)
+	if code := h.recheck(ctx, class); code != "" {
 		return code
 	}
-	return h.j7ServiceAdapter.WithActive(ctx, peer, r, result, release)
+	return h.j7ServiceAdapter.WithActive(ctx, peer, r, result, func(ctx context.Context) control.Code {
+		if code := h.recheck(ctx, class); code != "" {
+			return code
+		}
+		return release(ctx)
+	})
 }
 
 var _ j7ServiceAdapter = (*j7GatedHandler)(nil)

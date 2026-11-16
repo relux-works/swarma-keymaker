@@ -162,7 +162,7 @@ of the host defeats this pin. A crash during a run leaves HELD authority
 and requires operator recovery; an unknown signing handoff blocks restart.
 
 Startup is ordered: unprivileged process checks and hardening; protected config
-parse; required-member and cross-field checks; service identity; trusted time;
+parse; required-member and cross-field checks; service identity (step 4); trusted time;
 the static gate with that trusted sample and the exact config-byte digest;
 safe ancestors; protected head read (a missing or unsafe file refuses
 `j7_head_pin_unavailable` before state opens); state directory and exclusive
@@ -170,8 +170,13 @@ state lock; exact-head schema-5 Store and instance/identity/binding/epoch checks
 generation evidence; protected policy directory and an existing protected
 table; key load last and derived public-key equality with the gate's expected
 request key; adapter composition; socket-directory lock and listener publication;
-then exactly one `j7-request control ready` status line. No initializer or
-migration runs in the service. A missing table refuses readiness; an existing
+then exactly one `j7-request control ready` status line.
+The service never runs as root: uid or gid 0, real or effective, refuses.
+Step 4 returns non-retryable `role_not_permitted` before state, key or socket
+access, even if the configured service IDs are zero. Request-role config
+validation also rejects zero `service_uid` or `service_gid` as invalid
+configuration; legacy and the frozen delegation schema stay unchanged. No
+initializer or migration runs in the service. A missing table refuses readiness; an existing
 empty authority table grants nothing. The production static gate implements
 [the Keymaker consumer rule](keymaker-static-gate.md#keymaker-consumer-note),
 including the binary/pre-start and derived-key split, exact file formats,
@@ -185,18 +190,49 @@ static-gate window has expired does not start. This profile has no startup sweep
 and needs none: no claim outlives a stop; after a restart the launcher binds runs
 again, which is start class. Authority held from before a stop is ended only by
 the stopped-operator reconciliation, with the service stopped and outside the
-gate. Within one running process, run end and release are end-class and pass
-after expiry; all other gate checks remain required.
+gate. Within one running process, run end and its release are end-class and
+pass after expiry; all other gate checks remain required (R-U2-3).
 
 The first-run method scope is lifecycle (`hello`, bind, end, rebind),
 `j7_pubkey` and `consent_v3`. No node is configured. Node-backed operations
 cannot succeed. **R-U2-2 (decided 2026-11-16):** earlier checks keep precedence:
 schema-5 `delegation_request_v3` refuses `operation_unsupported`; an unenrolled
 `envelope_v3` refuses `GRANT_NOT_FOR_RUN` (LIP-0013 J7.3 (a) runs before any node
-read). `delegation_evidence_unavailable` is returned only where missing node
-evidence is the first failing precondition (`j7_enroll`). Every one of these is
-a closed refusal with no effect. The service
-provides no legacy SSH, master or registration-helper endpoint.
+read). In this no-node precedence case, `delegation_evidence_unavailable` is
+returned only where missing node evidence is the first failing precondition
+(`j7_enroll`). This does not restrict other uses of that code, including event
+time or stale evidence. Every one of these is a closed refusal with no effect.
+The service provides no legacy SSH, master or registration-helper endpoint.
+
+**R-U2-3 (decided 2026-11-16):** the class follows the effect. `hello` is
+START: it negotiates a channel and commits durable state for new work.
+Bind, rebind, `j7_sign`, `j7_pubkey`, enroll and hello use START at the
+release fence (`WithActive`), including a fresh check at the held socket
+callback after acquiring its barriers. No new signature is released after
+`not_after`. Only `j7_run_end` and its release use END, so run ends still pass
+after expiry as R-U2-1 requires.
+
+**R-U2-4 (decided 2026-11-16):** START uses the whole trusted uncertainty
+interval. It passes only when `staticgate.Verify` passes both with Now =
+`Lower` and with Now = `Upper`; the point Now stays for audit. END is unchanged.
+No host-clock value or point-only fallback substitutes for either bound.
+
+**R-U2-5 (decided 2026-11-16):** startup rechecks START with a fresh trusted
+sample immediately before listener publication and readiness. Expiry between
+the initial sample (step 5) and publication refuses `STATIC_GATE_WINDOW` with
+no socket or readiness line. The captured statement and pins do not change.
+
+The seven gate wire refusals are closed and non-retryable:
+
+| Wire code | `retryable` |
+| --- | --- |
+| `STATIC_GATE_KEY` | `false` |
+| `STATIC_GATE_PIN` | `false` |
+| `STATIC_GATE_FORM` | `false` |
+| `STATIC_GATE_SIGNATURE` | `false` |
+| `STATIC_GATE_HOST` | `false` |
+| `STATIC_GATE_WINDOW` | `false` |
+| `STATIC_GATE_SCOPE_MISMATCH` | `false` |
 
 Store or audit failure latches admission closed. An unexpected non-closing
 accept error is fatal and is returned to the service caller as `accept failed`,

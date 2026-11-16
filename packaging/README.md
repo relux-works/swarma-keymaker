@@ -258,7 +258,10 @@ plants make the runner fail; they cannot be reported as killed.
 first-run inputs for the [closed role contract](../spec/keymaker-j7.md#closed-role-configuration-and-runtime-behavior).
 They do not replace the legacy unit or participate in its byte-equality check.
 All numeric IDs, instance, generation and epoch/revision values need protected
-operator provisioning. Key, state, policy and runtime directories are distinct;
+operator provisioning. The request example uses nonzero placeholder IDs 1/2;
+replace them with allocated non-root accounts. Zero request service UID/GID
+values are rejected by configuration validation. Key, state, policy and runtime
+directories are distinct;
 key/state/policy are service-owned 0700 and runtime is 0755. The group
 `swarma-j7-launch` contains exactly the holder and the dispatcher's launcher
 service UID. The unit supplies holder supplementary membership solely to permit

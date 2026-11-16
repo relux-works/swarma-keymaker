@@ -18,6 +18,7 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
+	applies := flag.Bool("check-applies", false, "check selected source plants without running tests")
 	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle message-author or j7-service controls")
 	flag.Parse()
 	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author" && *group != "j7-service") {
@@ -33,7 +34,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "scratch unavailable")
 		os.Exit(2)
 	}
-	socketGuard := "\tif syscall.Fchownat(fd, \"control.sock\", os.Getuid(), int(gid), 0x100 /* Linux AT_SYMLINK_NOFOLLOW */) != nil || syscall.Fchmodat(fd, \"control.sock\", 0660, 0) != nil {\n\t\treturn fail()\n\t}\n\tst, err := os.Lstat(staged)\n\tif err != nil {\n\t\treturn fail()\n\t}\n\tstat := st.Sys().(*syscall.Stat_t)\n\tif st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || stat.Uid != uint32(os.Getuid()) || stat.Gid != gid {\n\t\treturn fail()\n\t}\n"
+	socketGuard := "\tif syscall.Fchownat(fd, \"control.sock\", os.Getuid(), int(gid), 0x100 /* Linux AT_SYMLINK_NOFOLLOW */) != nil || syscall.Fchmodat(fd, \"control.sock\", 0660, 0) != nil {\n\t\treturn fail()\n\t}\n\tst, err := os.Lstat(staged)\n\tif err != nil {\n\t\treturn fail()\n\t}\n\tstat := st.Sys().(*syscall.Stat_t)\n\tif st.Mode()&os.ModeSocket == 0 || st.Mode().Perm() != 0660 || stat.Uid != uint32(os.Getuid()) || stat.Gid != gid || !j7SocketNoACL(staged) {\n\t\treturn fail()\n\t}\n"
 	socketFallback := "\t_ = syscall.Fchmodat(fd, \"control.sock\", 0666, 0)\n\tst, err := os.Lstat(staged)\n\tif err != nil { return fail() }\n\tstat := st.Sys().(*syscall.Stat_t)\n"
 	// Move only the authoritative retained snapshot before the generation
 	// barrier, retaining Store synchronization and every authority predicate.
@@ -76,7 +77,7 @@ func main() {
 		{"busy-budget", "engine.go", "if c := e.charge(s); c != \"\" {\n\t\treturn e.overloadRefusal(s, c)\n\t}\n\tq, _ := parseAgent(body)", "if c := Code(\"\"); c != \"\" {\n\t\treturn e.overloadRefusal(s, c)\n\t}\n\tq, _ := parseAgent(body)", "^TestFrameRefusalAccounting$/^busy$", "--- FAIL: TestFrameRefusalAccounting/busy", "refusal bypassed work buckets"},
 		{"overload-audit", "engine.go", "emit := e.overload.take(e.rateNow(), 1, 1)", "emit := true", "^TestOverloadRefusalBudget$", "--- FAIL: TestOverloadRefusalBudget", "overload amplified journal writes"},
 		{"missing-journal", "snapshot.go", "if commit.Version == 0 ||", "if commit.Version == 0 { return true }; if", "^TestCustodyStartupReconciliation$/^empty-audit$", "--- FAIL: TestCustodyStartupReconciliation/empty-audit", "incomplete custody evidence admitted startup"},
-		{"snapshot-journal-divergence", "custody_linux.go", "if !s.matchesCommit(j.binding) {", "if false && !s.matchesCommit(j.binding) {", "^TestSnapshotJournalDivergence$/^snapshot-before-revoke$", "--- FAIL: TestSnapshotJournalDivergence/snapshot-before-revoke", "BYPASS: restored pre-revoke snapshot signed"},
+		{"snapshot-journal-divergence", "custody_linux.go", "if !s.matchesCommit(j.binding) && !recovery {", "if false && !s.matchesCommit(j.binding) && !recovery {", "^TestSnapshotJournalDivergence$/^snapshot-before-revoke$", "--- FAIL: TestSnapshotJournalDivergence/snapshot-before-revoke", "BYPASS: restored pre-revoke snapshot signed"},
 		{"snapshot-records-optional", "snapshot.go", "if _, ok := fields[\"records\"]; !ok {", "if _, ok := fields[\"records\"]; !ok && false {", "^TestSnapshotSchemaRequired$/^revoked$/^missing-records$", "--- FAIL: TestSnapshotSchemaRequired/revoked/missing-records", "missing snapshot member admitted"},
 		{"native-operator", "native.go", "if p != n.Config.Operator {", "if false {", "^TestNativeVectors$/^register-wrong-uid$/^negative$", "--- FAIL: TestNativeVectors/register-wrong-uid/negative", "want role_not_permitted"},
 		{"native-refusal-audit-wait", "audit.go", "if !j.mu.LockContext(ctx) {\n\t\treturn \"request_deadline_exceeded\"\n\t}", "j.mu.Lock()", "^TestReviewAdmissionQueuedAuditDeadline$", "--- FAIL: TestReviewAdmissionQueuedAuditDeadline", "expired refusal retained slot and appended after deadline"},
@@ -126,6 +127,18 @@ func main() {
 		// Every plant weakens a composed startup or socket invariant; a kill
 		// requires the named assertion, never a setup or compilation failure.
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-static-release-class", "j7_static_gate_linux.go", `class := j7GateClass(r.Method)`, `class := staticgate.ClassEnd`, "^TestJ7StaticGatePreparedSignatureExpiry$/^expired$", "--- FAIL: TestJ7StaticGatePreparedSignatureExpiry/expired", "want STATIC_GATE_WINDOW"},
+			{"j7-static-release-callback", "j7_static_gate_linux.go", `		if code := h.recheck(ctx, class); code != "" {
+			return code
+		}
+`, ``, "^TestJ7StaticGateReleaseWait$", "--- FAIL: TestJ7StaticGateReleaseWait/start-expired", "expired callback released"},
+			{"j7-static-start-bounds", "j7_static_gate_linux.go", `points = []time.Time{at.Lower, at.Upper}`, `points = []time.Time{at.Now}`, "^TestJ7StaticGateTrustedBounds$", "--- FAIL: TestJ7StaticGateTrustedBounds/lower", "effect interval admitted"},
+			{"j7-static-publication-recheck", "j7_service_linux.go", `		if code := gated.recheck(ctx, staticgate.ClassStart); code != "" {
+			return nil, 0, 0, Code(code)
+		}
+`, ``, "^TestJ7StaticGateStartupPublicationExpiry$/^expired$", "--- FAIL: TestJ7StaticGateStartupPublicationExpiry/expired", "want STATIC_GATE_WINDOW"},
+			{"j7-service-root-identity", "j7_service_linux.go", `if uid == 0 || euid == 0 || gid == 0 || egid == 0 {`, `if false && (uid == 0 || euid == 0 || gid == 0 || egid == 0) {`, "^TestJ7ServiceRootRefusal$", "--- FAIL: TestJ7ServiceRootRefusal", "want role_not_permitted"},
+			{"j7-service-root-config", "config_linux.go", `if request && (parsed.ServiceUID == 0 || parsed.ServiceGID == 0) {`, `if false && request && (parsed.ServiceUID == 0 || parsed.ServiceGID == 0) {`, "^TestJ7ServiceConfigRootRefusal$", "--- FAIL: TestJ7ServiceConfigRootRefusal", "root config admitted"},
 			{"j7-static-pin-key-order", "j7_static_gate_linux.go", `	keyFile, err := g.read(in.Files.ApproverKeyFile, 65)
 	key, ok := j7HexLine(keyFile, 64)
 	if err != nil || !ok {
@@ -138,7 +151,13 @@ func main() {
 	}
 	defer key.close()
 `, ``, "^TestJ7ServiceStartupOrder$", "--- FAIL: TestJ7ServiceStartupOrder", "startup order violated"},
-			{"j7-service-listener-before-state", "j7_service_linux.go", `	socket, e := openJ7Socket(cfg.J7Socket.Dir, uid, cfg.J7Socket.Group, d.listen)
+			{"j7-service-listener-before-state", "j7_service_linux.go", `	publish := func(dir *os.File, group uint32) (*net.UnixListener, uint64, uint64, error) {
+		if code := gated.recheck(ctx, staticgate.ClassStart); code != "" {
+			return nil, 0, 0, Code(code)
+		}
+		return d.listen(dir, group)
+	}
+	socket, e := openJ7Socket(cfg.J7Socket.Dir, uid, cfg.J7Socket.Group, publish)
 	if e != nil {
 		return e
 	}
@@ -418,6 +437,10 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		if os.WriteFile(overlay, mapping, 0600) != nil {
 			os.Exit(2)
 		}
+		if *applies {
+			fmt.Printf("mutant=%s applied=true matches=1 overlay=%s\n", c.name, overlay)
+			continue
+		}
 		args := []string{"test", "-overlay", overlay}
 		if *group == "message-state" {
 			args = append(args, "-timeout=90s")
@@ -466,7 +489,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "j7-service" {
+		if *group == "core" || *group == "native" || *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "j7-service" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{
@@ -517,7 +540,14 @@ func plant(name, source, old, replacement string) string {
 			fmt.Fprintln(os.Stderr, "startup order plant not applied")
 			os.Exit(2)
 		}
-		mutant = strings.Replace(mutant, beforeState, old+beforeState, 1)
+		block := old
+		if name == "j7-service-listener-before-state" {
+			// The deliberately early listener precedes adapter construction;
+			// call the same listener seam without its later publication wrapper.
+			block = block[strings.Index(block, "	socket, e := openJ7Socket"):]
+			block = strings.Replace(block, ", publish)", ", d.listen)", 1)
+		}
+		mutant = strings.Replace(mutant, beforeState, block+beforeState, 1)
 	}
 	if name == "message-caller-path" {
 		old := `strings.TrimPrefix(current.Path, "m/1'")`

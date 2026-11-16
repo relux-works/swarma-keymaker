@@ -86,7 +86,7 @@ func j7GateInstall(t *testing.T, f *j7ServiceFixture, edit func(map[string]any))
 }
 
 func j7GateInput(f *j7ServiceFixture) j7StaticGateInput {
-	return j7StaticGateInput{Files: *f.cfg.StaticGate, ConfigSHA256: j7Hash(f.static), ServiceUID: f.uid, Now: helperNow}
+	return j7StaticGateInput{Files: *f.cfg.StaticGate, ConfigSHA256: j7Hash(f.static), ServiceUID: f.uid, Now: helperNow, Lower: helperNow, Upper: helperNow}
 }
 
 // Claim: each malformed configured file refuses with its exact gate code before key/state/socket effects, beside the repaired service.
@@ -302,7 +302,7 @@ func (p *j7GateProbe) WithActive(ctx context.Context, _ control.Peer, _ control.
 	return release(ctx)
 }
 
-// Claim: expiry after startup blocks every start effect without reaching the adapter, but end and release pass; zero time blocks both classes.
+// Claim: expiry after startup blocks every start effect without reaching the adapter, but end and release pass; zero time blocks both classes; only end-method release passes expiry.
 func TestJ7StaticGatePerEffect(t *testing.T) {
 	f := j7ServiceSetup(t, j7ServiceOptions{})
 	gate := j7GateInstall(t, f, nil)
@@ -312,7 +312,7 @@ func TestJ7StaticGatePerEffect(t *testing.T) {
 	}
 	probe := &j7GateProbe{j7ServiceStub: &j7ServiceStub{}}
 	now := helperNow.Add(time.Hour)
-	h := &j7GatedHandler{j7ServiceAdapter: probe, check: verdict.check, now: func(context.Context) (time.Time, Code) { return now, "" }}
+	h := &j7GatedHandler{j7ServiceAdapter: probe, check: verdict.check, now: func(context.Context) (j7GateTime, Code) { return j7GatePoint(now), "" }}
 	for _, method := range []string{"j7_run_bind", "j7_run_rebind", "j7_sign", "consent_v3", "j7_pubkey"} {
 		before := probe.handled
 		if obj, c := h.Handle(t.Context(), control.Peer{}, control.Request{Method: method}); c != "STATIC_GATE_WINDOW" || obj != nil || probe.handled != before {
@@ -334,16 +334,16 @@ func TestJ7StaticGatePerEffect(t *testing.T) {
 	}
 	released := false
 	now = time.Time{}
-	if c := h.WithActive(t.Context(), control.Peer{}, control.Request{}, nil, func(context.Context) control.Code { released = true; return "" }); c != "STATIC_GATE_WINDOW" || released || probe.released != 0 {
+	if c := h.WithActive(t.Context(), control.Peer{}, control.Request{Method: "j7_run_end"}, nil, func(context.Context) control.Code { released = true; return "" }); c != "STATIC_GATE_WINDOW" || released || probe.released != 0 {
 		t.Fatal("zero release", c)
 	}
 	now = helperNow.Add(time.Hour)
-	if c := h.WithActive(t.Context(), control.Peer{}, control.Request{}, nil, func(context.Context) control.Code { released = true; return "" }); c != "" || !released || probe.released != 1 {
+	if c := h.WithActive(t.Context(), control.Peer{}, control.Request{Method: "j7_run_end"}, nil, func(context.Context) control.Code { released = true; return "" }); c != "" || !released || probe.released != 1 {
 		t.Fatal("expired release", c)
 	}
 	// Modifying the install files cannot change the captured statement.
 	os.WriteFile(f.cfg.StaticGate.StatementFile, []byte("{}"), 0640)
-	if c := verdict.check(helperNow, staticgate.ClassStart); c != "" {
+	if c := verdict.check(j7GatePoint(helperNow), staticgate.ClassStart); c != "" {
 		t.Fatal("re-read static bytes", c)
 	}
 }
@@ -364,10 +364,10 @@ func TestJ7StaticGateWireExpiry(t *testing.T) {
 	provider, clock, _ := fixtureTimeProvider(t, helperNow)
 	f.deps.clock = func(*timeconf.Policy) (*timeconf.Provider, error) { f.trace.add("clock"); return provider, nil }
 	f.deps.gate = j7StaticGateFunc(func(ctx context.Context, in j7StaticGateInput) (j7StaticGateResult, Code) {
-		return j7StaticGateResult{RequestKey: f.public, check: func(now time.Time, class staticgate.Class) Code {
-			seen.Store(now.UnixNano())
+		return j7StaticGateResult{RequestKey: f.public, check: func(now j7GateTime, class staticgate.Class) Code {
+			seen.Store(now.Now.UnixNano())
 			if expired.Load() {
-				now = helperNow.Add(time.Hour)
+				now = j7GatePoint(helperNow.Add(time.Hour))
 			}
 			return verdict.check(now, class)
 		}}, ""
@@ -424,11 +424,11 @@ func TestJ7StaticGateTrustedRecheck(t *testing.T) {
 	}
 	probe := &j7GateProbe{j7ServiceStub: &j7ServiceStub{}}
 	trusted := false
-	h := &j7GatedHandler{j7ServiceAdapter: probe, check: verdict.check, now: func(context.Context) (time.Time, Code) {
+	h := &j7GatedHandler{j7ServiceAdapter: probe, check: verdict.check, now: func(context.Context) (j7GateTime, Code) {
 		if !trusted {
-			return helperNow, "clock_untrusted"
+			return j7GatePoint(helperNow), "clock_untrusted"
 		}
-		return helperNow, ""
+		return j7GatePoint(helperNow), ""
 	}}
 	if _, c := h.Handle(t.Context(), control.Peer{}, control.Request{Method: "j7_run_bind"}); c != "clock_untrusted" || probe.handled != 0 {
 		t.Fatal("untrusted handle", c)
@@ -632,5 +632,266 @@ func TestJ7StaticGatePinBeforeKey(t *testing.T) {
 	want := []string{f.cfg.StaticGate.DigestFile, f.cfg.StaticGate.StatementFile, f.cfg.StaticGate.ApproverKeyFile, f.cfg.StaticGate.SignatureFile, "machine-id"}
 	if !reflect.DeepEqual(reads, want) {
 		t.Fatal("static input read order differs from verifier precedence")
+	}
+}
+
+// j7GatePoint is a zero-uncertainty fixture, not a provider fallback.
+func j7GatePoint(now time.Time) j7GateTime { return j7GateTime{Now: now, Lower: now, Upper: now} }
+
+// R-U2-4: both admission and captured per-effect checks require the entire
+// trusted interval inside the half-open gate; END keeps its point-time rule.
+func TestJ7StaticGateTrustedBounds(t *testing.T) {
+	f := j7ServiceSetup(t, j7ServiceOptions{})
+	gate := j7GateInstall(t, f, nil)
+	good := j7GateInput(f)
+	verdict, c := gate.verify(t.Context(), good)
+	if c != "" {
+		t.Fatal(c)
+	}
+	for _, edge := range []string{"lower", "upper"} {
+		t.Run(edge, func(t *testing.T) {
+			in := good
+			if edge == "lower" {
+				in.Lower = helperNow.Add(-time.Hour - time.Nanosecond)
+			} else {
+				in.Upper = helperNow.Add(time.Hour)
+			}
+			if _, c := gate.verify(t.Context(), in); c != "STATIC_GATE_WINDOW" {
+				t.Fatal("startup interval admitted", c)
+			}
+			if c := verdict.check(j7GateTime{in.Now, in.Lower, in.Upper}, staticgate.ClassStart); c != "STATIC_GATE_WINDOW" {
+				t.Fatal("effect interval admitted", c)
+			}
+			in.Lower, in.Upper = helperNow.Add(-time.Hour), helperNow.Add(time.Hour-time.Nanosecond)
+			if _, c := gate.verify(t.Context(), in); c != "" {
+				t.Fatal("inside startup interval refused", c)
+			}
+			if c := verdict.check(j7GateTime{in.Now, in.Lower, in.Upper}, staticgate.ClassStart); c != "" {
+				t.Fatal("inside effect interval refused", c)
+			}
+		})
+	}
+	if c := verdict.check(j7GatePoint(helperNow.Add(time.Hour)), staticgate.ClassEnd); c != "" {
+		t.Fatal("expired END refused", c)
+	}
+}
+
+// R-U2-3: hello's real wire release is START. Expiry refuses negotiation
+// without a durable hello commit; the identical in-window hello succeeds.
+func TestJ7StaticGateHelloExpiry(t *testing.T) {
+	for _, expired := range []bool{true, false} {
+		t.Run(map[bool]string{true: "expired", false: "inside"}[expired], func(t *testing.T) {
+			uid := uint32(os.Getuid())
+			f := j7ServiceSetup(t, j7ServiceOptions{launcher: &Principal{UID: uid, Generation: nativeToken}})
+			gate := j7GateInstall(t, f, nil)
+			verdict, c := gate.verify(t.Context(), j7GateInput(f))
+			if c != "" {
+				t.Fatal(c)
+			}
+			var outside atomic.Bool
+			f.deps.gate = j7StaticGateFunc(func(context.Context, j7StaticGateInput) (j7StaticGateResult, Code) {
+				return j7StaticGateResult{RequestKey: f.public, check: func(at j7GateTime, class staticgate.Class) Code {
+					if outside.Load() {
+						at = j7GatePoint(helperNow.Add(time.Hour))
+					}
+					return verdict.check(at, class)
+				}}, ""
+			})
+			r := f.start(t, j7ServiceInner)
+			before := recoveryFiles(t, f.statePath)
+			outside.Store(expired)
+			conn := j7ServiceDial(t, f)
+			nativeSend(t, conn, nativeHello(1))
+			want := Code("")
+			if expired {
+				want = "STATIC_GATE_WINDOW"
+			}
+			nativeResponse(t, nativeReceive(t, conn), nativeID(1), want)
+			after := recoveryFiles(t, f.statePath)
+			if expired {
+				changed := 0
+				for path, old := range before {
+					if after[path] == old {
+						continue
+					}
+					delta := strings.TrimPrefix(after[path], old)
+					if !strings.Contains(path, "/audit/") || !strings.HasPrefix(after[path], old) || strings.Count(delta, "\n") != 1 || !strings.Contains(delta, `"refusal_code":"STATIC_GATE_WINDOW"`) {
+						t.Fatal("expired hello committed state")
+					}
+					changed++
+				}
+				if changed != 1 || len(after) != len(before) {
+					t.Fatal("expired hello refusal evidence", changed)
+				}
+			} else if reflect.DeepEqual(before, after) {
+				t.Fatal("valid hello did not commit")
+			}
+			if e := r.stop(t); e != nil {
+				t.Fatal(e)
+			}
+		})
+	}
+}
+
+// This fixture wraps only the real custody release fence. Handling/preparation
+// remains the actual adapter; a deterministic boundary injection expires the
+// captured signed gate just before WithActive, never by changing host time.
+type j7StaticReleaseBoundary struct {
+	gated    *j7GatedHandler
+	expire   bool
+	outside  atomic.Bool
+	prepared atomic.Bool
+}
+
+func (p *j7StaticReleaseBoundary) WithActive(ctx context.Context, peer control.Peer, r control.Request, result control.Object, release func(context.Context) control.Code) control.Code {
+	if r.Method == "j7_sign" {
+		a := p.gated.j7ServiceAdapter.(*j7RequestCustody)
+		a.store.mu.Lock()
+		record := a.store.j7SigningRecord(a.launcher, r.ID)
+		p.prepared.Store(record != nil && record.Release == "prepared")
+		a.store.mu.Unlock()
+		p.outside.Store(p.expire)
+	}
+	return p.gated.WithActive(ctx, peer, r, result, release)
+}
+
+// R-U2-3: a signature prepared inside the window cannot cross its release
+// boundary after expiry; no wire result or released record appears. A valid
+// signature verifies independently, and the already-negotiated END works late.
+func TestJ7StaticGatePreparedSignatureExpiry(t *testing.T) {
+	for _, expired := range []bool{true, false} {
+		t.Run(map[bool]string{true: "expired", false: "inside"}[expired], func(t *testing.T) {
+			gateFixture := j7ServiceSetup(t, j7ServiceOptions{})
+			probe := &j7StaticReleaseBoundary{expire: expired}
+			f := j7SigningSetupFence(t, func(a *j7RequestCustody) control.ReleaseFence {
+				public, e := a.key.request(a.store, a.store.records[0], nil)
+				if e != nil {
+					t.Fatal(e)
+				}
+				gateFixture.public = hex.EncodeToString(public)
+				gate := j7GateInstall(t, gateFixture, nil)
+				verdict, c := gate.verify(t.Context(), j7GateInput(gateFixture))
+				if c != "" {
+					t.Fatal(c)
+				}
+				probe.gated = &j7GatedHandler{j7ServiceAdapter: a, check: verdict.check, now: func(context.Context) (j7GateTime, Code) {
+					at := helperNow
+					if probe.outside.Load() {
+						at = helperNow.Add(time.Hour)
+					}
+					return j7GatePoint(at), ""
+				}}
+				return probe
+			})
+			admin := f.dial(t, 1)
+			conn := f.dial(t, 2)
+			run := f.bind(t, conn, 3, f.f.origin, f.f.uid+200)
+			nativeSend(t, conn, nativeRequest(4, "j7_sign", f.consent(t)))
+			reply := nativeReceive(t, conn)
+			want := Code("")
+			if expired {
+				want = "STATIC_GATE_WINDOW"
+			}
+			result := nativeResponse(t, reply, nativeID(4), want)
+			if !probe.prepared.Load() {
+				t.Fatal("signature was not prepared inside window")
+			}
+			if expired {
+				if _, ok := reply["result"]; ok {
+					t.Fatal("expired signature released result")
+				}
+			} else {
+				j7ResultEvent(t, result)
+			}
+			f.f.store.mu.Lock()
+			record := f.f.store.j7SigningRecord(f.a.launcher, nativeID(4))
+			state := ""
+			if record != nil {
+				state = record.Release
+			}
+			f.f.store.mu.Unlock()
+			expected := "released"
+			if expired {
+				expected = "prepared"
+			}
+			if state != expected {
+				t.Fatal("signature release state", state)
+			}
+			probe.outside.Store(true)
+			j7Call(t, admin, 5, "j7_run_end", control.Object{"run_id": run}, "")
+		})
+	}
+}
+
+// R-U2-5: a fresh provider sample after key setup refuses a window that expired
+// during startup, with no socket/readiness or state change. A stable sample
+// with the same finite window reaches readiness. Clock/provider are fixtures.
+func TestJ7StaticGateStartupPublicationExpiry(t *testing.T) {
+	for _, expired := range []bool{true, false} {
+		t.Run(map[bool]string{true: "expired", false: "inside"}[expired], func(t *testing.T) {
+			f := j7ServiceSetup(t, j7ServiceOptions{})
+			f.deps.gate = j7GateInstall(t, f, func(g map[string]any) { g["not_after"] = helperNow.Add(4 * time.Second).Format(time.RFC3339) })
+			provider, clock, _ := fixtureTimeProvider(t, helperNow)
+			f.deps.clock = func(*timeconf.Policy) (*timeconf.Provider, error) { f.trace.add("clock"); return provider, nil }
+			load := f.deps.loadKey
+			f.deps.loadKey = func(path string, uid uint32, role, instance, epoch, registry string) (*j7Key, error) {
+				key, e := load(path, uid, role, instance, epoch, registry)
+				if expired && e == nil {
+					clock.advance(5 * time.Second)
+				}
+				return key, e
+			}
+			if expired {
+				f.refuses(t, "STATIC_GATE_WINDOW", j7ServiceRefusal{keyGate: true})
+			} else {
+				f.serves(t)
+			}
+		})
+	}
+}
+
+type j7StaticGateWaitingAdapter struct {
+	*j7ServiceStub
+	before func()
+}
+
+func (p *j7StaticGateWaitingAdapter) WithActive(ctx context.Context, _ control.Peer, _ control.Request, _ control.Object, release func(context.Context) control.Code) control.Code {
+	p.before()
+	return release(ctx)
+}
+
+// A START sample before inner barrier acquisition cannot authorize a late
+// callback. END remains allowed after expiry and in-window START releases.
+func TestJ7StaticGateReleaseWait(t *testing.T) {
+	f := j7ServiceSetup(t, j7ServiceOptions{})
+	gate := j7GateInstall(t, f, nil)
+	verdict, c := gate.verify(t.Context(), j7GateInput(f))
+	if c != "" {
+		t.Fatal(c)
+	}
+	for _, row := range []struct {
+		name, method string
+		expire       bool
+	}{
+		{"start-expired", "j7_sign", true}, {"start-inside", "j7_sign", false}, {"end-expired", "j7_run_end", true},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			at := helperNow
+			p := &j7StaticGateWaitingAdapter{j7ServiceStub: &j7ServiceStub{}, before: func() {
+				if row.expire {
+					at = helperNow.Add(time.Hour)
+				}
+			}}
+			h := &j7GatedHandler{j7ServiceAdapter: p, check: verdict.check, now: func(context.Context) (j7GateTime, Code) { return j7GatePoint(at), "" }}
+			released := false
+			c := h.WithActive(t.Context(), control.Peer{}, control.Request{Method: row.method}, nil, func(context.Context) control.Code { released = true; return "" })
+			if row.method == "j7_sign" && row.expire {
+				if c != "STATIC_GATE_WINDOW" || released {
+					t.Fatal("expired callback released", c)
+				}
+			} else if c != "" || !released {
+				t.Fatal("valid callback refused", c)
+			}
+		})
 	}
 }

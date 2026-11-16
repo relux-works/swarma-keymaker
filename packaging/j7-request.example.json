@@ -2,8 +2,8 @@
   "service_role": "j7-request",
   "j7_key_file": "/var/lib/swarma-keymaker-j7/key/request.seed",
   "instance_id": "11111111111111111111111111111111",
-  "service_uid": 0,
-  "service_gid": 0,
+  "service_uid": 1,
+  "service_gid": 1,
   "master_epoch": "REPLACE_WITH_PINNED_MASTER_EPOCH",
   "registry_revision": "REPLACE_WITH_PINNED_REGISTRY_REVISION",
   "time_policy": {
@@ -32,16 +32,16 @@
   },
   "socket": {
     "dir": "/run/swarma-keymaker-j7",
-    "group": 0
+    "group": 1
   },
   "j7_policy": {
     "path": "/var/lib/swarma-keymaker-j7/policy/table.json",
-    "holder_uid": 0,
+    "holder_uid": 1,
     "schema": "keymaker-j7-policy/1",
     "instance": "11111111111111111111111111111111",
     "identity_registration_number": 1,
     "launcher_principal": {
-      "uid": 1,
+      "uid": 2,
       "generation": "REPLACE_WITH_LAUNCHER_GENERATION"
     }
   },

@@ -43,16 +43,27 @@ not recovery.
   startup sweep and needs none: no claim outlives a stop; after a restart the
   launcher binds runs again, which is start class. Authority held from before
   a stop is ended only by the stopped-operator reconciliation, with the service
-  stopped and outside the gate. Within one running process, run end and release
-  are end-class and pass after expiry; all other gate checks remain required.
+  stopped and outside the gate. Within one running process, run end and its
+  release are end-class and pass after expiry; all other gate checks remain required.
 - **R-U2-2 — no-node refusal precedence.** Earlier checks keep precedence:
   schema-5 `delegation_request_v3` refuses `operation_unsupported`; an unenrolled
   `envelope_v3` refuses `GRANT_NOT_FOR_RUN` (LIP-0013 J7.3 (a), before any node
-  read). `delegation_evidence_unavailable` is returned only where missing node
-  evidence is the first failing precondition (`j7_enroll`). Every one of these
-  is a closed refusal with no effect. The
+  read). In this no-node precedence case, `delegation_evidence_unavailable` is
+  returned only where missing node evidence is the first failing precondition
+  (`j7_enroll`); other uses, including event time and stale evidence, are unchanged.
+  Every one of these is a closed refusal with no effect. The
   [operator ruling-4 row](spec/keymaker-j7.md#operator-procedures) states this
   precedence; no runtime check is reordered by this decision.
+- **R-U2-3 — class follows effect.** Hello and every START result use START
+  through release; only run end and its release use END. A prepared signature
+  cannot be released after the gate expires.
+- **R-U2-4 — whole trusted interval.** Each START check verifies at both
+  `Lower` and `Upper`; point Now stays for audit. END is unchanged.
+- **R-U2-5 — final startup recheck.** A fresh START sample immediately before
+  listener publication and readiness refuses an expiry during startup with no
+  socket. These dated decisions are specified in the
+  [request-role contract](spec/keymaker-j7.md) and
+  [consumer note](spec/keymaker-static-gate.md#keymaker-consumer-note).
 
 ## Station-caller purpose proposal
 

@@ -108,6 +108,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `spec/keymaker-operator-record.md` | Proposed S1 operator-record integration, fact sources, durable replay and audit delta; no runtime activation |
 | `spec/keymaker-time-adapter.md` | Qualified-time tightening, clause/path/slice map and external continuity/receipt/activation gates |
 | `spec/keymaker.md` | Normative candidate contract, operator runbook and test plan |
+| `spec/keymaker-static-gate.md` | First-run static gate statement `swarma-s7 static-gate/1`: preimage, closed members, consumer rule, stated limits and vectors; no importer or activation |
 | `spec/witness-service.md` | Proposed shared typed witness protocol, registry intent/resolution inclusion, server durability and paired text vectors; no implementation or activation |
 | `spec/keymaker-witness.md` | Proposed external-state witness, lifecycle vectors and curator review changes; no implementation or activation |
 | `spec/keymaker-provision.md` | Proposed pre-active binding, generation-pin ordering, local confirmation and paired text vectors; no activation |
@@ -117,6 +118,7 @@ normal create keeps register-after-active. No new method is enabled.
 | `spec/keymaker-msg-state.md` | Proposed K3 schema, exact-outcome recovery, issuance audit and durable registry/WC1 publication proof; no runtime activation |
 | `internal/control/` | Native framing/codec, injected authority and dispatch interfaces, socket tests |
 | `stationcaller/` | Public typed station-caller wire codec and byte-only tests; no signing or activation |
+| `staticgate/` | Public pure verifier for the [static gate statement](spec/keymaker-static-gate.md): pins, form, signature, host, window and section bytes; no signer, I/O or activation; [API and limits](staticgate/README.md) |
 | `internal/enrollment/` | Linux protected pins, isolated signed-Git verification, durable CAS state and enrollment authority; [API and limits](internal/enrollment/README.md) |
 | `internal/registration/` | Registrar-owned proof construction, trusted time/entropy/signing and final recheck; [API, vector coverage and limits](internal/registration/README.md) |
 | `go.mod`, `go.sum` | Go version and exact dependency pins |

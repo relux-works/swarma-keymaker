@@ -17,6 +17,7 @@ no binding/enrollment mutations, apart from permitted bounded audit writes.
 | `slip0010-ed25519.json` | Public SLIP-0010 Ed25519 test vectors 1 and 2: all six nodes each, expected chain code and SLIP-encoded public key; source URL and source SHA-256 retained |
 | `authority-root.json`, `authority-root/` | G4 draft: 84 byte goldens, 46 adjacent negative/positive pairs and 31 preimage links; integrity and hold-origin domain check, full PC2 reader/runtime qualification PENDING |
 | `keymaker-paths.json` | Fixed public 32-byte seed, explicit scoped registry and five name → path → Ed25519/SSH public-key examples; purpose and ancestor separation |
+| `staticgate/` | [Static gate statement](staticgate/README.md): one genuine statement and signature, and positive controls, negatives per refusal code and stated limits generated and checked by `go test ./staticgate/...` |
 
 `evaluation` names the future harness layer. Binding checks may directly
 inject a candidate binding to exercise UID equality; a real daemon must also

@@ -501,7 +501,11 @@ func TestJ7PurposeConfigStartup(t *testing.T) {
 			t.Fatal(err)
 		}
 		var status bytes.Buffer
-		if err := serveValidatedConfig(context.Background(), cfg, &status, nil); err != Code("operation_unsupported") || status.Len() != 0 {
+		want := Code("operation_unsupported")
+		if role == j7RequestRole {
+			want = "j7_configuration_incomplete"
+		}
+		if err := serveValidatedConfig(context.Background(), cfg, &status, nil); err != want || status.Len() != 0 {
 			t.Fatal("new profile reached legacy startup", err)
 		}
 		if err := serveWithClock(context.Background(), cfg, &status, nil, nil); err != Code("operation_unsupported") {

@@ -1,0 +1,33 @@
+[Unit]
+Description=Dedicated request-role key custody
+After=local-fs.target
+[Service]
+# REQUIRED before installation: the S8 root-owned pre-start verification hook.
+# On every unit start it must verify binary_sha256 and config_sha256, and
+# refuse unless the dedicated launch group contains exactly holder and launcher.
+# This template does not supply that hook and is not qualified for activation.
+Type=simple
+User=swarma-keymaker-j7
+Group=swarma-keymaker-j7
+SupplementaryGroups=swarma-j7-launch
+ExecStart=/usr/local/bin/keymaker serve --config /etc/swarma-keymaker-j7/config.json
+RuntimeDirectory=swarma-keymaker-j7
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/swarma-keymaker-j7/state /var/lib/swarma-keymaker-j7/policy /run/swarma-keymaker-j7
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+LimitNOFILE=512
+MemoryMax=256M
+TasksMax=64
+CPUQuota=100%
+Restart=no
+[Install]
+WantedBy=multi-user.target

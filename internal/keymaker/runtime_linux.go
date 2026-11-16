@@ -3,6 +3,7 @@
 package keymaker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -32,9 +33,21 @@ func ServeProduction(ctx context.Context, config string, status io.Writer) error
 type productionConfig = Config
 
 func serveConfigured(ctx context.Context, path string, status io.Writer, generation GenerationSource) error {
-	var cfg productionConfig
-	if e := ProtectedConfig(path, &cfg); e != nil {
+	raw, e := protectedBytes(path)
+	if e != nil {
 		return e
+	}
+	var cfg productionConfig
+	if e := StrictJSON(bytes.NewReader(raw), &cfg); e != nil {
+		return e
+	}
+	if cfg.ServiceRole == j7RequestRole {
+		if cfg.J7State != nil && cfg.J7State.HeadFile == filepath.Clean(path) {
+			return Code("j7_configuration_conflict")
+		}
+		// Only this path holds the exact static configuration bytes that the
+		// static gate binds; no injected generation source reaches the role.
+		return serveJ7Request(ctx, cfg, raw, status, productionJ7ServiceDeps())
 	}
 	return serveValidatedConfig(ctx, cfg, status, generation)
 }
@@ -43,8 +56,13 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 // that load separate permits unprivileged tests of the readiness gate without
 // an alternate configuration owner policy or a production fixture switch.
 func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.Writer, generation GenerationSource) error {
+	if cfg.ServiceRole == j7RequestRole {
+		// Without the protected static bytes the request role can pass its
+		// configuration, identity and time steps but never the static gate.
+		return serveJ7Request(ctx, cfg, nil, status, productionJ7ServiceDeps())
+	}
 	if cfg.ServiceRole != "" && cfg.ServiceRole != "legacy" {
-		// Role configuration is frozen, but new profile serving is not wired.
+		// The delegation profile is frozen configuration only and is not wired.
 		// Refuse before legacy custody/state, time, generation or socket access.
 		return Code("operation_unsupported")
 	}

@@ -22,7 +22,8 @@ type generationJournalConfig struct {
 	InitialFloor gj.Floor `json:"initial_floor"`
 }
 
-// J7 pins are configuration only; both new runtime profiles still refuse startup.
+// J7 pins are configuration only. The request role is served by the ordered
+// startup in j7_service_linux.go; the delegation role still refuses startup.
 // ProtectedConfig supplies the root-owner/ancestor boundary before runtime use.
 type j7PolicyConfiguration struct {
 	Path      string    `json:"path"`
@@ -32,31 +33,58 @@ type j7PolicyConfiguration struct {
 	Identity  uint64    `json:"identity_registration_number"`
 	Launcher  Principal `json:"launcher_principal"`
 }
+
+// The request role names a separate protected head file and carries no moving
+// pin: its configuration bytes stay static across served requests. The frozen
+// delegation variant keeps its inline pins and is not served.
 type j7StateConfiguration struct {
 	Path            string `json:"path"`
 	Minimum         int    `json:"minimum_reader_schema"`
-	ExpectedVersion uint64 `json:"expected_version"`
-	ExpectedDigest  string `json:"expected_digest"`
+	HeadFile        string `json:"head_file,omitempty"`
+	ExpectedVersion uint64 `json:"expected_version,omitempty"`
+	ExpectedDigest  string `json:"expected_digest,omitempty"`
 }
+
+// The socket group is connection admission only; kernel peer credentials are
+// the authentication. Group membership is a deployment duty.
+type j7SocketConfiguration struct {
+	Dir   string `json:"dir"`
+	Group uint32 `json:"group"`
+}
+
+// The four static-gate inputs are named here and read only by the gate step.
+type j7StaticGateConfiguration struct {
+	ApproverKeyFile string `json:"approver_key_file"`
+	StatementFile   string `json:"statement_file"`
+	SignatureFile   string `json:"signature_file"`
+	DigestFile      string `json:"digest_file"`
+}
+
+func cleanAbsolute(path string) bool {
+	return filepath.IsAbs(path) && filepath.Clean(path) == path && path != "/"
+}
+
 type Config struct {
-	J7Policy          *j7PolicyConfiguration   `json:"j7_policy,omitempty"`
-	J7State           *j7StateConfiguration    `json:"j7_state,omitempty"`
-	ServiceRole       string                   `json:"service_role,omitempty"`
-	J7KeyFile         string                   `json:"j7_key_file,omitempty"`
-	InstanceID        string                   `json:"instance_id,omitempty"`
-	TimePolicy        *timeconf.Policy         `json:"time_policy,omitempty"`
-	GenerationJournal *generationJournalConfig `json:"generation_journal,omitempty"`
-	Registration      *registrationConfig      `json:"registration_helper,omitempty"`
-	SocketDir         string                   `json:"socket_dir"`
-	StateDir          string                   `json:"state_dir"`
-	MasterFile        string                   `json:"master_file"`
-	RegistryFile      string                   `json:"registry_file"`
-	ServiceUID        uint32                   `json:"service_uid"`
-	ServiceGID        uint32                   `json:"service_gid"`
-	ControlGID        uint32                   `json:"control_gid"`
-	Operator          Principal                `json:"operator_principal"`
-	Epoch             string                   `json:"master_epoch"`
-	RegistryRevision  string                   `json:"registry_revision"`
+	J7Policy          *j7PolicyConfiguration     `json:"j7_policy,omitempty"`
+	J7State           *j7StateConfiguration      `json:"j7_state,omitempty"`
+	J7Socket          *j7SocketConfiguration     `json:"socket,omitempty"`
+	StaticGate        *j7StaticGateConfiguration `json:"static_gate,omitempty"`
+	ServiceRole       string                     `json:"service_role,omitempty"`
+	J7KeyFile         string                     `json:"j7_key_file,omitempty"`
+	InstanceID        string                     `json:"instance_id,omitempty"`
+	TimePolicy        *timeconf.Policy           `json:"time_policy,omitempty"`
+	GenerationJournal *generationJournalConfig   `json:"generation_journal,omitempty"`
+	Registration      *registrationConfig        `json:"registration_helper,omitempty"`
+	SocketDir         string                     `json:"socket_dir"`
+	StateDir          string                     `json:"state_dir"`
+	MasterFile        string                     `json:"master_file"`
+	RegistryFile      string                     `json:"registry_file"`
+	ServiceUID        uint32                     `json:"service_uid"`
+	ServiceGID        uint32                     `json:"service_gid"`
+	ControlGID        uint32                     `json:"control_gid"`
+	Operator          Principal                  `json:"operator_principal"`
+	Epoch             string                     `json:"master_epoch"`
+	RegistryRevision  string                     `json:"registry_revision"`
 }
 
 func (cfg *Config) UnmarshalJSON(raw []byte) error {
@@ -79,8 +107,20 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 		if !validJ7Role(role.ServiceRole) {
 			return failure("unknown service role")
 		}
-		if _, err := objectMembers(raw, []string{"service_role", "j7_key_file", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision"}, "j7_policy", "j7_state"); err != nil {
+		// The request role alone may carry the service members; the frozen
+		// delegation variant keeps its original closed set.
+		optional := []string{"j7_policy", "j7_state"}
+		request := role.ServiceRole == j7RequestRole
+		if request {
+			optional = append(optional, "time_policy", "generation_journal", "socket", "static_gate")
+		}
+		if _, err := objectMembers(raw, []string{"service_role", "j7_key_file", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision"}, optional...); err != nil {
 			return err
+		}
+		for _, name := range optional {
+			if value, ok := rawFields[name]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+				return failure("invalid key role configuration")
+			}
 		}
 		type plain Config
 		var parsed plain
@@ -97,13 +137,66 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 			}
 		}
 		if rawState, ok := rawFields["j7_state"]; ok {
-			if messageRequired(rawState, reflect.TypeFor[j7StateConfiguration]()) != nil || parsed.J7State == nil {
+			// The request role names the head file; inline pins there would go
+			// stale after the first served request and are refused.
+			members := []string{"path", "minimum_reader_schema", "expected_version", "expected_digest"}
+			if request {
+				members = []string{"path", "minimum_reader_schema", "head_file"}
+			}
+			if _, err := objectMembers(rawState, members); err != nil || parsed.J7State == nil {
 				return failure("invalid J7 state pins")
 			}
 			p := parsed.J7State
 			// Configuration stays pinned to4/5; trusted internal state6 is separate.
-			if !filepath.IsAbs(p.Path) || filepath.Clean(p.Path) != p.Path || (p.Minimum != 4 && p.Minimum != 5) || p.ExpectedVersion == 0 || p.ExpectedVersion > j7SafeInteger || !validDigest(p.ExpectedDigest) {
+			if !filepath.IsAbs(p.Path) || filepath.Clean(p.Path) != p.Path || (p.Minimum != 4 && p.Minimum != 5) {
 				return failure("invalid J7 state pins")
+			}
+			if request && !cleanAbsolute(p.HeadFile) {
+				return failure("invalid J7 state pins")
+			}
+			if !request && (p.ExpectedVersion == 0 || p.ExpectedVersion > j7SafeInteger || !validDigest(p.ExpectedDigest)) {
+				return failure("invalid J7 state pins")
+			}
+		}
+		if rawTime, ok := rawFields["time_policy"]; ok {
+			policy, err := timeconf.DecodePolicy(rawTime)
+			if err != nil || policy.BackwardTolerance < time.Second || parsed.TimePolicy == nil {
+				return failure("invalid time policy")
+			}
+		}
+		if rawJournal, ok := rawFields["generation_journal"]; ok {
+			journal, err := objectMembers(rawJournal, []string{"path", "initial_floor"})
+			if err != nil {
+				return failure("invalid generation journal configuration")
+			}
+			if _, err := objectMembers(journal["initial_floor"], []string{"seq", "hash"}); err != nil {
+				return failure("invalid generation journal configuration")
+			}
+			g := parsed.GenerationJournal
+			if g == nil || !cleanAbsolute(g.Path) || !validGenerationFloor(g.InitialFloor) {
+				return failure("invalid generation journal configuration")
+			}
+		}
+		if rawSocket, ok := rawFields["socket"]; ok {
+			if _, err := objectMembers(rawSocket, []string{"dir", "group"}); err != nil || parsed.J7Socket == nil || !cleanAbsolute(parsed.J7Socket.Dir) {
+				return failure("invalid J7 socket configuration")
+			}
+		}
+		if rawGate, ok := rawFields["static_gate"]; ok {
+			if _, err := objectMembers(rawGate, []string{"approver_key_file", "statement_file", "signature_file", "digest_file"}); err != nil || parsed.StaticGate == nil {
+				return failure("invalid static gate configuration")
+			}
+			g := parsed.StaticGate
+			files := []string{g.ApproverKeyFile, g.StatementFile, g.SignatureFile, g.DigestFile}
+			for i, file := range files {
+				if !cleanAbsolute(file) {
+					return failure("invalid static gate configuration")
+				}
+				for _, other := range files[:i] {
+					if other == file {
+						return failure("invalid static gate configuration")
+					}
+				}
 			}
 		}
 		*cfg = Config(parsed)

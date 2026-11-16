@@ -1,0 +1,59 @@
+{
+  "service_role": "j7-request",
+  "j7_key_file": "/var/lib/swarma-keymaker-j7/key/request.seed",
+  "instance_id": "11111111111111111111111111111111",
+  "service_uid": 0,
+  "service_gid": 0,
+  "master_epoch": "REPLACE_WITH_PINNED_MASTER_EPOCH",
+  "registry_revision": "REPLACE_WITH_PINNED_REGISTRY_REVISION",
+  "time_policy": {
+    "source": "chrony-nts-config",
+    "chronyc": "/usr/bin/chronyc",
+    "source_files": [
+      "/etc/chrony/chrony.conf"
+    ],
+    "max_sync_age_ns": 2048000000000,
+    "max_uncertainty_ns": 1500000000,
+    "max_offset_ns": 500000000,
+    "max_root_distance_ns": 1000000000,
+    "authority_window_ns": 300000000000,
+    "backward_tolerance_ns": 1000000000,
+    "step_tolerance_ns": 60000000000,
+    "timeout_ns": 1000000000,
+    "max_output_bytes": 4096,
+    "resync": "new-authenticated-sync"
+  },
+  "generation_journal": {
+    "path": "/var/lib/swarma-user-manager/generations",
+    "initial_floor": {
+      "seq": 0,
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "socket": {
+    "dir": "/run/swarma-keymaker-j7",
+    "group": 0
+  },
+  "j7_policy": {
+    "path": "/var/lib/swarma-keymaker-j7/policy/table.json",
+    "holder_uid": 0,
+    "schema": "keymaker-j7-policy/1",
+    "instance": "11111111111111111111111111111111",
+    "identity_registration_number": 1,
+    "launcher_principal": {
+      "uid": 1,
+      "generation": "REPLACE_WITH_LAUNCHER_GENERATION"
+    }
+  },
+  "j7_state": {
+    "path": "/var/lib/swarma-keymaker-j7/state",
+    "minimum_reader_schema": 5,
+    "head_file": "/etc/swarma-keymaker-j7/head.json"
+  },
+  "static_gate": {
+    "approver_key_file": "/etc/swarma-keymaker-j7/approver.pub",
+    "statement_file": "/etc/swarma-keymaker-j7/statement.json",
+    "signature_file": "/etc/swarma-keymaker-j7/statement.sig",
+    "digest_file": "/etc/swarma-keymaker-j7/statement.sha256"
+  }
+}

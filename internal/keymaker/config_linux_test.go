@@ -229,6 +229,9 @@ func TestJ7ConfigReaderFloorPin(t *testing.T) {
 		for _, floor := range []string{"4", "5", "0", "2", "3", "6", "7", "-1", "4.5", "\"5\"", "null", "true"} {
 			t.Run(string(role)+"/"+floor, func(t *testing.T) {
 				raw := strings.TrimSuffix(j7Config(role), "}") + `,"j7_state":{"path":"/protected/state","minimum_reader_schema":` + floor + `,"expected_version":1,"expected_digest":"` + strings.Repeat("a", 64) + `"}}`
+				if role == j7RequestRole {
+					raw = strings.Replace(raw, `"expected_version":1,"expected_digest":"`+strings.Repeat("a", 64)+`"`, `"head_file":"/protected/head.json"`, 1)
+				}
 				cfg, e := ParseConfig(strings.NewReader(raw))
 				if floor == "4" || floor == "5" {
 					if e != nil || cfg.J7State == nil || fmt.Sprint(cfg.J7State.Minimum) != floor {

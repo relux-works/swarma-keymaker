@@ -101,7 +101,7 @@ an independent integration obligation.
 
 Omitted `service_role` retains the unchanged legacy schema; explicit `legacy`
 uses that same schema. Legacy config cannot include new root/instance fields.
-The two new variants require exactly:
+The two role variants share these required members:
 
 ```text
 {service_role, j7_key_file, instance_id, service_uid, service_gid,
@@ -111,14 +111,97 @@ The two new variants require exactly:
 `service_role` is exactly `j7-request` or `delegation`; `j7_key_file` is an
 absolute clean path; instance follows the rule above; epoch/registry pins are
 nonempty strings; service IDs keep uint32 semantics. No legacy master, registry,
-helper, socket or generation-config members are accepted in those variants.
+helper or legacy socket members are accepted in those variants.
 The loaded record fixes role/instance, and the capability fixes epoch/revision.
 
-**Both new runtime profiles currently refuse `operation_unsupported` before
-legacy master/state, clock/generation readiness or socket initialization.**
-Configuration support does not create a fake delegation service or silently
-enable SSH/legacy sign routes. No startup path calls the new root loader or
-initializer. Future request and delegation services must use different OS users,
+The `j7-request` variant additionally accepts only:
+
+- `time_policy`: the inline protected shared time policy; absence refuses
+  `clock_untrusted` at startup, and a supplied backward tolerance must be at
+  least one second.
+- `generation_journal: {path, initial_floor: {seq, hash}}`: the protected
+  generation journal and initial floor. Established state needs its carried
+  generation anchor; startup never bootstraps a missing established anchor.
+- `socket: {dir, group}`: the dedicated socket directory and numeric group.
+- `static_gate: {approver_key_file, statement_file, signature_file, digest_file}`:
+  four distinct protected input-file paths for the signed static gate.
+- `j7_policy` with the protected table path, holder UID, schema, instance,
+  identity registration number and exact launcher principal as defined below.
+- `j7_state: {path, minimum_reader_schema, head_file}`: `path` is the Store
+  directory. Reader floors remain exactly 4 or 5 in configuration; signing
+  startup requires 5 and opens only schema 5. Inline expected-head members
+  are refused in this variant.
+
+Policy, state, socket, static-gate and generation stanzas are required for
+readiness. Missing role stanzas refuse `j7_configuration_incomplete`; a missing
+generation stanza refuses `generation_source_unavailable`. The launcher UID
+must differ from the service UID. Key, state, policy and socket directories
+must be distinct and nonoverlapping. Every path is absolute and clean.
+
+`head_file` is a separate root-owned, single-link regular file, mode 0600 or
+0640, under root-owned ancestors with no group/other write permission. It
+contains exactly compact `{"expected_version":V,"expected_digest":"D"}` in
+that member order, then exactly one LF: V is a canonical integer in
+1..2^53-1 and D is 64 lowercase hexadecimal digits. Other whitespace, BOMs,
+missing or extra LF, extra/missing/duplicate members, noncanonical integers,
+uppercase hexadecimal and trailing data refuse. Its path is distinct from the
+config file. It and the static-gate files must be outside all service-writable
+directories. The stopped-operator tool exports those bytes read-only under the
+state lock
+after a reconciled stop; an independent operator installs the protected file.
+Neither that service-user tool nor the running service writes the head file.
+Static configuration
+bytes therefore remain unchanged as served requests advance the state head.
+Every restart in this first-run profile needs operator reconciliation and a
+fresh independently retained export plus root installation. A root compromise
+of the host defeats this pin. A crash during a run leaves HELD authority
+and requires operator recovery; an unknown signing handoff blocks restart.
+
+Startup is ordered: unprivileged process checks and hardening; protected config
+parse; required-member and cross-field checks; service identity; trusted time;
+the static gate with that trusted sample and the exact config-byte digest;
+safe ancestors; protected head read (a missing or unsafe file refuses
+`j7_head_pin_unavailable` before state opens); state directory and exclusive
+state lock; exact-head schema-5 Store and instance/identity/binding/epoch checks; active launcher and station
+generation evidence; protected policy directory and an existing protected
+table; key load last and derived public-key equality with the gate's expected
+request key; adapter composition; socket-directory lock and listener publication;
+then exactly one `j7-request control ready` status line. No initializer or
+migration runs in the service. A missing table refuses readiness; an existing
+empty authority table grants nothing. An absent static-gate implementation
+refuses `static_gate_unavailable`, before state, secret or socket access.
+
+The first-run method scope is lifecycle (`hello`, bind, end, rebind),
+`j7_pubkey` and `consent_v3`. No node is configured. Node-backed operations
+cannot succeed and refuse `delegation_evidence_unavailable` when their preceding
+schema, run and grant checks are satisfied; existing earlier refusals remain
+in force, including schema-5 `delegation_request_v3` refusal. The service
+provides no legacy SSH, master or registration-helper endpoint.
+
+Store or audit failure latches admission closed. Shutdown stops acceptance,
+closes and drains connections, unlinks only its matching socket inode, closes
+the key, policy and Store, then releases the state lock. Socket admission is
+128 connections globally and 8 per peer UID; lifecycle has its existing eight
+slots. Rate buckets are not implemented on this dedicated socket in the
+single-launcher profile. The socket group contains exactly the holder service
+UID and the dispatcher's launcher UID. The holder membership is required for unprivileged
+socket group assignment; the launcher is the only non-holder member. Startup
+refuses `j7_socket_group_unavailable` if the holder process lacks the configured
+group. After creation, socket owner, group and mode 0660 are verified. Group
+membership enumeration belongs to a required root-owned S8 pre-start hook:
+on every unit start it verifies `binary_sha256`, `config_sha256` and that
+`getent group` lists exactly the holder and launcher, refusing otherwise.
+The service does not enumerate other accounts. That hook remains an external
+prerequisite; the example unit names it without implementing it. Group
+membership is admission; kernel peer
+credentials are authentication: the launcher checks the holder credential and
+Keymaker checks the launcher credential per request. Root-owned configuration,
+distinct-UID launcher interoperability and native qualification remain PENDING.
+
+The `delegation` variant retains its existing closed configuration (including
+optional policy and inline expected-head pins) and refuses
+`operation_unsupported` before state, clock, generation or socket access.
+Request and delegation services must use different OS users,
 independent roots/state/policy/runtime directories and control access. Neither
 holds owner, seal, funding or fee keys. Different public bytes alone cannot
 prove different custodians or exclusive control; those are deployment duties.
@@ -137,7 +220,7 @@ There are no seed/private/chain-code accessors or agent import/export operations
 Custody diagnostics are redacted and serialization refuses. Tests cover public
 crypto vectors, retries, entropy, exact binding/role selection and isolated
 filesystem failures. The fixture checker adds no production authority. Production
-run ownership, custody/node integration, child admission, packaging and real
+run ownership, custody/node integration, child admission, installation and real
 multi-user qualification remain separate work; unrelated witness,
 persistent-revoke and purpose-6 gates are not reopened or prerequisites here.
 
@@ -145,8 +228,9 @@ persistent-revoke and purpose-6 gates are not reopened or prerequisites here.
 
 A lifecycle-only internal native adapter implements `j7_run_bind`,
 `j7_run_end` and `j7_run_rebind`. It has no Master or signing dependency. The
-normal daemon still refuses both new profiles: this adapter is exercised with
-isolated Unix fixtures and is not installed broker integration or qualification.
+request service composes this landed adapter subject to the startup gate
+above. Isolated Unix fixtures are not installed integration or qualification;
+the delegation role remains closed.
 Legacy Native rejects these methods and all J7 signing/public-key methods.
 
 The transport creates a private connection scope exactly once from the accepted
@@ -241,7 +325,8 @@ Root-owned protected role configuration may additionally supply:
 ```text
 j7_policy:{path,holder_uid,schema,instance,identity_registration_number,
            launcher_principal:{uid,generation}}
-j7_state:{path,minimum_reader_schema,expected_version,expected_digest}
+j7_state:{path,minimum_reader_schema,head_file}  // request
+j7_state:{path,minimum_reader_schema,expected_version,expected_digest}  // delegation
 ```
 
 Policy schema is exactly `keymaker-j7-policy/1`, holder matches service UID,
@@ -251,7 +336,9 @@ It must match the explicitly migrated participant and its independently retained
 exact version/body head; `4` does not admit schema 5, and startup never migrates
 state or substitutes empty signing history. Expected version/digest pins are
 nonempty safe-integer/64-hex values. Both paths are absolute and clean. These
-optional objects are rejected by legacy config. Parsing pins does not open a
+objects are rejected by legacy config; request readiness requires both. The
+request head is read from its protected file as specified above; delegation
+keeps inline pins. Parsing pins does not open a
 store, publish policy, enable a profile or establish protection.
 
 ### Publication, withdrawal and the common fence

@@ -250,3 +250,33 @@ error. Negative witnesses have nearby valid controls.
 
 These witnesses do not claim exhaustive mutation coverage. Surviving or unapplied
 plants make the runner fail; they cannot be reported as killed.
+
+## Dedicated request-role service
+
+`j7-request.example.json` and `swarma-keymaker-j7-request.service` are separate
+first-run inputs for the [closed role contract](../spec/keymaker-j7.md#closed-role-configuration-and-runtime-behavior).
+They do not replace the legacy unit or participate in its byte-equality check.
+All numeric IDs, instance, generation and epoch/revision values need protected
+operator provisioning. Key, state, policy and runtime directories are distinct;
+key/state/policy are service-owned 0700 and runtime is 0755. The group
+`swarma-j7-launch` contains exactly the holder and the dispatcher's launcher
+service UID. The unit supplies holder supplementary membership solely to permit
+unprivileged socket group assignment; the launcher is the only non-holder
+member. A required root-owned S8 pre-start hook must refuse every unit start
+unless `getent group swarma-j7-launch` lists exactly those two accounts; it also
+verifies `binary_sha256` and `config_sha256`. Provisioning must check primary-group
+assignments for additional members. The unit names this required hook in a
+comment; it does not supply or execute an unimplemented privileged component.
+The process checks its own membership, not the membership of other accounts. The
+service is a different account from legacy custody; group admission does not
+replace the per-request kernel peer and generation checks.
+
+Configuration, static-gate inputs and the canonical one-LF head file are
+root-owned, read-only to the service. Only state, policy and runtime are writable
+inside the unit sandbox; the key directory and head file are not writable.
+The unit deliberately has no automatic restart: each restart needs the stopped
+operator's reconciled head export and a separate root installation. A crash
+leaves HELD authority pending operator recovery. No node or network access is
+configured. The static-gate importer is a required later dependency; this source
+cut refuses `static_gate_unavailable` before opening state or loading the key.
+Packaging is not installation or native qualification.

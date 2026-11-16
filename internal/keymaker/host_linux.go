@@ -195,14 +195,24 @@ func StrictJSON(r io.Reader, v any) error {
 // ProtectedConfig requires root ownership and non-writable ancestors. The master
 // loader additionally pins its service-owned 0700 immediate parent by descriptor.
 func ProtectedConfig(path string, v any) error {
+	b, err := protectedBytes(path)
+	if err != nil {
+		return err
+	}
+	return StrictJSON(bytes.NewReader(b), v)
+}
+
+// protectedBytes returns the exact protected file bytes under the same owner,
+// ancestor, mode and size rules, for callers that also bind those static bytes.
+func protectedBytes(path string) ([]byte, error) {
 	path = filepath.Clean(path)
 	if !filepath.IsAbs(path) {
-		return failure("configuration path must be absolute")
+		return nil, failure("configuration path must be absolute")
 	}
 	for d := filepath.Dir(path); ; d = filepath.Dir(d) {
 		st, err := os.Lstat(d)
 		if err != nil || !st.IsDir() || st.Mode().Perm()&022 != 0 || st.Sys().(*syscall.Stat_t).Uid != 0 {
-			return failure("unsafe configuration parent")
+			return nil, failure("unsafe configuration parent")
 		}
 		if d == "/" {
 			break
@@ -210,7 +220,7 @@ func ProtectedConfig(path string, v any) error {
 	}
 	dir, err := os.Open(filepath.Dir(path))
 	if err != nil {
-		return failure("configuration unavailable")
+		return nil, failure("configuration unavailable")
 	}
 	defer dir.Close()
 	// root-readable configuration may be 0600 or group-readable 0640; never writable by peers.
@@ -222,10 +232,14 @@ func ProtectedConfig(path string, v any) error {
 		}
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
-	return StrictJSON(f, v)
+	b, err := io.ReadAll(io.LimitReader(f, (256<<20)+1))
+	if err != nil || len(b) > 256<<20 {
+		return nil, failure("state capacity exceeded")
+	}
+	return b, nil
 }
 
 // UnavailableGeneration never treats UID existence as account-incarnation authority.

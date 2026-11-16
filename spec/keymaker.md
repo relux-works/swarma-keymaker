@@ -767,6 +767,22 @@ evidence are root-owned and not writable by stations or the daemon.
 | `agent.sock` | service user/service group | 0666 | World-connectable; peer generation and binding required |
 | `control.sock` | service user/`swarma-registration` | 0660 | Group-restricted; self-only pubkey, operator mutations and mandatory mapped helper authority |
 
+The separate `j7-request` service publishes only `control.sock` in its
+configured `socket.dir` (service-owned 0755), mode 0660, owned by the service
+UID and `socket.group`. That dedicated group's only members are the holder and
+the dispatcher's launcher service UID. Holder membership permits unprivileged socket group
+assignment; the launcher is the only non-holder member. Group access admits a
+connection; it supplies no request
+authority. Both ends check kernel peer credentials, and Keymaker resolves the
+launcher generation per request. This role has no `agent.sock` or legacy helper
+endpoint. Its [startup, readiness, method scope and shutdown contract](keymaker-j7.md#closed-role-configuration-and-runtime-behavior)
+requires a static gate, exact operator head pin, schema-5 state, trusted time,
+active generations and protected policy before loading the key and publishing
+the listener. Until the static-gate importer is supplied it refuses readiness
+with `static_gate_unavailable`. The 128-global/8-per-UID connection bounds and
+eight lifecycle slots apply; the first single-launcher profile has no rate
+buckets. This explicit limit does not relax the legacy budgets below.
+
 The helper group grants connection capability, not signing authority. Q9
 tracks how provisioning supplies that narrow group access. Socket modes MUST
 be set by the daemon before readiness; it MUST refuse unsafe pre-existing

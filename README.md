@@ -264,6 +264,7 @@ client traversal; see [Linux testing](docs/linux-testing.md).
 | Go 1.26.10 | `go run ./tools/vectors/main.go -check`; `go run ./tools/vectors/main.go -write-j7-delegation` explicitly regenerates only the new generic request corpus | `vectors/j7/delegation.json`; complete synthetic objects/preimages/signatures, without rewriting historical seeds/vectors |
 | Go 1.26.10 | `go run ./tools/mutations/main.go -group j7-delegation -scratch "$SCRATCH"`; `-only NAME` selects one plant | Eight requirement-derived overlays and named failing tests under private scratch; a setup/compile failure is not a kill |
 | Go 1.26.10 | `go run ./tools/mutations/main.go -group j7-delegation-r2 -scratch "$SCRATCH"` | Four creation-time, retained-release-time, config-floor and parent-order controls; named intended failures and command/output receipts under private scratch |
+| Go 1.26.10 | `go test ./internal/keymaker -run 'J7|Config|Startup|MessageAuthor'`; `go run ./tools/mutations -group j7-service -scratch "$SCRATCH"` | Ordered request-role startup/socket fixtures and six narrowing overlays; exact child exits, logs and receipts in private scratch. Root-owned and distinct-UID positives remain separate qualification gates |
 | Go 1.26.10 | `go run ./tools/vectors -check`; `go run ./tools/vectors -write-j7-signing` explicitly regenerates only the synthetic draft signing corpus | `vectors/j7/signing.json`; original signed domains, seeds and historical vectors are preserved |
 | Go 1.26.10 | `go run ./tools/mutations -group j7-signing -scratch "$SCRATCH"`; `-only NAME` selects one plant | Private overlays and exact test exit codes in the supplied scratch directory; kills require the named forbidden successful endpoint result |
 | Go | Custody response/audit regressions: `go test -race ./internal/keymaker -run '^Test(CustodyAudit|CustodySign|CustodyUnavailable|MasterUnavailable)' -count=1 -p=1`; `go run ./tools/mutations/main.go -group core -scratch "$SCRATCH"` | Real-socket byte-equal refusals, local cause enumeration, open signing controls; logs/overlays under private scratch |
@@ -624,3 +625,9 @@ These exercise literal wire fixtures, public fixture custody, matched receivers
 and closed-runtime witnesses. The mutation tool records overlays, child logs and
 intended-failure receipts in a new mutation subdirectory. Go caches hold build
 outputs. These checks provide no service activation/native qualification.
+
+The dedicated request-role [unit and example](packaging/README.md#dedicated-request-role-service)
+compose lifecycle, public-key and consent handling behind the ordered J7 startup
+gates. Production readiness remains closed until the required static-gate
+importer is supplied. Delegation, root-owned configuration qualification and
+distinct-UID launcher/native qualification remain separate gates.

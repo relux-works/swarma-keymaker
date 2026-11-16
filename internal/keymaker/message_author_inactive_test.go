@@ -82,7 +82,11 @@ func TestMessageAuthorRuntimeStaysClosed(t *testing.T) {
 			t.Fatal(e)
 		}
 		var status bytes.Buffer
-		if e := serveValidatedConfig(context.Background(), cfg, &status, nil); e != Code("operation_unsupported") || status.Len() != 0 {
+		want := Code("operation_unsupported")
+		if role == j7RequestRole {
+			want = "j7_configuration_incomplete"
+		}
+		if e := serveValidatedConfig(context.Background(), cfg, &status, nil); e != want || status.Len() != 0 {
 			t.Fatal("startup gate widened", e)
 		}
 	}

@@ -314,12 +314,12 @@ func TestJ7RunRestartRequiresLauncherRebind(t *testing.T) {
 // New optional protected pins cannot leak into legacy configuration, change
 // instance/holder/schema or accept a service-writable reset/empty expectation.
 func TestJ7RunConfigurationPins(t *testing.T) {
-	cfg := strings.TrimSuffix(j7Config(j7RequestRole), "}") + `,"j7_policy":{"path":"/protected/policy/table","holder_uid":1001,"schema":"keymaker-j7-policy/1","instance":"11111111111111111111111111111111","identity_registration_number":1,"launcher_principal":{"uid":1002,"generation":"launcher"}},"j7_state":{"path":"/protected/state","minimum_reader_schema":4,"expected_version":1,"expected_digest":"` + strings.Repeat("a", 64) + `"}}`
+	cfg := strings.TrimSuffix(j7Config(j7RequestRole), "}") + `,"j7_policy":{"path":"/protected/policy/table","holder_uid":1001,"schema":"keymaker-j7-policy/1","instance":"11111111111111111111111111111111","identity_registration_number":1,"launcher_principal":{"uid":1002,"generation":"launcher"}},"j7_state":{"path":"/protected/state","minimum_reader_schema":4,"head_file":"/protected/head.json"}}`
 	parsed, e := ParseConfig(strings.NewReader(cfg))
 	if e != nil || parsed.J7Policy == nil || parsed.J7State == nil {
 		t.Fatal("valid pins", e)
 	}
-	for _, bad := range []string{strings.Replace(cfg, `"holder_uid":1001`, `"holder_uid":1002`, 1), strings.Replace(cfg, `"minimum_reader_schema":4`, `"minimum_reader_schema":3`, 1), strings.Replace(cfg, `"expected_version":1`, `"expected_version":0`, 1), strings.Replace(cfg, `"launcher_principal":{`, `"unknown":1,"launcher_principal":{`, 1), strings.Replace(cfg, `"j7-request"`, `"legacy"`, 1)} {
+	for _, bad := range []string{strings.Replace(cfg, `"holder_uid":1001`, `"holder_uid":1002`, 1), strings.Replace(cfg, `"minimum_reader_schema":4`, `"minimum_reader_schema":3`, 1), strings.Replace(cfg, `"head_file":"/protected/head.json"`, `"head_file":"relative"`, 1), strings.Replace(cfg, `"launcher_principal":{`, `"unknown":1,"launcher_principal":{`, 1), strings.Replace(cfg, `"j7-request"`, `"legacy"`, 1)} {
 		if _, e := ParseConfig(strings.NewReader(bad)); e == nil {
 			t.Fatal("bad pins accepted")
 		}

@@ -501,3 +501,17 @@ privileged operator/J7 real-key gate. Existing messageCurrent is unavailable;
 a readable certificate or public fixture does not fill it. No fleet export is
 needed: the carrier owns sender-carried A verification with per-host issuer pins
 and an owner-published registration-to-sender projection.
+
+## Dedicated request-role service gates
+
+The [closed role configuration](spec/keymaker-j7.md#closed-role-configuration-and-runtime-behavior)
+selects separate time, generation, socket and static-gate members, a root-owned
+operator head file, schema-5 signing, an existing policy table and one dedicated
+launcher group. Lifecycle, public-key and consent methods are composed without
+a node; grant operations cannot succeed. Unknown signing handoffs remain fenced.
+The static-gate verifier/importer and per-effect rechecks remain required and
+unwired; production refuses readiness rather than silently passing that seam.
+Root-owned configuration/head positive controls, distinct-UID launcher
+interoperability, deployment and native qualification are PENDING. Rate buckets
+are absent from the single-launcher J7 socket. These limits do not activate
+other roles or change the legacy service.

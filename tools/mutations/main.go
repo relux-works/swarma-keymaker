@@ -18,10 +18,10 @@ import (
 func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle or message-author controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle message-author or j7-service controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author" && *group != "j7-service") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author|j7-service]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -120,6 +120,28 @@ func main() {
 			{"ma-identity", "message_author_preimage.go", `MultiAgent: true, Check: true`, `MultiAgent: false, Check: false`, "^TestMessageAuthorCallerIdentity$/^attestation$", "--- FAIL: TestMessageAuthorCallerIdentity/attestation", "identity path accepted"},
 			{"ma-no-copy", "message_author_preimage.go", `original: append([]byte(nil), original...)`, `original: original`, "^TestMessageAuthorEnvelopeProfile$", "--- FAIL: TestMessageAuthorEnvelopeProfile", "preimage alias"},
 			{"ma-export", "message_author_key.go", `io.WriteString(s, "[message-author custody]")`, `fmt.Fprintf(s, "%x", k.seed)`, "^TestMessageAuthorCustodyNoRelease$", "--- FAIL: TestMessageAuthorCustodyNoRelease", "secret diagnostic"},
+		}
+	}
+	if *group == "j7-service" {
+		// Every plant weakens a composed startup or socket invariant; a kill
+		// requires the named assertion, never a setup or compilation failure.
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-service-key-before-lock", "j7_service_linux.go", `	key, e := d.loadKey(cfg.J7KeyFile, uid, j7RequestRole, cfg.InstanceID, cfg.Epoch, cfg.RegistryRevision)
+	if e != nil {
+		return e
+	}
+	defer key.close()
+`, ``, "^TestJ7ServiceStartupOrder$", "--- FAIL: TestJ7ServiceStartupOrder", "startup order violated"},
+			{"j7-service-listener-before-state", "j7_service_linux.go", `	socket, e := openJ7Socket(cfg.J7Socket.Dir, uid, cfg.J7Socket.Group, d.listen)
+	if e != nil {
+		return e
+	}
+	defer socket.remove()
+`, ``, "^TestJ7ServiceStartupOrder$", "--- FAIL: TestJ7ServiceStartupOrder", "startup order violated"},
+			{"j7-service-head-canonical", "j7_service_linux.go", `if !bytes.Equal(raw, []byte(canonical)) {`, `if false && !bytes.Equal(raw, []byte(canonical)) {`, "^TestJ7ServiceHeadCanonical$", "--- FAIL: TestJ7ServiceHeadCanonical", "noncanonical head accepted"},
+			{"j7-service-idle-failure", "j7_service_socket_linux.go", `if health != nil {`, `if false && health != nil {`, "^TestJ7ServiceIdleStoreHealth$/^store$", "--- FAIL: TestJ7ServiceIdleStoreHealth/store", "idle Store failure did not stop service"},
+			{"j7-service-peer-limit", "j7_service_socket_linux.go", `s.counts[uid] >= 8`, `s.counts[uid] >= 9`, "^TestJ7ServiceAcceptBounds$", "--- FAIL: TestJ7ServiceAcceptBounds", "ninth connection of one UID was served"},
+			{"j7-service-global-limit", "j7_service_socket_linux.go", `len(s.connections) >= 128`, `len(s.connections) >= 129`, "^TestJ7ServiceAdmissionCapacity$", "--- FAIL: TestJ7ServiceAdmissionCapacity", "global limit admitted at bound"},
 		}
 	}
 	if *group == "j7-idle" {
@@ -438,7 +460,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" {
+		if *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "j7-service" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{
@@ -475,6 +497,14 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 // replace one uniquely matched authority gate.
 func plant(name, source, old, replacement string) string {
 	mutant := strings.Replace(source, old, replacement, 1)
+	if name == "j7-service-key-before-lock" || name == "j7-service-listener-before-state" {
+		const beforeState = "\tstate, e := OpenDirectory(cfg.J7State.Path, uid, 0700)"
+		if strings.Count(mutant, beforeState) != 1 {
+			fmt.Fprintln(os.Stderr, "startup order plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, beforeState, old+beforeState, 1)
+	}
 	if name == "message-caller-path" {
 		old := `strings.TrimPrefix(current.Path, "m/1'")`
 		if strings.Count(mutant, old) != 1 {

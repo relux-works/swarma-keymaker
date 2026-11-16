@@ -78,8 +78,8 @@ type Class string
 const (
 	// ClassStart covers effects that begin or extend work. The window applies.
 	ClassStart Class = "start"
-	// ClassEnd covers effects that only end work. The comparison with Now is
-	// skipped; every other check still applies.
+	// ClassEnd covers effects that only end work. Comparing Now with the window
+	// bounds is skipped; Now must still be non-zero and every other check applies.
 	ClassEnd Class = "end"
 )
 
@@ -96,8 +96,8 @@ const (
 
 // Inputs are supplied in full by the caller. The two pins and the expected
 // bytes come from the caller's protected install, never from the statement.
-// All-zero pins and an all-zero machine-id digest refuse; a zero Now refuses
-// for ClassStart only. ClassEnd never compares Now.
+// All-zero pins, an all-zero machine-id digest and a zero Now refuse for every
+// class. ClassEnd skips only comparing Now with the window bounds.
 type Inputs struct {
 	// ApproverKey is the pinned x-only BIP-340 approver key.
 	ApproverKey [32]byte
@@ -106,7 +106,8 @@ type Inputs struct {
 	StatementDigest [32]byte
 	// MachineIDSHA256 is SHA-256 of this host's machine-id file content.
 	MachineIDSHA256 [32]byte
-	// Now is the host clock reading. It is compared for ClassStart only.
+	// Now is the host clock reading and must be non-zero for every class.
+	// It is compared with the window bounds for ClassStart only.
 	Now time.Time
 	// Class is ClassStart or ClassEnd; any other value refuses.
 	Class Class
@@ -297,8 +298,8 @@ func (e engine) verify(raw, sig []byte, in Inputs) (Statement, error) {
 		}
 	}
 
-	// Step 5: the window. Its width is a property of the statement and is
-	// checked for both classes; the comparison with Now is ClassStart only.
+	// Step 5: window width and a non-zero Now are required for both classes;
+	// Now is compared with the window bounds for ClassStart only.
 	if on(ckClass) && in.Class != ClassStart && in.Class != ClassEnd {
 		return refuse(CodeWindow, ckClass)
 	}
@@ -307,8 +308,11 @@ func (e engine) verify(raw, sig []byte, in Inputs) (Statement, error) {
 	if on(ckWindowWidth) && (!okBefore || !okAfter || !notBefore.Before(notAfter) || notAfter.Sub(notBefore) > MaxWindow) {
 		return refuse(CodeWindow, ckWindowWidth)
 	}
+	if on(ckWindowNow) && in.Now.IsZero() {
+		return refuse(CodeWindow, ckWindowNow)
+	}
 	if on(ckWindowNow) && in.Class != ClassEnd {
-		if !okBefore || !okAfter || in.Now.IsZero() || in.Now.Before(notBefore) || !in.Now.Before(notAfter) {
+		if !okBefore || !okAfter || in.Now.Before(notBefore) || !in.Now.Before(notAfter) {
 			return refuse(CodeWindow, ckWindowNow)
 		}
 	}

@@ -53,6 +53,12 @@ byte for byte and runs every row. To regenerate after a format change:
 STATICGATE_WRITE_VECTORS=1 go test ./staticgate/... -count=1
 ```
 
+The set has 180 rows: 21 passes and 159 refusals. `end-zero-now` and
+`window-zero-now-start` both refuse with `STATIC_GATE_WINDOW`; their passing
+neighbours keep the same consumer, statement bytes and signature with real
+clock readings. Six `form-host-machine-id-*` rows pin malformed host digest
+shapes to `STATIC_GATE_FORM` before the later host-binding check.
+
 An implementation in another language can run the rows directly: decode
 `statement_hex`, apply the consumer rule with `inputs`, and compare the result
 with `expect`.

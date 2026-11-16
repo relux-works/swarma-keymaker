@@ -27,8 +27,8 @@ statement, err := staticgate.Verify(raw, sig, staticgate.Inputs{
 - `sig` is the wire signature: exactly 128 lowercase hex characters. Raw 64
   bytes, uppercase hex and a trailing LF refuse.
 - `Class` is `ClassStart` (bind, sign, dispatch, lease) or `ClassEnd` (run end,
-  sweep, lease release, owned-run cancel). `ClassEnd` skips only the comparison
-  with `Now`.
+  sweep, lease release, owned-run cancel). `ClassEnd` skips only comparing
+  `Now` with the window bounds; a zero `Now` refuses for every class.
 - `Consumer` is `Keymaker`, `Dispatcher`, `Source`, `BrokerTime` or `BrokerD5`.
   `Association` is required only for `Dispatcher`, and is compared for any
   consumer whenever `len(Association) > 0`. Keymaker needs no association
@@ -49,7 +49,7 @@ value and the error is an `*Error`:
 | 2 | canonical bytes, depth, closed members, exact values, shapes | `STATIC_GATE_FORM` | `ErrForm` |
 | 3 | BIP-340 signature under the pinned key | `STATIC_GATE_SIGNATURE` | `ErrSignature` |
 | 4 | machine-id digest | `STATIC_GATE_HOST` | `ErrHost` |
-| 5 | class, window width, and for `start` the clock | `STATIC_GATE_WINDOW` | `ErrWindow` |
+| 5 | class, window width, non-zero `Now`, and for `start` the window-bound comparison | `STATIC_GATE_WINDOW` | `ErrWindow` |
 | 6 | own section and association bytes | `STATIC_GATE_SCOPE_MISMATCH` | `ErrScopeMismatch` |
 
 Match with `errors.Is(err, staticgate.ErrWindow)` or read `Error.Code`. The

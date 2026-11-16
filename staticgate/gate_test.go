@@ -427,6 +427,20 @@ func buildVectors() []vector {
 	shape("gate-id-short", "gate_id of 31 digits refuses", Keymaker, only, func(g map[string]any) { g["gate_id"] = "00112233445566778899aabbccddeef" })
 	shape("host-extra", "an unknown host member refuses", Keymaker, only, sub("host", "extra", int64(1)))
 	shape("host-label-empty", "an empty host label refuses", Keymaker, only, sub("host", "label", ""))
+	machineHex := hex.EncodeToString(machineID[:])
+	for _, tc := range []struct {
+		id    string
+		value any
+	}{
+		{"uppercase", strings.ToUpper(machineHex)},
+		{"short", machineHex[:63]},
+		{"long", machineHex + "0"},
+		{"nonhex", strings.Repeat("z", 64)},
+		{"nonstring", int64(1)},
+		{"empty", ""},
+	} {
+		shape("host-machine-id-"+tc.id, "a malformed host.machine_id_sha256 ("+tc.id+") refuses with FORM before host binding", Keymaker, ck(ckShape, ckHost), sub("host", "machine_id_sha256", tc.value))
+	}
 	shape("approver-alg", "an approver algorithm other than bip340 refuses", Keymaker, only, sub("approver", "alg", "ed25519"))
 	shape("approver-label-empty", "an empty approver label refuses", Keymaker, only, sub("approver", "label", ""))
 	shape("approver-extra", "an unknown approver member refuses", Keymaker, only, sub("approver", "extra", int64(1)))
@@ -500,9 +514,10 @@ func buildVectors() []vector {
 	window("at-not-after", "at not_after a start refuses", "window-last-instant", ck(ckWindowNow), g, now(notAfter))
 	window("expired-start", "after not_after a start (bind, sign, dispatch, lease) refuses", "end-after-expiry", ck(ckWindowNow), g, now(notAfter.Add(time.Hour)))
 	b.pass("end-after-expiry", "after not_after an end (run end, sweep, release, cancel) still verifies", g, Keymaker, func(in *vectorInputs) { in.Now = notAfter.Add(time.Hour).Format(time.RFC3339Nano); end(in) })
-	b.pass("end-before-not-before", "an end is not compared with the clock at all", g, Keymaker, func(in *vectorInputs) { in.Now = notBefore.Add(-time.Hour).Format(time.RFC3339Nano); end(in) })
+	b.pass("end-before-not-before", "an end is not compared with the window bounds", g, Keymaker, func(in *vectorInputs) { in.Now = notBefore.Add(-time.Hour).Format(time.RFC3339Nano); end(in) })
 	b.pass("end-inside-window", "an end also verifies inside the window", g, Keymaker, end)
-	b.pass("end-zero-now", "an end with zero Now verifies because only the clock comparison is skipped", g, Keymaker, func(in *vectorInputs) { in.Now = time.Time{}.Format(time.RFC3339Nano); end(in) })
+	b.neg("end-zero-now", "an end with zero Now refuses even though window-bound comparisons are skipped", CodeWindow, ck(ckWindowNow), g, Keymaker, func(in *vectorInputs) { in.Now = time.Time{}.Format(time.RFC3339Nano); end(in) })
+	b.out[len(b.out)-1].Control = "end-inside-window"
 	window("zero-now-start", "a start with zero Now refuses", "genuine-keymaker", ck(ckWindowNow), g, now(time.Time{}))
 	window("class-unknown", "an operation class other than start or end refuses", "genuine-keymaker", ck(ckClass), g, func(in *vectorInputs) { in.Class = "bind" })
 	window("class-empty", "an unset operation class refuses", "genuine-keymaker", ck(ckClass), g, func(in *vectorInputs) { in.Class = "" })

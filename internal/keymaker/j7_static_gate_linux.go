@@ -111,11 +111,6 @@ func j7GateCode(err error) Code {
 
 func (g j7ProductionGate) verify(_ context.Context, in j7StaticGateInput) (j7StaticGateResult, Code) {
 	var empty j7StaticGateResult
-	keyFile, err := g.read(in.Files.ApproverKeyFile, 65)
-	key, ok := j7HexLine(keyFile, 64)
-	if err != nil || !ok {
-		return empty, Code(staticgate.CodeKey)
-	}
 	digestFile, err := g.read(in.Files.DigestFile, 65)
 	digest, ok := j7HexLine(digestFile, 64)
 	if err != nil || !ok {
@@ -124,6 +119,11 @@ func (g j7ProductionGate) verify(_ context.Context, in j7StaticGateInput) (j7Sta
 	raw, err := g.read(in.Files.StatementFile, staticgate.MaxPreimage-int64(len(staticgate.Tag))-1)
 	if err != nil {
 		return empty, Code(staticgate.CodeForm)
+	}
+	keyFile, err := g.read(in.Files.ApproverKeyFile, 65)
+	key, ok := j7HexLine(keyFile, 64)
+	if err != nil || !ok {
+		return empty, Code(staticgate.CodeKey)
 	}
 	sigFile, err := g.read(in.Files.SignatureFile, 129)
 	sig, ok := j7HexLine(sigFile, 128)

@@ -126,6 +126,12 @@ func main() {
 		// Every plant weakens a composed startup or socket invariant; a kill
 		// requires the named assertion, never a setup or compilation failure.
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"j7-static-pin-key-order", "j7_static_gate_linux.go", `	keyFile, err := g.read(in.Files.ApproverKeyFile, 65)
+	key, ok := j7HexLine(keyFile, 64)
+	if err != nil || !ok {
+		return empty, Code(staticgate.CodeKey)
+	}
+`, ``, "^TestJ7StaticGatePinBeforeKey$", "--- FAIL: TestJ7StaticGatePinBeforeKey", "want STATIC_GATE_PIN"},
 			{"j7-service-key-before-lock", "j7_service_linux.go", `	key, e := d.loadKey(cfg.J7KeyFile, uid, j7RequestRole, cfg.InstanceID, cfg.Epoch, cfg.RegistryRevision)
 	if e != nil {
 		return e
@@ -497,6 +503,14 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 // replace one uniquely matched authority gate.
 func plant(name, source, old, replacement string) string {
 	mutant := strings.Replace(source, old, replacement, 1)
+	if name == "j7-static-pin-key-order" {
+		const beforePin = "\tdigestFile, err := g.read(in.Files.DigestFile, 65)"
+		if strings.Count(mutant, beforePin) != 1 {
+			fmt.Fprintln(os.Stderr, "PIN/KEY order plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, beforePin, old+beforePin, 1)
+	}
 	if name == "j7-service-key-before-lock" || name == "j7-service-listener-before-state" {
 		const beforeState = "\tstate, e := OpenDirectory(cfg.J7State.Path, uid, 0700)"
 		if strings.Count(mutant, beforeState) != 1 {

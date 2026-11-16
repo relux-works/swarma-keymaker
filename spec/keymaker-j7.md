@@ -178,17 +178,24 @@ including the binary/pre-start and derived-key split, exact file formats,
 closed section and trusted per-effect rechecks. The seven `STATIC_GATE_*`
 refusals are preserved on startup and on the wire. A missing implementation,
 static bytes or recheck capability refuses `static_gate_unavailable`, before
-state, secret or socket access. There is no startup-sweep hook in this profile;
-its transition and reachability after gate expiry require a separate ruling.
+state, secret or socket access.
+
+**R-U2-1 (decided 2026-11-16):** startup is a start-class effect. A service whose
+static-gate window has expired does not start. This profile has no startup sweep
+and needs none: no claim outlives a stop; after a restart the launcher binds runs
+again, which is start class. Authority held from before a stop is ended only by
+the stopped-operator reconciliation, with the service stopped and outside the
+gate. Within one running process, run end and release are end-class and pass
+after expiry; all other gate checks remain required.
 
 The first-run method scope is lifecycle (`hello`, bind, end, rebind),
 `j7_pubkey` and `consent_v3`. No node is configured. Node-backed operations
-cannot succeed and refuse `delegation_evidence_unavailable` when their preceding
-schema, run and grant checks are satisfied; existing earlier refusals remain
-in force. In particular, an unenrolled `envelope_v3` refuses
-`GRANT_NOT_FOR_RUN` and schema-5 `delegation_request_v3` refuses
-`operation_unsupported`, not `delegation_evidence_unavailable`. These codes
-name earlier checks; they do not make either node-backed operation available. The service
+cannot succeed. **R-U2-2 (decided 2026-11-16):** earlier checks keep precedence:
+schema-5 `delegation_request_v3` refuses `operation_unsupported`; an unenrolled
+`envelope_v3` refuses `GRANT_NOT_FOR_RUN` (LIP-0013 J7.3 (a) runs before any node
+read). `delegation_evidence_unavailable` is returned only where missing node
+evidence is the first failing precondition (`j7_enroll`). Every one of these is
+a closed refusal with no effect. The service
 provides no legacy SSH, master or registration-helper endpoint.
 
 Store or audit failure latches admission closed. An unexpected non-closing
@@ -731,6 +738,10 @@ own-node closures, P17, production origins, ambient credential exclusion,
 distinct-UID and enforcing/native qualification stay separate gates.
 
 ## Operator procedures
+
+| First-run ruling | Operator-visible refusal precedence |
+| --- | --- |
+| 4 / R-U2-2 (decided 2026-11-16) | Earlier checks win: schema-5 `delegation_request_v3` refuses `operation_unsupported`; an unenrolled `envelope_v3` refuses `GRANT_NOT_FOR_RUN` under LIP-0013 J7.3 (a), before any node read. `j7_enroll` returns `delegation_evidence_unavailable` when missing node evidence is its first failing precondition. Each is a closed refusal with no effect. |
 
 The request role is prepared and reconciled only by four stopped-operator
 subcommands of the service binary. They are local commands, not socket methods,

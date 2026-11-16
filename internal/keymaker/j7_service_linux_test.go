@@ -1277,6 +1277,7 @@ func TestJ7ServiceNonLauncherPeer(t *testing.T) {
 // head, so a restart with the old pin refuses until the operator re-exports.
 // This single-UID fixture enters after the cross-field step, which forbids a
 // launcher equal to the service UID; the distinct-UID launcher is PENDING.
+// R-U2-2: earlier schema/grant refusal codes precede missing-node evidence.
 func TestJ7ServiceLauncherWire(t *testing.T) {
 	uid := uint32(os.Getuid())
 	f := j7ServiceSetup(t, j7ServiceOptions{launcher: &Principal{UID: uid, Generation: nativeToken}})

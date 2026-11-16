@@ -208,8 +208,8 @@ func TestJ7StaticGateUnsafeFiles(t *testing.T) {
 					f.deps.gate = local
 					expected := want
 					if kind == "parent-mode" {
-						expected = "STATIC_GATE_KEY"
-					} // all four inputs share this parent
+						expected = "STATIC_GATE_PIN"
+					} // all four inputs share this parent; PIN is read first
 					f.refuses(t, expected, j7ServiceRefusal{})
 					repair()
 					repair = nil
@@ -280,7 +280,7 @@ func TestJ7StaticGateSeamAndKey(t *testing.T) {
 	})
 	f.refuses(t, "static_gate_unavailable", j7ServiceRefusal{})
 	f.deps.gate = productionJ7ServiceDeps().gate
-	f.refuses(t, "STATIC_GATE_KEY", j7ServiceRefusal{})
+	f.refuses(t, "STATIC_GATE_PIN", j7ServiceRefusal{})
 	f.deps.gate = j7GateInstall(t, f, func(g map[string]any) { g["keymaker"].(map[string]any)["j7_request_key"] = strings.Repeat("a", 64) })
 	f.refuses(t, "j7_request_key_mismatch", j7ServiceRefusal{keyGate: true})
 	// Restore the statement whose key matches custody.
@@ -594,5 +594,43 @@ func TestJ7StaticGateStatementBounds(t *testing.T) {
 			f.deps.gate = j7GateInstall(t, f, nil)
 			f.serves(t)
 		})
+	}
+}
+
+// Claim: unsafe PIN and KEY files together refuse PIN before later reads or
+// service effects; repairing both serves with PIN/FORM/KEY/SIGNATURE/HOST order.
+func TestJ7StaticGatePinBeforeKey(t *testing.T) {
+	f := j7ServiceSetup(t, j7ServiceOptions{})
+	gate := j7GateInstall(t, f, nil)
+	var reads []string
+	read, machine := gate.read, gate.machine
+	gate.read = func(path string, limit int64) ([]byte, error) {
+		reads = append(reads, path)
+		return read(path, limit)
+	}
+	gate.machine = func() ([]byte, error) {
+		reads = append(reads, "machine-id")
+		return machine()
+	}
+	f.deps.gate = gate
+	for _, path := range []string{f.cfg.StaticGate.DigestFile, f.cfg.StaticGate.ApproverKeyFile} {
+		if err := os.Chmod(path, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.refuses(t, "STATIC_GATE_PIN", j7ServiceRefusal{absent: []string{"ancestors", "head", "generation", "policy"}})
+	if !reflect.DeepEqual(reads, []string{f.cfg.StaticGate.DigestFile}) {
+		t.Fatal("PIN refusal reached a later input")
+	}
+	for _, path := range []string{f.cfg.StaticGate.DigestFile, f.cfg.StaticGate.ApproverKeyFile} {
+		if err := os.Chmod(path, 0640); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reads = nil
+	f.serves(t)
+	want := []string{f.cfg.StaticGate.DigestFile, f.cfg.StaticGate.StatementFile, f.cfg.StaticGate.ApproverKeyFile, f.cfg.StaticGate.SignatureFile, "machine-id"}
+	if !reflect.DeepEqual(reads, want) {
+		t.Fatal("static input read order differs from verifier precedence")
 	}
 }

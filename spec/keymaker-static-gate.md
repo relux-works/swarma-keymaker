@@ -210,6 +210,8 @@ root-owned ancestors. Access/default ACLs are refused. The approver key and
 digest files are exactly 64 lowercase hex characters plus one LF; the
 signature file is exactly 128 lowercase hex characters plus one LF. The
 statement is the exact CCJ-1 bytes with no LF. Reads are bounded before parsing.
+File reads follow PIN (digest), FORM (statement), KEY (approver key), SIGNATURE,
+then HOST (machine-id); a failed earlier read prevents later reads.
 Unreadable, unsafe or malformed key, digest, statement and signature files
 refuse `STATIC_GATE_KEY`, `STATIC_GATE_PIN`, `STATIC_GATE_FORM` and
 `STATIC_GATE_SIGNATURE`, respectively. An unreadable or unsafe root-owned
@@ -236,16 +238,20 @@ again with a fresh trusted sample. Run end and response release use class
 the wrapped effect. File replacement after startup does not update authority;
 a reconciled restart is required. No host-clock fallback is used.
 
-The base lifecycle has no startup-sweep entry point. Adding that transition
-and specifying how it is reached when startup's required `start` check is
-expired remain unresolved; the importer does not invent a sweep.
+R-U2-1 (decided 2026-11-16): startup is a start-class effect, so a service whose
+window has expired does not start. This profile has no startup sweep and needs
+none: no claim outlives a stop; the launcher binds runs again after restart as
+start class. Authority held from before a stop is ended only by stopped-operator
+reconciliation, with the service stopped and outside the gate. Within one running
+process, run end and release are end-class and pass after expiry; all other
+checks remain required.
 
 ### 5.1 Operation classes and the window end
 
 | Class | Operations | Step 5 |
 | --- | --- | --- |
-| `start` | Keymaker run bind and sign, dispatcher dispatch, broker lease | the clock comparison is required: at or after `not_after`, `STATIC_GATE_WINDOW` |
-| `end` | Keymaker run end, the startup sweep, broker lease release, dispatcher owned-run cancel | only the window-bound comparison is skipped; non-zero `Now`, window width, and steps 1–4 and 6 still apply |
+| `start` | Keymaker startup, run bind and sign, dispatcher dispatch, broker lease | the clock comparison is required: at or after `not_after`, `STATIC_GATE_WINDOW` |
+| `end` | Keymaker run end and response release, broker lease release, dispatcher owned-run cancel | only the window-bound comparison is skipped; non-zero `Now`, window width, and steps 1–4 and 6 still apply |
 
 A run bound inside the window may end after `not_after`; it gets no new
 signature or lease. Without this an expired gate would strand a run in

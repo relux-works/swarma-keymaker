@@ -25,7 +25,7 @@ The authoritative decision list and safe defaults are in
   enforcement capability. All matched rows with `exe` refuse locally, including
   matching procfs snapshots. No UID-only fallback is allowed.
 
-## Request-role stopped recovery and sweep
+## Request-role stopped recovery
 
 An unknown signing handoff or cancelled pending policy publication fences
 normal open and head export. No recovery/completion command exists in this
@@ -36,18 +36,23 @@ install it durably before restart. Defining and qualifying that offline state
 recovery remains an owner gate; clearing markers or installing a stale pin is
 not recovery.
 
-There is no startup-sweep implementation or hook in the current lifecycle.
-The sweep transition and how it can run after expiry while startup requires
-class `start` verification need an owner contract. Existing run-end and release
-paths use class `end`; this does not supply the missing sweep.
+## Decided request-role rulings (2026-11-16)
 
-The no-node service currently retains earlier schema/grant refusals:
-`delegation_request_v3` returns `operation_unsupported` at schema 5 and an
-unenrolled `envelope_v3` returns `GRANT_NOT_FOR_RUN`. Whether the first-run
-no-node rule must instead supersede those checks with
-`delegation_evidence_unavailable` needs an explicit refusal-precedence ruling.
-The operator specification names the actual behavior; it does not silently
-reorder those checks or claim the uniform code is implemented.
+- **R-U2-1 — no startup sweep.** Startup is a start-class effect. A service
+  whose static-gate window has expired does not start. This profile has no
+  startup sweep and needs none: no claim outlives a stop; after a restart the
+  launcher binds runs again, which is start class. Authority held from before
+  a stop is ended only by the stopped-operator reconciliation, with the service
+  stopped and outside the gate. Within one running process, run end and release
+  are end-class and pass after expiry; all other gate checks remain required.
+- **R-U2-2 — no-node refusal precedence.** Earlier checks keep precedence:
+  schema-5 `delegation_request_v3` refuses `operation_unsupported`; an unenrolled
+  `envelope_v3` refuses `GRANT_NOT_FOR_RUN` (LIP-0013 J7.3 (a), before any node
+  read). `delegation_evidence_unavailable` is returned only where missing node
+  evidence is the first failing precondition (`j7_enroll`). Every one of these
+  is a closed refusal with no effect. The
+  [operator ruling-4 row](spec/keymaker-j7.md#operator-procedures) states this
+  precedence; no runtime check is reordered by this decision.
 
 ## Station-caller purpose proposal
 
@@ -533,8 +538,8 @@ selects separate time, generation, socket and static-gate members, a root-owned
 operator head file, schema-5 signing, an existing policy table and one dedicated
 launcher group. Lifecycle, public-key and consent methods are composed without
 a node; grant operations cannot succeed. Unknown signing handoffs remain fenced.
-The static-gate verifier/importer and per-effect rechecks remain required and
-unwired; production refuses readiness rather than silently passing that seam.
+The static-gate verifier/importer and per-effect rechecks are composed;
+production requires a valid signed gate and trusted samples at their checks.
 Root-owned configuration/head positive controls, distinct-UID launcher
 interoperability, deployment and native qualification are PENDING. Rate buckets
 are absent from the single-launcher J7 socket. These limits do not activate

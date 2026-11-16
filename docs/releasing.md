@@ -103,12 +103,18 @@ recipe-equivalence control, not an additional workflow build path.
 
 The [native runner matrix](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 uses `ubuntu-24.04` (amd64) and `ubuntu-24.04-arm` (arm64). It preserves the existing assembler tests on each architecture.
-Inventory of `cmd/` main packages (both are Linux buildable):
+Inventory of `cmd/` main packages:
 
 | Package | Bundle disposition |
 | --- | --- |
-| `github.com/relux-works/swarma-keymaker/cmd/keymaker` | Released `keymaker` binary on both native architectures. |
-| `github.com/relux-works/swarma-keymaker/cmd/keymaker-window` | Existing nonroot integration test harness; not a bundle member. |
+| `github.com/relux-works/swarma-keymaker/cmd/keymaker` | Existing bundle binary; amd64 builds, arm64 has the source gate below. |
+| `github.com/relux-works/swarma-keymaker/cmd/keymaker-window` | Builds on Linux amd64/arm64; existing nonroot integration test harness, not a bundle member. |
+
+The imported baseline `2cc4a390984128437e806a45168eabd55667857a` has an
+arm64 compilation gate in `internal/enrollment/files_linux.go`: `Stat_t.Nlink`
+is `uint32` there, while `Metadata.Links` is `uint64`. The arm64 job fails closed
+until a source portability correction is reviewed. The wrapper does not bypass
+that source gate or publish a partial architecture set.
 
 The binding owner instruction to wrap the existing bundle supersedes the original
 all-command build step. The harness is not added to the bundle. No darwin output

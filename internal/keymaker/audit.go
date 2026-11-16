@@ -194,6 +194,9 @@ type Journal struct {
 	binding      bindingCommit
 	generation   generationCommit
 
+	deferredWriter bool // Stopped-operator replay creates no writer until a commit.
+	createSegment  bool
+
 	messageReserved        int64
 	messageEvents          map[string]AuditRecord
 	messageCommits         map[uint64]bindingCommit
@@ -228,6 +231,11 @@ func openJournal(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader) 
 
 // The callback runs after read-only replay and before opening/creating a writer.
 func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader, check func(*Journal) error) (*Journal, error) {
+	return openJournalCheckedMode(dir, uid, clock, entropy, check, false)
+}
+
+// Only stopped-operator callers defer writer creation. Service open stays eager.
+func openJournalCheckedMode(dir *os.File, uid uint32, clock AuditClock, entropy io.Reader, check func(*Journal) error, deferred bool) (*Journal, error) {
 	j := &Journal{dir: dir, uid: uid, segment: 1, first: 1, segmentLimit: 64 << 20, totalLimit: (1 << 30) + (16 << 20), reserve: 16 << 20, clock: clock}
 	var nonce [16]byte
 	if _, e := io.ReadFull(entropy, nonce[:]); e != nil {
@@ -340,20 +348,33 @@ func openJournalChecked(dir *os.File, uid uint32, clock AuditClock, entropy io.R
 			return nil, err
 		}
 	}
-	flags := syscall.O_WRONLY | syscall.O_APPEND
-	if len(segments) == 0 || j.segment > uint64(len(segments)) {
-		flags |= syscall.O_CREAT | syscall.O_EXCL
-	}
-	j.file, e = openRelative(dir, auditName(j.segment), flags, uid, 0600)
-	if e != nil {
-		return nil, e
-	}
-	j.writer = j.file
-	if dir.Sync() != nil {
-		j.file.Close()
-		return nil, failure("audit directory sync failed")
+	j.createSegment = len(segments) == 0 || j.segment > uint64(len(segments))
+	j.deferredWriter = deferred
+	if !deferred {
+		if err := j.openWriter(); err != nil {
+			return nil, err
+		}
 	}
 	return j, nil
+}
+
+// openWriter runs under the journal gate (or before publication of the Journal).
+// Replay and argument refusals never enter this durable boundary.
+func (j *Journal) openWriter() error {
+	flags := syscall.O_WRONLY | syscall.O_APPEND
+	if j.createSegment {
+		flags |= syscall.O_CREAT | syscall.O_EXCL
+	}
+	f, err := openRelative(j.dir, auditName(j.segment), flags, j.uid, 0600)
+	if err != nil {
+		return err
+	}
+	if j.dir.Sync() != nil {
+		f.Close()
+		return failure("audit directory sync failed")
+	}
+	j.file, j.writer, j.deferredWriter = f, f, false
+	return nil
 }
 func (j *Journal) rotate() error {
 	seal := auditSeal{j.first, j.seq, j.previous}
@@ -468,6 +489,12 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
 	}
+	if j.deferredWriter {
+		if j.openWriter() != nil {
+			j.failed = true
+			return "audit_unavailable"
+		}
+	}
 	if j.size+int64(len(b)) > j.segmentLimit {
 		if j.rotate() != nil {
 			j.failed = true
@@ -498,5 +525,8 @@ func (j *Journal) Close() error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.failed = true
+	if j.file == nil {
+		return nil
+	}
 	return j.file.Close()
 }

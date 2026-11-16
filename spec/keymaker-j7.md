@@ -709,3 +709,185 @@ comparison; this request endpoint has no child attestation and does not implemen
 that separate verifier. Purpose8 supplies nothing on v3. Child/v4 wire inputs,
 own-node closures, P17, production origins, ambient credential exclusion,
 distinct-UID and enforcing/native qualification stay separate gates.
+
+## Operator procedures
+
+The request role is prepared and reconciled only by four stopped-operator
+subcommands of the service binary. They are local commands, not socket methods,
+startup actions or agent APIs, and they add no import, export or signing path.
+
+```text
+keymaker j7 seed-init      --service-uid U --state-dir D --key-file F --instance-id I
+keymaker j7 migrate        --service-uid U --state-dir D --source-schema 0|2|4
+                           --instance-id I --identity N --generation-journal P
+                           --expected-version V --expected-digest H
+keymaker j7 policy-publish --service-uid U --state-dir D --schema 4|5
+                           --instance-id I --identity N --policy-file T --input P
+                           --expected-version V --expected-digest H
+keymaker j7 head           --service-uid U --state-dir D --schema 0|2|4|5
+                           [--expected-version V --expected-digest H]
+```
+
+Rules common to all four:
+
+- **Service user only.** The effective user must be the unprivileged user named
+  by `--service-uid`; root and every other user refuse `role_not_permitted`.
+  Every directory a command opens must already be owned by that user with mode
+  0700 under ancestors that only root or that user can write. No command
+  creates a directory or changes ownership.
+- **Stopped service only.** Each command takes the exclusive state lock on
+  `--state-dir`, the lock the service holds for its whole Store lifetime, before
+  any other effect and keeps it until it returns. While a service (or another
+  command) holds it the command refuses `state_locked`. `seed-init` takes the
+  lock too, although it writes nothing in the state directory.
+- **Explicit inputs.** Every flag is required exactly once; only the expected
+  head of `j7 head` is optional (both flags or neither). Paths are absolute and
+  clean. Numbers are canonical decimal. Nothing is read from a configuration
+  file, the environment or a default. A malformed invocation is a usage error
+  (exit 2, no result, no effect); a well-formed but invalid argument refuses
+  `request_malformed` before any path is touched.
+- **Closed result.** Except for successful `head` export (specified below),
+  exit 0 or 1 prints exactly one JSON line on stdout with
+  exactly the members `{command, outcome, refusal, detail, state_schema,
+  head_version, head_digest}`. `outcome` is `ok` or `refused`. On a refusal
+  the refusal code is also the single stderr line and the exit status is 1.
+  `detail` is fixed diagnostic text, never input or state bytes. The head
+  members describe the store as the command left it whenever the store could
+  be opened and proved against its journal; otherwise they are zero and empty.
+  Unknown commands are never reflected in the result. No result, diagnostic
+  or log contains seed, key or policy bytes.
+- **No initialization or repair.** No command initializes binding state: an
+  empty state directory, a staged `bindings.next`, an unmatched journal or a
+  floor mismatch refuses `j7_state_fenced` and retains the evidence. Operator
+  replay defers opening an audit writer until an actual commit: a head export
+  or precondition refusal creates no new segment, even after a sealed tail.
+  The service opener retains its eager writer behavior. Refusal audit records
+  required by policy publication remain permitted telemetry.
+- **No time source.** A command argument cannot select a time policy, so the
+  audit records these commands commit carry a null time and the `unknown`
+  result that replay accepts. The service's own records keep trusted time.
+
+### `j7 seed-init`
+
+Wraps `InitializeJ7Seed` for the fixed role `j7-request`. The key file's parent
+is outside the state directory. An existing entry at the target, including a
+symbolic link, refuses `j7_seed_exists`; the initializer's own no-replace
+publication stays the authority that nothing is overwritten. Any other failure
+refuses `j7_key_unavailable` under the retention rules of "Explicit
+initialization and restart". The result has no head and names no key material;
+the public key is first derived by the service at startup.
+
+### `j7 migrate`
+
+Runs `migrateJ7` (schema 0 or 2 to 4) and then `migrateJ7Signing` (4 to 5) in
+place, in one invocation and under one lock. `--source-schema` is the schema
+the operator asserts the store has now; any other schema refuses. The store
+must be a reconciled binding/audit pair whose head equals the independently
+retained `--expected-version`/`--expected-digest` exactly, and must hold the
+active binding of `--identity`; otherwise the command refuses `j7_state_fenced`
+or `binding_not_found` with no effect. The first transition is judged against
+the operator's expectation. Only the intermediate schema-4 head, created by
+this invocation under the lock, is computed in process.
+
+The `generation.anchor` is carried in place: the migrated state directory and
+its audit journal keep both sides of the anchor byte-for-byte. Before any
+transition the command requires a complete anchor that names
+`--generation-journal`, the journal path the service will be configured with,
+and that equals the journal's last anchor record. A missing, staged, fenced or
+foreign-path anchor refuses `generation_source_fenced` with no effect, because
+such a store would start fenced. A store is therefore prepared for the request
+role by placing a reconciled legacy state directory, anchor and audit journal
+included, under the request service user and migrating it there; the command
+copies nothing and changes no owner.
+
+After the second transition the command closes the store, reopens it with the
+opener the service uses and the new head, rechecks the anchor and only then
+reports `state_schema:5` with the head to retain. `--source-schema 4` resumes
+an invocation that stopped between the transitions: it requires the retained
+schema-4 head and the same instance and identity the store already pins, and
+runs only the second transition. The pinned station binding must still be
+active; a revoked or unbound station refuses `binding_not_found` before the
+second transition. A refusal after the first transition reports
+the last head the command proved, the schema-4 one.
+
+### `j7 policy-publish`
+
+Wraps `j7Policy.publish` on a schema-4 or schema-5 store opened with the exact
+expected head. The holder is the service user, so a non-holder refuses
+`role_not_permitted` before any access. `--input` is a closed policy file as
+defined in "Policy format and protection": a regular file owned by root or the
+holder, single-link, without an ACL and not writable by group or others,
+under protected root-or-holder-owned ancestors; it is read once without
+following a final symbolic link. It is validated against `--instance-id` and `--identity` before
+the store is opened; unknown, missing or foreign members refuse
+`request_malformed`. `--policy-file` is the table path the service reads; it is
+neither the input nor inside the state directory. Publication follows the
+pending-commit, write, rename and completion-commit order of "Publication,
+withdrawal and the common fence". Success reports the advanced head, which
+replaces the operator's retained expectation. Republishing the current bytes is
+idempotent and leaves the head unchanged. A rollback or equivocation is refused
+with the table and head unchanged. An interrupted publication keeps its pending
+intent, reports no head and needs operator reconciliation.
+
+### `j7 head`
+
+A read-only export of the current head. On success stdout is exactly a compact
+JSON object with these two members in this order, followed by exactly one LF:
+
+```json
+{"expected_version":7,"expected_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+```
+
+The displayed values are a fixture, not a deployment pin. The version is a
+canonical decimal integer in 1..2^53-1; the digest is 64 lowercase hex digits.
+There is no result envelope, BOM, extra whitespace, duplicate member or trailing
+data. A refused export uses the ordinary refusal envelope and exit 1; it never
+prints an installable pin. Output write failure also exits 1. There is no
+`--head-file` mode: this command never writes a restart pin.
+
+It opens the store at the asserted schema exactly as a restart would, validates the snapshot against its
+journal, appends no record and changes no existing file. With the optional
+expected head it additionally refuses `j7_state_fenced` unless the store is
+exactly at that head. A store with an unknown signing handoff or a pending
+publication has no exportable head.
+
+The export proves only that the local snapshot and journal agree. It cannot
+detect a matched rollback of both: the operator reconciles the exported head
+against independent evidence of what the service did, then retains it outside
+the host's state.
+
+### Head file and restart
+
+The service's head file (`j7_state.head_file`) is **root-owned**, regular and
+single-link, mode 0600 or 0640, under root-owned ancestors without group or
+other write, using the protected-configuration reader's rules. It is distinct
+from the configuration file, the Store and every service-writable directory.
+The operator reconciles a stopped `j7 head` export against independent evidence
+and installs those exact bytes as a separate privileged provisioning step.
+Neither a Keymaker subcommand nor the running service writes it or advances
+its own pin. The service refuses an absent, foreign-owned or unsafe pin before
+opening its Store. Root compromise defeats this pin; root is in the static
+cut's stated trust domain.
+
+Every state commit advances the head, so the pin becomes stale during serving
+and **every restart of the service needs the operator**: stop the service,
+export its head, reconcile it independently, have root install the pin, then
+start the service. There is no unattended restart. A crash during a run ends
+in HELD and operator recovery. The heads in `migrate` and `policy-publish`
+results are reconciliation aids; only a subsequent successful `j7 head`
+prints the exact installable bytes.
+
+### Provisioning order
+
+1. Create distinct service-owned key, state and policy directories with mode
+   0700, and the socket directory with mode 0755 as required by the runtime.
+2. `j7 seed-init`.
+3. Place the reconciled legacy state, with its `generation.anchor` and audit
+   journal, in the state directory; `j7 head --schema 0|2` verifies the
+   independently retained head.
+4. `j7 migrate` with that head; retain the reported schema-5 head.
+5. `j7 policy-publish` with that head; retain the reported head.
+6. Run `j7 head` with the retained expected head, independently reconcile the
+   export, have root install it in the protected head file, then start the service.
+
+There is no offline enrollment command.

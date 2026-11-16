@@ -19,11 +19,20 @@ func openCustodyStateClock(state *os.File, uid uint32, clock AuditClock) (*Store
 	return openCustodyStateMessage(state, uid, clock, 0, false)
 }
 func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor int, recovery bool, expected ...j7Expectation) (*Store, *Journal, *os.File, error) {
+	return openCustodyStateMessageMode(state, uid, clock, floor, recovery, false, expected...)
+}
+
+// deferred is reserved for stopped operators: no initialization or writer open
+// occurs until an already-reconciled command actually commits.
+func openCustodyStateMessageMode(state *os.File, uid uint32, clock AuditClock, floor int, recovery, deferred bool, expected ...j7Expectation) (*Store, *Journal, *os.File, error) {
 	s, err := loadStoreMessage(state, uid, floor, recovery)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	if s.initialized {
+		if deferred {
+			return nil, nil, nil, failure("binding snapshot unavailable")
+		}
 		if err = syscall.Mkdirat(int(state.Fd()), "audit", 0700); err != nil {
 			return nil, nil, nil, failure("audit initialization failed")
 		}
@@ -44,7 +53,7 @@ func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor
 	if syscall.Fstat(fd, &st) != nil || st.Uid != uid || st.Mode&07777 != 0700 {
 		return fail()
 	}
-	j, err := openJournalChecked(dir, uid, clock, rand.Reader, func(j *Journal) error {
+	j, err := openJournalCheckedMode(dir, uid, clock, rand.Reader, func(j *Journal) error {
 		if s.initialized {
 			if j.seq != 0 {
 				return failure("unexpected bootstrap audit evidence")
@@ -81,7 +90,7 @@ func openCustodyStateMessage(state *os.File, uid uint32, clock AuditClock, floor
 			}
 		}
 		return nil
-	})
+	}, deferred)
 	if err != nil {
 		dir.Close()
 		return nil, nil, nil, err

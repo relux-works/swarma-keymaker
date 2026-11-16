@@ -133,7 +133,12 @@ func TestJ7DelegationRootConsentBootstrap(t *testing.T) {
 	if newer.Tags[4][1] == event.Tags[4][1] {
 		t.Fatal("new request reused nonce")
 	}
-	if f.f.store.validateJ7() != nil {
+	// The response callback can precede release bookkeeping. Inspect retained
+	// state under the same Store gate; this fixture is not native qualification.
+	f.f.store.mu.Lock()
+	validation := f.f.store.validateJ7()
+	f.f.store.mu.Unlock()
+	if validation != nil {
 		t.Fatal("retained schema6 state invalid")
 	}
 }

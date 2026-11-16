@@ -421,7 +421,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		}
 		testPackage := pkg
 		if *group == "message-author" && strings.HasPrefix(c.name, "ma-wire-") {
-			testPackage = "./messageauthor"
+			testPackage = "github.com/relux-works/swarma-keymaker/messageauthor"
 		}
 		if *group == "j7-idle" && c.name == "j7-unbound-probe-budget" {
 			testPackage = "./internal/control"

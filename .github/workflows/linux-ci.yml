@@ -287,3 +287,55 @@ jobs:
               os.close(child)
           print(f"Empty fixture retained until disposable VM teardown: {expected}")
           PY
+
+  messageauthor:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    env:
+      GOTOOLCHAIN: local
+      GOMAXPROCS: '2'
+      GOFLAGS: '-p=2'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.26.8'
+          cache: false
+      - name: Prepare isolated codec checkout
+        id: scratch
+        run: |
+          set -eu
+          umask 022
+          codec_root="$(mktemp -d "$RUNNER_TEMP/messageauthor.XXXXXXXX")"
+          codec_root="$(cd "$codec_root" && pwd -P)"
+          mkdir -p "$codec_root"/{home,config,cache,go-build,go-mod,go-path,tmp,work}
+          cp -R messageauthor/. "$codec_root/work/"
+          {
+            echo "HOME=$codec_root/home"
+            echo "USERPROFILE=$codec_root/home"
+            echo "XDG_CONFIG_HOME=$codec_root/config"
+            echo "XDG_CACHE_HOME=$codec_root/cache"
+            echo "GOCACHE=$codec_root/go-build"
+            echo "GOMODCACHE=$codec_root/go-mod"
+            echo "GOPATH=$codec_root/go-path"
+            echo "TMPDIR=$codec_root/tmp"
+            echo "TMP=$codec_root/tmp"
+            echo "TEMP=$codec_root/tmp"
+            echo "GOENV=off"
+            echo "GOTELEMETRY=off"
+          } >> "$GITHUB_ENV"
+          echo "work=$codec_root/work" >> "$GITHUB_OUTPUT"
+      - name: Check codec module tidiness
+        working-directory: ${{ steps.scratch.outputs.work }}
+        run: go mod tidy -diff
+      - name: Vet codec with Go 1.26.8
+        working-directory: ${{ steps.scratch.outputs.work }}
+        run: go vet ./...
+      - name: Test codec with Go 1.26.8
+        working-directory: ${{ steps.scratch.outputs.work }}
+        run: go test -count=1 ./...

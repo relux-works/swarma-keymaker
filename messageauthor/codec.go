@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/relux-works/swarma-envelope/record"
-	"github.com/relux-works/swarma-keymaker/internal/control"
+	control "github.com/relux-works/swarma-keymaker/messageauthor/internal/frame"
 )
 
 const (

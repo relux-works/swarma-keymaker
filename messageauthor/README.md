@@ -4,8 +4,28 @@
 `github.com/relux-works/swarma-keymaker/messageauthor` for byte conversion only.
 It supplies no transport, signing, current certificate, identity lookup, secret
 constructor or authority provider. Both constants name unregistered methods.
-The [source contract](../spec/keymaker-message-author.md) pins exact upstream
+The [source contract](https://github.com/relux-works/swarma-keymaker/blob/main/spec/keymaker-message-author.md) pins exact upstream
 BIP-340 semantics and separate live prerequisites.
+
+## Module and version pin
+
+This is an independently consumable nested Go module:
+`github.com/relux-works/swarma-keymaker/messageauthor`, with a **Go 1.26.8**
+minimum and no toolchain directive. The root service keeps its Go 1.26.10 floor.
+The module requires only the existing pinned envelope module and its transitive
+requirements; it does not depend on the root service module.
+
+After a reviewed commit is published, set `REVIEWED_COMMIT` to its full commit
+ID and pin it:
+
+```sh
+go get github.com/relux-works/swarma-keymaker/messageauthor@"$REVIEWED_COMMIT"
+```
+
+Go records the nested module's pseudo-version, for example
+`v0.0.0-YYYYMMDDhhmmss-abcdefabcdef`, in the consumer's `go.mod`. Retain that exact
+version and its `go.sum` entries. A local root `replace` is development wiring,
+not a consumer version or a live-service qualification.
 
 ## Requests and frames
 
@@ -100,21 +120,32 @@ barriers, restart/ack-loss and real-key/native qualification remain separate.
 
 ## Tools and fixtures
 
-Use the module-pinned Go toolchain and exact offline dependencies in private
-HOME/TMPDIR/Go caches. From the module root:
+Use Go 1.26.8 and isolated absolute HOME/TMPDIR/Go caches. From this
+nested module directory:
 
 ```sh
-go test -p=1 ./messageauthor -count=1
-go test -p=1 -parallel=2 ./internal/keymaker -run '^TestMessageAuthor' -count=1
-go build -p=1 ./messageauthor ./internal/keymaker
-go vet -p=1 ./messageauthor ./internal/keymaker ./tools/mutations
-go run ./tools/mutations -group message-author -scratch <private-directory>
+go mod tidy -diff
+go vet ./...
+go test -count=1 ./...
 ```
 
-`testdata/wire-v1` contains literal request/reply verdicts with a SHA256 manifest;
-`internal/keymaker/testdata/message-author-v1` contains explicitly public fixture
-roots, signed bytes and historical /1 receiver context. The independent stdlib
-public-math oracle comes from exact envelope065; no secret math uses it.
-The mutation tool stores overlays/logs/real child exit receipts in a new
-`mutation-*` directory under the supplied private scratch. Go caches hold build
-outputs; none of these commands activates a service or qualifies live traffic.
+From the repository root with Go 1.26.10, the module import-path pattern crosses
+the nested-module boundary (the relative `./messageauthor/...` pattern does not):
+
+```sh
+go test -count=1 github.com/relux-works/swarma-keymaker/messageauthor/... ./internal/control/... ./internal/messageauthorcompat
+```
+
+`internal/frame` copies only the daemon's canonical value codec, without its
+transport or server. Root-side equality tests execute the actual private copy
+through a test-only subprocess probe, comparing exact canonical bytes, refusal
+text and boundary verdicts against `internal/control`. Both sides also retain
+independent negative/positive property tests. The root CI job runs the equality
+test; a separate CI job vets and tests this module with Go 1.26.8.
+
+`testdata/wire-v1` retains the literal request/reply verdicts and SHA256 manifest
+unchanged. The root's `internal/keymaker/testdata/message-author-v1` keeps its
+explicitly public fixture roots, signed bytes and historical /1 context. The
+independent stdlib public-math oracle comes from exact envelope065 and is for
+public verification only. All checks remain **fixture-only, not live** and activate no
+service or native qualification.

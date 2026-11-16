@@ -2,6 +2,8 @@
 
 Role: per-station key custody. Lore name: Keymaker.
 
+`github.com/relux-works/swarma-keymaker/messageauthor` is a [nested codec module](messageauthor/README.md#module-and-version-pin) with a Go 1.26.8 floor; the root service remains on Go 1.26.10.
+
 The [purpose catalog](spec/keymaker-purposes.md) allocates purpose9
 `message-author` as **fixture-only, not live**. The new inert
 [`messageauthor`](messageauthor/README.md) codec publishes self-only identity/sign
@@ -617,10 +619,10 @@ remains gated; this tool does not install or run a service.
 Use the pinned Go SDK and private offline module/build caches:
 
 ```sh
-go test -p=1 ./messageauthor -count=1
+go test -p=1 github.com/relux-works/swarma-keymaker/messageauthor/... -count=1
 go test -p=1 -parallel=2 ./internal/keymaker -run '^TestMessageAuthor' -count=1
-go build -p=1 ./messageauthor ./internal/keymaker
-go vet -p=1 ./messageauthor ./internal/keymaker ./tools/mutations
+go build -p=1 github.com/relux-works/swarma-keymaker/messageauthor ./internal/keymaker
+go vet -p=1 github.com/relux-works/swarma-keymaker/messageauthor ./internal/keymaker ./tools/mutations
 go run ./tools/mutations -group message-author -scratch <private-directory>
 ```
 

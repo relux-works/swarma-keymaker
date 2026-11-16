@@ -9,6 +9,7 @@ purpose 6 of the [station-caller proposal](keymaker-station-caller.md) stays
 reserved and unallocated.
 
 The key words MUST, MUST NOT and MAY are normative.
+The consumer-rule clarifications below amend the static-gate r2 format.
 
 ## 1. What the statement replaces, and what that costs
 
@@ -42,7 +43,8 @@ MAY journal `gate_id` for audit only.
 - Algorithm: BIP-340 over secp256k1 with a 32-byte x-only public key.
 - Signature: 64 bytes, BIP-340 over `SHA-256(preimage)`.
 - The signing tool is outside this repository. It is expected to show every
-  member and to re-derive the digest before signing.
+  member and to re-derive the digest before signing; it MUST enforce
+  `not_before < not_after` and a window width of at most 72 hours.
 
 This repository holds no signer and no private key. The test statements are
 signed with the published BIP-340 test-vector keys.
@@ -102,6 +104,11 @@ Rules for the table:
   `broker_d5` are two members and neither replaces the other.
 - **Generations** are opaque non-empty UTF-8 strings, compared byte for byte
   and never normalised (no case folding, trimming or Unicode normalisation).
+  Consumers such as M0 apply their own stricter shape: its caller and worker
+  generations are exactly 32 lowercase hex digits, as used in these examples;
+  a non-hex Source-section positive vector proves the verifier stays opaque.
+- **Example UIDs** (caller, worker and services) use the managed range
+  30000..59999; the format itself remains range-neutral.
 - **`caller_key`** is the public half of the caller's signing key in the
   spelling the caller check already uses. It MUST equal the association key
   of the dispatcher's protected policy. The 32 bytes are not checked as a
@@ -109,8 +116,12 @@ Rules for the table:
 - **`host.machine_id_sha256`** is SHA-256 of the exact content of the host's
   machine-id file, with nothing trimmed.
 - In `dispatcher`, `policy_sha256` is SHA-256 of CCJ-1 of the installed
-  protected policy body, and `config_sha256` is SHA-256 of the daemon's
-  protected configuration file bytes.
+  protected policy body.
+- The dispatcher's transport spec defines `dispatcher.config_sha256` as
+  SHA-256 over CCJ-1 of `{"m0":<sha256 hex>,"server":<sha256 hex>}` over
+  its two protected config files; the verifier compares bytes only.
+- The host and approver labels are audit-only; authentication relies on the
+  digest/key pins and machine-id digest, not on a label.
 
 ## 5. Consumer rule
 
@@ -119,20 +130,20 @@ of its two sections) applies this rule at startup and again before each
 dependent effect. It checks only its own section. The steps run in this order
 and the first failure decides the refusal code.
 
-0. **Readable bytes.** A statement whose preimage exceeds 8192 bytes, or that
-   the CCJ-1 decoder refuses, or that is not an object, refuses with
-   `STATIC_GATE_FORM`. This comes first only because step 1 must read
-   `approver.key`; nothing else is examined before step 1.
-1. **Pins.** The consumer reads the approver key and the SHA-256 of the
-   preimage of the one G in use from its protected, root-owned install path,
-   never from G.
-   - Unless `approver.key` equals the pinned key: `STATIC_GATE_KEY`. A
-     statement without a readable `approver.key` refuses here.
-   - Then, unless the preimage digest equals the pinned digest:
+1. **Pins and bounded parse.** The consumer reads the approver key and the
+   SHA-256 of the preimage of the one G in use from its protected, root-owned
+   install path, never from G, and performs these checks in this exact order:
+   - First, compute the digest over the raw bytes, before any parse or size
+     check, and refuse unless it equals the pinned digest:
      `STATIC_GATE_PIN`.
+   - Then bound the parse: a preimage over 8192 bytes, a codec refusal, or a
+     non-object value refuses with `STATIC_GATE_FORM`.
+   - Then require `approver.key` to equal the pinned key:
+     `STATIC_GATE_KEY`; an unreadable approver key refuses here too.
 
-   The digest pin only stops an old signed G from being picked up by mistake.
-   It sits in the same trust domain as G and restores no independence.
+   This PIN → bounded parse → KEY order is an r2 amendment. The digest pin
+   only stops an old signed G from being picked up by mistake; it sits in the
+   same trust domain as G and restores no independence.
 2. **Form.** Canonical re-encoding, depth, the closed member set, exact
    `v`/`kind`/`milestone` and the shapes of §4: `STATIC_GATE_FORM`.
 3. **Signature.** BIP-340 over `SHA-256(preimage)` under the *pinned* key. The
@@ -153,25 +164,48 @@ and again at every unit start.
 
 Every refusal happens before secret load and before the listener (Keymaker),
 before dispatch (dispatcher) and before lease (broker), and leaves no partial
-state. All-zero pins, an all-zero machine-id digest, a zero clock reading, an
-unknown consumer and an empty expected section refuse; nothing defaults open.
+state. All-zero pins, an all-zero machine-id digest, an unknown consumer and
+an empty expected section refuse. A zero `Now` refuses for `start`; an `end`
+with zero `Now` passes when all other checks pass.
 
-`association` is consumed by `keymaker` and `dispatcher`: both MUST supply its
-expected bytes. Another consumer MAY supply them, and then they are compared
-too.
+Only `dispatcher` MUST supply the expected `association` bytes. Every
+consumer, including `keymaker`, compares them whenever supplied. Supplied
+means `len(Association) > 0`: omitted and empty are indistinguishable, which
+is acceptable for consumers that do not consume the association. A mutated
+association can therefore pass Keymaker with no supplied association, but it
+cannot authorize dispatch unless it also equals the dispatcher's protected
+association.
+
+The following producer choices are ratified as r2 clarifications:
+
+- (a) A missing or unreadable `approver`/`approver.key` refuses with
+  `STATIC_GATE_KEY`, rather than `STATIC_GATE_FORM`, after the bounded parse.
+- (b) A malformed `approver.key`, including uppercase, non-hex or non-string,
+  refuses with `STATIC_GATE_KEY` before the shape check.
+- (c) An unknown operation class refuses with `STATIC_GATE_WINDOW`.
+- (d) An unknown consumer or empty expected section refuses with
+  `STATIC_GATE_SCOPE_MISMATCH`.
+- (e) All-zero key pins, digest pins and machine digests refuse with
+  `STATIC_GATE_KEY`, `STATIC_GATE_PIN` and `STATIC_GATE_HOST`, respectively,
+  at their ordered checks.
+- (f) Every section is a non-empty JSON object as in r2 §5; scalar and empty
+  sections refuse with `STATIC_GATE_FORM`, while values within an object
+  remain opaque, including arrays, booleans and null.
 
 ### 5.1 Operation classes and the window end
 
 | Class | Operations | Step 5 |
 | --- | --- | --- |
 | `start` | Keymaker run bind and sign, dispatcher dispatch, broker lease | the clock comparison is required: at or after `not_after`, `STATIC_GATE_WINDOW` |
-| `end` | Keymaker run end, the startup sweep, broker lease release, dispatcher owned-run cancel | the clock comparison is skipped; steps 0–4 and 6 apply in full |
+| `end` | Keymaker run end, the startup sweep, broker lease release, dispatcher owned-run cancel | the clock comparison is skipped; steps 1–4 and 6 apply in full |
 
 A run bound inside the window may end after `not_after`; it gets no new
 signature or lease. Without this an expired gate would strand a run in
 quarantine. The bounds on the window itself (`not_before < not_after`, at most
-72 hours) are properties of G and are checked for both classes. Any class
-other than `start` or `end` refuses with `STATIC_GATE_WINDOW`.
+72 hours) are properties of G and are checked for both classes with
+`STATIC_GATE_WINDOW`; the signer applies the same width rule. This width
+rule is an r2 amendment: only the comparison with `Now` is skipped for `end`.
+Any class other than `start` or `end` refuses with `STATIC_GATE_WINDOW`.
 
 ## 6. Caller authentication
 
@@ -209,17 +243,29 @@ BIP-340 test-vector keys; the committed file is checked against the generator.
 
 | Code | Negatives |
 | --- | --- |
-| `STATIC_GATE_KEY` | another key, and a key with another purpose, as signer; `approver.key` differing from the pin; zero pin; `approver` absent |
-| `STATIC_GATE_PIN` | a validly signed statement that is not the pinned one; zero pin |
-| `STATIC_GATE_FORM` | 8193-byte preimage; depth 9; duplicate names at the top and nested; non-integer number; whitespace, final LF, unsorted names, needless escapes; each member missing; unknown member; wrong `v`, `kind`, `milestone`; each shape of §4 |
-| `STATIC_GATE_SIGNATURE` | signature over another tag, over no tag, over a final LF, by another key, for another statement; uppercase, short, empty, LF-terminated or altered signature text |
+| `STATIC_GATE_KEY` | another key, and a key with another purpose, as signer; `approver.key` differing from the pin; zero pin; `approver` absent or unreadable; malformed or uppercase `approver.key`; KEY before canonical form on parseable pinned bytes |
+| `STATIC_GATE_PIN` | a validly signed statement that is not the pinned one; zero pin; wrong pin before size/codec refusal |
+| `STATIC_GATE_FORM` | 8193-byte preimage; depth 9; duplicate names at the top and nested; non-integer number; whitespace, final LF, unsorted names, needless escapes; each member missing except `approver` (KEY); unknown member; wrong `v`, `kind`, `milestone`; remaining shapes of §4 (`approver.key` is KEY) |
+| `STATIC_GATE_SIGNATURE` | signature over another tag, over no tag, over a final LF, by another key, for another statement; uppercase, short, empty, LF-terminated or altered signature text; hand-encoded r ≥ p, s ≥ N, non-liftable R; unusable pinned key |
 | `STATIC_GATE_HOST` | another machine-id; zero digest |
 | `STATIC_GATE_WINDOW` | not yet valid; at `not_after`; expired `start` beside a passing `end`; unknown class; 72 h + 1 s, empty and inverted windows for both classes |
-| `STATIC_GATE_SCOPE_MISMATCH` | every member of every section and of `association` (including `caller_key`) changed one at a time; member added or removed; `broker_time`/`broker_d5` swapped; `source`/`dispatcher` swapped; generations re-spelled (case, trailing space, look-alike letter, decomposed form); unknown consumer; missing or non-canonical expected bytes |
+| `STATIC_GATE_SCOPE_MISMATCH` | every scalar leaf of the example sections and of the dispatcher's `association` (including `caller_key`) changed one at a time; a nested array element changed; member added or removed; `broker_time`/`broker_d5` swapped; `source`/`dispatcher` swapped; generations re-spelled (case, trailing space, look-alike letter, decomposed form); unknown consumer; missing or non-canonical expected bytes |
 
 Positive controls include the genuine statement for all five consumers and the
 exact boundaries: 8192 bytes, depth 8, `now = not_before`, the last nanosecond
-before `not_after`, exactly 72 hours, and `end` after expiry.
+before `not_after`, exactly 72 hours for both classes, and `end` after expiry
+or with zero `Now`. A section holding an array, true, false, null and a nested
+array verifies when its expected bytes match.
+
+Each negative uses a passing control of the same consumer, except the two
+consumer-name misuse rows: an invalid consumer cannot have a passing row of
+that same consumer, so only that input field differs from a genuine consumer.
+Input-only negatives keep identical statement bytes and signature and change
+exactly one field belonging to the named check; the suite checks this
+mechanically. The precedence rows deliberately combine multiple faults and
+are not input-only negatives. Statement mutations necessarily re-pin and
+re-sign, and unusable-key rows also pin the unusable key to isolate signature
+verification.
 
 The planted control in the package tests removes each check in turn and shows
 that the negatives naming it then verify, so each refusal is attributed to the
@@ -227,14 +273,14 @@ check that causes it.
 
 ## 9. Example
 
-The genuine vector (`vectors/staticgate/genuine.ccj`, 1449 bytes, placeholder
+The genuine vector (`vectors/staticgate/genuine.ccj`, 1491 bytes, placeholder
 values, **not for signing**):
 
 ```text
-{"approver":{"alg":"bip340","key":"dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659","label":"static-gate-example"},"association":{"caller_generation":"g-example-1","caller_key":"ed25519:iIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIg","caller_uid":28601},"broker_d5":{"example_acknowledged_head":"8888888888888888888888888888888888888888888888888888888888888888"},"broker_time":{"example_hold_seconds":30,"example_in_flight":1},"dispatcher":{"config_sha256":"9999999999999999999999999999999999999999999999999999999999999999","policy_sha256":"7777777777777777777777777777777777777777777777777777777777777777","receiver":"66666666666666666666666666666666","service_uid":28602,"worker":{"generation":"w-example-1","uid":28603}},"gate_id":"00112233445566778899aabbccddeeff","host":{"label":"host-a","machine_id_sha256":"6ed6653dba3d6aee8110c6e23de37f15c609b8a6e29aa164d1acace604e5cb7e"},"keymaker":{"binary_sha256":"3333333333333333333333333333333333333333333333333333333333333333","config_sha256":"4444444444444444444444444444444444444444444444444444444444444444","j7_request_key":"5555555555555555555555555555555555555555555555555555555555555555","service_uid":28600},"kind":"swarma-s7 static-gate/1","milestone":"G1.0","not_after":"2026-11-19T00:00:00Z","not_before":"2026-11-17T00:00:00Z","source":{"config_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","generation":"s-example-1","service_uid":28604},"v":1}
+{"approver":{"alg":"bip340","key":"dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659","label":"static-gate-example"},"association":{"caller_generation":"0123456789abcdef0123456789abcdef","caller_key":"ed25519:iIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIg","caller_uid":38601},"broker_d5":{"example_acknowledged_head":"8888888888888888888888888888888888888888888888888888888888888888"},"broker_time":{"example_hold_seconds":30,"example_in_flight":1},"dispatcher":{"config_sha256":"9999999999999999999999999999999999999999999999999999999999999999","policy_sha256":"7777777777777777777777777777777777777777777777777777777777777777","receiver":"66666666666666666666666666666666","service_uid":38602,"worker":{"generation":"fedcba9876543210fedcba9876543210","uid":38603}},"gate_id":"00112233445566778899aabbccddeeff","host":{"label":"host-a","machine_id_sha256":"6ed6653dba3d6aee8110c6e23de37f15c609b8a6e29aa164d1acace604e5cb7e"},"keymaker":{"binary_sha256":"3333333333333333333333333333333333333333333333333333333333333333","config_sha256":"4444444444444444444444444444444444444444444444444444444444444444","j7_request_key":"5555555555555555555555555555555555555555555555555555555555555555","service_uid":38600},"kind":"swarma-s7 static-gate/1","milestone":"G1.0","not_after":"2026-11-19T00:00:00Z","not_before":"2026-11-17T00:00:00Z","source":{"config_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","generation":"s-example-1","service_uid":38604},"v":1}
 ```
 
-The preimage (tag, LF, the bytes above) is 1473 bytes with SHA-256
-`4b42a926b2b362ea233fd23f621515ca3c486c59a04b3e133d4ab26abd12e6bc`. The
-approver key is row 1 of the published BIP-340 test vectors. The contents of
-`broker_time` and `broker_d5` are invented placeholders.
+The preimage (tag, LF, the bytes above) is 1515 bytes with SHA-256
+`a9112c6bc3bfbf86661f0a637c7ad820ecaff1f777be6cc48d2a23b3e27dda41`. The
+approver key is CSV index 1 of the published BIP-340 test vectors. The contents
+of `broker_time` and `broker_d5` are invented placeholders.

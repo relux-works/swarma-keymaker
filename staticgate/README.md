@@ -20,7 +20,6 @@ statement, err := staticgate.Verify(raw, sig, staticgate.Inputs{
     Class:           staticgate.ClassStart,
     Consumer:        staticgate.Keymaker,
     Section:         expectedSection,     // canonical bytes from protected config
-    Association:     expectedAssociation, // canonical bytes from protected config
 })
 ```
 
@@ -31,8 +30,9 @@ statement, err := staticgate.Verify(raw, sig, staticgate.Inputs{
   sweep, lease release, owned-run cancel). `ClassEnd` skips only the comparison
   with `Now`.
 - `Consumer` is `Keymaker`, `Dispatcher`, `Source`, `BrokerTime` or `BrokerD5`.
-  `Association` is required for `Keymaker` and `Dispatcher`, and is compared
-  whenever it is supplied.
+  `Association` is required only for `Dispatcher`, and is compared for any
+  consumer whenever `len(Association) > 0`. Keymaker needs no association
+  input unless it chooses to compare one; omitted and empty are equivalent.
 - `Digest(raw)` returns `SHA-256(tag || 0x0a || raw)`, the value that is signed
   and the value an installer pins. A consumer must pin the digest it was
   given, not recompute it from the statement it is about to check.
@@ -43,9 +43,9 @@ value and the error is an `*Error`:
 
 | Step | Check | Code | Sentinel |
 | --- | --- | --- | --- |
-| 0 | size, decoder rules, object | `STATIC_GATE_FORM` | `ErrForm` |
+| 1 | raw preimage digest equals the pinned digest, before any parse | `STATIC_GATE_PIN` | `ErrPin` |
+| 1 | bounded parse: size, decoder rules, object | `STATIC_GATE_FORM` | `ErrForm` |
 | 1 | `approver.key` equals the pinned key | `STATIC_GATE_KEY` | `ErrKey` |
-| 1 | preimage digest equals the pinned digest | `STATIC_GATE_PIN` | `ErrPin` |
 | 2 | canonical bytes, depth, closed members, exact values, shapes | `STATIC_GATE_FORM` | `ErrForm` |
 | 3 | BIP-340 signature under the pinned key | `STATIC_GATE_SIGNATURE` | `ErrSignature` |
 | 4 | machine-id digest | `STATIC_GATE_HOST` | `ErrHost` |
@@ -79,11 +79,17 @@ go vet ./staticgate/...
 
 Every test carries a comment naming the claim it proves. `TestVectors` runs
 [`vectors/staticgate/vectors.json`](../vectors/staticgate/README.md) through
-the exported `Verify`. `TestVectorFileIsGenerated` proves the committed file
+the exported `Verify` and the strict engine, requiring identical returned
+statements, refusal codes and check names. It also checks same-consumer
+neighbours and single-field input-side mutations with identical bytes and
+signatures (the invalid-consumer rows necessarily change the consumer).
+`TestVectorFileIsGenerated` proves the committed file
 is what the suite generates (`STATICGATE_WRITE_VECTORS=1` rewrites it).
 `TestPlantedControls` removes the checks each negative names, through an
 unexported switch that `Verify` never sets, and requires that the negative
 then verifies and that each named check alone still refuses it.
 
-The only keys in the tests are rows 1 to 3 of the published BIP-340 test
-vectors. They are public and must never approve anything real.
+The only scalars in the tests are CSV indices 1, 2 and 3 of the published
+[BIP-340 test vectors](https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv).
+`TestPublishedKeys` checks both literal published columns, not just derivation.
+They are public and must never approve anything real.

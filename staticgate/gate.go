@@ -96,7 +96,8 @@ const (
 
 // Inputs are supplied in full by the caller. The two pins and the expected
 // bytes come from the caller's protected install, never from the statement.
-// An all-zero pin, an all-zero machine-id digest and a zero Now refuse.
+// All-zero pins and an all-zero machine-id digest refuse; a zero Now refuses
+// for ClassStart only. ClassEnd never compares Now.
 type Inputs struct {
 	// ApproverKey is the pinned x-only BIP-340 approver key.
 	ApproverKey [32]byte
@@ -114,7 +115,7 @@ type Inputs struct {
 	// Section is the expected CCJ-1 bytes of the consumer's own section.
 	Section []byte
 	// Association is the expected CCJ-1 bytes of the association member. It
-	// is required for Keymaker and Dispatcher and compared whenever present.
+	// is required only for Dispatcher and compared whenever len(Association) > 0.
 	Association []byte
 }
 
@@ -162,7 +163,7 @@ var members = []member{
 	{name: "not_after", shape: timeShape},
 	{name: "approver", shape: approverShape},
 	{name: "association", shape: associationShape},
-	{name: "keymaker", section: true, association: true},
+	{name: "keymaker", section: true},
 	{name: "dispatcher", section: true, association: true},
 	{name: "source", section: true},
 	{name: "broker_time", section: true},
@@ -208,9 +209,14 @@ func refuse(code Code, c check) (Statement, error) {
 func (e engine) verify(raw, sig []byte, in Inputs) (Statement, error) {
 	on := func(c check) bool { return !e.off[c] }
 
-	// Reading approver.key needs a bounded parse. Bytes that are too long or
-	// that the codec refuses (duplicate names, non-integer numbers, invalid
-	// UTF-8, codec depth) are a form refusal before any other step.
+	// Step 1: pin the raw bytes before any parse, including the size bound.
+	digest := Digest(raw)
+	if on(ckPin) && (in.StatementDigest == ([32]byte{}) || digest != in.StatementDigest) {
+		return refuse(CodePin, ckPin)
+	}
+
+	// Reading approver.key then needs a bounded parse. Excess size, codec
+	// refusals and non-object values refuse with FORM before the key check.
 	if on(ckSize) && len(Tag)+1+len(raw) > MaxPreimage {
 		return refuse(CodeForm, ckSize)
 	}
@@ -223,17 +229,13 @@ func (e engine) verify(raw, sig []byte, in Inputs) (Statement, error) {
 		return refuse(CodeForm, ckCodec)
 	}
 
-	// Step 1: the two pins. The key is compared before the digest.
+	// After the bounded parse, compare the approver key before form checks.
 	approver := object(g, "approver")
 	if on(ckKey) {
 		key, _ := approver["key"].(string)
 		if in.ApproverKey == ([32]byte{}) || key != hex.EncodeToString(in.ApproverKey[:]) {
 			return refuse(CodeKey, ckKey)
 		}
-	}
-	digest := Digest(raw)
-	if on(ckPin) && (in.StatementDigest == ([32]byte{}) || digest != in.StatementDigest) {
-		return refuse(CodePin, ckPin)
 	}
 
 	// Step 2: canonical form, closed members, exact fixed values and shapes.

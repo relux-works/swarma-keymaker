@@ -191,6 +191,38 @@ func corpus(t *testing.T) ([]bodyCase, []objectCase) {
 		bodies = append(bodies, bodyCase{fmt.Sprintf("depth/%d", n), []byte(body), n == 16})
 		objects = append(objects, objectCase{fmt.Sprintf("depth/%d", n), construction{Kind: "depth", Value: int64(n)}, n == 16})
 	}
+
+	// Pure-object nesting reaches the object guard, independently of array depth.
+	for _, depth := range []int{16, 17} {
+		body := strings.Repeat(`{"a":`, depth) + "0" + strings.Repeat("}", depth)
+		bodies = append(bodies, bodyCase{fmt.Sprintf("object-depth/%d", depth), []byte(body), depth == 16})
+		objects = append(objects, objectCase{fmt.Sprintf("object-depth/%d", depth), construction{Kind: "object-depth", Value: int64(depth)}, depth == 16})
+	}
+	// Claim: boundary spellings, named aliases, separators and truncation retain
+	// their specific refusals beside canonical space, escapes and separator controls.
+	for _, c := range []bodyCase{
+		{"raw-control-1f", []byte("{\"a\":\"\x1f\"}"), false},
+		{"raw-space-20", []byte(`{"a":" "}`), true},
+		{"unicode-control-1f", []byte(`{"a":"\u001f"}`), true},
+		{"unicode-space-alias", []byte(`{"a":"\u0020"}`), false},
+		{"named-backspace-alias", []byte(`{"a":"\u0008"}`), false},
+		{"named-formfeed-alias", []byte(`{"a":"\u000c"}`), false},
+		{"named-newline-alias", []byte(`{"a":"\u000a"}`), false},
+		{"named-return-alias", []byte(`{"a":"\u000d"}`), false},
+		{"named-tab-alias", []byte(`{"a":"\u0009"}`), false},
+		{"named-escape-control", []byte(`{"a":"\b\f\n\r\t"}`), true},
+		{"missing-colon", []byte(`{"a"0}`), false},
+		{"extra-colon", []byte(`{"a"::0}`), false},
+		{"missing-array-comma", []byte(`{"a":[0true]}`), false},
+		{"extra-array-comma", []byte(`{"a":[0,,true]}`), false},
+		{"separator-control", []byte(`{"a":[0,true]}`), true},
+		{"eof-value", []byte(`{"a":`), false},
+		{"eof-escape", []byte(`{"a":"\`), false},
+		{"eof-unicode", []byte(`{"a":"\u00`), false},
+		{"backslash-control", []byte(`{"a":"\\"}`), true},
+	} {
+		bodies = append(bodies, c)
+	}
 	for i, s := range []string{"", "{", "{} ", "{}{}", "{}\n", `{"a":1e0}`, `{"a":01}`, `{"a":+1}`, `{"a":true,"a":false}`} {
 		bodies = append(bodies, bodyCase{fmt.Sprintf("extra-negative/%d", i), []byte(s), false})
 	}
@@ -219,6 +251,12 @@ func nativeObject(c construction) control.Object {
 		var v any = int64(0)
 		for i := int64(1); i < c.Value; i++ {
 			v = []any{v}
+		}
+		return control.Object{"a": v}
+	case "object-depth":
+		var v any = int64(0)
+		for i := int64(1); i < c.Value; i++ {
+			v = control.Object{"a": v}
 		}
 		return control.Object{"a": v}
 	case "integer":

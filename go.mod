@@ -2,7 +2,8 @@ module github.com/relux-works/swarma-keymaker
 
 go 1.26.10
 
-require github.com/relux-works/swarma-keymaker/messageauthor v0.0.0
+// Sort the local replacement below published pseudo-versions for downstream consumers.
+require github.com/relux-works/swarma-keymaker/messageauthor v0.0.0-00010101000000-000000000000
 
 replace github.com/relux-works/swarma-keymaker/messageauthor => ./messageauthor
 

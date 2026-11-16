@@ -45,6 +45,12 @@ func object(c construction) frame.Object {
 			value = []any{value}
 		}
 		return frame.Object{"a": value}
+	case "object-depth":
+		var value any = int64(0)
+		for i := int64(1); i < c.Value; i++ {
+			value = frame.Object{"a": value}
+		}
+		return frame.Object{"a": value}
 	case "integer":
 		return frame.Object{"a": c.Value}
 	case "unsigned":
@@ -69,13 +75,7 @@ func main() {
 	}
 	out := output{}
 	for _, body := range in.Bodies {
-		obj, err := frame.Decode(body)
-		v := verdict{Accepted: err == nil, Error: diagnostic(err)}
-		if err == nil {
-			b, e := frame.Marshal(obj)
-			v.Bytes, v.MarshalError = b, diagnostic(e)
-		}
-		out.Bodies = append(out.Bodies, v)
+		out.Bodies = append(out.Bodies, decode(body))
 	}
 	for _, c := range in.Objects {
 		b, err := frame.Marshal(object(c))
@@ -84,4 +84,21 @@ func main() {
 	if json.NewEncoder(os.Stdout).Encode(out) != nil {
 		os.Exit(2)
 	}
+}
+
+// A parser mutant's panic is a per-case observable drift, never an aborted
+// probe/build that could be mistaken for a killed canonical-refusal assertion.
+func decode(body []byte) (v verdict) {
+	defer func() {
+		if recover() != nil {
+			v = verdict{Error: "copied codec panic"}
+		}
+	}()
+	obj, err := frame.Decode(body)
+	v = verdict{Accepted: err == nil, Error: diagnostic(err)}
+	if err == nil {
+		b, e := frame.Marshal(obj)
+		v.Bytes, v.MarshalError = b, diagnostic(e)
+	}
+	return v
 }

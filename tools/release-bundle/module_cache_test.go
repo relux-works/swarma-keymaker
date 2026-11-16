@@ -96,9 +96,13 @@ func fixtureModuleCache(t *testing.T) string {
 
 // A stale checksum for the previously pinned registrar must not select that
 // version or require its archive. The active graph remains copyable offline.
+// The fixture carries nested module files because the root replaces it locally.
 func TestReleaseFixtureModuleCacheIgnoresStaleSums(t *testing.T) {
 	root := t.TempDir()
-	for _, name := range []string{"go.mod", "go.sum"} {
+	if err := os.Mkdir(filepath.Join(root, "messageauthor"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"go.mod", "go.sum", "messageauthor/go.mod", "messageauthor/go.sum"} {
 		raw, err := os.ReadFile(filepath.Join("../..", name))
 		if err != nil {
 			t.Fatal(err)

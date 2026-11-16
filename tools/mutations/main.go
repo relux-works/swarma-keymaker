@@ -104,6 +104,9 @@ func main() {
 		// Only new source gates are weakened. Each named assertion must fail;
 		// compiler/setup errors, timeouts and unplanted controls are not kills.
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"ma-authority-algorithm", "authority_codec.go", `(algorithm != "ed25519" && algorithm != "p256")`, `false && (algorithm != "ed25519" && algorithm != "p256")`, "^TestMessageAuthorLegacyAuthorityAlgorithms$/^bip340$", "--- FAIL: TestMessageAuthorLegacyAuthorityAlgorithms/bip340", "legacy algorithm accepted"},
+			{"ma-purpose5-issuer-algorithm", "message_files.go", `algorithm == "ed25519" && record.ValidateKey(key) == nil`, `algorithm != "" && record.ValidateKey(key) == nil`, "^TestMessageAuthorPurpose5(Intent|Certificate)IssuerAlgorithms$", "--- FAIL: TestMessageAuthorPurpose5IntentIssuerAlgorithms/bip340", "purpose5 issuer algorithm accepted"},
+			{"ma-wire-received-id", "../../messageauthor/codec.go", `if !ok || !validID(id) {`, `if !ok || false && !validID(id) {`, "^TestMessageAuthorReceivedResponseID$", "--- FAIL: TestMessageAuthorReceivedResponseID/busy", "received nonnull ID alias"},
 			{"ma-wire-cap", "../../messageauthor/codec.go", `if n > MaxFrame {`, `if false && n > MaxFrame {`, "^TestMessageAuthorFrameLimits$", "--- FAIL: TestMessageAuthorFrameLimits", "cap header accepted"},
 			{"ma-wire-params", "../../messageauthor/codec.go", `if !members(p, "preimage") {`, `if false && !members(p, "preimage") {`, "^TestMessageAuthorClosedRequests$", "--- FAIL: TestMessageAuthorClosedRequests", "request refusal/zero"},
 			{"ma-wire-id", "../../messageauthor/codec.go", `r.ID != q.ID`, `false && r.ID != q.ID`, "^TestMessageAuthorResponseContext$", "--- FAIL: TestMessageAuthorResponseContext", "response refusal/zero"},

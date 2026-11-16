@@ -296,6 +296,9 @@ func (s *Store) messageStoredBinding(b Binding) (Binding, bool) {
 }
 
 func validateMessageCertificate(c messageCertificate) error {
+	if !validPurpose5IssuerKey(c.IssuerPolicy.Key) {
+		return failure("invalid certificate signature")
+	}
 	raw, e := record.DecodeBase64(c.Envelope, -1)
 	if e != nil {
 		return failure("invalid certificate bytes")
@@ -484,11 +487,18 @@ func validateMessageIntent(intent messageIntent) error {
 		return e
 	}
 	algorithm, public, e := record.KeyBytes(intent.KeyID)
-	if e != nil || algorithm != "ed25519" || ValidatePath(intent.Policy.Path, "root-attestation") != "" || record.ValidateKey(intent.Policy.Key) != nil {
+	if e != nil || algorithm != "ed25519" || ValidatePath(intent.Policy.Path, "root-attestation") != "" || !validPurpose5IssuerKey(intent.Policy.Key) {
 		return failure("invalid issuance policy")
 	}
 	if _, code := (&messageIssuer{policy: intent.Policy}).body(intent.Binding, public, at); code != "" {
 		return failure("invalid issuance selection")
 	}
 	return nil
+}
+
+// Retained purpose5 policy/certificate issuers stay Ed25519. This local grammar
+// is distinct from the subject algorithm and from purpose9's BIP340 profile.
+func validPurpose5IssuerKey(key string) bool {
+	algorithm, _, err := record.KeyBytes(key)
+	return err == nil && algorithm == "ed25519" && record.ValidateKey(key) == nil
 }

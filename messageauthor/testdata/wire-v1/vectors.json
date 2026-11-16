@@ -52,5 +52,11 @@
     "Kind": "sign",
     "Body": "{\"error\":{\"code\":\"busy\",\"retryable\":false},\"request_id\":\"0123456789abcdef0123456789abcdef\"}",
     "Error": "ErrResponse"
+  },
+  {
+    "Name": "received-empty-string-id",
+    "Kind": "sign",
+    "Body": "{\"error\":{\"code\":\"busy\",\"retryable\":true},\"request_id\":\"\"}",
+    "Error": "ErrResponse"
   }
 ]

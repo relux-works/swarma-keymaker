@@ -310,3 +310,40 @@ func TestMessageAuthorWireCorpus(t *testing.T) {
 		})
 	}
 }
+
+// Received null is distinct from every nonnull malformed/foreign ID, including
+// the Go empty sentinel. Retryable/nonretryable/framing refusals keep exact
+// zero-result failures; successful null/valid controls retain their wire bytes.
+func TestMessageAuthorReceivedResponseID(t *testing.T) {
+	for _, tc := range []struct {
+		code    string
+		retry   bool
+		framing bool
+	}{{"busy", true, false}, {"signer_identity_mismatch", false, false}, {"ccj_noncanonical", false, true}} {
+		t.Run(tc.code, func(t *testing.T) {
+			for _, id := range []any{nil, wireID, "", strings.Repeat("b", 32), strings.Repeat("A", 32), "0123", int64(7), false} {
+				o := map[string]any{"error": map[string]any{"code": tc.code, "retryable": tc.retry}, "request_id": id}
+				raw, e := json.Marshal(o)
+				if e != nil {
+					t.Fatal(e)
+				}
+				f := frame(string(raw))
+				got, e := DecodeResponseFrame(wireRequest(), f)
+				valid := id == nil || id == wireID && !tc.framing
+				if !valid {
+					if e != ErrResponse || !reflect.DeepEqual(got, Response{}) {
+						t.Fatalf("received nonnull ID alias: %v result=%+v error=%v", id, got, e)
+					}
+					continue
+				}
+				if e != nil || got.Refusal == nil || got.Refusal.Code != tc.code || got.Refusal.Retryable != tc.retry {
+					t.Fatal("valid ID/null control", id, e)
+				}
+				again, e := EncodeResponseFrame(wireRequest(), got)
+				if e != nil || !bytes.Equal(again, f) {
+					t.Fatal("valid refusal wire changed", e)
+				}
+			}
+		})
+	}
+}

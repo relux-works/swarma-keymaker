@@ -216,7 +216,8 @@ func DecodeResponseFrame(q Request, frame []byte) (Response, error) {
 	r := Response{}
 	if o["request_id"] != nil {
 		id, ok := o["request_id"].(string)
-		if !ok {
+		// Only received null may use the Go empty-ID sentinel.
+		if !ok || !validID(id) {
 			return Response{}, ErrResponse
 		}
 		r.ID = id

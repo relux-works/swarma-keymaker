@@ -1105,7 +1105,10 @@ func arKey(v any) error {
 	if !ok {
 		return authorityFail("wrong_type")
 	}
-	if record.ValidateKey(s) != nil {
+	// The authority-root contract keeps its own closed Ed25519/P256 grammar;
+	// the envelope library also understands keys for other owned profiles.
+	algorithm, _, err := record.KeyBytes(s)
+	if err != nil || (algorithm != "ed25519" && algorithm != "p256") || record.ValidateKey(s) != nil {
 		return authorityFail("field_format")
 	}
 	return nil

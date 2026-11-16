@@ -2,6 +2,6 @@
   "format": "message-author-wire/1",
   "test_only": true,
   "source": "literal CCJ-1 transport fixtures; no signing or certificate authority",
-  "vectors_sha256": "0c7a31a1e42242104fcf063ee1121bf1e5a677646e3f1761372d63eb3fa127f3",
+  "vectors_sha256": "5b92c770733a5e814dea77be00525db2690c1fd176cbad67a86fa9cabe98d83c",
   "envelope_commit": "065e25f69da8b28cdf3ea35d9fcd7fc4aacc4d5e"
 }

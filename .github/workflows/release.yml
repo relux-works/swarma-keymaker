@@ -57,6 +57,10 @@ jobs:
         with:
           go-version: '1.26.10'
           cache: false
+      - name: Seed the module cache for the offline controls
+        run: |
+          go mod download
+          go mod verify
       - name: Run isolated positive and negative release controls
         run: .scripts/release-test.sh "$RUNNER_TEMP/release-controls"
       - name: Build admitted source with default-branch tooling in isolated scratch

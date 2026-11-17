@@ -157,6 +157,8 @@ owned scratch, and unset `GOTELEMETRYDIR`. Populate the exact dependency downloa
 cache first. Optional `RELEASE_MODULE_CACHE=/absolute/cache` seeds downloads from
 its read-only file proxy without network fallback. Every assembler build still
 uses fresh private extracted modules and an empty private build cache.
+The hosted workflow seeds the default module cache with a verified `go mod download`
+before the controls; the offline build then reads only that seed.
 
 ```bash
 GO=/absolute/path/to/go1.26.10/bin/go .scripts/release-build.sh \

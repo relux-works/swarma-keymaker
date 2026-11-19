@@ -637,6 +637,26 @@ frame/preimage/attestation bounds from section 4, not the older legacy connectio
 or a PC2 numeric window.
 
 
+#### Runtime memory policy
+
+Message-author role startup calls `debug.SetMemoryLimit` with the named constant
+`maLiveMemoryLimit = 192 MiB` before loading retained state. The dedicated role
+sets the policy itself, so it does not depend on a missing or larger inherited
+`GOMEMLIMIT`. Other roles and package initialization do not set this limit.
+The unit's `MemoryMax=256M` remains unchanged: the 64 MiB gap leaves space for
+memory outside Go's runtime accounting. This is a soft GC budget, not a hard RSS
+limit; capacity evidence must independently check process peak RSS below 240 MiB
+(16 MiB below the unit ceiling), and sampled heap below 128 MiB.
+
+`TestMALiveCapacityLatency` uses this same startup helper before fixture setup,
+then exercises the persisted/reopened near-bound state in separate one-CPU and
+`runtime.NumCPU()` children. Five repeated runs use race instrumentation off.
+An otherwise identical child without the limit retains all assertions as a
+negative diagnostic; local survival does not erase the hosted RSS failure.
+`TestMALiveRuntimeMemoryLimit` independently checks actual role startup before
+state loading, beside an unselected-role control, so an omitted limit is detected
+even when one machine's uncontrolled GC happens to stay below the RSS ceiling.
+
 #### O13 capacity amendment and matching acceptance rows
 
 The owner-approved O13 amendment lowers only this participant's capacity. The

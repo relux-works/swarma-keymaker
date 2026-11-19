@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -51,19 +53,41 @@ func TestMALiveCapacityLatency(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		cmd := exec.Command(binary, "-test.run=^TestMALiveCapacityLatency$", "-test.v", "-test.timeout=120s")
-		cmd.Env = append(os.Environ(), "KEYMAKER_MA_CAPACITY_CHILD="+root, "GOTMPDIR="+root, "GOMAXPROCS=1")
-		var log bytes.Buffer
-		cmd.Stdout = &log
-		cmd.Stderr = &log
-		e = cmd.Run()
-		t.Log(log.String())
-		if e != nil {
-			t.Fatal("isolated capacity process", e)
+		// Exercise both the unit-like one-CPU case and all CPUs visible to a
+		// hosted runner; a fresh process owns each RSS high-water mark.
+		cpus := []int{1}
+		if n := runtime.NumCPU(); n != 1 {
+			cpus = append(cpus, n)
+		}
+		for _, n := range cpus {
+			t.Run(fmt.Sprintf("cpus-%d", n), func(t *testing.T) {
+				cmd := exec.Command(binary, "-test.run=^TestMALiveCapacityLatency$", "-test.v", "-test.timeout=120s")
+				cmd.Env = append(os.Environ(), "KEYMAKER_MA_CAPACITY_CHILD="+root, "GOTMPDIR="+root, "GOMAXPROCS="+strconv.Itoa(n))
+				var log bytes.Buffer
+				cmd.Stdout = &log
+				cmd.Stderr = &log
+				e := cmd.Run()
+				t.Log(log.String())
+				if e != nil {
+					t.Fatal("isolated capacity process", e)
+				}
+			})
 		}
 		return
 	} else if !filepath.IsAbs(root) || root != os.Getenv("GOTMPDIR") {
 		t.Fatal("capacity child outside isolated scratch")
+	}
+
+	// The diagnostic negative control changes only the runtime limit. It keeps
+	// the same workload and every time/heap/RSS assertion; a passing control is
+	// reported as a survivor, not proof that local RSS reproduces hosted RSS.
+	if os.Getenv("KEYMAKER_MA_CAPACITY_NO_LIMIT") == "1" {
+		debug.SetMemoryLimit(int64(^uint64(0) >> 1))
+	} else {
+		setMALiveMemoryLimit()
+		if got := debug.SetMemoryLimit(-1); got != maLiveMemoryLimit {
+			t.Fatal("production runtime memory limit missing", got)
+		}
 	}
 
 	var peak atomic.Uint64
@@ -209,12 +233,15 @@ func TestMALiveCapacityLatency(t *testing.T) {
 	if e = syscall.Getrusage(syscall.RUSAGE_SELF, &u); e != nil {
 		t.Fatal(e)
 	}
-	t.Logf("rows=%d state_budget=%d snapshot_bytes=%d utilization=%.4f preimage_bytes=%d fresh=%s replay=%s peak_heap=%d process_peak_rss=%d", len(s.maLive.Attempts), maLiveStateLimit, len(raw), float64(len(raw))/float64(ceiling), len(maximal), fresh, elapsed, p, u.Maxrss*1024)
+	t.Logf("runtime_limit=%d gomaxprocs=%d rows=%d state_budget=%d snapshot_bytes=%d utilization=%.4f preimage_bytes=%d fresh=%s replay=%s peak_heap=%d process_peak_rss=%d", debug.SetMemoryLimit(-1), runtime.GOMAXPROCS(0), len(s.maLive.Attempts), maLiveStateLimit, len(raw), float64(len(raw))/float64(ceiling), len(maximal), fresh, elapsed, p, u.Maxrss*1024)
 	if len(raw) < ceiling*95/100 {
 		t.Fatal("capacity fixture not near byte budget")
 	}
 	if fresh >= time.Second || elapsed >= time.Second {
 		t.Fatal("capacity operation lacks 2x deadline margin", fresh, elapsed)
+	}
+	if u.Maxrss*1024 >= 240<<20 {
+		t.Fatal("capacity RSS lacks 16 MiB unit headroom", u.Maxrss*1024)
 	}
 	if p >= 128<<20 || u.Maxrss*1024 >= 256<<20 {
 		t.Fatal("capacity heap margin or unit RSS exceeded", p, u.Maxrss*1024)

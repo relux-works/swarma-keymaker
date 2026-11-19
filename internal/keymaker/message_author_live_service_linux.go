@@ -7,6 +7,7 @@ import (
 	"golang.org/x/sys/unix"
 	"io"
 	"os"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/relux-works/swarma-credential-broker/timeconf"
@@ -27,11 +28,19 @@ func productionMALiveDeps() maLiveServiceDeps {
 		return newJournalGeneration(productionGenerationWindow{}, s, g.Path, g.InitialFloor)
 	}, current: maLiveUnqualified{}}
 }
+
+// Leave 64 MiB of the unit's 256 MiB ceiling for memory outside Go's soft
+// runtime budget. This is role startup policy, not a process-wide package init.
+const maLiveMemoryLimit int64 = 192 << 20
+
+func setMALiveMemoryLimit() { debug.SetMemoryLimit(maLiveMemoryLimit) }
+
 func serveMALive(ctx context.Context, cfg Config, status io.Writer, d maLiveServiceDeps) error {
 	m := cfg.maLive
 	if m == nil {
 		return failure("message-author configuration unavailable")
 	}
+	setMALiveMemoryLimit()
 	if m.Generation == nil {
 		return Code("generation_source_unavailable")
 	}

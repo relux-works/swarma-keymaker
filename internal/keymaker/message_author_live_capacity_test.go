@@ -255,4 +255,9 @@ func TestMALiveCapacityLatency(t *testing.T) {
 	if p >= 128<<20 {
 		t.Fatal("capacity heap margin exceeded", p)
 	}
+	// O13 amendment 2 qualifies the caps with another 16 MiB below the
+	// unchanged 128 MiB heap bound; the sampler and GC policy stay unchanged.
+	if p > 112<<20 {
+		t.Fatal("capacity heap qualification target exceeded", p)
+	}
 }

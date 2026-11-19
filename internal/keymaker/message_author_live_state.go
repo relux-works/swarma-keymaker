@@ -11,8 +11,8 @@ import (
 )
 
 const maLiveSchema = 7
-const maLiveAttemptLimit = 3072
-const maLiveStateLimit = 15 << 20
+const maLiveAttemptLimit = 2304
+const maLiveStateLimit = 11796480
 
 // Two existing generation anchors are each capped at 4096 bytes. Snapshot
 // commits can retain the old, staging and new copies at the same time.

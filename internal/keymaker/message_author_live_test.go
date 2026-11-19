@@ -378,6 +378,9 @@ func TestMALiveDeadlineThroughHandoff(t *testing.T) {
 		g.control(t)
 	})
 }
+
+// Transient custody/entropy failures stay distinct from terminal identity LOSS;
+// restoring each fixture permits a fresh valid signature without a prior effect.
 func TestMALiveCustodyAndEntropy(t *testing.T) {
 	for _, fault := range []string{"closed", "unloaded", "protection", "role", "instance", "entropy"} {
 		t.Run(fault, func(t *testing.T) {
@@ -398,6 +401,7 @@ func TestMALiveCustodyAndEntropy(t *testing.T) {
 				k.role = "j7-request"
 			case "instance":
 				k.instance = strings.Repeat("8", 32)
+				want = "message_author_unqualified"
 			case "entropy":
 				k.entropy = errorMAReader{}
 				want = "entropy_unavailable"

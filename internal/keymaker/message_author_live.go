@@ -95,12 +95,25 @@ func (h *maLiveHolder) selected(ctx context.Context, p Principal, id string) (Bi
 	return b, ""
 }
 
+// Caller holds Store. Terminal evidence gets its own short persistence bound;
+// an expired request cannot leave a named dead mark only in memory. Values such
+// as the audit reservation are retained, but request cancellation is not.
+func (s *Store) maLivePersistDead(ctx context.Context, i int) Code {
+	// A failed writer cannot converge; preserve its existing audit refusal/fence.
+	if s.failed {
+		return "audit_unavailable"
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 250*time.Millisecond)
+	defer cancel()
+	return s.persistMALive(ctx, i)
+}
+
 // Caller holds Store. Proven identity loss terminally suppresses a retained
 // attempt; transient provider, clock and custody availability failures do not.
 func (s *Store) maLiveTerminal(ctx context.Context, p Principal, id string, fresh Code) Code {
 	if i := s.maLiveIndex(p, id); i >= 0 {
 		s.maLive.Attempts[i].Status = "dead"
-		if c := s.persistMALive(ctx, i); c != "" {
+		if c := s.maLivePersistDead(ctx, i); c != "" {
 			return c
 		}
 		return "message_author_unqualified"
@@ -176,7 +189,7 @@ func (h *maLiveHolder) qualified(ctx context.Context, p Principal, r messageauth
 			}
 			if h.key.instance != s.maLive.Instance || h.key.epoch != s.maLive.Epoch || h.key.registry != s.maLive.Registry {
 				maLiveSetCause(ctx, custodyProtectionFailed)
-				return s.maLiveTerminal(ctx, p, r.ID, "custody_unavailable")
+				return s.maLiveTerminal(ctx, p, r.ID, "message_author_unqualified")
 			}
 			public, c := h.key.selectedHeld(s, b, nil, nil)
 			if c != "" {
@@ -199,14 +212,14 @@ func (h *maLiveHolder) qualified(ctx context.Context, p Principal, r messageauth
 				}
 				if a.Attestation != tuple.T {
 					a.Status = "dead"
-					if c = s.persistMALive(ctx, i); c != "" {
+					if c = s.maLivePersistDead(ctx, i); c != "" {
 						return c
 					}
 					return "signer_identity_mismatch"
 				}
 				if a.Binding != b || a.Instance != s.maLive.Instance || a.Key != tuple.Key || a.Key != messageAuthorPublicString(public) {
 					a.Status = "dead"
-					if c = s.persistMALive(ctx, i); c != "" {
+					if c = s.maLivePersistDead(ctx, i); c != "" {
 						return c
 					}
 					return "message_author_unqualified"
@@ -304,7 +317,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 			}
 			s.maLive.Attempts = append(s.maLive.Attempts, maLiveAttempt{Caller: p, ID: r.ID, Method: string(r.Method), Preimage: append([]byte(nil), r.Preimage...), Binding: b, Instance: s.maLive.Instance, Key: tuple.Key, Attestation: tuple.T, Status: "intent"})
 			i = len(s.maLive.Attempts) - 1
-			if c = s.persistMALive(ctx, i); c != "" {
+			if c = s.persistMALiveAdmission(ctx, i); c != "" {
 				if c == "state_capacity_exceeded" || c == "request_deadline_exceeded" {
 					s.maLive.Attempts = s.maLive.Attempts[:i]
 				}
@@ -336,7 +349,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 			}
 			if a.Status == "invoking" {
 				a.Status = "dead"
-				if pc := s.persistMALive(context.WithoutCancel(ctx), i); pc != "" {
+				if pc := s.maLivePersistDead(ctx, i); pc != "" {
 					return pc
 				}
 				return "message_author_unqualified"
@@ -348,10 +361,8 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 		if c != "" {
 			erase(signature)
 			a.Status = "dead"
-			if c == "clock_untrusted" {
-				if pc := s.persistMALive(context.WithoutCancel(ctx), i); pc != "" {
-					return pc
-				}
+			if pc := s.maLivePersistDead(ctx, i); pc != "" {
+				return pc
 			}
 			return c
 		}
@@ -370,6 +381,9 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 			a.SuccessSeq = 0
 			a.SuccessHash = ""
 			a.Status = "dead"
+			if pc := s.maLivePersistDead(ctx, i); pc != "" {
+				return pc
+			}
 		}
 		return c
 	})

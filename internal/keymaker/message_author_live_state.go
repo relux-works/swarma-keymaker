@@ -14,6 +14,12 @@ const maLiveSchema = 7
 const maLiveAttemptLimit = 2304
 const maLiveStateLimit = 11796480
 
+// Fresh attempts and enrollments leave a fixed 64 KiB of encoded state for
+// retirement. Each canonical binding exceeds 64 bytes, so the absolute snapshot
+// ceiling permits fewer than 65536 bindings; active -> revoked adds one byte
+// each, while terminal attempt tombstones never grow their reserved rows.
+const maLiveRetireReserve = 64 << 10
+
 // Two existing generation anchors are each capped at 4096 bytes. Snapshot
 // commits can retain the old, staging and new copies at the same time.
 const maLiveStateOverhead = 8192
@@ -213,6 +219,14 @@ func (s *Store) maLiveIndex(p Principal, id string) int {
 // snapshot protocol. Once a durable effect starts its commit is completed even
 // if the request expires; the delivery barrier separately suppresses late bytes.
 func (s *Store) persistMALive(ctx context.Context, changed ...int) Code {
+	return s.persistMALiveReserved(ctx, 0, changed...)
+}
+
+func (s *Store) persistMALiveAdmission(ctx context.Context, changed ...int) Code {
+	return s.persistMALiveReserved(ctx, maLiveRetireReserve, changed...)
+}
+
+func (s *Store) persistMALiveReserved(ctx context.Context, reserve int, changed ...int) Code {
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
 	}
@@ -285,7 +299,7 @@ func (s *Store) persistMALive(ctx context.Context, changed ...int) Code {
 	version := s.version + 1
 	// Account incrementally before allocating the complete snapshot body.
 	bound := s.maLiveBodySize(j7SafeInteger, len(s.maLive.Attempts), total) + maLiveReceiptBound
-	if !maLiveStateRoom(bound) {
+	if !maLiveStateRoom(bound + reserve) {
 		return "state_capacity_exceeded"
 	}
 	body := s.maLiveBody(version, updates, actual)
@@ -372,12 +386,6 @@ func (s *Store) maLiveBody(version uint64, updates map[int][]byte, actual int) [
 	raw = append(raw, `,"requests":[],"schema_version":7,"version":`...)
 	raw = strconv.AppendUint(raw, version, 10)
 	return append(raw, '}')
-}
-func (s *Store) maLiveRoom() bool {
-	if s.validateMALive() != nil {
-		return false
-	}
-	return maLiveStateRoom(s.maLiveBodySize(j7SafeInteger, len(s.maLive.Attempts), s.maLiveCache.total) + maLiveReceiptBound)
 }
 func maLiveStateRoom(bytes int) bool {
 	return bytes >= 0 && bytes <= (maLiveStateLimit-maLiveStateOverhead)/3

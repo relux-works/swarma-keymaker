@@ -309,6 +309,16 @@ func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Reques
 	if connection == nil || connection.requestID != r.ID {
 		return nil, "peer_identity_unavailable"
 	}
+	if mutation(r.Method) || r.Method == "sign_registration" {
+		if !n.Engine.Store.mu.LockContext(ctx) {
+			return nil, control.DeadlineExceeded
+		}
+		unsupported := n.Engine.Store.schema == maLiveSchema
+		n.Engine.Store.mu.Unlock()
+		if unsupported {
+			return nil, control.OperationUnsupported
+		}
+	}
 	if r.Method == "sign_registration" {
 		return n.signRegistration(ctx, peer, r)
 	}

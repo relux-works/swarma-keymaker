@@ -166,8 +166,8 @@ func (s *maLiveServer) refuse(ctx context.Context, conn net.Conn, p Principal, i
 	}
 	// Custody failures without a captured cause are not emitted as unaudited
 	// diagnostics. The held path supplies a cause for any such refusal.
-	if c == "custody_unavailable" {
-		cause, _ := ctx.Value(maLiveCauseKey{}).(*custodyCause)
+	cause, _ := ctx.Value(maLiveCauseKey{}).(*custodyCause)
+	if c == "custody_unavailable" || c == "message_author_unqualified" && cause != nil && cause.valid() {
 		if cause == nil || !cause.valid() {
 			return false
 		}

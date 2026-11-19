@@ -297,7 +297,7 @@ func TestMALiveCustodyIdentityRefusalFrame(t *testing.T) {
 			}
 			f.f.h.key.mu.Unlock()
 			out := maLiveSocketCall(t, c, f.f.request())
-			if out.Refusal == nil || out.Refusal.Code != "custody_unavailable" || out.Refusal.Retryable || out.Signature != nil || f.f.calls.Load() != 0 {
+			if out.Refusal == nil || out.Refusal.Code != "message_author_unqualified" || out.Refusal.Retryable || out.Signature != nil || f.f.calls.Load() != 0 {
 				t.Fatal("custody identity refusal", out)
 			}
 			s := f.f.h.store
@@ -307,7 +307,7 @@ func TestMALiveCustodyIdentityRefusalFrame(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if bytes.Count(raw, []byte(`"refusal_code":"custody_unavailable"`)) != 1 || bytes.Count(raw, []byte(`"custody_cause":"protection_failed"`)) != 1 {
+			if bytes.Count(raw, []byte(`"refusal_code":"message_author_unqualified"`)) != 1 || bytes.Count(raw, []byte(`"custody_cause":"protection_failed"`)) != 1 {
 				t.Fatal("custody refusal missing exact single audit", string(raw))
 			}
 			if len(s.maLive.Attempts) != 0 {

@@ -256,7 +256,7 @@ func validateBindings(records []Binding, next uint64) Code {
 func (s *Store) persist() Code { return s.persistContext(context.Background()) }
 func (s *Store) persistContext(ctx context.Context) Code {
 	if s.schema == maLiveSchema {
-		return s.persistMALive(ctx)
+		return "operation_unsupported"
 	}
 	if j7StateSchema(s.schema) {
 		return s.persistJ7ParticipantContext(ctx)
@@ -324,6 +324,9 @@ func (s *Store) Register(caller, operator Principal, b Binding) (Binding, Code) 
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.schema == maLiveSchema {
+		return Binding{}, "operation_unsupported"
+	}
 	if s.failed {
 		return Binding{}, "audit_unavailable"
 	}
@@ -366,6 +369,10 @@ func (s *Store) Revoke(ctx context.Context, caller, operator Principal, number u
 		return "role_not_permitted"
 	}
 	s.mu.Lock()
+	if s.schema == maLiveSchema {
+		s.mu.Unlock()
+		return "operation_unsupported"
+	}
 	var candidate Binding
 	for _, b := range s.records {
 		if b.Number == number {
@@ -486,6 +493,9 @@ func (s *Store) Unbind(caller, operator Principal, uid uint32, generation string
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.schema == maLiveSchema {
+		return "operation_unsupported"
+	}
 	if s.failed {
 		return "audit_unavailable"
 	}

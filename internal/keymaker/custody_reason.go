@@ -29,7 +29,11 @@ func validAuditCustody(r AuditRecord) bool {
 	if r.CustodyCause == nil {
 		return !isCustody
 	}
-	return isCustody && r.Result == "refused" && r.CustodyCause.valid()
+	// A message-author identity LOSS keeps its captured protection cause while
+	// following table 7.1's terminal code. Other non-custody refusals stay closed.
+	isMALoss := r.RefusalCode != nil && *r.RefusalCode == "message_author_unqualified" &&
+		r.Surface == "control" && r.Operation == "unparsed" && r.Domain != nil && *r.Domain == "control" && *r.CustodyCause == custodyProtectionFailed
+	return (isCustody || isMALoss) && r.Result == "refused" && r.CustodyCause.valid()
 }
 
 // Recovery accepts absent historical metadata without inventing a cause or

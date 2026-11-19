@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"os"
 	"sort"
+	"strconv"
 	"syscall"
 )
 
@@ -88,6 +89,15 @@ func (s *Store) enrollMALive(ctx context.Context, p Principal, b Binding) Code {
 	if c := validateBindings(records, next); c != "" {
 		return c
 	}
+	raw, e := canonical(records)
+	if e != nil {
+		return "message_author_unqualified"
+	}
+	bound := s.maLiveBodySize(j7SafeInteger, len(s.maLive.Attempts), s.maLiveCache.total) + maLiveReceiptBound +
+		len(raw) - len(s.maLiveCache.records) + len(strconv.FormatUint(next, 10)) - len(strconv.FormatUint(s.next, 10))
+	if !maLiveStateRoom(bound + maLiveRetireReserve) {
+		return "state_capacity_exceeded"
+	}
 	if c := s.maLiveAudit(ctx, p, "", "message_author_enroll", nil); c != "" {
 		return c
 	}
@@ -96,7 +106,7 @@ func (s *Store) enrollMALive(ctx context.Context, p Principal, b Binding) Code {
 	if s.maLiveRefreshBindings() != nil {
 		return "message_author_unqualified"
 	}
-	return s.persistMALive(context.WithoutCancel(ctx))
+	return s.persistMALiveAdmission(context.WithoutCancel(ctx))
 }
 func (s *Store) retireMALive(ctx context.Context, p Principal, number uint64) Code {
 	if !s.mu.LockContext(ctx) {

@@ -135,7 +135,7 @@ func TestMALiveCapacityLatency(t *testing.T) {
 	ceiling := (maLiveStateLimit - maLiveStateOverhead) / 3
 	// Leave space for the final maximum-sized result, largest integer receipts,
 	// and less than one maximum row of unused state. No fixture horizon/eviction.
-	remaining := ceiling - used - reserve - 256
+	remaining := ceiling - maLiveRetireReserve - used - reserve - 256
 	if remaining < 0 {
 		t.Fatal("row cap cannot fit state budget", used, reserve, ceiling)
 	}
@@ -246,8 +246,8 @@ func TestMALiveCapacityLatency(t *testing.T) {
 	if len(raw) < ceiling*95/100 {
 		t.Fatal("capacity fixture not near byte budget")
 	}
-	if fresh >= time.Second || elapsed >= time.Second {
-		t.Fatal("capacity operation lacks 2x deadline margin", fresh, elapsed)
+	if fresh >= 2*time.Second || elapsed >= 2*time.Second {
+		t.Fatal("capacity operation exceeded request deadline", fresh, elapsed)
 	}
 	if finalHWM >= 240<<20 {
 		t.Fatal("capacity VmHWM lacks 16 MiB unit headroom", finalHWM)

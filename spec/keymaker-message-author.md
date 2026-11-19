@@ -625,8 +625,8 @@ legacy/J7/PC2 root budget, hidden unlimited queue, or eviction to make room.
 | Requests per UID+generation | 20/s, burst 40 |
 | `sign_message_author` per UID+generation | 2/s, burst 4 |
 | Global request rate | 200/s, burst 256 |
-| Attempt rows | 3072, no horizon or eviction |
-| State | 15 MiB, including concurrent old/staging/new snapshots and 8192 bytes of generation anchors |
+| Attempt rows | 2304, no horizon or eviction |
+| State | 11.25 MiB, including concurrent old/staging/new snapshots and 8192 bytes of generation anchors |
 | Audit segment | 64 MiB |
 | Online audit | 1 GiB |
 | Audit reserve | 16 MiB |
@@ -648,6 +648,10 @@ memory outside Go's runtime accounting. This is a soft GC budget, not a hard RSS
 limit; capacity evidence must independently check the participant process's own
 peak RSS (`VmHWM` from `/proc/self/status`) below 240 MiB after the fresh sign
 and after replay (16 MiB below the unit ceiling), and sampled heap below 128 MiB.
+O13 amendment 2 qualifies the caps at sampled heap at most 112 MiB across five
+repetitions in both one-CPU and all-visible-CPU children, leaving another 16 MiB
+below that unchanged heap bound. No GC or sampling adjustment substitutes for
+lowering the caps.
 Linux `ru_maxrss` can inherit the launching parent's high-water mark across exec;
 it is logged as a possibly inherited diagnostic and never used as an assertion.
 `TestMALiveRSSAccounting` pairs a trivial measuring child with and without a
@@ -666,18 +670,19 @@ participant's own RSS or a unit memory-limit violation.
 state loading, beside an unselected-role control, so an omitted limit is detected
 even when one machine's uncontrolled GC happens to stay below the RSS ceiling.
 
-#### O13 capacity amendment and matching acceptance rows
+#### O13 capacity amendments and matching acceptance rows
 
-The owner-approved O13 amendment lowers only this participant's capacity. The
+Owner-approved O13 amendment 2 further lowers only this participant's capacity
+to 2304 attempt rows and 11.25 MiB of state. The
 whole-snapshot CCJ1 layout, journal-first commitment, retained evidence and
 refusal semantics stay unchanged. Full validation runs at load; each durable
 transition validates its changed rows and touched uniqueness/reservation
-invariants. The encoded snapshot ceiling is `(15 MiB - 8192) / 3` bytes.
+invariants. The encoded snapshot ceiling is `(11.25 MiB - 8192) / 3` bytes.
 
 | Acceptance row | Required positive and negative evidence |
 | --- | --- |
-| N2-19 `TestMALiveRetentionNoEviction` | At 3072 rows, fresh work refuses before intent/invocation; results, dead rows and tombstones remain. Exact replay at the same retained bound still requires audit, rate budget and current authority. |
-| N2-19 capacity companion `TestMALiveCapacityLatency` | Persist and reopen history at 3071 rows near the encoded byte ceiling; admit one final 24576-byte P, then durably replay at 3072 rows. Each operation is below 1000 ms and measured peak heap below 128 MiB (and process RSS below the unchanged 256 MiB unit ceiling), giving at least 2x margin against the 2000 ms deadline and unit MemoryMax=256 MiB. No shrinking/eviction is a valid fixture. |
+| N2-19 `TestMALiveRetentionNoEviction` | At 2304 rows, fresh work refuses before intent/invocation; results, dead rows and tombstones remain. Exact replay at the same retained bound still requires audit, rate budget and current authority. |
+| N2-19 capacity companion `TestMALiveCapacityLatency` | Persist and reopen history at 2303 rows near the encoded byte ceiling; admit one final 24576-byte P, then durably replay at 2304 rows. In five repetitions at both one CPU and all visible CPUs, each operation is below 1000 ms, sampled heap is at most 112 MiB (with the unchanged hard bound below 128 MiB), and own process `VmHWM` is below 240 MiB. This keeps at least 2x margin against the 2000 ms deadline and unit MemoryMax=256 MiB; inherited `ru_maxrss` is diagnostic only. No shrinking/eviction is a valid fixture. |
 | N2-19 load companion `TestMALiveIncrementalPersistence` | Reject a corrupt unchanged retained row on load, beside a valid canonical snapshot. Reject an invalid changed row or duplicate caller/id before journal mutation. |
 
 These are source-fixture measurements, not native runtime qualification. Higher
@@ -687,7 +692,7 @@ or retention horizon is introduced by this amendment.
 
 **Activation gate G-A7A2-RETENTION-SCALING is closed.** With no eviction in v1,
 this participant refuses new work with `state_capacity_exceeded` before intent
-or crypto after at most about **3072 lifetime attempts**, possibly earlier when
+or crypto after at most about **2304 lifetime attempts**, possibly earlier when
 its state budget binds. This finite lifetime is acceptable only because A7a-2
 is closed by default. Live purpose-9 signing MUST NOT be activated until a
 separately reviewed retention-scaling change provides a persistence layout

@@ -450,13 +450,17 @@ func TestMALiveContractManifest(t *testing.T) {
 // A retained result cannot survive proven root-identity replacement. Restore of
 // the old root does not resurrect its terminal row; an independent holder signs.
 func TestMALiveTerminalCustodyIdentity(t *testing.T) {
-	for _, field := range []string{"instance", "epoch", "registry"} {
+	for _, field := range []string{"instance", "epoch", "registry", "seed"} {
 		t.Run(field, func(t *testing.T) {
 			f := newMALiveFixture(t)
 			f.control(t)
 			k := f.h.key
 			old := k.instance
-			if field == "epoch" {
+			seedByte := k.seed[0]
+			if field == "seed" {
+				// Alter only this mapped copy of the public fixture root.
+				k.seed[0] ^= 1
+			} else if field == "epoch" {
 				old = k.epoch
 				k.epoch = "replacement"
 			} else if field == "registry" {
@@ -469,7 +473,9 @@ func TestMALiveTerminalCustodyIdentity(t *testing.T) {
 			if f.h.store.maLive.Attempts[0].Status != "dead" {
 				t.Fatal("custody identity loss retained live result")
 			}
-			if field == "epoch" {
+			if field == "seed" {
+				k.seed[0] = seedByte
+			} else if field == "epoch" {
 				k.epoch = old
 			} else if field == "registry" {
 				k.registry = old

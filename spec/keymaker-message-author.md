@@ -529,7 +529,7 @@ and pre-crypto checks, never on recovery alone.
 
 | State | ADMIT new id | RETRY | OLD-T | CONFLICT | DUP | LOSS |
 | --- | --- | --- | --- | --- | --- | --- |
-| Absent | Sync `intent`; immediately continue with the `intent` RETRY action in this same request | Unreachable: unseen id is ADMIT | Refuse `signer_identity_mismatch`; remain absent | Unreachable: no retained identity | Unreachable: first admission owns this row | Refuse `message_author_unqualified`; remain absent |
+| Absent | Sync `intent`; immediately continue with the `intent` RETRY action in this same request | Unreachable: unseen id is ADMIT | Refuse `signer_identity_mismatch`; remain absent | Unreachable: no retained identity | Unreachable: first admission owns this row | Refuse `message_author_unqualified`; remain absent (custody-identity mismatch is LOSS; retain its captured cause in the framed refusal audit) |
 | `intent` | Unreachable: occupied id | INVOKE once | Sync `dead`; refuse `signer_identity_mismatch` | Refuse `request_conflict`; keep `intent` | WAIT | Sync `dead`; refuse `message_author_unqualified` |
 | `invoking` | Unreachable: occupied id | WAIT | Suppress computed bytes; sync `dead`; refuse `signer_identity_mismatch` | Refuse `request_conflict`; keep `invoking` | WAIT | Suppress computed bytes; sync `dead`; refuse `message_author_unqualified` |
 | `result` | Unreachable: occupied id | BARRIER | Sync `dead`; refuse `signer_identity_mismatch` | Refuse `request_conflict`; keep `result` | BARRIER | Sync `dead`; refuse `message_author_unqualified` |
@@ -677,12 +677,22 @@ to 2304 attempt rows and 11.25 MiB of state. The
 whole-snapshot CCJ1 layout, journal-first commitment, retained evidence and
 refusal semantics stay unchanged. Full validation runs at load; each durable
 transition validates its changed rows and touched uniqueness/reservation
-invariants. The encoded snapshot ceiling is `(11.25 MiB - 8192) / 3` bytes.
+invariants. The absolute encoded snapshot ceiling is `(11.25 MiB - 8192) / 3` bytes.
+Fresh-attempt and enrollment admission reserve a fixed 64 KiB **inside** that
+ceiling for operator retirement and tombstone growth. Their reserved-byte bound
+must not exceed the absolute ceiling minus 65536 bytes; result/replay, terminal
+marking, and retirement may use that reserve but never exceed the absolute bound.
+Each canonical binding exceeds 64 bytes, so fewer than 65536 bindings fit even
+without attempts; retiring all active bindings adds at most one byte per binding
+(`active` to `revoked`). A terminal attempt's `dead` encoding fits within its
+already reserved row. Retirement therefore remains available at the exact
+fresh-work ceiling, without eviction or a larger state budget.
 
 | Acceptance row | Required positive and negative evidence |
 | --- | --- |
 | N2-19 `TestMALiveRetentionNoEviction` | At 2304 rows, fresh work refuses before intent/invocation; results, dead rows and tombstones remain. Exact replay at the same retained bound still requires audit, rate budget and current authority. |
-| N2-19 capacity companion `TestMALiveCapacityLatency` | Persist and reopen history at 2303 rows near the encoded byte ceiling; admit one final 24576-byte P, then durably replay at 2304 rows. In five repetitions at both one CPU and all visible CPUs, each operation is below 1000 ms, sampled heap is at most 112 MiB (with the unchanged hard bound below 128 MiB), and own process `VmHWM` is below 240 MiB. This keeps at least 2x margin against the 2000 ms deadline and unit MemoryMax=256 MiB; inherited `ru_maxrss` is diagnostic only. No shrinking/eviction is a valid fixture. |
+| N2-19 capacity companion `TestMALiveCapacityLatency` | Persist and reopen history at 2303 rows near the encoded byte ceiling; admit one final 24576-byte P, then durably replay at 2304 rows. CI asserts each operation completes inside the 2000 ms request deadline, sampled heap is at most 112 MiB (with the unchanged hard bound below 128 MiB), and own process `VmHWM` is below 240 MiB. Five repetitions at both one CPU and all visible CPUs, with measured operation times below 1000 ms (2x deadline margin), are manual qualification evidence attached to the PR, not a CI property (`-count=1`). The unit MemoryMax=256 MiB is unchanged; inherited `ru_maxrss` is diagnostic only. No shrinking/eviction is a valid fixture. |
+| N2-19 byte-cap companions `TestMALiveStateCapBeforeIntent`, `TestMALiveStateCapLoad`, `TestMALiveRetireByteCeiling` | Maximum-size preimages reach the byte bound below the row cap. Fresh work refuses before intent/journal/crypto without changing rows/version/fence, beside a just-under-bound signing control; the full loader rejects an over-budget snapshot beside a valid control. At the exact fresh-work ceiling retire succeeds using reserved headroom. Each byte enforcement site has its own deletion plant. |
 | N2-19 load companion `TestMALiveIncrementalPersistence` | Reject a corrupt unchanged retained row on load, beside a valid canonical snapshot. Reject an invalid changed row or duplicate caller/id before journal mutation. |
 
 These are source-fixture measurements, not native runtime qualification. Higher

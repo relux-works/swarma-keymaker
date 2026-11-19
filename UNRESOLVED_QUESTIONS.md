@@ -555,3 +555,12 @@ Root-owned configuration/head positive controls, distinct-UID launcher
 interoperability, deployment and native qualification are PENDING. Rate buckets
 are absent from the single-launcher J7 socket. These limits do not activate
 other roles or change the legacy service.
+
+## Message-author retention scaling
+
+**G-A7A2-RETENTION-SCALING remains closed.** The finite lifetime and byte budget
+are source-fixture bounds only. Live purpose-9 activation requires the separately
+reviewed retention-scaling change described in
+[message-author section 8](spec/keymaker-message-author.md#8-finite-capacity-per-participant),
+including permanent request-id rejection. Current capacity evidence does not
+satisfy this gate.

@@ -48,7 +48,7 @@ func TestMALiveCrashStatusMatrix(t *testing.T) {
 				a := maLiveIntent(f)
 				a.Status = status
 				s.maLive.Attempts = append(s.maLive.Attempts, a)
-				if c := s.persistMALive(t.Context()); c != "" {
+				if c := s.persistMALive(t.Context(), 0); c != "" {
 					t.Fatal(c)
 				}
 			case "partial", "missing", "wrong-head":
@@ -61,7 +61,7 @@ func TestMALiveCrashStatusMatrix(t *testing.T) {
 					a.Status = "result"
 					a.SuccessHash = strings.Repeat("0", 64)
 				}
-				if c := s.persistMALive(t.Context()); c != "" {
+				if c := s.persistMALive(t.Context(), 0); c != "" {
 					t.Fatal(c)
 				}
 			}
@@ -237,7 +237,7 @@ func TestMALiveUnknownAuditNeedsResolve(t *testing.T) {
 	f.control(t)
 	s := f.h.store
 	s.maLive.Fenced = true
-	if c := s.persistMALive(t.Context()); c != "" {
+	if c := s.persistMALive(t.Context(), 0); c != "" {
 		t.Fatal(c)
 	}
 	expected := maLiveExpected(t, s)
@@ -251,14 +251,14 @@ func TestMALiveUnknownAuditNeedsResolve(t *testing.T) {
 	original := a.SuccessHash
 	a.SuccessHash = strings.Repeat("0", 64)
 	// Even a self-consistent snapshot/head does not prove the missing sign audit.
-	if c := s.persistMALive(t.Context()); c != "" {
+	if c := s.persistMALive(t.Context(), 0); c != "" {
 		t.Fatal(c)
 	}
 	if c := s.reconcileMALive(t.Context(), fixtureOperator, maLiveExpected(t, s)); c != "message_author_unqualified" || !s.maLive.Fenced {
 		t.Fatal("unproven result resolved", c)
 	}
 	a.SuccessHash = original
-	if c := s.persistMALive(t.Context()); c != "" {
+	if c := s.persistMALive(t.Context(), 0); c != "" {
 		t.Fatal(c)
 	}
 	if c := s.reconcileMALive(t.Context(), fixtureOperator, maLiveExpected(t, s)); c != "" || s.maLive.Fenced {

@@ -73,6 +73,7 @@ type bindingDisk struct {
 }
 type Store struct {
 	maLive       *maLiveInventory
+	maLiveCache  *maLiveStateCache
 	j7           *j7Inventory
 	j7Signing    *j7SigningInventory
 	j7Fault      func(string) Code

@@ -237,7 +237,7 @@ func TestMALiveRetryAcrossConnection(t *testing.T) {
 		t.Fatal("released replay", c)
 	}
 	f.h.store.maLive.Attempts[0].Status = "handoff_unknown"
-	if c = f.h.store.persistMALive(t.Context()); c != "" {
+	if c = f.h.store.persistMALive(t.Context(), 0); c != "" {
 		t.Fatal(c)
 	}
 	out, c = f.call(t.Context(), f.request())

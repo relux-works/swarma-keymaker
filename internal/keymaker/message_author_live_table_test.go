@@ -24,7 +24,7 @@ func TestMALiveRetainedEventTable(t *testing.T) {
 					f.control(t)
 					s.maLive.Attempts[0].Status = status
 				}
-				if c := s.persistMALive(t.Context()); c != "" {
+				if c := s.persistMALive(t.Context(), 0); c != "" {
 					t.Fatal(c)
 				}
 				count := f.calls.Load()

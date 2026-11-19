@@ -100,6 +100,7 @@ func (s *Store) recoverMALive(ctx context.Context) Code {
 	}
 	wasFenced := s.maLive.Fenced
 	changed := false
+	var rows []int
 	for i := range s.maLive.Attempts {
 		a := &s.maLive.Attempts[i]
 		switch a.Status {
@@ -112,6 +113,7 @@ func (s *Store) recoverMALive(ctx context.Context) Code {
 				s.maLive.Fenced = true
 			} else {
 				a.Status = "dead"
+				rows = append(rows, i)
 			}
 			changed = true
 		case "result", "handoff_unknown", "released":
@@ -130,7 +132,7 @@ func (s *Store) recoverMALive(ctx context.Context) Code {
 				return c
 			}
 		}
-		return s.persistMALive(ctx)
+		return s.persistMALive(ctx, rows...)
 	}
 	return ""
 }
@@ -168,13 +170,15 @@ func (s *Store) reconcileMALive(ctx context.Context, operator Principal, expecte
 	if c := s.maLiveAudit(ctx, operator, "", "message_author_reconcile", nil); c != "" {
 		return c
 	}
+	var rows []int
 	for i := range s.maLive.Attempts {
 		if s.maLive.Attempts[i].Status == "invoking" {
 			s.maLive.Attempts[i].Status = "dead"
+			rows = append(rows, i)
 		}
 	}
 	s.maLive.Fenced = false
-	return s.persistMALive(context.WithoutCancel(ctx))
+	return s.persistMALive(context.WithoutCancel(ctx), rows...)
 }
 func (s *Store) maLiveResultProven(a maLiveAttempt) bool {
 	s.journal.mu.Lock()

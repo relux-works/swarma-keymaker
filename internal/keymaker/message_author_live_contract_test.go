@@ -265,13 +265,22 @@ func TestMALiveRetentionNoEviction(t *testing.T) {
 	dead := retained
 	dead.ID = strings.Repeat("d", 32)
 	dead.Status = "dead"
+	dead.Signature = nil
+	dead.SuccessSeq = 0
+	dead.SuccessHash = ""
 	s.maLive.Attempts = make([]maLiveAttempt, maLiveAttemptLimit)
 	s.maLive.Attempts[0] = retained
 	s.maLive.Attempts[1] = dead
 	for i := 2; i < len(s.maLive.Attempts); i++ {
-		a := retained
+		a := dead
 		a.ID = fmt.Sprintf("%032x", i)
 		s.maLive.Attempts[i] = a
+	}
+	if e := s.validateMALive(); e != nil {
+		t.Fatal(e)
+	}
+	if c := s.persistMALive(t.Context()); c != "" {
+		t.Fatal(c)
 	}
 	last := s.maLive.Attempts[len(s.maLive.Attempts)-1].ID
 	r := f.request()
@@ -280,9 +289,7 @@ func TestMALiveRetentionNoEviction(t *testing.T) {
 	if len(s.maLive.Attempts) != maLiveAttemptLimit || s.maLive.Attempts[0].ID != retained.ID || s.maLive.Attempts[1].Status != "dead" || s.maLive.Attempts[len(s.maLive.Attempts)-1].ID != last || !bytes.Equal(s.maLive.Attempts[0].Signature, first.Signature.Signature) {
 		t.Fatal("capacity evicted evidence")
 	}
-	// Restore the exact valid durable history; rejected admission must not have
-	// mutated it. Replay is then proved under its own budget and current barrier.
-	s.maLive.Attempts = []maLiveAttempt{retained}
+	// Replay at the actual retained cap, without shrinking or evicting history.
 	f.control(t)
 }
 

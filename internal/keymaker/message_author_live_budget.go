@@ -26,7 +26,16 @@ func (b *maLiveBudget) charge(p Principal, sign bool) Code {
 	peer := b.peers[p]
 	if peer == nil {
 		if len(b.peers) >= 65536 {
-			return "rate_limited"
+			// An idle peer is reclaimable only after BOTH buckets have naturally
+			// refilled. Resetting any outstanding debt would bypass its rate limit.
+			for key, old := range b.peers {
+				if maLiveBucketFull(old.all, now, 20, 40) && maLiveBucketFull(old.sign, now, 2, 4) {
+					delete(b.peers, key)
+				}
+			}
+			if len(b.peers) >= 65536 {
+				return "rate_limited"
+			}
 		}
 		peer = &maLivePeerBudget{}
 		b.peers[p] = peer
@@ -66,4 +75,11 @@ func (h *maLiveHolder) chargeSign(p Principal) Code {
 		return "rate_limited"
 	}
 	return b.chargeSign(p)
+}
+
+func maLiveBucketFull(v bucket, now time.Time, rate, burst float64) bool {
+	if v.last.IsZero() {
+		return true
+	}
+	return now.After(v.last) && v.tokens+now.Sub(v.last).Seconds()*rate >= burst
 }

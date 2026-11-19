@@ -100,7 +100,7 @@ func (h *maLiveHolder) selected(ctx context.Context, p Principal, id string) (Bi
 func (s *Store) maLiveTerminal(ctx context.Context, p Principal, id string, fresh Code) Code {
 	if i := s.maLiveIndex(p, id); i >= 0 {
 		s.maLive.Attempts[i].Status = "dead"
-		if c := s.persistMALive(ctx); c != "" {
+		if c := s.persistMALive(ctx, i); c != "" {
 			return c
 		}
 		return "message_author_unqualified"
@@ -175,6 +175,7 @@ func (h *maLiveHolder) qualified(ctx context.Context, p Principal, r messageauth
 				return "custody_unavailable"
 			}
 			if h.key.instance != s.maLive.Instance || h.key.epoch != s.maLive.Epoch || h.key.registry != s.maLive.Registry {
+				maLiveSetCause(ctx, custodyProtectionFailed)
 				return s.maLiveTerminal(ctx, p, r.ID, "custody_unavailable")
 			}
 			public, c := h.key.selectedHeld(s, b, nil, nil)
@@ -198,14 +199,14 @@ func (h *maLiveHolder) qualified(ctx context.Context, p Principal, r messageauth
 				}
 				if a.Attestation != tuple.T {
 					a.Status = "dead"
-					if c = s.persistMALive(ctx); c != "" {
+					if c = s.persistMALive(ctx, i); c != "" {
 						return c
 					}
 					return "signer_identity_mismatch"
 				}
 				if a.Binding != b || a.Instance != s.maLive.Instance || a.Key != tuple.Key || a.Key != messageAuthorPublicString(public) {
 					a.Status = "dead"
-					if c = s.persistMALive(ctx); c != "" {
+					if c = s.persistMALive(ctx, i); c != "" {
 						return c
 					}
 					return "message_author_unqualified"
@@ -303,7 +304,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 			}
 			s.maLive.Attempts = append(s.maLive.Attempts, maLiveAttempt{Caller: p, ID: r.ID, Method: string(r.Method), Preimage: append([]byte(nil), r.Preimage...), Binding: b, Instance: s.maLive.Instance, Key: tuple.Key, Attestation: tuple.T, Status: "intent"})
 			i = len(s.maLive.Attempts) - 1
-			if c = s.persistMALive(ctx); c != "" {
+			if c = s.persistMALive(ctx, i); c != "" {
 				if c == "state_capacity_exceeded" || c == "request_deadline_exceeded" {
 					s.maLive.Attempts = s.maLive.Attempts[:i]
 				}
@@ -323,16 +324,19 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 				return "request_deadline_exceeded"
 			}
 			a.Status = "invoking"
-			c := s.persistMALive(ctx)
+			c := s.persistMALive(ctx, i)
 			if c == "request_deadline_exceeded" || c == "state_capacity_exceeded" {
 				a.Status = "intent"
 			}
 			return c
 		})
 		if c != "" {
+			if c == "custody_unavailable" {
+				maLiveSetCause(ctx, custodyProtectionFailed)
+			}
 			if a.Status == "invoking" {
 				a.Status = "dead"
-				if pc := s.persistMALive(context.WithoutCancel(ctx)); pc != "" {
+				if pc := s.persistMALive(context.WithoutCancel(ctx), i); pc != "" {
 					return pc
 				}
 				return "message_author_unqualified"
@@ -345,7 +349,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 			erase(signature)
 			a.Status = "dead"
 			if c == "clock_untrusted" {
-				if pc := s.persistMALive(context.WithoutCancel(ctx)); pc != "" {
+				if pc := s.persistMALive(context.WithoutCancel(ctx), i); pc != "" {
 					return pc
 				}
 			}
@@ -359,7 +363,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 		erase(signature)
 		a.SuccessSeq, a.SuccessHash = seq, hash
 		a.Status = "result"
-		c = s.persistMALive(context.WithoutCancel(ctx))
+		c = s.persistMALive(context.WithoutCancel(ctx), i)
 		if c != "" {
 			erase(a.Signature)
 			a.Signature = nil
@@ -374,7 +378,8 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 	}
 	if r.Method == messageauthor.SignMethod {
 		c = h.qualified(ctx, p, r, func(s *Store, tuple maLiveTuple) Code {
-			a := &s.maLive.Attempts[s.maLiveIndex(p, r.ID)]
+			i := s.maLiveIndex(p, r.ID)
+			a := &s.maLive.Attempts[i]
 			if a.Status != "result" && a.Status != "handoff_unknown" && a.Status != "released" {
 				return "message_author_unqualified"
 			}
@@ -382,7 +387,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 				return c
 			}
 			a.Status = "handoff_unknown"
-			return s.persistMALive(ctx)
+			return s.persistMALive(ctx, i)
 		})
 		if c != "" {
 			return c
@@ -432,7 +437,7 @@ func (h *maLiveHolder) handle(ctx context.Context, p Principal, r messageauthor.
 		}
 		if a != nil {
 			a.Status = "released"
-			return s.persistMALive(context.WithoutCancel(ctx))
+			return s.persistMALive(context.WithoutCancel(ctx), s.maLiveIndex(p, r.ID))
 		}
 		return ""
 	})

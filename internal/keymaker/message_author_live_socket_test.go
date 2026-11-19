@@ -278,3 +278,46 @@ func TestMALiveRetirementClosesConnection(t *testing.T) {
 	t.Log("retirement closes idle real Unix connection; invocation_count=1")
 	newMALiveFixture(t).control(t)
 }
+
+// The actual Unix writer must frame and audit each custody identity refusal,
+// once and without signing; an unchanged identity still returns a valid result.
+func TestMALiveCustodyIdentityRefusalFrame(t *testing.T) {
+	for _, field := range []string{"instance", "epoch", "registry"} {
+		t.Run(field, func(t *testing.T) {
+			f := newMALiveSocketFixture(t)
+			c := f.dial(t, true)
+			f.f.h.key.mu.Lock()
+			switch field {
+			case "instance":
+				f.f.h.key.instance = "different"
+			case "epoch":
+				f.f.h.key.epoch = "different"
+			case "registry":
+				f.f.h.key.registry = "different"
+			}
+			f.f.h.key.mu.Unlock()
+			out := maLiveSocketCall(t, c, f.f.request())
+			if out.Refusal == nil || out.Refusal.Code != "custody_unavailable" || out.Refusal.Retryable || out.Signature != nil || f.f.calls.Load() != 0 {
+				t.Fatal("custody identity refusal", out)
+			}
+			s := f.f.h.store
+			s.journal.mu.Lock()
+			raw, e := os.ReadFile(filepath.Join(f.f.dir.Name(), "audit", s.journal.file.Name()))
+			s.journal.mu.Unlock()
+			if e != nil {
+				t.Fatal(e)
+			}
+			if bytes.Count(raw, []byte(`"refusal_code":"custody_unavailable"`)) != 1 || bytes.Count(raw, []byte(`"custody_cause":"protection_failed"`)) != 1 {
+				t.Fatal("custody refusal missing exact single audit", string(raw))
+			}
+			if len(s.maLive.Attempts) != 0 {
+				t.Fatal("custody refusal retained intent")
+			}
+			valid := newMALiveSocketFixture(t)
+			positive := maLiveSocketCall(t, valid.dial(t, true), valid.f.request())
+			if positive.Signature == nil || valid.f.calls.Load() != 1 {
+				t.Fatal("valid custody control")
+			}
+		})
+	}
+}

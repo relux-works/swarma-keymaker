@@ -93,6 +93,9 @@ func (s *Store) enrollMALive(ctx context.Context, p Principal, b Binding) Code {
 	}
 	s.records = records
 	s.next = next
+	if s.maLiveRefreshBindings() != nil {
+		return "message_author_unqualified"
+	}
 	return s.persistMALive(context.WithoutCancel(ctx))
 }
 func (s *Store) retireMALive(ctx context.Context, p Principal, number uint64) Code {
@@ -112,13 +115,18 @@ func (s *Store) retireMALive(ctx context.Context, p Principal, number uint64) Co
 				return c
 			}
 			s.records[i].Status = "revoked"
+			if s.maLiveRefreshBindings() != nil {
+				return "message_author_unqualified"
+			}
+			var changed []int
 			for n := range s.maLive.Attempts {
 				a := &s.maLive.Attempts[n]
 				if a.Binding.Number == number {
 					a.Status = "dead"
+					changed = append(changed, n)
 				}
 			}
-			c := s.persistMALive(context.WithoutCancel(ctx))
+			c := s.persistMALive(context.WithoutCancel(ctx), changed...)
 			s.notify(number)
 			return c
 		}

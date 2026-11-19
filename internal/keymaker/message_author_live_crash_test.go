@@ -48,7 +48,11 @@ func TestMALiveAuditSyncProcess(t *testing.T) {
 	if marker == "" {
 		return
 	}
-	if !filepath.IsAbs(marker) || !strings.HasPrefix(marker, os.Getenv("TMPDIR")+string(os.PathSeparator)) {
+	root := os.Getenv("GOTMPDIR")
+	if root == "" {
+		root = os.Getenv("TMPDIR")
+	}
+	if !filepath.IsAbs(root) || !filepath.IsAbs(marker) || !strings.HasPrefix(marker, filepath.Clean(root)+string(os.PathSeparator)) {
 		t.Fatal("child marker outside isolated scratch")
 	}
 	f := newMALiveFixture(t)
@@ -73,7 +77,7 @@ func TestMALiveKilledAuditSync(t *testing.T) {
 		t.Fatal(e)
 	}
 	cmd := exec.Command(binary, "-test.run=^TestMALiveAuditSyncProcess$", "-test.timeout=10s")
-	cmd.Env = append(os.Environ(), "TMPDIR="+root, "TMP="+root, "TEMP="+root, "KEYMAKER_MA_AUDIT_SYNC_CHILD="+marker)
+	cmd.Env = append(os.Environ(), "TMPDIR="+root, "TMP="+root, "TEMP="+root, "GOTMPDIR="+root, "KEYMAKER_MA_AUDIT_SYNC_CHILD="+marker)
 	var log bytes.Buffer
 	cmd.Stdout = &log
 	cmd.Stderr = &log

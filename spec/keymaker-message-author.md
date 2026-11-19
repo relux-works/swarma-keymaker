@@ -402,7 +402,7 @@ ordered checks, not a producer-chosen error race.
 #### 4.3 Trusted time
 
 Use J7's broker `timeconf` provider and **inline `time_policy`**, not a second policy
-file: sync age at most **2048 s**, uncertainty at most **1.5 s**, using the existing
+file: sync age at most **3072 s**, uncertainty at most **1.5 s**, using the existing
 policy and adapter semantics. Sign release is **START class at both Lower and Upper
 bounds**, the R-U2-4 form. Use conservative attestation/lifetime admission, not a single
 wall-clock point. Apply fresh time evidence at the final barrier, including retained
@@ -450,7 +450,7 @@ separate handoff marker makes uncertain delivery different from uncertain result
 durability.
 
 No horizon, eviction or automatic reclamation exists in v1, as in [Message certification
-state, finite capacity](keymaker-msg-state.md). Retain at most **65536 attempt rows**;
+state, finite capacity](keymaker-msg-state.md). Retain at most **3072 attempt rows**;
 at capacity refuse new work and keep results, dead rows and tombstones. Replays still
 require their ordinary budgets, durable audit and fresh authority; audit exhaustion is
 not waived for a retained result. The audit journal is never the result cache.
@@ -625,8 +625,8 @@ legacy/J7/PC2 root budget, hidden unlimited queue, or eviction to make room.
 | Requests per UID+generation | 20/s, burst 40 |
 | `sign_message_author` per UID+generation | 2/s, burst 4 |
 | Global request rate | 200/s, burst 256 |
-| Attempt rows | 65536, no horizon or eviction |
-| State | 256 MiB |
+| Attempt rows | 3072, no horizon or eviction |
+| State | 15 MiB, including concurrent old/staging/new snapshots and 8192 bytes of generation anchors |
 | Audit segment | 64 MiB |
 | Online audit | 1 GiB |
 | Audit reserve | 16 MiB |
@@ -635,3 +635,33 @@ Retain the existing section-11 rotation/reserve rules; reserve does not authoriz
 unbounded signing after audit capacity is exhausted. Keep codec
 frame/preimage/attestation bounds from section 4, not the older legacy connection count
 or a PC2 numeric window.
+
+
+#### O13 capacity amendment and matching acceptance rows
+
+The owner-approved O13 amendment lowers only this participant's capacity. The
+whole-snapshot CCJ1 layout, journal-first commitment, retained evidence and
+refusal semantics stay unchanged. Full validation runs at load; each durable
+transition validates its changed rows and touched uniqueness/reservation
+invariants. The encoded snapshot ceiling is `(15 MiB - 8192) / 3` bytes.
+
+| Acceptance row | Required positive and negative evidence |
+| --- | --- |
+| N2-19 `TestMALiveRetentionNoEviction` | At 3072 rows, fresh work refuses before intent/invocation; results, dead rows and tombstones remain. Exact replay at the same retained bound still requires audit, rate budget and current authority. |
+| N2-19 capacity companion `TestMALiveCapacityLatency` | Persist and reopen history at 3071 rows near the encoded byte ceiling; admit one final 24576-byte P, then durably replay at 3072 rows. Each operation is below 1000 ms and measured peak heap below 128 MiB (and process RSS below the unchanged 256 MiB unit ceiling), giving at least 2x margin against the 2000 ms deadline and unit MemoryMax=256 MiB. No shrinking/eviction is a valid fixture. |
+| N2-19 load companion `TestMALiveIncrementalPersistence` | Reject a corrupt unchanged retained row on load, beside a valid canonical snapshot. Reject an invalid changed row or duplicate caller/id before journal mutation. |
+
+These are source-fixture measurements, not native runtime qualification. Higher
+capacities require a new measured owner decision; no journal/per-row-file design
+or retention horizon is introduced by this amendment.
+
+
+**Activation gate G-A7A2-RETENTION-SCALING is closed.** With no eviction in v1,
+this participant refuses new work with `state_capacity_exceeded` before intent
+or crypto after at most about **3072 lifetime attempts**, possibly earlier when
+its state budget binds. This finite lifetime is acceptable only because A7a-2
+is closed by default. Live purpose-9 signing MUST NOT be activated until a
+separately reviewed retention-scaling change provides a persistence layout
+whose per-transition cost does not grow with retained rows, and/or a compaction
+rule preserving permanent request-id rejection. This amendment names that gate;
+it does not design or satisfy it. The unit's `MemoryMax=256M` remains unchanged.

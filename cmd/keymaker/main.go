@@ -26,11 +26,14 @@ func run(ctx context.Context, args []string, out, errOut io.Writer) int {
 	if len(args) >= 2 && args[0] == "enrollment" && args[1] == "reconcile" {
 		return runReconcile(ctx, args[2:], os.Stdin, out, errOut)
 	}
+	if len(args) >= 1 && args[0] == "message-author" {
+		return runMessageAuthor(ctx, args[1:], out, errOut)
+	}
 	if len(args) >= 1 && args[0] == "j7" {
 		return runJ7(ctx, args[1:], out, errOut)
 	}
 	if len(args) == 0 || args[0] != "serve" {
-		fmt.Fprintln(errOut, "usage: keymaker version | serve --config <file> | enrollment reconcile --config <file> [--bootstrap] [--confirm <sha256>] | j7 seed-init|migrate|policy-publish|head <flags>")
+		fmt.Fprintln(errOut, "usage: keymaker version | serve --config <file> | enrollment reconcile --config <file> [--bootstrap] [--confirm <sha256>] | j7 seed-init|migrate|policy-publish|head <flags> | message-author init|enroll|retire --config <file>")
 		return 2
 	}
 	flags := flag.NewFlagSet("serve", flag.ContinueOnError)
@@ -49,7 +52,7 @@ func main() {
 	timeconf.CollectorEntry()
 	// The stopped-operator commands handle custody, so they get the same
 	// process hardening as the service before any argument is interpreted.
-	if len(os.Args) > 1 && os.Args[1] == "j7" {
+	if len(os.Args) > 1 && (os.Args[1] == "j7" || os.Args[1] == "message-author") {
 		if e := keymaker.HardenProcess(); e != nil {
 			fmt.Fprintln(os.Stderr, e)
 			os.Exit(1)

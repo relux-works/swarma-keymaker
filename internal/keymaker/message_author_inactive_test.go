@@ -109,7 +109,7 @@ func TestMessageAuthorSourceIsolation(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		allowed := path == "message_author_key.go" || path == "message_author_preimage.go"
+		allowed := path == "message_author_key.go" || path == "message_author_preimage.go" || path == "message_author_live.go" || path == "message_author_live_state.go" || path == "message_author_live_service_linux.go" || path == "message_author_live_custody_linux.go"
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.Ident:
@@ -136,6 +136,9 @@ func TestMessageAuthorSourceIsolation(t *testing.T) {
 			t.Fatal(e)
 		}
 		for _, name := range []string{"message_author_identity", "sign_message_author", "message-author"} {
+			if path == "config_linux.go" && name == "message-author" {
+				continue
+			}
 			if bytes.Contains(b, []byte(name)) {
 				t.Fatal("runtime profile/route added", path)
 			}

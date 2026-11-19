@@ -65,6 +65,7 @@ func cleanAbsolute(path string) bool {
 }
 
 type Config struct {
+	maLive            *maLiveConfiguration
 	J7Policy          *j7PolicyConfiguration     `json:"j7_policy,omitempty"`
 	J7State           *j7StateConfiguration      `json:"j7_state,omitempty"`
 	J7Socket          *j7SocketConfiguration     `json:"socket,omitempty"`
@@ -102,6 +103,9 @@ func (cfg *Config) UnmarshalJSON(raw []byte) error {
 	}
 	if _, exists := rawFields["service_role"]; exists && role.ServiceRole == "" {
 		return failure("invalid service role")
+	}
+	if role.ServiceRole == "message-author" {
+		return unmarshalMALiveConfig(raw, cfg)
 	}
 	if role.ServiceRole != "" && role.ServiceRole != "legacy" {
 		if !validJ7Role(role.ServiceRole) {

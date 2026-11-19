@@ -5,13 +5,14 @@ Role: per-station key custody. Lore name: Keymaker.
 `github.com/relux-works/swarma-keymaker/messageauthor` is a [nested codec module](messageauthor/README.md#module-and-version-pin) with a Go 1.26.8 floor; the root service remains on Go 1.26.10.
 
 The [purpose catalog](spec/keymaker-purposes.md) allocates purpose9
-`message-author` as **fixture-only, not live**. The new inert
-[`messageauthor`](messageauthor/README.md) codec publishes self-only identity/sign
-request and reply grammar against exact envelope065. Public fixture roots and
-independent verifier/oracle controls establish source compatibility; there is no
-message-author runtime/config/state/current-certificate provider or live RPC.
-The [source contract](spec/keymaker-message-author.md) lists separate live
-coordinator and real-key/J7 prerequisites. Existing Ed25519/J7 gates are unchanged.
+`message-author`; its historical fixture roots and vectors remain unchanged.
+The [`messageauthor`](messageauthor/README.md) codec publishes self-only
+identity/sign request and reply grammar against exact envelope065. The dedicated
+schema-7 participant implements that contract with a refusing production
+current-attestation provider. Public fixture roots and independent verifier/oracle
+controls establish source compatibility. The [source contract](spec/keymaker-message-author.md)
+keeps production issuance, real-key provisioning and activation as separate
+prerequisites. Existing Ed25519/J7 gates are unchanged.
 
 The [request/child-delegation custody contract](spec/keymaker-j7.md) supplies
 isolated internal BIP-340 custody for purposes 7/8 and protected run/policy
@@ -635,6 +636,37 @@ These exercise literal wire fixtures, public fixture custody, matched receivers
 and closed-runtime witnesses. The mutation tool records overlays, child logs and
 intended-failure receipts in a new mutation subdirectory. Go caches hold build
 outputs. These checks provide no service activation/native qualification.
+
+The dedicated `message-author` participant is specified in
+[the live participant contract](spec/keymaker-message-author.md#live-participant-a7a-2).
+Its schema-7 state, bindings, purpose-9 root capability and Unix socket are separate
+from legacy and J7 roles. Production current-attestation selection refuses by default;
+there is no production key loader, issuer, provisioning or activation in this slice.
+The [configuration example](packaging/message-author.example.json) and
+[unit source](packaging/swarma-keymaker-message-author.service) require installer-selected
+principals, socket group and protected external expected-head pin. They install nothing.
+
+Stopped operator command source is `keymaker message-author init|enroll|retire --config
+<root-owned-config>`, with `--registration-number <number>` for retire. Enroll reads one
+closed Binding JSON document from standard input, including the explicit purpose-1 epoch
+and registration identity. That audited operator assertion is the v1 link to purpose-1;
+the participant has no live legacy binding feed. Init creates no key. Successful commands
+print the new expected-head document; they do not install/advance its protected pin.
+Reconciliation is a private stopped-operator exact-proof primitive, with no socket method
+or production reconciliation command in this slice. It never signs or issues an attestation.
+
+| Tool | Command / entry point | Evidence |
+| --- | --- | --- |
+| Go | `go test -count=1 ./internal/keymaker -run 'MessageAuthor|MALive|Config|Startup|J7|Static'` | Participant, legacy isolation, state/recovery, Unix and paired controls; private task scratch |
+| Go | `go test -count=1 ./internal/control github.com/relux-works/swarma-keymaker/messageauthor/...`; `go test -count=1 ./cmd/keymaker -run MALive` | Closed refusal/codec and CLI source contracts |
+| Mutation tool | `go run ./tools/mutations -group message-author-live -scratch <private-directory>` | Named narrowing overlays, real child exits and receipts under private scratch |
+
+Run these with the pinned Go SDK, read-only modules and absolute task-owned HOME,
+caches, TMPDIR and checkout. The source-only packaging plant uses an isolated fixture
+copy: Go overlays cannot mutate files read through `os.ReadFile`. Passing fixtures do
+not establish installed ownership, multi-UID privilege, issuer/current-T qualification
+or production activation. The joint O10 corpus is not produced unless its actual upstream
+payload and manifest exist; historical wire and purpose-9 fixtures remain immutable.
 
 The dedicated request-role [unit and example](packaging/README.md#dedicated-request-role-service)
 compose lifecycle, public-key and consent handling behind the ordered J7 startup

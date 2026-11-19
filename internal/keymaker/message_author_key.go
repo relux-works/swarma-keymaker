@@ -28,6 +28,8 @@ type messageAuthorKey struct {
 	role, instance, epoch, registry string
 	entropy                         io.Reader
 	closed                          bool
+	mapped, locked                  bool
+	beforeVerify                    func([]byte)
 }
 
 func (k *messageAuthorKey) Format(s fmt.State, _ rune) {
@@ -41,11 +43,13 @@ func (k *messageAuthorKey) close() error {
 	}
 	k.mu.Lock()
 	defer k.mu.Unlock()
-	erase(k.seed)
+	err := eraseMALiveMemory(k.seed, k.mapped, k.locked)
+	k.mapped = false
+	k.locked = false
 	k.seed = nil
 	k.entropy = nil
 	k.closed = true
-	return nil
+	return err
 }
 func validateMessageAuthorPath(path string) ([]uint32, error) {
 	p, c := parsePath(path)
@@ -60,8 +64,8 @@ func validateMessageAuthorPath(path string) ([]uint32, error) {
 	return p, nil
 }
 
-// Lock order is Store -> custody. A future caller still needs actual GEN,
-// current-certificate/state and release barriers; these methods supply none.
+// Lock order is Store -> custody. The live holder supplies GEN, current tuple
+// and release barriers; fixture-only callers exercise this arithmetic directly.
 func (k *messageAuthorKey) selected(store *Store, b Binding, plan *messageAuthorPlan) ([]byte, Code) {
 	if store == nil {
 		return nil, "binding_not_found"
@@ -71,6 +75,14 @@ func (k *messageAuthorKey) selected(store *Store, b Binding, plan *messageAuthor
 	}
 	store.mu.Lock()
 	defer store.mu.Unlock()
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.selectedHeld(store, b, plan, nil)
+}
+
+// selectedHeld is private to the held live barrier. Store and custody are held
+// by its caller; before records invoking only AFTER all pre-crypto preparation.
+func (k *messageAuthorKey) selectedHeld(store *Store, b Binding, plan *messageAuthorPlan, before func() Code) ([]byte, Code) {
 	current, c := store.lookup(b.UID, b.Generation)
 	if c != "" {
 		return nil, c
@@ -82,8 +94,6 @@ func (k *messageAuthorKey) selected(store *Store, b Binding, plan *messageAuthor
 		return nil, "binding_conflict"
 	}
 	path := "m/9'" + strings.TrimPrefix(current.Path, "m/1'")
-	k.mu.Lock()
-	defer k.mu.Unlock()
 	if k.closed || len(k.seed) != 32 || k.role != messageAuthorRole || !validJ7Instance(k.instance) {
 		return nil, "custody_unavailable"
 	}
@@ -129,11 +139,19 @@ func (k *messageAuthorKey) selected(store *Store, b Binding, plan *messageAuthor
 	if _, e := io.ReadFull(k.entropy, aux[:]); e != nil {
 		return nil, "entropy_unavailable"
 	}
+	if before != nil {
+		if c := before(); c != "" {
+			return nil, c
+		}
+	}
 	sig, e := schnorr.Sign(private, hash[:], schnorr.CustomNonce(aux))
 	if e != nil {
 		return nil, "custody_unavailable"
 	}
 	out := sig.Serialize()
+	if k.beforeVerify != nil {
+		k.beforeVerify(out)
+	}
 	if record.VerifySignature(key, out, plan.original) != nil {
 		erase(out)
 		return nil, "custody_unavailable"
@@ -152,4 +170,8 @@ func (k *messageAuthorKey) signSelected(s *Store, b Binding, p *messageAuthorPla
 		return nil, "signer_payload_invalid"
 	}
 	return k.selected(s, b, p)
+}
+
+func messageAuthorPublicString(public []byte) string {
+	return "bip340:" + base64.RawURLEncoding.EncodeToString(public)
 }

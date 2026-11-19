@@ -41,6 +41,9 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 	if e := StrictJSON(bytes.NewReader(raw), &cfg); e != nil {
 		return e
 	}
+	if cfg.ServiceRole == messageAuthorRole {
+		return serveMALive(ctx, cfg, status, productionMALiveDeps())
+	}
 	if cfg.ServiceRole == j7RequestRole {
 		if cfg.J7State != nil && cfg.J7State.HeadFile == filepath.Clean(path) {
 			return Code("j7_configuration_conflict")
@@ -56,6 +59,9 @@ func serveConfigured(ctx context.Context, path string, status io.Writer, generat
 // that load separate permits unprivileged tests of the readiness gate without
 // an alternate configuration owner policy or a production fixture switch.
 func serveValidatedConfig(ctx context.Context, cfg productionConfig, status io.Writer, generation GenerationSource) error {
+	if cfg.ServiceRole == messageAuthorRole {
+		return serveMALive(ctx, cfg, status, productionMALiveDeps())
+	}
 	if cfg.ServiceRole == j7RequestRole {
 		// Without the protected static bytes the request role can pass its
 		// configuration, identity and time steps but never the static gate.

@@ -59,6 +59,7 @@ type Binding struct {
 	RegistryRevision string    `json:"registry_revision"`
 }
 type bindingDisk struct {
+	MALive        *maLiveInventory    `json:"message_author,omitempty"`
 	SchemaVersion int                 `json:"schema_version,omitempty"`
 	Messages      *messageInventory   `json:"messages,omitempty"`
 	J7            *j7Inventory        `json:"j7,omitempty"`
@@ -71,6 +72,7 @@ type bindingDisk struct {
 	AuditHash     string              `json:"audit_hash"`
 }
 type Store struct {
+	maLive       *maLiveInventory
 	j7           *j7Inventory
 	j7Signing    *j7SigningInventory
 	j7Fault      func(string) Code
@@ -167,7 +169,7 @@ func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Stor
 		}
 		// The paired opener will commit bootstrap journal-first. Any artifact
 		// left before that completes fences the next attempt.
-		if floor == 2 || j7StateSchema(floor) {
+		if floor == maLiveSchema || floor == 2 || j7StateSchema(floor) {
 			return nil, failure("message schema requires explicit migration")
 		}
 		s.initialized = true
@@ -178,7 +180,10 @@ func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Stor
 	if StrictJSON(f, &disk) != nil {
 		return nil, failure("invalid binding journal")
 	}
-	s.schema, s.messages, s.j7, s.j7Signing = disk.SchemaVersion, disk.Messages, disk.J7, disk.J7Signing
+	s.schema, s.messages, s.j7, s.j7Signing, s.maLive = disk.SchemaVersion, disk.Messages, disk.J7, disk.J7Signing, disk.MALive
+	if (s.schema == maLiveSchema || floor == maLiveSchema) && (s.schema != maLiveSchema || floor != maLiveSchema) {
+		return nil, failure("message-author schema floor mismatch")
+	}
 	if (s.schema == 2 && floor != 2) || (floor == 2 && s.schema != 2 && !recovery) || (j7StateSchema(s.schema) && floor != s.schema) || (j7StateSchema(floor) && s.schema != floor && !recovery) {
 		return nil, failure("message schema floor mismatch")
 	}
@@ -203,6 +208,11 @@ func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Stor
 	if s.messages != nil && !recovery {
 		if e := s.validateMessages(); e != nil {
 			return nil, e
+		}
+	}
+	if s.maLive != nil {
+		if err := s.validateMALive(); err != nil {
+			return nil, err
 		}
 	}
 	return s, nil
@@ -244,6 +254,9 @@ func validateBindings(records []Binding, next uint64) Code {
 }
 func (s *Store) persist() Code { return s.persistContext(context.Background()) }
 func (s *Store) persistContext(ctx context.Context) Code {
+	if s.schema == maLiveSchema {
+		return s.persistMALive(ctx)
+	}
 	if j7StateSchema(s.schema) {
 		return s.persistJ7ParticipantContext(ctx)
 	}

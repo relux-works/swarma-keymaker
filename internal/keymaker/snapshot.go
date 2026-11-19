@@ -10,7 +10,7 @@ import (
 // References are excluded from the committed body to avoid a circular hash.
 // Version, all binding bytes and the next issued number are committed together.
 func (s *Store) contentDigest(version uint64) (string, error) {
-	if s.schema == 2 || j7StateSchema(s.schema) {
+	if s.schema == maLiveSchema || s.schema == 2 || j7StateSchema(s.schema) {
 		body, e := s.messageBody(version)
 		if e != nil {
 			return "", e
@@ -65,12 +65,23 @@ func objectMembers(raw []byte, required []string, optional ...string) (map[strin
 // UnmarshalJSON requires every persisted member, including explicit empty
 // records. Typed strict decoding also rejects unknown fields at every level.
 func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
-	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records", "schema_version", "messages", "j7", "j7_signing")
+	fields, err := objectMembers(raw, []string{"next_registration_number", "version", "audit_seq", "audit_hash", "requests"}, "records", "schema_version", "messages", "j7", "j7_signing", "message_author")
 	if err != nil {
 		return err
 	}
 	if _, ok := fields["records"]; !ok {
 		return failure("missing snapshot records")
+	}
+	_, ma := fields["message_author"]
+	if ma || string(fields["schema_version"]) == "7" {
+		if !ma || string(fields["schema_version"]) != "7" || bytes.Equal(bytes.TrimSpace(fields["message_author"]), []byte("null")) {
+			return failure("invalid message-author schema")
+		}
+		for _, name := range []string{"messages", "j7", "j7_signing"} {
+			if _, exists := fields[name]; exists {
+				return failure("mixed message-author participant")
+			}
+		}
 	}
 	_, schema := fields["schema_version"]
 	_, messages := fields["messages"]
@@ -83,7 +94,7 @@ func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
 		if !j7 || (string(fields["schema_version"]) != "4" && string(fields["schema_version"]) != "5" && string(fields["schema_version"]) != "6") || bytes.Equal(bytes.TrimSpace(fields["j7"]), []byte("null")) {
 			return failure("invalid J7 schema")
 		}
-	} else if schema || messages {
+	} else if !ma && (schema || messages) {
 		if !schema || !messages || string(fields["schema_version"]) != "2" || bytes.Equal(bytes.TrimSpace(fields["messages"]), []byte("null")) {
 			return failure("invalid message schema")
 		}

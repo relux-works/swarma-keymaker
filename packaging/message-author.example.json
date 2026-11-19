@@ -1,0 +1,45 @@
+{
+  "instance_id": "11111111111111111111111111111111",
+  "service_uid": 1,
+  "service_gid": 1,
+  "master_epoch": "REPLACE_WITH_PINNED_MASTER_EPOCH",
+  "registry_revision": "REPLACE_WITH_PINNED_REGISTRY_REVISION",
+  "time_policy": {
+    "source": "chrony-nts-config",
+    "chronyc": "/usr/bin/chronyc",
+    "source_files": [
+      "/etc/chrony/chrony.conf"
+    ],
+    "max_sync_age_ns": 2048000000000,
+    "max_uncertainty_ns": 1500000000,
+    "max_offset_ns": 500000000,
+    "max_root_distance_ns": 1000000000,
+    "authority_window_ns": 300000000000,
+    "backward_tolerance_ns": 1000000000,
+    "step_tolerance_ns": 60000000000,
+    "timeout_ns": 1000000000,
+    "max_output_bytes": 4096,
+    "resync": "new-authenticated-sync"
+  },
+  "generation_journal": {
+    "path": "/var/lib/swarma-user-manager/generations",
+    "initial_floor": {
+      "seq": 0,
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "service_role": "message-author",
+  "operator_principal": {
+    "uid": 1,
+    "generation": "REPLACE_WITH_OPERATOR_GENERATION"
+  },
+  "socket": {
+    "dir": "/run/swarma-keymaker-ma",
+    "group": 1
+  },
+  "state": {
+    "path": "/var/lib/swarma-keymaker-ma/state",
+    "minimum_reader_schema": 7,
+    "head_file": "/REPLACE_WITH_INSTALLER_SELECTED_PROTECTED_MA_HEAD"
+  }
+}

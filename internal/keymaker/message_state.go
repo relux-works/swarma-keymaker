@@ -492,7 +492,7 @@ func (s *Store) messageBody(version uint64) ([]byte, error) {
 	return canonical(obj)
 }
 func (s *Store) disk(version uint64, commit bindingCommit) bindingDisk {
-	return bindingDisk{Next: s.next, Records: s.records, Requests: s.requests, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash, SchemaVersion: s.schema, Messages: s.messages, J7: s.j7, J7Signing: s.j7Signing}
+	return bindingDisk{Next: s.next, Records: s.records, Requests: s.requests, Version: version, AuditSeq: commit.Seq, AuditHash: commit.Hash, SchemaVersion: s.schema, Messages: s.messages, J7: s.j7, J7Signing: s.j7Signing, MALive: s.maLive}
 }
 func (s *Store) readMessageIntent(tx *messageTransaction) (messageIntent, Code) {
 	var i messageIntent

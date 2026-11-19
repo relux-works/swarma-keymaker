@@ -174,6 +174,7 @@ type auditSeal struct {
 	Digest string `json:"last_digest"`
 }
 type Journal struct {
+	maLiveEvents map[uint64]AuditRecord
 	mu           auditGate
 	dir          *os.File
 	file         *os.File
@@ -303,6 +304,9 @@ func openJournalCheckedMode(dir *os.File, uid uint32, clock AuditClock, entropy 
 			digest, e2 := auditDigest(r)
 			if e != nil || e2 != nil || !bytes.Equal(b, line) || r.Seq != j.seq+1 || r.Previous != j.previous || r.Digest != digest {
 				return nil, failure("audit continuity failure")
+			}
+			if err := j.observeMALive(r); err != nil {
+				return nil, err
 			}
 			if err := j.observeGeneration(r); err != nil {
 				return nil, err
@@ -455,10 +459,16 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 	if auditContextExpired(ctx) {
 		return "request_deadline_exceeded"
 	}
+	// This participant's clock standing is per-request. A lost audit sample
+	// before a write is not a failed writer or an uncertain durable success.
+	// Other roles retain their existing unknown-time record behavior.
+	if maLiveOperation(r.Operation) && r.Time == nil {
+		return "clock_untrusted"
+	}
 	// Time qualification can replace the supplied result with unknown. Validate
 	// the final record too, before any write, so custody metadata never lands
 	// on a non-refusal result. Keep the context deadline check above this gate.
-	if !validAuditCustody(r) {
+	if !validAuditCustody(r) || validMALiveAudit(r) != nil || r.Operation == "sign_message_author" && len(j.maLiveEvents) >= maLiveAttemptLimit {
 		return "audit_unavailable"
 	}
 	if e != nil {
@@ -476,7 +486,7 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 		return "audit_unavailable"
 	}
 	budget := j.totalLimit - j.reserve
-	if r.Surface == "control" || r.RefusalCode != nil || r.Result == "refused" {
+	if (r.Surface == "control" && r.Operation != "sign_message_author") || r.RefusalCode != nil || r.Result == "refused" {
 		budget = j.totalLimit
 	}
 	held, available := j.messageAuditBudget(ctx, int64(len(b)))
@@ -511,7 +521,7 @@ func (j *Journal) appendContextLocked(ctx context.Context, r AuditRecord) Code {
 		return "audit_unavailable"
 	}
 	j.chargeMessageAudit(ctx, int64(len(b)))
-	if j.observeGeneration(r) != nil || j.observeBinding(r) != nil {
+	if j.observeMALive(r) != nil || j.observeGeneration(r) != nil || j.observeBinding(r) != nil {
 		j.failed = true
 		return "audit_unavailable"
 	}

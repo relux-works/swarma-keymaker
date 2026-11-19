@@ -19,10 +19,10 @@ func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
 	applies := flag.Bool("check-applies", false, "check selected source plants without running tests")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle message-author or j7-service controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle message-author, message-author-live or j7-service controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author" && *group != "j7-service") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author|j7-service]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author-live" && *group != "message-author" && *group != "j7-service") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author|message-author-live|j7-service]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -101,7 +101,7 @@ func main() {
 		}
 	}
 	pkg := "./internal/keymaker"
-	if *group == "message-author" {
+	if *group == "message-author" || *group == "message-author-live" {
 		// Only new source gates are weakened. Each named assertion must fail;
 		// compiler/setup errors, timeouts and unplanted controls are not kills.
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
@@ -122,6 +122,65 @@ func main() {
 			{"ma-no-copy", "message_author_preimage.go", `original: append([]byte(nil), original...)`, `original: original`, "^TestMessageAuthorEnvelopeProfile$", "--- FAIL: TestMessageAuthorEnvelopeProfile", "preimage alias"},
 			{"ma-export", "message_author_key.go", `io.WriteString(s, "[message-author custody]")`, `fmt.Fprintf(s, "%x", k.seed)`, "^TestMessageAuthorCustodyNoRelease$", "--- FAIL: TestMessageAuthorCustodyNoRelease", "secret diagnostic"},
 		}
+	}
+	if *group == "message-author-live" {
+		// The original fixture/codec guards above stay in this group. These
+		// additional plants narrow only the live holder's accepted contracts.
+		controls = append(controls, []struct{ name, file, old, new, test, needle, witness string }{
+			{"malive-tag", "message_author_preimage.go", "return nil, Code(e.Code)", "if e.Code == \"signer_tag_malformed\" { return &messageAuthorPlan{original:append([]byte(nil),original...),key:key,attestation:attestation}, \"\" }; return nil, Code(e.Code)", "^TestMALiveTagDomain$", "--- FAIL: TestMALiveTagDomain", "negative standing/effect"},
+			{"malive-domain", "message_author_preimage.go", "return nil, Code(e.Code)", "if e.Code == \"signer_domain_refused\" { return &messageAuthorPlan{original:append([]byte(nil),original...),key:key,attestation:attestation}, \"\" }; return nil, Code(e.Code)", "^TestMALiveTagDomain$", "--- FAIL: TestMALiveTagDomain", "negative standing/effect"},
+			{"malive-author", "message_author_preimage.go", "return nil, Code(e.Code)", "if e.Code == \"signer_identity_mismatch\" { return &messageAuthorPlan{original:append([]byte(nil),original...),key:key,attestation:attestation}, \"\" }; return nil, Code(e.Code)", "^TestMALiveAuthorEqualsOwnKey$", "--- FAIL: TestMALiveAuthorEqualsOwnKey", "negative standing/effect"},
+			{"malive-t-admit", "message_author_preimage.go", "return nil, Code(e.Code)", "if e.Code == \"signer_identity_mismatch\" { return &messageAuthorPlan{original:append([]byte(nil),original...),key:key,attestation:attestation}, \"\" }; return nil, Code(e.Code)", "^TestMALiveCurrentTAdmission$", "--- FAIL: TestMALiveCurrentTAdmission", "negative standing/effect"},
+			{"malive-payload", "message_author_preimage.go", "return nil, Code(e.Code)", "if e.Code == \"signer_payload_invalid\" { return &messageAuthorPlan{original:append([]byte(nil),original...),key:key,attestation:attestation}, \"\" }; return nil, Code(e.Code)", "^TestMALiveCanonicalPayload$", "--- FAIL: TestMALiveCanonicalPayload", "negative standing/effect"},
+			{"malive-record-key", "message_author_preimage.go", "return nil, Code(e.Code)", "if e.Code == \"signer_identity_mismatch\" { return &messageAuthorPlan{original:append([]byte(nil),original...),key:key,attestation:attestation}, \"\" }; return nil, Code(e.Code)", "^TestMALiveRecordKeyEqualsOwnKey$", "--- FAIL: TestMALiveRecordKeyEqualsOwnKey", "negative standing/effect"},
+			{"malive-decoded-cap", "message_author_live.go", "if len(r.Preimage) > messageauthor.MaxPreimage {", "if false && len(r.Preimage) > messageauthor.MaxPreimage {", "^TestMALivePreimageBounds$", "--- FAIL: TestMALivePreimageBounds", "oversized preimage reached authority before cap"},
+			{"malive-encoded-cap", "message_author_live_socket_linux.go", "len(p64) > 32768", "len(p64) > 65536", "^TestMALiveWireAndCodeClosure$", "--- FAIL: TestMALiveWireAndCodeClosure", "wire refusal"},
+			{"malive-opaque-claims", "message_author_live.go", "plan, c := prepareMessageAuthor(r.Preimage, tuple.Key, tuple.T)", "if bytes.Contains(r.Preimage,[]byte(`\"approver\":true`)) { return \"role_not_permitted\" }; plan, c := prepareMessageAuthor(r.Preimage, tuple.Key, tuple.T)", "^TestMALiveOpaqueClaimsGrantNothing$", "--- FAIL: TestMALiveOpaqueClaimsGrantNothing", "opaque claims interpreted"},
+			{"malive-intent-sync", "message_author_live.go", "if c = s.persistMALive(ctx); c != \"\" {\n\t\t\t\tif c == \"state_capacity_exceeded\"", "if c = Code(\"\"); c != \"\" {\n\t\t\t\tif c == \"state_capacity_exceeded\"", "^TestMALiveIntentBeforeCrypto$", "--- FAIL: TestMALiveIntentBeforeCrypto", "durable boundary missing before crypto"},
+			{"malive-invoking-sync", "message_author_live.go", "a.Status = \"invoking\"\n\t\t\tc := s.persistMALive(ctx)", "a.Status = \"invoking\"\n\t\t\tc := Code(\"\")", "^TestMALiveIntentBeforeCrypto$", "--- FAIL: TestMALiveIntentBeforeCrypto", "durable boundary missing before crypto"},
+			{"malive-retained-lookup", "message_author_live.go", "if a.Status != \"intent\" {\n\t\t\treturn \"\"", "if false && a.Status != \"intent\" {\n\t\t\treturn \"\"", "^TestMALiveRetryAcrossConnection$", "--- FAIL: TestMALiveRetryAcrossConnection", "released replay"},
+			{"malive-wait-owner", "message_author_live.go", "if wait := h.running[k]; wait != nil {", "if wait := h.running[k]; false && wait != nil {", "^TestMALiveConcurrentEqualRetry$", "--- FAIL: TestMALiveConcurrentEqualRetry", "duplicate did not wait for running handoff"},
+			{"malive-conflict-first", "message_author_live.go", "if a.Method != string(r.Method) || !bytes.Equal(a.Preimage, r.Preimage) {\n\t\t\treturn \"request_conflict\"", "if false && (a.Method != string(r.Method) || !bytes.Equal(a.Preimage, r.Preimage)) {\n\t\t\treturn \"request_conflict\"", "^TestMALiveRequestConflict$", "--- FAIL: TestMALiveRequestConflict", "negative standing/effect"},
+			{"malive-principal", "message_author_live_state.go", "a.Caller == p && a.ID == id", "a.ID == id", "^TestMALivePrincipalIsolation$", "--- FAIL: TestMALivePrincipalIsolation", "principal borrowed retained result"},
+			{"malive-old-t", "message_author_live.go", "if a.Attestation != tuple.T {", "if false && a.Attestation != tuple.T {", "^TestMALiveRetryOldT$", "--- FAIL: TestMALiveRetryOldT", "old T not dead"},
+			{"malive-recover-invoking", "message_author_live_audit.go", "a.Status = \"dead\"\n\t\t\t}", "a.Status = \"intent\"\n\t\t\t}", "^TestMALiveCrashStatusMatrix$", "--- FAIL: TestMALiveCrashStatusMatrix", "recovery row"},
+			{"malive-unproven-audit", "message_author_live_audit.go", "if !s.maLiveResultProven(*a) {", "if false && !s.maLiveResultProven(*a) {", "^TestMALiveCrashStatusMatrix$", "--- FAIL: TestMALiveCrashStatusMatrix", "unproven audit admitted result"},
+			{"malive-journal-append", "../keymaker/audit.go", "if e != nil || n != len(b) {", "if false && (e != nil || n != len(b)) {", "^TestMALiveKnownAuditFailure$", "--- FAIL: TestMALiveKnownAuditFailure", "negative standing/effect"},
+			{"malive-journal-sync", "../keymaker/audit.go", "if j.writer.Sync() != nil {", "if j.writer.Sync() != nil && false {", "^TestMALiveKnownAuditFailure$", "--- FAIL: TestMALiveKnownAuditFailure", "negative standing/effect"},
+			{"malive-release-current", "message_author_live.go", "if a.Attestation != tuple.T {", "if a.Attestation != tuple.T && a.Status != \"handoff_unknown\" {", "^TestMALiveWithdrawalBarrier$", "--- FAIL: TestMALiveWithdrawalBarrier", "negative standing/effect"},
+			{"malive-release-gen-loss", "message_author_live.go", "s.maLive.Attempts[i].Status = \"dead\"", "s.maLive.Attempts[i].Status = \"released\"", "^TestMALiveTerminalGenerationLoss$", "--- FAIL: TestMALiveTerminalGenerationLoss", "terminal generation loss retained releasable result"},
+			{"malive-lower-bound", "message_author_live.go", "!at.Lower.Before(notBefore)", "!at.Now.Before(notBefore)", "^TestMALiveTimeScope$", "--- FAIL: TestMALiveTimeScope", "negative standing/effect"},
+			{"malive-upper-bound", "message_author_live.go", "at.Upper.Before(notAfter)", "at.Now.Before(notAfter)", "^TestMALiveTimeScope$", "--- FAIL: TestMALiveTimeScope", "negative standing/effect"},
+			{"malive-message-exp", "message_author_live.go", "plan, c := prepareMessageAuthor(r.Preimage, tuple.Key, tuple.T)", "if bytes.Contains(r.Preimage,[]byte(`\"exp\":`)) {return \"key_not_valid_now\"};plan, c := prepareMessageAuthor(r.Preimage, tuple.Key, tuple.T)", "^TestMALiveTimeScope$", "--- FAIL: TestMALiveTimeScope", "valid control"},
+			{"malive-deadline-callback", "message_author_live.go", "if auditContextExpired(ctx) {\n\t\t\ts.journal.mu.Unlock()", "if false && auditContextExpired(ctx) {\n\t\t\ts.journal.mu.Unlock()", "^TestMALiveDeadlineThroughHandoff$", "--- FAIL: TestMALiveDeadlineThroughHandoff", "negative standing/effect"},
+			{"malive-attempt-cap", "message_author_live.go", "if len(s.maLive.Attempts) >= maLiveAttemptLimit {", "if false && len(s.maLive.Attempts) >= maLiveAttemptLimit {", "^TestMALiveRetentionNoEviction$", "--- FAIL: TestMALiveRetentionNoEviction", "negative standing/effect"},
+			{"malive-state-cap", "message_author_live_state.go", "bytes <= (maLiveStateLimit-maLiveStateOverhead)/3", "bytes <= maLiveStateLimit", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "state byte limit widened"},
+			{"malive-entropy", "message_author_key.go", "if _, e := io.ReadFull(k.entropy, aux[:]); e != nil {", "if _, e := io.ReadFull(k.entropy, aux[:]); false && e != nil {", "^TestMALiveCustodyAndEntropy$", "--- FAIL: TestMALiveCustodyAndEntropy", "negative standing/effect"},
+			{"malive-self-verify", "message_author_key.go", "if record.VerifySignature(key, out, plan.original) != nil {", "if false && record.VerifySignature(key, out, plan.original) != nil {", "^TestMALiveSelfVerifyFailure$", "--- FAIL: TestMALiveSelfVerifyFailure", "primitive released corrupt signature"},
+			{"malive-audit-material", "message_author_live_audit.go", "if r.Path != nil || r.Epoch != nil {", "if false && (r.Path != nil || r.Epoch != nil) {", "^TestMALiveAuditOperations$", "--- FAIL: TestMALiveAuditOperations", "raw material written"},
+			{"malive-resolve-head", "message_author_live_audit.go", "!s.j7HeadMatches(expected) || !s.matchesCommit(s.journal.binding)", "!s.matchesCommit(s.journal.binding)", "^TestMALiveUnknownAuditNeedsResolve$", "--- FAIL: TestMALiveUnknownAuditNeedsResolve", "single source/readback cleared uncertainty"},
+			{"malive-sync-uncertainty", "message_author_live_audit.go", "if s.maLiveUnpairedSign(*a) {", "if false && s.maLiveUnpairedSign(*a) {", "^TestMALiveKilledAuditSync$", "--- FAIL: TestMALiveKilledAuditSync", "unknown audit inferred absence/result"},
+			{"malive-production-refuser", "message_author_live.go", "func (maLiveUnqualified) WithCurrent(context.Context, Binding, j7GateTime, func(maLiveTuple) Code) Code {\n\treturn \"message_author_unqualified\"\n}", "func (maLiveUnqualified) WithCurrent(ctx context.Context,b Binding,at j7GateTime,fn func(maLiveTuple)Code) Code { return fn(maLiveTuple{Key:\"bip340:WowJ0rnekTFSPtivBWuoato06f_BXuc3w-BkTJspoPE\",T:\"sha256:557f3ffbd6aaa0a341ca3e817fc72dca935ec06f155dcd3d92fd4aab0b7f9989\",Attestation:[]byte(\"fixture\")}) }", "^TestMALiveProductionProviderRefuses$", "--- FAIL: TestMALiveProductionProviderRefuses", "negative standing/effect"},
+			{"malive-schema-floor", "message_author_live_config_linux.go", "m.State.Minimum != maLiveSchema", "m.State.Minimum != maLiveSchema && m.State.Minimum != 6", "^TestMALivePackagingContract$", "--- FAIL: TestMALivePackagingContract", "old schema floor accepted"},
+			{"malive-epoch", "message_author_live_operator_linux.go", "b.Epoch != s.maLive.Epoch || b.RegistryRevision != s.maLive.Registry", "b.RegistryRevision != s.maLive.Registry", "^TestMALiveOwnBindingUniqueness$", "--- FAIL: TestMALiveOwnBindingUniqueness", "C2 epoch mismatch"},
+			{"malive-tombstone", "message_author_live_operator_linux.go", "old.Epoch == b.Epoch && old.Path == b.Path", "old.Status == \"active\" && old.Epoch == b.Epoch && old.Path == b.Path", "^TestMALiveOwnBindingUniqueness$", "--- FAIL: TestMALiveOwnBindingUniqueness", "resurrected tombstone"},
+			{"malive-tombstone-restart", "message_author_live_operator_linux.go", "if c := s.recoverMALive(context.Background()); c != \"\" {\n\t\ts.Close()\n\t\treturn nil, c\n\t}\n\treturn s, \"\"", "if c := s.recoverMALive(context.Background()); c != \"\" {\n\t\ts.Close()\n\t\treturn nil, c\n\t}\n var active []Binding; for _, b := range s.records { if b.Status == \"active\" { active=append(active,b) } }; s.records=active\n\treturn s, \"\"", "^TestMALiveOwnBindingUniqueness$", "--- FAIL: TestMALiveOwnBindingUniqueness", "retired tombstone lost on restart"},
+			{"malive-generation", "message_author_live.go", "if h.generations == nil {\n\t\treturn \"generation_source_unavailable\"\n\t}", "if h.generations == nil {return fn(ctx)}", "^TestMALiveRequiredGeneration$", "--- FAIL: TestMALiveRequiredGeneration", "negative standing/effect"},
+			{"malive-existing-fence", "message_author_live.go", "if s.failed || s.maLive == nil || s.maLive.Fenced {\n\t\treturn Binding{}, \"message_author_unqualified\"", "if s.failed || s.maLive == nil {\n\t\treturn Binding{}, \"message_author_unqualified\"", "^TestMALiveTimeRefusalNotFence$", "--- FAIL: TestMALiveTimeRefusalNotFence", "negative standing/effect"},
+			{"malive-connection-limit", "message_author_live_socket_linux.go", "return global < 32 && uid < 4", "return global < 128 && uid < 16", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "connection limits widened"},
+			{"malive-slot-limit", "message_author_live_socket_linux.go", "slots: make(chan struct{}, 16)", "slots: make(chan struct{}, 128)", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "request slot limit widened"},
+			{"malive-rate-peer", "message_author_live_budget.go", "!peer.all.take(now, 20, 40)", "!peer.all.take(now, 20, 41)", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "forty-first peer request admitted"},
+			{"malive-rate-sign", "message_author_live_budget.go", "if sign && !peer.sign.take(now, 2, 4)", "if sign && !peer.sign.take(now, 2, 5)", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "fifth sign admitted"},
+			{"malive-rate-global", "message_author_live_budget.go", "!b.global.take(now, 200, 256)", "!b.global.take(now, 200, 257)", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "257th global request admitted"},
+			{"malive-audit-reserve", "message_author_live.go", "s.journal.totalLimit-s.journal.reserve", "s.journal.totalLimit", "^TestMALiveCapacityAndRate$", "--- FAIL: TestMALiveCapacityAndRate", "negative standing/effect"},
+			{"malive-audit-domain", "message_author_live_audit.go", "domain = \"swarma-msg\"\n\t}\n\tr := AuditRecord", "domain = \"control\"\n\t}\n\tr := AuditRecord", "^TestMALiveAuditOperations$", "--- FAIL: TestMALiveAuditOperations", "audit_unavailable"},
+			{"malive-audit-receipt", "message_author_live.go", "a.SuccessSeq, a.SuccessHash = seq, hash", "_ = seq; _ = hash; s.journal.mu.Lock(); a.SuccessSeq, a.SuccessHash = s.journal.seq, s.journal.previous; s.journal.mu.Unlock()", "^TestMALiveAuditReceiptAssociation$", "--- FAIL: TestMALiveAuditReceiptAssociation", "unrelated audit head substituted for sign receipt"},
+			{"malive-audit-clock-standing", "audit.go", "if maLiveOperation(r.Operation) && r.Time == nil {", "if false && maLiveOperation(r.Operation) && r.Time == nil {", "^TestMALiveAuditTimeRefusal$", "--- FAIL: TestMALiveAuditTimeRefusal", "negative standing/effect"},
+			{"malive-audit-clock-fence", "message_author_live_audit.go", "c != \"request_deadline_exceeded\" && c != \"clock_untrusted\"", "c != \"request_deadline_exceeded\"", "^TestMALiveAuditTimeRefusal$", "--- FAIL: TestMALiveAuditTimeRefusal", "temporary audit time latched failure/fence"},
+			{"malive-retire-connection", "message_author_live_operator_linux.go", "s.notify(number)", "// deliberately omit binding withdrawal notification", "^TestMALiveRetirementClosesConnection$", "--- FAIL: TestMALiveRetirementClosesConnection", "retired connection not invalidated"},
+			{"malive-wire-retry", "../control/protocol.go", "\"enrollment_unavailable\", \"audit_unavailable\", DeadlineExceeded:", "\"enrollment_unavailable\", \"audit_unavailable\", \"message_author_unqualified\", DeadlineExceeded:", "^TestMALiveControlCodes$", "--- FAIL: TestMALiveControlCodes", "message-author code closure or retryability changed"},
+			{"malive-legacy-method", "native.go", "func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Request) (control.Object, control.Code) {", "func (n *Native) Handle(ctx context.Context, peer control.Peer, r control.Request) (control.Object, control.Code) {\n if r.Method == \"message_author_identity\" { return control.Object{}, \"\" }", "^TestMALiveLegacyIsolation$", "--- FAIL: TestMALiveLegacyIsolation", "operation_unsupported"},
+		}...)
 	}
 	if *group == "j7-service" {
 		// Every plant weakens a composed startup or socket invariant; a kill
@@ -433,7 +492,22 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		overlay := filepath.Join(dir, c.name+".json")
-		mapping, _ := json.Marshal(map[string]any{"Replace": map[string]string{source: mutant}})
+		replacements := map[string]string{source: mutant}
+		if c.name == "malive-legacy-method" {
+			transport := filepath.Join(root, "internal/control/server.go")
+			raw, err := os.ReadFile(transport)
+			const old = `case "hello", "pubkey", "register", "revoke", "sign_registration":`
+			if err != nil || strings.Count(string(raw), old) != 1 {
+				fmt.Fprintln(os.Stderr, "legacy transport plant not applied")
+				os.Exit(2)
+			}
+			file := filepath.Join(dir, c.name+"-transport.go")
+			if os.WriteFile(file, []byte(strings.Replace(string(raw), old, `case "message_author_identity", "hello", "pubkey", "register", "revoke", "sign_registration":`, 1)), 0600) != nil {
+				os.Exit(2)
+			}
+			replacements[transport] = file
+		}
+		mapping, _ := json.Marshal(map[string]any{"Replace": replacements})
 		if os.WriteFile(overlay, mapping, 0600) != nil {
 			os.Exit(2)
 		}
@@ -449,10 +523,10 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			args = append(args, "-tags", "genjournal_testseam")
 		}
 		testPackage := pkg
-		if *group == "message-author" && strings.HasPrefix(c.name, "ma-wire-") {
+		if (*group == "message-author" || *group == "message-author-live") && strings.HasPrefix(c.name, "ma-wire-") {
 			testPackage = "github.com/relux-works/swarma-keymaker/messageauthor"
 		}
-		if *group == "j7-idle" && c.name == "j7-unbound-probe-budget" {
+		if (*group == "message-author-live" && c.name == "malive-wire-retry") || (*group == "j7-idle" && c.name == "j7-unbound-probe-budget") {
 			testPackage = "./internal/control"
 		}
 		args = append(args, testPackage, "-run", c.test, "-count=1", "-v")
@@ -489,7 +563,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "core" || *group == "native" || *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "j7-service" {
+		if *group == "core" || *group == "native" || *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "message-author-live" || *group == "j7-service" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{
@@ -526,6 +600,19 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 // replace one uniquely matched authority gate.
 func plant(name, source, old, replacement string) string {
 	mutant := strings.Replace(source, old, replacement, 1)
+	if name == "malive-existing-fence" || name == "malive-conflict-first" {
+		target, replacement := "if s.failed || s.maLive == nil || s.maLive.Fenced {", "if s.failed || s.maLive == nil {"
+		if name == "malive-conflict-first" {
+			target = "if a.Method != string(r.Method) || !bytes.Equal(a.Preimage, r.Preimage) {"
+			replacement = "if false && (a.Method != string(r.Method) || !bytes.Equal(a.Preimage, r.Preimage)) {"
+		}
+		if strings.Count(mutant, target) != 1 {
+			fmt.Fprintln(os.Stderr, "paired gate plant not applied")
+			os.Exit(2)
+		}
+		mutant = strings.Replace(mutant, target, replacement, 1)
+	}
+
 	if name == "j7-static-pin-key-order" {
 		const beforePin = "\tdigestFile, err := g.read(in.Files.DigestFile, 65)"
 		if strings.Count(mutant, beforePin) != 1 {

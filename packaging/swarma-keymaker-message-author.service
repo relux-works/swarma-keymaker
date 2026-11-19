@@ -1,0 +1,31 @@
+[Unit]
+Description=Dedicated message-author participant
+After=local-fs.target
+[Service]
+# Source template only. Configuration is root-owned 0640 at the path below.
+# Installer selects the protected external state head and socket group.
+# The current-attestation provider refuses; this unit is not activation evidence.
+Type=simple
+User=swarma-keymaker-ma
+Group=swarma-keymaker-ma
+ExecStart=/usr/local/bin/keymaker serve --config /etc/swarma-keymaker-ma/config.json
+RuntimeDirectory=swarma-keymaker-ma
+RuntimeDirectoryMode=0755
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/swarma-keymaker-ma/state /run/swarma-keymaker-ma
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+LimitNOFILE=512
+MemoryMax=256M
+TasksMax=64
+CPUQuota=100%
+Restart=no
+[Install]
+WantedBy=multi-user.target

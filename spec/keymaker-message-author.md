@@ -402,7 +402,7 @@ ordered checks, not a producer-chosen error race.
 #### 4.3 Trusted time
 
 Use J7's broker `timeconf` provider and **inline `time_policy`**, not a second policy
-file: sync age at most **3072 s**, uncertainty at most **1.5 s**, using the existing
+file: sync age at most **2048 s**, uncertainty at most **1.5 s**, using the existing
 policy and adapter semantics. Sign release is **START class at both Lower and Upper
 bounds**, the R-U2-4 form. Use conservative attestation/lifetime admission, not a single
 wall-clock point. Apply fresh time evidence at the final barrier, including retained
@@ -450,7 +450,7 @@ separate handoff marker makes uncertain delivery different from uncertain result
 durability.
 
 No horizon, eviction or automatic reclamation exists in v1, as in [Message certification
-state, finite capacity](keymaker-msg-state.md). Retain at most **3072 attempt rows**;
+state, finite capacity](keymaker-msg-state.md). Retain at most the attempt-row limit in section 8;
 at capacity refuse new work and keep results, dead rows and tombstones. Replays still
 require their ordinary budgets, durable audit and fresh authority; audit exhaustion is
 not waived for a retained result. The audit journal is never the result cache.

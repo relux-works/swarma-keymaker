@@ -1545,6 +1545,14 @@ delivery. A typed refusal never authorizes a second effect.
 | `sign_key_mismatch`, `sign_flags_unsupported`, `agent_message_unsupported` | Wrong SSH key/flags or unsupported agent type |
 | `operation_unsupported`, `request_malformed`, `request_conflict` | Unsupported method, invalid schema or conflicting effect ID |
 | `frame_too_large`, `frame_truncated`, `frame_malformed`, `ccj_noncanonical` | Transport/canonical-byte failure |
+| `signer_preimage_too_large` (A7a-2 contract update) | Encoded or decoded preimage exceeds the pinned bound; `retryable=false` |
+| `signer_tag_malformed` (A7a-2 contract update) | Malformed preimage tag under pinned upstream admission; `retryable=false` |
+| `signer_domain_refused` (A7a-2 contract update) | Well-formed tag outside the admitted domain; `retryable=false` |
+| `signer_payload_invalid` (A7a-2 contract update) | Pinned canonical/profile payload admission fails; `retryable=false` |
+| `signer_identity_unavailable` (A7a-2 contract update) | Pinned message-author admission/codec identity-unavailable standing; `retryable=false` |
+| `signer_identity_malformed` (A7a-2 contract update) | Pinned message-author admission/codec identity-malformed standing; `retryable=false` |
+| `signer_identity_mismatch` (A7a-2 contract update) | Own K/author/record-key/current-T equality fails, including an exact retry with a T proven no longer current; `retryable=false` |
+| `message_author_unqualified` (A7a-2 contract update) | No qualified signing for this caller/request: no exact active binding or current tuple, fenced state, issuer not live, or terminally dead attempt unless proven old T requires `signer_identity_mismatch`; identity and sign both refuse; `retryable=false` |
 | `message_too_large` (decided, unimplemented message contract) | Complete decoded message preimage >24576 bytes within a valid native frame; `retryable=false` |
 | `signer_identity_unavailable` (unimplemented message contract) | Missing/invalid service-resolved attested caller key, current attestation or identity policy after precise native authority checks; `retryable=false` |
 | `signer_identity_malformed` (unimplemented message contract) | Missing `key`, `body.author` or `body.author_attestation`, non-object record/path container or wrongly typed/multi-value identity field after canonical validation; `retryable=false` |

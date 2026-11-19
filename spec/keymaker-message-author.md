@@ -645,14 +645,23 @@ sets the policy itself, so it does not depend on a missing or larger inherited
 `GOMEMLIMIT`. Other roles and package initialization do not set this limit.
 The unit's `MemoryMax=256M` remains unchanged: the 64 MiB gap leaves space for
 memory outside Go's runtime accounting. This is a soft GC budget, not a hard RSS
-limit; capacity evidence must independently check process peak RSS below 240 MiB
-(16 MiB below the unit ceiling), and sampled heap below 128 MiB.
+limit; capacity evidence must independently check the participant process's own
+peak RSS (`VmHWM` from `/proc/self/status`) below 240 MiB after the fresh sign
+and after replay (16 MiB below the unit ceiling), and sampled heap below 128 MiB.
+Linux `ru_maxrss` can inherit the launching parent's high-water mark across exec;
+it is logged as a possibly inherited diagnostic and never used as an assertion.
+`TestMALiveRSSAccounting` pairs a trivial measuring child with and without a
+touched 208 MiB parent allocation: the child's `VmHWM` must remain small, while
+any inherited `ru_maxrss` is reported separately. A kernel that does not expose
+that inheritance is reported as such; it does not change the `VmHWM` gate.
 
 `TestMALiveCapacityLatency` uses this same startup helper before fixture setup,
 then exercises the persisted/reopened near-bound state in separate one-CPU and
 `runtime.NumCPU()` children. Five repeated runs use race instrumentation off.
 An otherwise identical child without the limit retains all assertions as a
-negative diagnostic; local survival does not erase the hosted RSS failure.
+negative diagnostic; local survival does not establish that the policy is
+unnecessary. Earlier hosted `ru_maxrss` failures alone do not establish the
+participant's own RSS or a unit memory-limit violation.
 `TestMALiveRuntimeMemoryLimit` independently checks actual role startup before
 state loading, beside an unselected-role control, so an omitted limit is detected
 even when one machine's uncontrolled GC happens to stay below the RSS ceiling.

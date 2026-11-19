@@ -45,8 +45,8 @@ func maLiveSizedPreimage(t *testing.T, f *maLiveFixture, size int) []byte {
 // state; at the exact row cap an identical replay is durable and never re-signs.
 // The measurements bound this fixture/environment, not native qualification.
 func TestMALiveCapacityLatency(t *testing.T) {
-	// RSS high-water marks are process-wide. A dedicated child prevents another
-	// test's old high-water mark from being presented as this participant's heap.
+	// A dedicated exec child has its own mm and VmHWM. Linux ru_maxrss can
+	// inherit the parent's peak across exec, so it is diagnostic only.
 	if root := os.Getenv("KEYMAKER_MA_CAPACITY_CHILD"); root == "" {
 		root = t.TempDir()
 		binary, e := os.Executable()
@@ -201,11 +201,19 @@ func TestMALiveCapacityLatency(t *testing.T) {
 	if c != "" || first.Signature == nil || f.calls.Load() != 1 || len(s.maLive.Attempts) != maLiveAttemptLimit {
 		t.Fatal("at-bound fresh", c, fresh, f.calls.Load())
 	}
+	freshHWM := maLiveVmHWM(t)
+	if freshHWM >= 240<<20 {
+		t.Fatal("fresh capacity VmHWM lacks 16 MiB unit headroom", freshHWM)
+	}
 	start = time.Now()
 	replay, c := f.call(t.Context(), f.request())
 	elapsed := time.Since(start)
 	if c != "" || replay.Signature == nil || !bytes.Equal(first.Signature.Signature, replay.Signature.Signature) || f.calls.Load() != 1 {
 		t.Fatal("at-bound replay", c, elapsed)
+	}
+	replayHWM := maLiveVmHWM(t)
+	if replayHWM >= 240<<20 {
+		t.Fatal("replay capacity VmHWM lacks 16 MiB unit headroom", replayHWM)
 	}
 	if record.VerifySignature(f.v.Key, replay.Signature.Signature, maximal) != nil {
 		t.Fatal("boundary signature invalid")
@@ -233,17 +241,18 @@ func TestMALiveCapacityLatency(t *testing.T) {
 	if e = syscall.Getrusage(syscall.RUSAGE_SELF, &u); e != nil {
 		t.Fatal(e)
 	}
-	t.Logf("runtime_limit=%d gomaxprocs=%d rows=%d state_budget=%d snapshot_bytes=%d utilization=%.4f preimage_bytes=%d fresh=%s replay=%s peak_heap=%d process_peak_rss=%d", debug.SetMemoryLimit(-1), runtime.GOMAXPROCS(0), len(s.maLive.Attempts), maLiveStateLimit, len(raw), float64(len(raw))/float64(ceiling), len(maximal), fresh, elapsed, p, u.Maxrss*1024)
+	finalHWM := maLiveVmHWM(t)
+	t.Logf("runtime_limit=%d gomaxprocs=%d rows=%d state_budget=%d snapshot_bytes=%d utilization=%.4f preimage_bytes=%d fresh=%s replay=%s peak_heap=%d fresh_vmhwm=%d replay_vmhwm=%d final_vmhwm=%d ru_maxrss_possibly_inherited=%d", debug.SetMemoryLimit(-1), runtime.GOMAXPROCS(0), len(s.maLive.Attempts), maLiveStateLimit, len(raw), float64(len(raw))/float64(ceiling), len(maximal), fresh, elapsed, p, freshHWM, replayHWM, finalHWM, u.Maxrss*1024)
 	if len(raw) < ceiling*95/100 {
 		t.Fatal("capacity fixture not near byte budget")
 	}
 	if fresh >= time.Second || elapsed >= time.Second {
 		t.Fatal("capacity operation lacks 2x deadline margin", fresh, elapsed)
 	}
-	if u.Maxrss*1024 >= 240<<20 {
-		t.Fatal("capacity RSS lacks 16 MiB unit headroom", u.Maxrss*1024)
+	if finalHWM >= 240<<20 {
+		t.Fatal("capacity VmHWM lacks 16 MiB unit headroom", finalHWM)
 	}
-	if p >= 128<<20 || u.Maxrss*1024 >= 256<<20 {
-		t.Fatal("capacity heap margin or unit RSS exceeded", p, u.Maxrss*1024)
+	if p >= 128<<20 {
+		t.Fatal("capacity heap margin exceeded", p)
 	}
 }

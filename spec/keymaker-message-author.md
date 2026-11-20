@@ -740,14 +740,14 @@ pairwise distinct; a claimed purpose or additional pin cannot widen a role.
 ### I2. Audited operator source contracts and the issuer pin
 
 The following are source contracts for explicit operator commands, not an
-installation or provisioning runbook. Both require the existing operator
-authorization and durable closed control audit before effects or public output;
-pin-document output is never copied into the audit payload:
+installation or provisioning runbook. Seed creation requires the existing
+operator authorization and durable closed control audit before effects. Pin
+printing is read-only, discloses only the public key, and writes no audit record:
 
 | Command | Required effect and limit |
 | --- | --- |
 | `keymaker message-author issuer-seed-init` | Explicit creation of the independent issuer seed in its separate protected custody state; never implicit during startup, enrollment, renewal, recovery or retry. Refuse an existing seed instead of replacing it. Audit `message_author_issuer_seed_init`; disclose no seed or private material. |
-| `keymaker message-author issuer-pin` | Print only the public pin document for the installer, from the selected issuer public key; never print/export private custody. It does not install, replace or approve a pin. |
+| `keymaker message-author issuer-pin` | Print only the public pin document for the installer, from the selected issuer public key; never print/export private custody. It does not install, replace or approve a pin and writes no audit record. |
 
 Host key provisioning belongs to the owner and Infra. This source unit creates
 no live key and performs neither command on an installed host. Root rotation,
@@ -815,10 +815,13 @@ Schedule renewal **no later than one hour before exp**. If that threshold is
 already reached, signing/identity close while renewal is required; missing the
 schedule never extends validity. During renewal both signing and identity are
 **closed** until the new T commits, even while the old A remains unexpired.
-The old T is retained only as evidence and never becomes selectable again after
-renewal starts. A failed, cancelled, interrupted or unknown renewal cannot
-reopen it. A renewal requires a new T; keep the subject K stable when its exact
-root/path is unchanged. Old-T retained-signature disclosure still refuses
+The old T is retained as evidence. The book 06:94 cancellation exception permits
+it to become current again only when durable evidence proves cancellation
+BEFORE the issuance commit, no new T was ever committed, the previous A is still
+valid at both trusted-time bounds, and its exact binding is unchanged. Unknown,
+partial, failed or interrupted evidence stays fenced. After any new T commits,
+the old T never becomes current again. A renewal requires a new T; keep the
+subject K stable when its exact root/path is unchanged. Old-T retained-signature disclosure still refuses
 `signer_identity_mismatch`; a sender needs new P and a new request ID.
 
 Rebinding or a new registration requires a new T even when K is unchanged.
@@ -855,23 +858,27 @@ continuity evidence. BAD is a clean pre-effect profile/custody refusal, includin
 temporary time or generation unavailability; it neither clears nor creates an
 uncertainty fence. CRASH invokes the evidence-only recovery rule below. RESOLVE
 is audited reconciliation proving exactly one durable state, never new issuance.
+CANCEL means durable proof of pre-commit cancellation, no new committed T,
+and an unchanged exact binding with the predecessor valid at both time bounds.
+Missing or partial cancellation evidence is UNCERTAIN, not CANCEL.
 
 REFUSE means no success/issuance/publication, unchanged state except bounded
 refusal audit. STAY changes nothing. UNREACHABLE follows the event/state
 definition and requires a cited argument or test; it is not a fallback.
 
-| State | ISSUE | COMMIT | READ | REBIND | WITHDRAW | EXPIRE | UNCERTAIN | BAD | CRASH | RESOLVE |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S0 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | Bind successor as S1, no T | STAY | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY |
-| S1 | Persist pending, enter S2 | UNREACHABLE: no pending issuance | REFUSE | Replace with exact successor S1, no old T | Tombstone as S4 | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY |
-| S2 | REFUSE | Atomically select new T as S3 | REFUSE | Abort pending; successor S1, predecessor tombstoned | Abort pending; tombstone as S4 | Suppress candidate; enter S1, no old T | Fence as S5 | REFUSE | RECOVER | STAY |
-| S3 | Fence old T; persist pending as S2 | UNREACHABLE: no pending issuance | Return exact K/T/A under barrier | Suppress old T; successor S1, predecessor tombstoned | Suppress current; tombstone as S4 | Suppress current; enter S1 | Fence as S5 | REFUSE | RECOVER | STAY |
-| S4 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | UNREACHABLE in this instance: successor only | STAY | STAY | STAY, no return | REFUSE | RECOVER | STAY |
-| S5 | REFUSE | UNREACHABLE: outcome unproven | REFUSE | STAY fenced | Retain withdrawal evidence; stay fenced | STAY fenced | STAY fenced | REFUSE | RECOVER | Recover the one proven state, else remain S5 |
+| State | ISSUE | COMMIT | READ | REBIND | WITHDRAW | EXPIRE | UNCERTAIN | BAD | CRASH | RESOLVE | CANCEL |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S0 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | Bind successor as S1, no T | STAY | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY | UNREACHABLE: no pending issuance |
+| S1 | Persist pending, enter S2 | UNREACHABLE: no pending issuance | REFUSE | Replace with exact successor S1, no old T | Tombstone as S4 | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY | UNREACHABLE: no pending issuance |
+| S2 | REFUSE | Atomically select new T as S3 | REFUSE | Abort pending; successor S1, predecessor tombstoned | Abort pending; tombstone as S4 | Suppress candidate; enter S1, no old T | Fence as S5 | REFUSE | RECOVER | STAY | Restore proven predecessor as S3; absent predecessor enters S1 |
+| S3 | Fence old T; persist pending as S2 | UNREACHABLE: no pending issuance | Return exact K/T/A under barrier | Suppress old T; successor S1, predecessor tombstoned | Suppress current; tombstone as S4 | Suppress current; enter S1 | Fence as S5 | REFUSE | RECOVER | STAY | UNREACHABLE: no pending issuance |
+| S4 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | UNREACHABLE in this instance: successor only | STAY | STAY | STAY, no return | REFUSE | RECOVER | STAY | REFUSE |
+| S5 | REFUSE | UNREACHABLE: outcome unproven | REFUSE | STAY fenced | Retain withdrawal evidence; stay fenced | STAY fenced | STAY fenced | REFUSE | RECOVER | Recover the one proven state, else remain S5 | Restore proven predecessor as S3; absent predecessor enters S1 |
 
 RECOVER has one rule in every cell: read authoritative durable evidence only;
 select exactly its proven state, otherwise S5. It publishes/returns nothing.
-Complete pending evidence recovers S2, never the old S3; a complete new-current
+Complete pending evidence recovers S2. Proven pre-commit cancellation restores
+only the unchanged, still-valid predecessor under CANCEL; a complete new-current
 commit plus its success audit recovers that exact S3, still subject to fresh
 release authority. Proven withdrawal recovers S4. Partial, zero, missing or
 conflicting candidate/commit/head/audit evidence cannot invent an absent issue
@@ -974,9 +981,9 @@ justify UNREACHABLE cells from its event definition.
 | Revocation/1 or any other non-attestation bytes | Internally built attestation succeeds; purpose 5 refuses every other language, including message P. |
 | Unbound, retired or revoked subject | Exact active enrollment issues; no cached active binding or equal K revives withdrawn authority. |
 | Rebind retaining old T | Successor with unchanged K still needs new T; neither identity nor retained-signature disclosure uses predecessor T. |
-| Renewal returning old T or selecting two currents | Initial current selection succeeds; identity/sign close throughout pending renewal and only the new committed T returns, never old T after failure/cancel/restart. |
+| Renewal returning old T or selecting two currents | Initial current selection succeeds; identity/sign close throughout pending renewal and only the new committed T returns; proven pre-commit cancellation alone may restore a still-valid exact predecessor. Unknown cancellation/restart stays fenced; after commit old T never returns. |
 | Issuer/pin mismatch at startup | Exact protected pin passes; mismatch refuses by name. Absent pin starts as explicitly unpinned, and verifier still refuses; malformed present pin never falls through to absence. |
-| Crash around issue/renew commit | Proven complete current/audit reloads exactly; before-commit, partial, zero, conflicting and unknown evidence never invent T or reopen old T. |
+| Crash around issue/renew commit | Proven complete current/audit reloads exactly; partial, zero, conflicting and unknown evidence never invent T or reopen old T; proven pre-commit cancellation follows the explicit exception. |
 | Untrusted time or stale/withdrawn binding at either bound/barrier | Fresh qualified control commits/returns; temporary unavailable evidence refuses without clearing or inventing a fence; proven uncertainty stays fenced. |
 | Issuer bytes exhaust shared state | Under-budget current/pending pair issues; overflow refuses before effects, full loader rejects oversized state and retire preserves tombstones at the ceiling. |
 | Production gate closed | Test-injected qualified real provider exercises issue/renew/read; production remains refusing with no issuance even with valid seed, pin and binding. |

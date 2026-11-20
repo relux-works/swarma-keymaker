@@ -723,7 +723,9 @@ spec revision. It creates no live key, installation or runtime authority.
 
 The message-author participant contains a separate **purpose-5 Ed25519 issuer**
 for its BIP-340 subjects. Its seed is its **own seed**, distinct from the
-purpose-9 seed, with separate custody state and capability. Co-location is not
+purpose-9 seed, with separate custody state and capability. The protected
+`issuer-seed` file lives in the participant Store state directory, beside its
+state and audit files; it is separate from purpose-9 custody. Co-location is not
 root sharing: purpose 9 never signs an attestation, purpose 5 never signs a
 message, and neither capability exposes the other's private material. The
 legacy daemon retains its separate purpose-5 root for purpose-4 Ed25519
@@ -757,7 +759,9 @@ The owner installer places `/etc/swarma-keymaker/purpose5-pin.json`, root-owned
 mode **0644**, containing exactly the CCJ-1 object
 `{format:"keymaker-purpose5-pin/1",issuer_key:"ed25519:...",profile:"attestation/1"}`
 followed by LF. The issuer key is the canonical public Ed25519 key ID, not a
-subject K. This is the issuer trust pin, not the independent protected
+subject K. The optional `issuer_pin` configuration override selects a clean
+absolute path subject to the same root-owned protected-ancestor walk and exact
+file checks; installers use the default path above. This is the issuer trust pin, not the independent protected
 expected-head/reader-floor pin of the Store.
 
 At startup, if that pin exists, validate its closed format, ownership/mode and
@@ -851,15 +855,18 @@ commit with fresh authority; failed checks classify as their actual event.
 READ is current-T selection, including the final release barrier. REBIND means
 an authorized successor binding, subject to the existing no-resurrection rule.
 WITHDRAW is proven terminal withdrawal. EXPIRE is trusted-time proof that the
-selected current T (S3) or pending candidate T (S2) expired. Expiry of an
-unselectable predecessor alone never makes it current or aborts a valid
-candidate. UNCERTAIN is unknown/conflicting durable or
+selected current T (S3) or pending candidate T (S2) expired. With no candidate,
+expiry of the proven predecessor permits S2 to enter S1 only when no unpaired
+issuance audit exists for this binding. Expiry of a predecessor never makes it
+current or aborts an unexpired candidate. UNCERTAIN is unknown/conflicting durable or
 continuity evidence. BAD is a clean pre-effect profile/custody refusal, including
 temporary time or generation unavailability; it neither clears nor creates an
 uncertainty fence. CRASH invokes the evidence-only recovery rule below. RESOLVE
 is audited reconciliation proving exactly one durable state, never new issuance.
 CANCEL means durable proof of pre-commit cancellation, no new committed T,
-and an unchanged exact binding with the predecessor valid at both time bounds.
+and an unchanged exact binding. A predecessor valid at both time bounds may be
+restored; a predecessor proven expired at both bounds is tombstoned into S1.
+An interval straddling expiry proves neither transition and refuses.
 Missing or partial cancellation evidence is UNCERTAIN, not CANCEL.
 
 REFUSE means no success/issuance/publication, unchanged state except bounded
@@ -870,15 +877,16 @@ definition and requires a cited argument or test; it is not a fallback.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | S0 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | Bind successor as S1, no T | STAY | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY | UNREACHABLE: no pending issuance |
 | S1 | Persist pending, enter S2 | UNREACHABLE: no pending issuance | REFUSE | Replace with exact successor S1, no old T | Tombstone as S4 | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY | UNREACHABLE: no pending issuance |
-| S2 | REFUSE | Atomically select new T as S3 | REFUSE | Abort pending; successor S1, predecessor tombstoned | Abort pending; tombstone as S4 | Suppress candidate; enter S1, no old T | Fence as S5 | REFUSE | RECOVER | STAY | Restore proven predecessor as S3; absent predecessor enters S1 |
+| S2 | REFUSE | Atomically select new T as S3 | REFUSE | Abort pending; successor S1, predecessor tombstoned | Abort pending; tombstone as S4 | Suppress expired candidate; or absent candidate with proven expired predecessor and no binding-local unpaired audit: tombstone into S1 | Fence as S5 | REFUSE | RECOVER | STAY | Restore proven valid predecessor as S3; absent or proven expired predecessor enters S1 |
 | S3 | Fence old T; persist pending as S2 | UNREACHABLE: no pending issuance | Return exact K/T/A under barrier | Suppress old T; successor S1, predecessor tombstoned | Suppress current; tombstone as S4 | Suppress current; enter S1 | Fence as S5 | REFUSE | RECOVER | STAY | UNREACHABLE: no pending issuance |
 | S4 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | UNREACHABLE in this instance: successor only | STAY | STAY | STAY, no return | REFUSE | RECOVER | STAY | REFUSE |
-| S5 | REFUSE | UNREACHABLE: outcome unproven | REFUSE | STAY fenced | Retain withdrawal evidence; stay fenced | STAY fenced | STAY fenced | REFUSE | RECOVER | Recover the one proven state, else remain S5 | Restore proven predecessor as S3; absent predecessor enters S1 |
+| S5 | REFUSE | UNREACHABLE: outcome unproven | REFUSE | STAY fenced | Retain withdrawal evidence; stay fenced | STAY fenced | STAY fenced | REFUSE | RECOVER | Recover the one proven state; proven pending (with or without candidate), no binding-local unpaired audit: use the same durable CANCEL proof, else remain S5 | Cannot occur (no path fences a cancelled record) |
 
 RECOVER has one rule in every cell: read authoritative durable evidence only;
 select exactly its proven state, otherwise S5. It publishes/returns nothing.
 Complete pending evidence recovers S2. Proven pre-commit cancellation restores
-only the unchanged, still-valid predecessor under CANCEL; a complete new-current
+only the unchanged, still-valid predecessor under CANCEL, or tombstones a
+proven expired predecessor into S1; a complete new-current
 commit plus its success audit recovers that exact S3, still subject to fresh
 release authority. Proven withdrawal recovers S4. Partial, zero, missing or
 conflicting candidate/commit/head/audit evidence cannot invent an absent issue

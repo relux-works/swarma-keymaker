@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/relux-works/swarma-credential-broker/timeconf"
 	"github.com/relux-works/swarma-keymaker/internal/timeconfidence"
 )
 
@@ -20,11 +19,15 @@ import (
 // Binding JSON, including the operator-asserted purpose-1 epoch/registration.
 // The caller owns process hardening and supplies an explicit command/config.
 func RunMessageAuthorOperator(ctx context.Context, command, path string, number uint64, input io.Reader, out io.Writer) Code {
+	return runMessageAuthorOperator(ctx, command, path, number, input, out, productionMALiveDeps())
+}
+
+func runMessageAuthorOperator(ctx context.Context, command, path string, number uint64, input io.Reader, out io.Writer, d maLiveServiceDeps) Code {
 	if command != "init" && command != "enroll" && command != "retire" && command != "issuer-seed-init" && command != "issuer-pin" || command != "retire" && number != 0 || command == "retire" && number == 0 {
 		return "request_malformed"
 	}
 	var cfg Config
-	if ProtectedConfig(path, &cfg) != nil || cfg.maLive == nil {
+	if d.config == nil || d.config(path, &cfg) != nil || cfg.maLive == nil {
 		return "role_not_permitted"
 	}
 	m := cfg.maLive
@@ -61,7 +64,7 @@ func RunMessageAuthorOperator(ctx context.Context, command, path string, number 
 	if m.Generation == nil {
 		return "generation_source_unavailable"
 	}
-	clock, e := timeconf.Production(m.Time, nil)
+	clock, e := d.clock(m.Time)
 	if e != nil || clock == nil || timeconfidence.Start(ctx, clock) != nil {
 		return "clock_untrusted"
 	}
@@ -86,7 +89,7 @@ func RunMessageAuthorOperator(ctx context.Context, command, path string, number 
 	if command == "init" {
 		s, c = initMALive(ctx, dir, uid, systemAuditClock{provider: clock}, m.Instance, m.Epoch, m.Registry)
 	} else {
-		expected, e := protectedJ7Head(m.State.Head)
+		expected, e := d.head(m.State.Head)
 		if e != nil {
 			return "message_author_unqualified"
 		}
@@ -99,7 +102,7 @@ func RunMessageAuthorOperator(ctx context.Context, command, path string, number 
 	if s.maLive.Instance != m.Instance || s.maLive.Epoch != m.Epoch || s.maLive.Registry != m.Registry || s.maLive.Fenced {
 		return "message_author_unqualified"
 	}
-	generation := newJournalGeneration(productionGenerationWindow{}, s, m.Generation.Path, m.Generation.InitialFloor)
+	generation := d.generation(s, *m.Generation)
 	c = generation.WithActive(ctx, m.Operator.UID, m.Operator.Generation, func(ctx context.Context) Code {
 		switch command {
 		case "init":

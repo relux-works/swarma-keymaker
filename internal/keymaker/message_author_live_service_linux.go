@@ -15,6 +15,8 @@ import (
 )
 
 type maLiveServiceDeps struct {
+	config     func(string, *Config) error
+	pinCheck   func(string, *maIssuerKey) (bool, Code)
 	clock      func(*timeconf.Policy) (*timeconf.Provider, error)
 	head       func(string) (j7Expectation, error)
 	generation func(*Store, generationJournalConfig) GenerationSource
@@ -26,7 +28,7 @@ type maLiveServiceDeps struct {
 func productionMALiveDeps() maLiveServiceDeps {
 	return maLiveServiceDeps{clock: func(p *timeconf.Policy) (*timeconf.Provider, error) { return timeconf.Production(p, nil) }, head: protectedJ7Head, generation: func(s *Store, g generationJournalConfig) GenerationSource {
 		return newJournalGeneration(productionGenerationWindow{}, s, g.Path, g.InitialFloor)
-	}, current: maLiveUnqualified{}}
+	}, current: maLiveUnqualified{}, pinCheck: maIssuerStartupPin, config: func(p string, c *Config) error { return ProtectedConfig(p, c) }}
 }
 
 // Leave 64 MiB of the unit's 256 MiB ceiling for memory outside Go's soft
@@ -93,14 +95,19 @@ func serveMALive(ctx context.Context, cfg Config, status io.Writer, d maLiveServ
 	// only with an absent pin; a present pin requires the exact independent key.
 	issuer, issuerCode := loadMAIssuerKey(state, uid)
 	if issuerCode == "" {
-		defer issuer.close()
+		// Closed production uses custody only for this startup comparison.
 	} else {
 		var st unix.Stat_t
 		if e := unix.Fstatat(int(state.Fd()), maIssuerSeedFile, &st, unix.AT_SYMLINK_NOFOLLOW); e != unix.ENOENT {
 			return issuerCode
 		}
 	}
-	pinned, pinCode := maIssuerStartupPin(m.IssuerPin, issuer)
+	pinCheck := d.pinCheck
+	if pinCheck == nil {
+		pinCheck = maIssuerStartupPin
+	}
+	pinned, pinCode := pinCheck(m.IssuerPin, issuer)
+	issuer.close()
 	if pinCode != "" {
 		return pinCode
 	}

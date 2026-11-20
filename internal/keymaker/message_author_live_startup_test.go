@@ -55,6 +55,7 @@ func TestMALiveProductionRole(t *testing.T) {
 			if e = json.Unmarshal(raw, &o); e != nil {
 				t.Fatal(e)
 			}
+			o["issuer_pin"] = filepath.Join(socketDir, "absent-pin")
 			o["instance_id"] = f.h.store.maLive.Instance
 			o["service_uid"] = os.Getuid()
 			o["service_gid"] = os.Getgid()
@@ -75,6 +76,7 @@ func TestMALiveProductionRole(t *testing.T) {
 				t.Fatal(e)
 			}
 			d := productionMALiveDeps()
+			d.pinCheck = func(p string, k *maIssuerKey) (bool, Code) { return maIssuerStartupPinOwner(p, k, uint32(os.Getuid())) }
 			d.clock = func(*timeconf.Policy) (*timeconf.Provider, error) {
 				p, _, _ := fixtureTimeProvider(t, helperNow)
 				return p, nil

@@ -75,11 +75,54 @@ func TestMAIssuerUpstream(t *testing.T) {
 	if e != nil {
 		t.Fatal("upstream positive", e)
 	}
-	tampered := append([]byte(nil), v.Attestation...)
-	tampered[len(tampered)-8] ^= 1
-	facts["attestations"] = map[string]any{v.T: base64Text(tampered)}
-	if _, e = verifier.New(maContext(t, facts)).VerifyAttestation(v.Key, v.T, false); e == nil {
-		t.Fatal("tampered A accepted")
+	// Each negative retains valid outer CCJ-1 framing, except the separately
+	// labelled historical version flip. Expected refusal is key_binding_invalid.
+	other := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x73}, 32))
+	otherID := messageTestID(other[32:])
+	for _, fault := range []string{"body", "signature", "other-signature", "other-root", "version"} {
+		t.Run(fault, func(t *testing.T) {
+			facts["service_root"] = map[string]any{"key": pub, "purpose": int64(5)}
+			x, err := record.Parse(v.Attestation, 8192, 16)
+			if err != nil {
+				t.Fatal(err)
+			}
+			a := x.(map[string]any)
+			sig := a["signatures"].([]any)[0].(map[string]any)
+			switch fault {
+			case "body":
+				a["body"].(map[string]any)["binding"].(map[string]any)["owner"] = "different-owner"
+			case "signature":
+				b, err := base64.RawURLEncoding.DecodeString(sig["sig"].(string))
+				if err != nil {
+					t.Fatal(err)
+				}
+				b[0] ^= 1
+				sig["sig"] = base64Text(b)
+			case "other-signature":
+				pre, err := record.SigningPreimage("attestation/1", otherID, "author", a["body"].(map[string]any))
+				if err != nil {
+					t.Fatal(err)
+				}
+				sig["key"], sig["sig"] = otherID, base64Text(ed25519.Sign(other, pre))
+			case "other-root":
+				facts["service_root"] = map[string]any{"key": otherID, "purpose": int64(5)}
+			case "version":
+				a["version"] = "swarm-envemope/2"
+			}
+			tampered, err := record.Canonical(a)
+			if err != nil {
+				t.Fatal(err)
+			}
+			facts["attestations"] = map[string]any{v.T: base64Text(tampered)}
+			if _, err = verifier.New(maContext(t, facts)).VerifyAttestation(v.Key, v.T, false); err == nil || !strings.Contains(err.Error(), "key_binding_invalid") {
+				t.Fatal("tampered A not refused by name", fault, err)
+			}
+			facts["service_root"] = map[string]any{"key": pub, "purpose": int64(5)}
+			facts["attestations"] = map[string]any{v.T: base64Text(v.Attestation)}
+			if _, err = verifier.New(maContext(t, facts)).VerifyAttestation(v.Key, v.T, false); err != nil {
+				t.Fatal("adjacent valid A", err)
+			}
+		})
 	}
 	// The real issuer also composes with the unchanged holder wire/crypto path.
 	obj := maRecord(t, f.v)
@@ -255,8 +298,8 @@ func TestMAIssuerCrash(t *testing.T) {
 	f.at.Now = f.at.Now.Add(24 * time.Hour)
 	f.at.Lower = f.at.Lower.Add(24 * time.Hour)
 	f.at.Upper = f.at.Upper.Add(24 * time.Hour)
-	if c := i.cancel(t.Context(), f.b); c != "key_not_valid_now" {
-		t.Fatal("expired predecessor restored", c)
+	if c := i.cancel(t.Context(), f.b); c != "" || i.store.maLive.Issuers[0].Phase != "bound" || i.store.maLive.Issuers[0].Current != nil {
+		t.Fatal("expired predecessor not tombstoned into bound", c)
 	}
 	maIssuerRead(t, f, i, "message_author_unqualified")
 }

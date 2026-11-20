@@ -432,8 +432,8 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 		controls = []struct{ name, file, old, new, test, needle, witness string }{
 			{"mai-pending-current", "message_author_issuer.go", `r.Phase == "current" && pc == ""`, `pc == ""`, "^TestMAIssuerRenewal$", "--- FAIL: TestMAIssuerRenewal", `current gate got "" want "message_author_unqualified"`},
 			{"mai-cancel-proof", "message_author_issuer.go", `a.Digest != r.CancelHash`, `false`, "^TestMAIssuerCancelRecovery$", "--- FAIL: TestMAIssuerCancelRecovery/true", "false cancellation proof accepted"},
-			{"mai-cancel-after-commit", "message_author_issuer.go", `if r.Phase != "pending" {`, `if false && r.Phase != "pending" {`, "^TestMAIssuerRenewal$", "--- FAIL: TestMAIssuerRenewal", "post-commit cancellation changed evidence"},
-			{"mai-unknown-audit", "message_author_issuer.go", `if a.Seq > s.auditSeq && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {`, `if false && a.Seq > s.auditSeq && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {`, "^TestMAIssuerCrash$/^mai-success-audit$", "--- FAIL: TestMAIssuerCrash/mai-success-audit", "unknown cancellation restored"},
+			{"mai-cancel-after-commit", "message_author_issuer.go", `if r.Phase != "pending" {`, `if false && r.Phase != "pending" {`, "^TestMAIssuerRenewal$", "--- FAIL: TestMAIssuerRenewal", "post-commit cancellation accepted"},
+			{"mai-unknown-audit", "message_author_issuer.go", `if a.PeerUID != nil && *a.PeerUID == r.Binding.UID && a.Generation != nil && *a.Generation == r.Binding.Generation && (a.Seq > s.auditSeq || r.Pending != nil && a.PayloadDigest != nil && *a.PayloadDigest == maIssuerEvidence(r.Pending)) && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {`, `if false && a.Seq > s.auditSeq {`, "^TestMAIssuerCrash$/^mai-success-audit$", "--- FAIL: TestMAIssuerCrash/mai-success-audit", "unknown cancellation restored"},
 			{"mai-pin-equality", "message_author_issuer_custody_linux.go", `if pin.Issuer != key {`, `if false && pin.Issuer != key {`, "^TestMAIssuerCustodyPin$/^key$", "--- FAIL: TestMAIssuerCustodyPin/key", "pin mutation key"},
 			{"mai-profile-reader", "message_author_issuer.go", `if !bytes.Equal(want, got) {`, `if false && !bytes.Equal(want, got) {`, "^TestMAIssuerEnvelopeClosed$/^(roles|actions|purpose|algorithm|binding)$", "--- FAIL: TestMAIssuerEnvelopeClosed/roles", "wider signed issuer record accepted"},
 			{"mai-lifetime", "message_author_issuer.go", `lifetime > 86400*time.Second`, `false`, "^TestMAIssuerProfile$", "--- FAIL: TestMAIssuerProfile", "lifetime gate"},
@@ -446,7 +446,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			{"mai-tombstone-reuse", "message_author_issuer.go", `if old == nextT {`, `if false && old == nextT {`, "^TestMAIssuerTombstoneNoResurrection$", "--- FAIL: TestMAIssuerTombstoneNoResurrection", "tombstoned candidate resurrected"},
 			{"mai-timestamp", "message_author_issuer.go", `messageStamp(from) == c.From && messageStamp(until) == c.Until`, `true`, "^TestMAIssuerEnvelopeClosed$/^timestamp$", "--- FAIL: TestMAIssuerEnvelopeClosed/timestamp", "wider signed issuer record accepted"},
 			{"mai-expiry-proof", "message_author_issuer.go", `if e != nil || !at.startBoundsValid() || at.Lower.Before(until) {`, `if e != nil || !at.startBoundsValid() || at.Upper.Before(until) {`, "^TestMAIssuerExpiry$/^pending$", "--- FAIL: TestMAIssuerExpiry/pending", "unproven expiry changed evidence"},
-			{"mai-expiry-uncertain", "message_author_issuer.go", `if s.maIssuerUnpaired() || r.Current != nil && !s.maIssuerCommitted(r.Current) {`, `if r.Current != nil && !s.maIssuerCommitted(r.Current) {`, "^TestMAIssuerExpiry$/^unknown$", "--- FAIL: TestMAIssuerExpiry/unknown", "unknown commit erased by expiry"},
+			{"mai-expiry-uncertain", "message_author_issuer.go", `if s.maIssuerUnpaired(r) || r.Current != nil && !s.maIssuerCommitted(r.Current) {`, `if r.Current != nil && !s.maIssuerCommitted(r.Current) {`, "^TestMAIssuerExpiry$/^unknown$", "--- FAIL: TestMAIssuerExpiry/unknown", "unknown commit erased by expiry"},
 			{"mai-resolve-proof", "message_author_issuer.go", `|| !s.maIssuerCommitted(r.Current) ||`, `|| false ||`, "^TestMAIssuerStateBoundaries$/^fenced$", "--- FAIL: TestMAIssuerStateBoundaries/fenced", "unknown resolution changed evidence"},
 			{"mai-withdraw-fence", "message_author_live_operator_linux.go", `if r.Phase != "fenced" {`, `if true {`, "^TestMAIssuerStateBoundaries$/^fenced$", "--- FAIL: TestMAIssuerStateBoundaries/fenced", "withdraw cleared fence"},
 			{"mai-production-closed", "message_author_live.go", `func (maLiveUnqualified) WithCurrent(context.Context, Binding, j7GateTime, func(maLiveTuple) Code) Code {
@@ -454,6 +454,36 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 }`, `func (maLiveUnqualified) WithCurrent(context.Context, Binding, j7GateTime, func(maLiveTuple) Code) Code {
 	return ""
 }`, "^TestMAIssuerSchemaProduction$", "--- FAIL: TestMAIssuerSchemaProduction", "production gate opened"},
+			{"mai-restore-expired", "message_author_issuer.go", `expired := maIssuerExpired(r.Current, at)`, `expired := false`, "^TestMAIssuerRenewalNoExit$/^cancelled$", "--- FAIL: TestMAIssuerRenewalNoExit/cancelled", "cancelled expired predecessor did not restore S1"},
+			{"mai-marker-expire", "message_author_issuer.go", `if r.Phase == "pending" && r.Pending != nil {
+		selected = r.Pending
+	}`, `if r.Phase == "pending" {
+		selected = r.Pending
+	}`, "^TestMAIssuerRenewalNoExit$/^no-candidate$", "--- FAIL: TestMAIssuerRenewalNoExit/no-candidate", "no-candidate expiry did not enter S1"},
+			{"mai-maintain-cancel", "message_author_issuer.go", `if c == "" && cancel {`, `if false && c == "" && cancel {`, "^TestMAIssuerRenewalNoExit$/^valid-", "--- FAIL: TestMAIssuerRenewalNoExit/valid-pending", `current gate got "message_author_unqualified" want ""`},
+			{"mai-startup-pin", "message_author_live_service_linux.go", `if pinCode != "" {`, `if false && pinCode != "" {`, "^TestMAIssuerStartupProduction$/^key$", "--- FAIL: TestMAIssuerStartupProduction/key", "startup pin refusal bypassed"},
+			{"mai-startup-seed-close", "message_author_live_service_linux.go", `issuer.close()`, `_ = issuer`, "^TestMAIssuerStartupProduction$/^match$", "--- FAIL: TestMAIssuerStartupProduction/match", "startup retained issuer seed"},
+			{"mai-renew-evidence", "message_author_issuer.go", `digest := maIssuerEvidence(candidate)`, `digest := maLiveHash(envelope)`, "^TestMAIssuerRenewAudit$", "--- FAIL: TestMAIssuerRenewAudit", "renewal omitted old T"},
+			{"mai-binding-local", "message_author_issuer.go", `a.PeerUID != nil && *a.PeerUID == r.Binding.UID && a.Generation != nil && *a.Generation == r.Binding.Generation &&`, `true &&`, "^TestMAIssuerBindingLocalResolve$/^marker$", "--- FAIL: TestMAIssuerBindingLocalResolve/marker", "other binding audit fenced pending"},
+			{"mai-resolve-cancel-proof", "message_author_issuer.go", `if r.Phase != "fenced" {
+			return ""
+		}`, `if r.Phase == "fenced" {
+			r.Phase = "current"
+			return s.maIssuerPersist(ctx)
+		}`, "^TestMAIssuerBindingLocalResolve$/^marker$", "--- FAIL: TestMAIssuerBindingLocalResolve/marker", "resolve bypassed cancel proof"},
+			{"mai-startup-seed-refusal", "message_author_live_service_linux.go", `return issuerCode`, `_ = issuerCode`, "^TestMAIssuerStartupProduction$/^seed-mode-absent$", "--- FAIL: TestMAIssuerStartupProduction/seed-mode-absent", "startup pin refusal bypassed"},
+			{"mai-upstream-body-control", "message_author_issuer_test.go", `["owner"] = "different-owner"`, `["owner"] = f.b.Owner`, "^TestMAIssuerUpstream$/^body$", "--- FAIL: TestMAIssuerUpstream/body", "tampered A not refused by name"},
+			{"mai-schema7-named", "binding.go", `StrictJSON(f, &fields) == nil && string(fields["schema_version"]) == "7"`, `false && StrictJSON(f, &fields) == nil && string(fields["schema_version"]) == "7"`, "^TestMAIssuerSchema7Original$", "--- FAIL: TestMAIssuerSchema7Original", "genuine schema7 accepted"},
+			{"mai-command-seed-dispatch", "message_author_live_command_linux.go", `case "issuer-seed-init":
+			return s.initMAIssuerSeed(ctx, m.Operator, nil)`, `case "issuer-seed-init":
+			return ""`, "^TestMAIssuerCommandDispatch$", "--- FAIL: TestMAIssuerCommandDispatch", "seed command absent"},
+			{"mai-pending-receipt", "message_author_issuer.go", `committed.Seq, committed.Hash = seq, hash`, `committed.Seq, committed.Hash = seq, hash
+        candidate.Seq, candidate.Hash = seq, hash`, "^TestMAIssuerBindingLocalResolve$", "--- FAIL: TestMAIssuerBindingLocalResolve", "uncommitted pending acquired receipt"},
+			{"mai-current-before-durable", "message_author_issuer.go", `s.maLive = &staged`, `*r = next
+        s.maLive = &staged`, "^TestMAIssuerCommitPersistFailure$/^snapshot-rename$", "--- FAIL: TestMAIssuerCommitPersistFailure/snapshot-rename", "current before durable commit"},
+			{"mai-commit-failure", "message_author_issuer.go", `s.failed, s.maLive.Fenced = true, true`, `s.failed, s.maLive.Fenced = false, false`, "^TestMAIssuerCommitPersistFailure$", "--- FAIL: TestMAIssuerCommitPersistFailure", "failed commit retained current standing"},
+			{"mai-bound-evidence", "message_author_issuer.go", `(r.Phase == "bound" || r.Phase == "withdrawn") && (r.Current != nil || r.Pending != nil)`, `false`, "^TestMAIssuerPhaseEvidence$/^bound$", "--- FAIL: TestMAIssuerPhaseEvidence/bound", "invalid phase evidence accepted"},
+			{"mai-pending-seq", "message_author_issuer.go", `r.Phase == "pending" && r.Pending != nil && r.Pending.Seq != 0`, `false`, "^TestMAIssuerPhaseEvidence$/^pending$", "--- FAIL: TestMAIssuerPhaseEvidence/pending", "invalid phase evidence accepted"},
 		}
 	}
 

@@ -559,7 +559,9 @@ other roles or change the legacy service.
 ## Message-author retention scaling
 
 **G-A7A2-RETENTION-SCALING remains closed.** The finite lifetime and byte budget
-are source-fixture bounds only. Live purpose-9 activation requires the separately
+are source-fixture bounds only. Issuer audit proof retention (`maIssuerEvents`)
+and per-instance tombstones are also uncapped and inside this closed gate; this
+source slice supplies no retention policy. Live purpose-9 activation requires the separately
 reviewed retention-scaling change described in
 [message-author section 8](spec/keymaker-message-author.md#8-finite-capacity-per-participant),
 including permanent request-id rejection. Current capacity evidence does not

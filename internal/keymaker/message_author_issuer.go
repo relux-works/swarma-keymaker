@@ -24,13 +24,14 @@ type maIssuer struct {
 	clock       func(context.Context) (j7GateTime, Code)
 }
 type maIssuerCertificate struct {
-	Key   string `json:"key"`
-	T     string `json:"t"`
-	A     []byte `json:"a"`
-	From  string `json:"from"`
-	Until string `json:"until"`
-	Seq   uint64 `json:"audit_seq"`
-	Hash  string `json:"audit_hash"`
+	Key       string `json:"key"`
+	T         string `json:"t"`
+	A         []byte `json:"a"`
+	From      string `json:"from"`
+	Until     string `json:"until"`
+	Seq       uint64 `json:"audit_seq"`
+	Hash      string `json:"audit_hash"`
+	PreviousT string `json:"previous_t,omitempty"`
 }
 type maIssuerRecord struct {
 	Binding    Binding              `json:"binding"`
@@ -57,7 +58,7 @@ func (r *maIssuerRecord) UnmarshalJSON(raw []byte) error {
 	return StrictJSON(bytes.NewReader(raw), (*plain)(r))
 }
 func (c *maIssuerCertificate) UnmarshalJSON(raw []byte) error {
-	if _, e := objectMembers(raw, []string{"key", "t", "a", "from", "until", "audit_seq", "audit_hash"}); e != nil {
+	if _, e := objectMembers(raw, []string{"key", "t", "a", "from", "until", "audit_seq", "audit_hash"}, "previous_t"); e != nil {
 		return e
 	}
 	type plain maIssuerCertificate
@@ -198,8 +199,11 @@ func (s *Store) validateMAIssuers() error {
 		default:
 			return failure("invalid issuer phase")
 		}
+		if (r.Phase == "bound" || r.Phase == "withdrawn") && (r.Current != nil || r.Pending != nil) || r.Phase == "pending" && r.Pending != nil && r.Pending.Seq != 0 {
+			return failure("invalid issuer phase evidence")
+		}
 		for _, c := range []*maIssuerCertificate{r.Current, r.Pending} {
-			if c != nil && !maIssuerEnvelope(c, r.Binding) {
+			if c != nil && (!maIssuerEnvelope(c, r.Binding) || c.PreviousT != "" && (!strings.HasPrefix(c.PreviousT, "sha256:") || !validDigest(strings.TrimPrefix(c.PreviousT, "sha256:")))) {
 				return failure("invalid issuer certificate")
 			}
 		}
@@ -209,7 +213,7 @@ func (s *Store) validateMAIssuers() error {
 		if r.Phase == "cancelled" && (r.CancelSeq == 0 || !validDigest(r.CancelHash)) {
 			return failure("invalid issuer cancellation")
 		}
-		if r.Phase != "cancelled" && r.Phase != "fenced" && (r.CancelSeq != 0 || r.CancelHash != "") {
+		if r.Phase != "cancelled" && (r.CancelSeq != 0 || r.CancelHash != "") {
 			return failure("unexpected cancellation proof")
 		}
 		for _, t := range r.Tombstones {
@@ -327,6 +331,9 @@ func (i *maIssuer) issue(ctx context.Context, b Binding) Code {
 		if r.Current != nil && r.Current.T == t {
 			return "message_author_unqualified"
 		}
+		if r.Current != nil {
+			candidate.PreviousT = r.Current.T
+		}
 		r.Pending = candidate
 		if c = s.maIssuerPersist(ctx); c != "" {
 			return c
@@ -346,25 +353,51 @@ func (i *maIssuer) issue(ctx context.Context, b Binding) Code {
 		if r.Current != nil {
 			op = "message_author_attestation_renew"
 		}
-		digest := maLiveHash(envelope)
+		digest := maIssuerEvidence(candidate)
 		seq, hash, c := s.maLiveAppend(ctx, Principal{b.UID, b.Generation}, "", op, &digest)
 		if c != "" {
 			return c
 		}
-		candidate.Seq, candidate.Hash = seq, hash
+		committed := *candidate
+		committed.Seq, committed.Hash = seq, hash
 		if c = s.messagePoint("mai-success-audit"); c != "" {
 			return c
 		}
+		candidate = &committed
+		// Serialize a staging view while retaining the live row as pending. The
+		// issuer/Store locks exclude all readers until durable installation.
+		live := s.maLive
+		staged := *live
+		staged.Issuers = append([]maIssuerRecord{}, live.Issuers...)
+		next := staged.Issuers[n]
 		if r.Current != nil {
-			r.Tombstones = append(r.Tombstones, r.Current.T)
+			next.Tombstones = append(append([]string{}, r.Tombstones...), r.Current.T)
 		}
-		r.Current, r.Pending, r.Phase = candidate, nil, "current"
+		next.Current, next.Pending, next.Phase = candidate, nil, "current"
+		staged.Issuers[n] = next
+		s.maLive = &staged
 		c = s.maIssuerPersist(context.WithoutCancel(ctx))
+		s.maLive = live
 		if c != "" {
+			r.Phase = "fenced"
+			s.failed, s.maLive.Fenced = true, true
 			return c
 		}
+		*r = next
 		return s.messagePoint("mai-commit")
 	})
+}
+
+// Renewal commits bind both the superseded T and exact new A; issue remains A-only.
+func maIssuerEvidence(c *maIssuerCertificate) string {
+	if c.PreviousT == "" {
+		return maLiveHash(c.A)
+	}
+	raw, _ := canonical(struct {
+		OldT string `json:"old_t"`
+		NewA []byte `json:"new_a"`
+	}{c.PreviousT, c.A})
+	return maLiveHash(raw)
 }
 func (s *Store) maIssuerProof(c *maIssuerCertificate, op string) bool {
 	if c == nil || s.journal == nil || c.Seq == 0 || !validDigest(c.Hash) {
@@ -373,19 +406,21 @@ func (s *Store) maIssuerProof(c *maIssuerCertificate, op string) bool {
 	s.journal.mu.Lock()
 	r, ok := s.journal.maIssuerEvents[c.Seq]
 	s.journal.mu.Unlock()
-	return ok && r.Digest == c.Hash && r.Operation == op && r.PayloadDigest != nil && *r.PayloadDigest == maLiveHash(c.A)
+	return ok && r.Digest == c.Hash && r.Operation == op && r.PayloadDigest != nil && *r.PayloadDigest == maIssuerEvidence(c) && (op == "message_author_attestation_renew") == (c.PreviousT != "")
 }
 func (s *Store) maIssuerCommitted(c *maIssuerCertificate) bool {
 	return s.maIssuerProof(c, "message_author_attestation_issue") || s.maIssuerProof(c, "message_author_attestation_renew")
 }
 
-// A readable issuance audit beyond the paired snapshot cannot prove whether its
-// commit completed. Neither expiry nor cancellation may erase that uncertainty.
-func (s *Store) maIssuerUnpaired() bool {
+// An unpaired receipt is local to its principal: validateBindings/enrollMALive
+// permit exactly one active binding per UID/generation. A retained pending
+// candidate also matches its exact evidence digest, even if another transition
+// has since advanced the shared snapshot. Neither cancel nor expiry may erase it.
+func (s *Store) maIssuerUnpaired(r *maIssuerRecord) bool {
 	s.journal.mu.Lock()
 	defer s.journal.mu.Unlock()
 	for _, a := range s.journal.maIssuerEvents {
-		if a.Seq > s.auditSeq && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {
+		if a.PeerUID != nil && *a.PeerUID == r.Binding.UID && a.Generation != nil && *a.Generation == r.Binding.Generation && (a.Seq > s.auditSeq || r.Pending != nil && a.PayloadDigest != nil && *a.PayloadDigest == maIssuerEvidence(r.Pending)) && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {
 			return true
 		}
 	}
@@ -438,34 +473,47 @@ func (i *maIssuer) cancel(ctx context.Context, b Binding) Code {
 			return "message_author_unqualified"
 		}
 		r := &s.maLive.Issuers[n]
-		if r.Phase == "cancelled" || r.Phase == "fenced" && r.CancelSeq != 0 {
+		if r.Phase == "cancelled" {
 			return s.maIssuerRestore(r, at, ctx)
 		}
 		if r.Phase != "pending" {
 			return "message_author_unqualified"
 		}
-		// A success audit beyond the snapshot means issuance outcome is unknown.
-		if s.maIssuerUnpaired() {
-			return "message_author_unqualified"
-		}
-		if r.Current != nil && !maIssuerTimes(r.Current, at) {
-			return "key_not_valid_now"
-		}
-		raw, _ := canonical(r)
-		digest := maLiveHash(raw)
-		seq, hash, c := s.maLiveAppend(ctx, Principal{b.UID, b.Generation}, "", "message_author_attestation_fence", &digest)
-		if c != "" {
-			return c
-		}
-		r.Phase, r.CancelSeq, r.CancelHash = "cancelled", seq, hash
-		if c = s.maIssuerPersist(ctx); c != "" {
-			return c
-		}
-		if c = s.messagePoint("mai-cancel"); c != "" {
-			return c
-		}
-		return s.maIssuerRestore(r, at, ctx)
+		return s.maIssuerCancel(ctx, r, at)
 	})
+}
+
+// Called only under the issuer/Store barrier. Resolve uses the same proof as cancel.
+func (s *Store) maIssuerCancel(ctx context.Context, r *maIssuerRecord, at j7GateTime) Code {
+	if s.maIssuerUnpaired(r) {
+		return "message_author_unqualified"
+	}
+	if r.Current != nil && (!s.maIssuerCommitted(r.Current) || !maIssuerTimes(r.Current, at) && !maIssuerExpired(r.Current, at)) {
+		return "key_not_valid_now"
+	}
+	proof := *r
+	proof.Phase = "pending"
+	raw, _ := canonical(proof)
+	digest := maLiveHash(raw)
+	seq, hash, c := s.maLiveAppend(ctx, Principal{r.Binding.UID, r.Binding.Generation}, "", "message_author_attestation_fence", &digest)
+	if c != "" {
+		return c
+	}
+	r.Phase, r.CancelSeq, r.CancelHash = "cancelled", seq, hash
+	if c = s.maIssuerPersist(ctx); c != "" {
+		return c
+	}
+	if c = s.messagePoint("mai-cancel"); c != "" {
+		return c
+	}
+	return s.maIssuerRestore(r, at, ctx)
+}
+func maIssuerExpired(c *maIssuerCertificate, at j7GateTime) bool {
+	if c == nil || !at.startBoundsValid() {
+		return false
+	}
+	until, e := time.Parse(time.RFC3339, c.Until)
+	return e == nil && !at.Lower.Before(until)
 }
 func (s *Store) maIssuerRestore(r *maIssuerRecord, at j7GateTime, ctx context.Context) Code {
 	s.journal.mu.Lock()
@@ -479,11 +527,16 @@ func (s *Store) maIssuerRestore(r *maIssuerRecord, at j7GateTime, ctx context.Co
 	if a.PayloadDigest == nil || *a.PayloadDigest != maLiveHash(raw) {
 		return "message_author_unqualified"
 	}
-	if (r.Phase != "cancelled" && r.Phase != "fenced") || !ok || a.Digest != r.CancelHash || a.Operation != "message_author_attestation_fence" {
+	if r.Phase != "cancelled" || !ok || a.Digest != r.CancelHash || a.Operation != "message_author_attestation_fence" {
 		return "message_author_unqualified"
 	}
-	if r.Current != nil && (!maIssuerTimes(r.Current, at) || !s.maIssuerCommitted(r.Current)) {
+	if s.maIssuerUnpaired(r) || r.Current != nil && (!s.maIssuerCommitted(r.Current) || !maIssuerTimes(r.Current, at) && !maIssuerExpired(r.Current, at)) {
 		return "message_author_unqualified"
+	}
+	expired := maIssuerExpired(r.Current, at)
+	if expired {
+		r.Tombstones = append(r.Tombstones, r.Current.T)
+		r.Current = nil
 	}
 	if r.Pending != nil {
 		r.Tombstones = append(r.Tombstones, r.Pending.T)
@@ -495,7 +548,13 @@ func (s *Store) maIssuerRestore(r *maIssuerRecord, at j7GateTime, ctx context.Co
 	if r.Current != nil {
 		r.Phase = "current"
 	}
-	return s.maIssuerPersist(ctx)
+	if c := s.maIssuerPersist(ctx); c != "" {
+		return c
+	}
+	if expired {
+		return s.messagePoint("mai-expired")
+	}
+	return ""
 }
 
 // Recovery validates evidence but performs no issuance or renewal. Cancellation
@@ -505,7 +564,7 @@ func (s *Store) recoverMAIssuers() bool {
 	changed := false
 	for n := range s.maLive.Issuers {
 		r := &s.maLive.Issuers[n]
-		if r.Phase == "current" && !s.maIssuerCommitted(r.Current) || r.Phase == "pending" && s.maIssuerUnpaired() {
+		if r.Phase == "current" && !s.maIssuerCommitted(r.Current) || r.Phase == "pending" && s.maIssuerUnpaired(r) {
 			r.Phase = "fenced"
 			changed = true
 		}
@@ -525,23 +584,11 @@ func (i *maIssuer) resolve(ctx context.Context, b Binding) Code {
 		if r.Phase != "fenced" {
 			return ""
 		}
-		if r.CancelSeq != 0 {
-			return s.maIssuerRestore(r, at, ctx)
-		}
 		pub, c := i.custody.public()
-		if c != "" || r.Pending != nil || r.Current == nil || !maIssuerEnvelope(r.Current, b) || !s.maIssuerCommitted(r.Current) || !maIssuerSignedBy(r.Current, pub) {
+		if c != "" || s.maIssuerUnpaired(r) || r.Current != nil && (!maIssuerEnvelope(r.Current, b) || !s.maIssuerCommitted(r.Current) || !maIssuerSignedBy(r.Current, pub)) || r.Pending != nil && !maIssuerSignedBy(r.Pending, pub) {
 			return "message_author_unqualified"
 		}
-		if !maIssuerTimes(r.Current, at) {
-			return s.maIssuerExpire(ctx, r, at)
-		}
-		raw, _ := canonical(r)
-		digest := maLiveHash(raw)
-		if _, _, c := s.maLiveAppend(ctx, Principal{b.UID, b.Generation}, "", "message_author_attestation_fence", &digest); c != "" {
-			return c
-		}
-		r.Phase = "current"
-		return s.maIssuerPersist(context.WithoutCancel(ctx))
+		return s.maIssuerCancel(ctx, r, at)
 	})
 }
 
@@ -549,7 +596,7 @@ func (i *maIssuer) resolve(ctx context.Context, b Binding) Code {
 // bounds must prove expiry, and no unpaired issuance commit may be forgotten.
 func (s *Store) maIssuerExpire(ctx context.Context, r *maIssuerRecord, at j7GateTime) Code {
 	selected := r.Current
-	if r.Phase == "pending" {
+	if r.Phase == "pending" && r.Pending != nil {
 		selected = r.Pending
 	}
 	if selected == nil {
@@ -559,7 +606,7 @@ func (s *Store) maIssuerExpire(ctx context.Context, r *maIssuerRecord, at j7Gate
 	if e != nil || !at.startBoundsValid() || at.Lower.Before(until) {
 		return "key_not_valid_now"
 	}
-	if s.maIssuerUnpaired() || r.Current != nil && !s.maIssuerCommitted(r.Current) {
+	if s.maIssuerUnpaired(r) || r.Current != nil && !s.maIssuerCommitted(r.Current) {
 		return "message_author_unqualified"
 	}
 	raw, _ := canonical(r)
@@ -583,7 +630,7 @@ func (s *Store) maIssuerExpire(ctx context.Context, r *maIssuerRecord, at j7Gate
 // a production factory. The scheduler must call it before exp-1h; selection
 // refuses overdue authority even if scheduling or qualified time is unavailable.
 func (i *maIssuer) maintain(ctx context.Context, b Binding) Code {
-	issue := false
+	issue, cancel := false, false
 	c := i.active(ctx, b, func(s *Store, at j7GateTime) Code {
 		n := s.maIssuerIndex(b)
 		if n < 0 {
@@ -593,7 +640,7 @@ func (i *maIssuer) maintain(ctx context.Context, b Binding) Code {
 		r := &s.maLive.Issuers[n]
 		if r.Phase == "pending" || r.Phase == "current" {
 			selected := r.Current
-			if r.Phase == "pending" {
+			if r.Phase == "pending" && r.Pending != nil {
 				selected = r.Pending
 			}
 			if selected != nil {
@@ -604,6 +651,10 @@ func (i *maIssuer) maintain(ctx context.Context, b Binding) Code {
 					}
 				}
 			}
+		}
+		if r.Phase == "pending" {
+			cancel = true
+			return ""
 		}
 		if r.Phase == "cancelled" {
 			if c := s.maIssuerRestore(r, at, ctx); c != "" {
@@ -626,6 +677,9 @@ func (i *maIssuer) maintain(ctx context.Context, b Binding) Code {
 		}
 		return ""
 	})
+	if c == "" && cancel {
+		return i.cancel(ctx, b)
+	}
 	if c != "" || !issue {
 		return c
 	}

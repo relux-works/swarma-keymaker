@@ -564,3 +564,15 @@ reviewed retention-scaling change described in
 [message-author section 8](spec/keymaker-message-author.md#8-finite-capacity-per-participant),
 including permanent request-id rejection. Current capacity evidence does not
 satisfy this gate.
+
+
+## Message-author owner-registry end condition
+
+**OPEN: who builds the owner registry, and when does it replace the interim?**
+The dated issuer publication interim is identity reply K/T/A plus the host
+roster's T on the a2a side, until the owner registry exists. The keeper and owner
+must establish delivery ownership and the reviewed transition; no builder or
+schedule is assumed. See [Live issuer publication interim](spec/keymaker-message-author.md#i5-dated-publication-interim-and-its-end-condition)
+and the [closed retention-scaling gate](#message-author-retention-scaling).
+The interim and this open question do not open G-A7A2-RETENTION-SCALING or
+authorize production issuance, identity or signing.

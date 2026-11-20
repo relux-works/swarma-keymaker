@@ -709,3 +709,277 @@ separately reviewed retention-scaling change provides a persistence layout
 whose per-transition cost does not grow with retained rows, and/or a compaction
 rule preserving permanent request-id rejection. This amendment names that gate;
 it does not design or satisfy it. The unit's `MemoryMax=256M` remains unchanged.
+
+
+## Live issuer (A7a-1)
+
+Status: **source contract only; production issuance, identity and signing remain
+closed**. This section extends the frozen live-participant contract above without
+changing its wire grammar, current-T interface, final-barrier ordering, purpose-9 signing
+language or legacy/J7 gates. Implementation requires separate acceptance of this
+spec revision. It creates no live key, installation or runtime authority.
+
+### I1. Two roots and internal issuance
+
+The message-author participant contains a separate **purpose-5 Ed25519 issuer**
+for its BIP-340 subjects. Its seed is its **own seed**, distinct from the
+purpose-9 seed, with separate custody state and capability. Co-location is not
+root sharing: purpose 9 never signs an attestation, purpose 5 never signs a
+message, and neither capability exposes the other's private material. The
+legacy daemon retains its separate purpose-5 root for purpose-4 Ed25519
+subjects; no legacy master/root, issuer seed or signing hook is shared.
+
+Only internal service code builds and issues attestations from protected own
+bindings. There is no issuance RPC, caller-supplied body/preimage, digest-signing
+hook or subject-key self-certification. Purpose 5 signs only the exact
+attestation/1 language in [message certification section 4](keymaker-msg.md#4-public-key-certification-and-revocation).
+It never signs revocation/1, withdrawal snapshots, Git, registration, witness or
+message preimages. Registry, operator, grant and other root roles remain
+pairwise distinct; a claimed purpose or additional pin cannot widen a role.
+
+### I2. Audited operator source contracts and the issuer pin
+
+The following are source contracts for explicit operator commands, not an
+installation or provisioning runbook. Both require the existing operator
+authorization and durable closed control audit before effects or public output;
+pin-document output is never copied into the audit payload:
+
+| Command | Required effect and limit |
+| --- | --- |
+| `keymaker message-author issuer-seed-init` | Explicit creation of the independent issuer seed in its separate protected custody state; never implicit during startup, enrollment, renewal, recovery or retry. Refuse an existing seed instead of replacing it. Audit `message_author_issuer_seed_init`; disclose no seed or private material. |
+| `keymaker message-author issuer-pin` | Print only the public pin document for the installer, from the selected issuer public key; never print/export private custody. It does not install, replace or approve a pin. |
+
+Host key provisioning belongs to the owner and Infra. This source unit creates
+no live key and performs neither command on an installed host. Root rotation,
+compromise recovery and pin replacement are not authorized by these commands.
+
+The owner installer places `/etc/swarma-keymaker/purpose5-pin.json`, root-owned
+mode **0644**, containing exactly the CCJ-1 object
+`{format:"keymaker-purpose5-pin/1",issuer_key:"ed25519:...",profile:"attestation/1"}`
+followed by LF. The issuer key is the canonical public Ed25519 key ID, not a
+subject K. This is the issuer trust pin, not the independent protected
+expected-head/reader-floor pin of the Store.
+
+At startup, if that pin exists, validate its closed format, ownership/mode and
+exact issuer-key/profile equality before publication. A key mismatch refuses
+startup with the named reason `message_author_issuer_pin_mismatch`; a malformed,
+unreadable or unprotected present pin is not absence and refuses startup.
+Absence is allowed and explicitly recorded as an unpinned standing, never as a
+successful pin check. Verifiers refuse unpinned attestations; pin absence cannot
+become a trust-on-first-use fallback or open the production gate.
+
+### I3. Exact attestation and selected binding
+
+Use the pinned envelope module and its attestation/1 profile, signed-record
+construction and content-ID function from the frozen upstream profile. A is the
+exact signed evidence envelope, at most **8192 raw bytes**; T is its canonical
+`sha256:` content ID. The issuer key ID equals `body.issuer` and the sole author
+signature's key. Purpose 5 signs the full service-built record under
+`swarma-attestation attestation/1` plus LF, never a bare body or message P.
+
+| Profile field | Required value/source |
+| --- | --- |
+| `type` | `attestation/1` |
+| `subject` | Exactly `{algorithm:"BIP-340",key_id:K,public_bytes:base64url(raw_x_only_32)}`; strict canonical K, x-only32 and lift_x checks from the pinned profile. No Ed25519 relabeling or parity-prefixed subject key. |
+| `key_class`, `purpose` | `agent`, `swarma-msg`; numeric purpose 9 selects the subject capability internally, never the wire purpose value. |
+| `roles`, `actions` | Exactly `["author"]`, `["message.sign"]`; no operator, service, approver or concrete action authority. |
+| `iat`, `exp` | The exact typed timestamps of attestation/1; positive validity **at most 86400 s**, start-inclusive/end-exclusive, issuer and verifier enforced. |
+| `binding` | The exact own selected binding: UID, generation, registration number, master epoch, owner and **exact purpose-9 subject path**, with the profile's existing six-member wire shape and typed limits. |
+
+The participant's protected selection additionally binds lifetime/status and
+registry revision, as well as the recorded epoch. They are checked as authority,
+not invented seventh/eighth certificate members. Do not substitute another
+binding, generation or registry revision merely because K is stable. The
+purpose-1 epoch equality remains the audited enrollment assertion specified
+above; this issuer adds no legacy binding feed. The purpose-4 identity-sibling
+mapping is Ed25519-specific, as the erratum in keymaker-msg.md records.
+
+### I4. Issue, renew and select one current T
+
+All issuance/renewal is internal under holder-local `WithActive`, against the
+exact active enrolled binding, and uses trusted time **START at both Lower and
+Upper bounds**. Revalidate binding, own K, registry revision, issuer custody,
+time and withdrawal standing at commit and at every identity/sign release.
+Use the existing ordered generation -> binding/current -> Store -> custody ->
+audit -> callback barrier. No remote proof fetch under locks, cached-current
+Boolean or second independently serving publication point is introduced.
+
+Enrollment may trigger issuance only after the exact active binding exists.
+Durably record pending issuance before signing or publication; preserve the
+exact candidate A/T and supporting audit/commit evidence. Exactly one T is
+selectable per binding. Only a fully proven commit makes its candidate current.
+Issuance/renewal audit is durable before any public disclosure; uncertain writes
+fence rather than claim completion.
+
+Schedule renewal **no later than one hour before exp**. If that threshold is
+already reached, signing/identity close while renewal is required; missing the
+schedule never extends validity. During renewal both signing and identity are
+**closed** until the new T commits, even while the old A remains unexpired.
+The old T is retained only as evidence and never becomes selectable again after
+renewal starts. A failed, cancelled, interrupted or unknown renewal cannot
+reopen it. A renewal requires a new T; keep the subject K stable when its exact
+root/path is unchanged. Old-T retained-signature disclosure still refuses
+`signer_identity_mismatch`; a sender needs new P and a new request ID.
+
+Rebinding or a new registration requires a new T even when K is unchanged.
+Withdraw/retire uses the same exclusion, suppresses pending/current selection
+and every later return, and retains tombstones. Already released bytes cannot
+be recalled. Recovery and reconciliation never issue, re-sign, invent T,
+choose a convenient older attestation or infer currentness from readable bytes.
+
+#### I4.1 States and events
+
+Adapt the issuer draft's table per exact registration instance
+(path, registration number, epoch), with the remaining complete binding identity
+checked on every transition. A successor registration is a new instance;
+predecessor evidence/tombstones remain. Events serialize through `WithActive`.
+
+| State | Meaning |
+| --- | --- |
+| S0 UNBOUND | No exact active enrolled binding for this instance. |
+| S1 BOUND-NO-T | Exact active binding and K, no selectable T. |
+| S2 ISSUE-PENDING | Durable issuance/renewal pending; identity/sign fenced; any predecessor T is unselectable. |
+| S3 CURRENT | Exactly one durably committed current A/T for this exact active binding. |
+| S4 WITHDRAWN | Terminal retirement/revocation/withdrawal of this instance. |
+| S5 FENCED | Durable/continuity evidence cannot prove one state; preserve underlying records and return nothing until audited RESOLVE. |
+
+ISSUE is an internal issue/renew trigger. COMMIT is a proven complete pending
+commit with fresh authority; failed checks classify as their actual event.
+READ is current-T selection, including the final release barrier. REBIND means
+an authorized successor binding, subject to the existing no-resurrection rule.
+WITHDRAW is proven terminal withdrawal. EXPIRE is trusted-time proof that the
+selected current T (S3) or pending candidate T (S2) expired. Expiry of an
+unselectable predecessor alone never makes it current or aborts a valid
+candidate. UNCERTAIN is unknown/conflicting durable or
+continuity evidence. BAD is a clean pre-effect profile/custody refusal, including
+temporary time or generation unavailability; it neither clears nor creates an
+uncertainty fence. CRASH invokes the evidence-only recovery rule below. RESOLVE
+is audited reconciliation proving exactly one durable state, never new issuance.
+
+REFUSE means no success/issuance/publication, unchanged state except bounded
+refusal audit. STAY changes nothing. UNREACHABLE follows the event/state
+definition and requires a cited argument or test; it is not a fallback.
+
+| State | ISSUE | COMMIT | READ | REBIND | WITHDRAW | EXPIRE | UNCERTAIN | BAD | CRASH | RESOLVE |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| S0 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | Bind successor as S1, no T | STAY | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY |
+| S1 | Persist pending, enter S2 | UNREACHABLE: no pending issuance | REFUSE | Replace with exact successor S1, no old T | Tombstone as S4 | UNREACHABLE: no T | Fence as S5 | REFUSE | RECOVER | STAY |
+| S2 | REFUSE | Atomically select new T as S3 | REFUSE | Abort pending; successor S1, predecessor tombstoned | Abort pending; tombstone as S4 | Suppress candidate; enter S1, no old T | Fence as S5 | REFUSE | RECOVER | STAY |
+| S3 | Fence old T; persist pending as S2 | UNREACHABLE: no pending issuance | Return exact K/T/A under barrier | Suppress old T; successor S1, predecessor tombstoned | Suppress current; tombstone as S4 | Suppress current; enter S1 | Fence as S5 | REFUSE | RECOVER | STAY |
+| S4 | REFUSE | UNREACHABLE: no pending issuance | REFUSE | UNREACHABLE in this instance: successor only | STAY | STAY | STAY, no return | REFUSE | RECOVER | STAY |
+| S5 | REFUSE | UNREACHABLE: outcome unproven | REFUSE | STAY fenced | Retain withdrawal evidence; stay fenced | STAY fenced | STAY fenced | REFUSE | RECOVER | Recover the one proven state, else remain S5 |
+
+RECOVER has one rule in every cell: read authoritative durable evidence only;
+select exactly its proven state, otherwise S5. It publishes/returns nothing.
+Complete pending evidence recovers S2, never the old S3; a complete new-current
+commit plus its success audit recovers that exact S3, still subject to fresh
+release authority. Proven withdrawal recovers S4. Partial, zero, missing or
+conflicting candidate/commit/head/audit evidence cannot invent an absent issue
+or a current T. Recovery itself does not sign or finish issuing. A clean
+temporary clock/generation refusal preserves the last proven state, as in
+A7a-2; it cannot clear an existing S5 fence. Every S3 READ rechecks expiry and
+withdrawal first, so an expired/withdrawn T is never returned by that cell.
+
+### I5. Dated publication interim and its end condition
+
+**Owner decision dated 2026-11-20, v1 interim:** until the owner registry exists,
+publication for this issuer is the identity reply carrying exact **K, T, A**.
+The host roster carries T on the a2a side. The sender verifies A under its
+approved per-host purpose-5 pin; identity bytes alone grant no authority.
+This source unit adds neither a fleet export nor a snapshot endpoint, roster
+writer, registry client or /2 currency opt-in.
+
+The **owner registry is the end condition of this interim**. Its builder,
+delivery ownership and transition timing remain open with the keeper and
+owner; no project is assumed to supply it. This dated issuer interim does not
+rewrite the older purpose-4 publication/receiver contract or claim its journal,
+checkpoint, witness or revocation-distribution gates are satisfied. Any registry
+transition requires its own reviewed contract; it cannot silently change T
+selection, pin trust, withdrawal or disclosure rules.
+
+### I6. State revision and shared finite capacity
+
+Issuer-integrated state uses **`keymaker-message-author-state/2` at Store schema
+8, with reader floor exactly 8**. This is a new format revision, not an
+in-place interpretation of /1. A schema-7 store refuses at load with named
+reason `message_author_state_schema_unsupported`. There is **no migration**:
+no earlier store was deployed. Legacy/J7 formats/floors stay unchanged; the
+explicit initializer and separately protected expected-head pin must select
+this exact revision, never auto-upgrade an observed file.
+
+Per exact binding retain current and pending attestation records, their exact
+A/T when present, issuance phase and durable audit/commit identity, plus
+withdrawal/superseded-T tombstones. Pending renewal never grants access to the
+retained predecessor. Binding/root/epoch/registry identity is inseparable from
+these records. All existing attempt evidence and permanent request-ID rejection
+remain; no horizon, eviction or automatic tombstone pruning creates space.
+
+The issuer's share is **inside the existing 11.25 MiB total**, not another
+budget: charge the complete encoded current A plus pending A, their metadata
+and tombstones, with each A at most 8192 raw bytes. Charge actual canonical
+encoding, including base64 expansion; two raw-size allowances alone are not a
+serialized-state bound. Include issuer bytes in every load and transition
+check, concurrent old/staging/new snapshot accounting and the existing 8192
+anchor allowance. The absolute snapshot bound remains
+`(11.25 MiB - 8192 bytes) / 3`; all fresh attempt/enrollment/issuance reservations
+leave the existing 64 KiB retirement headroom **inside** it. Reserve the
+candidate and full commit/tombstone growth before any issue/renew effect;
+retirement/terminal marking must remain possible at the fresh-work ceiling.
+Capacity exhaustion refuses `state_capacity_exceeded` before issuance/signing,
+retains evidence and never evicts an old request or makes old T current.
+No existing numeric cap or memory policy is raised by this section.
+
+### I7. Audit and one closed production gate
+
+Extend only the participant's existing closed section-11 audit vocabulary:
+
+| Operation | Surface / domain | Content rule |
+| --- | --- | --- |
+| `message_author_attestation_issue` | `control` / `control` | Digest-only evidence identity, no raw A, signed record or private material. |
+| `message_author_attestation_renew` | `control` / `control` | Digest-only old/new evidence identity, no raw A or signed bytes. |
+| `message_author_attestation_fence` | `control` / `control` | Digest-only retained evidence; no free-form reason payload. |
+| `message_author_issuer_seed_init` | `control` / `control` | Existing no-payload control representation; never seed/private data. |
+
+Bounded refusal audit and fail-closed append/sync/recovery rules remain intact.
+No seed, chain code, private key, raw attestation/preimage/signature, native
+frame or free-form client error enters logs/audit.
+
+Implement and exercise the real internal current-T provider in tests behind the
+**same frozen per-binding interface**, including all admission and final-barrier
+rechecks. In production **G-A7A2-RETENTION-SCALING remains CLOSED**: issuance
+MUST NOT run and identity/sign MUST refuse `message_author_unqualified` while it
+is closed. This is the **one named activation gate** for the integrated issuer;
+implementation, enrollment, seed initialization, pin presence or publication
+interim cannot open it. Opening it is a separate reviewed unit satisfying the
+retention-scaling contract, not a switch, fixture provider or side effect of
+this spec. Other existing qualification obligations remain obligations, not
+claims of new authority.
+
+### I8. Required implementation negatives and paired controls
+
+These are requirements for the later implementation, not tests run by this
+spec-only change. Each clean refusal proves no signature, publication or
+state change beyond permitted bounded audit; keep valid controls so a
+reject-all issuer fails. Each changed enforcement site needs a bounded plant
+whose named test detects the intended violation, with real exits and any
+survivor reported honestly. Exercise every reachable state-table cell and
+justify UNREACHABLE cells from its event definition.
+
+| Negative witness | Nearby valid control and required observation |
+| --- | --- |
+| Wrong subject algorithm or noncanonical/non-x-only K | Exact BIP-340 subject issues; changing only algorithm/key shape refuses. |
+| Wrong roles, actions or numeric wire purpose | Exact author/message.sign/swarma-msg issues; each one-field mutation refuses without wider authority. |
+| Validity over 86400 s | Positive validity exactly 86400 s passes; over-cap refuses even with otherwise valid bytes. |
+| Purpose-9 self-issue | Separate purpose-5 issuer succeeds; purpose-9 capability has no attestation path and produces no certificate. |
+| Revocation/1 or any other non-attestation bytes | Internally built attestation succeeds; purpose 5 refuses every other language, including message P. |
+| Unbound, retired or revoked subject | Exact active enrollment issues; no cached active binding or equal K revives withdrawn authority. |
+| Rebind retaining old T | Successor with unchanged K still needs new T; neither identity nor retained-signature disclosure uses predecessor T. |
+| Renewal returning old T or selecting two currents | Initial current selection succeeds; identity/sign close throughout pending renewal and only the new committed T returns, never old T after failure/cancel/restart. |
+| Issuer/pin mismatch at startup | Exact protected pin passes; mismatch refuses by name. Absent pin starts as explicitly unpinned, and verifier still refuses; malformed present pin never falls through to absence. |
+| Crash around issue/renew commit | Proven complete current/audit reloads exactly; before-commit, partial, zero, conflicting and unknown evidence never invent T or reopen old T. |
+| Untrusted time or stale/withdrawn binding at either bound/barrier | Fresh qualified control commits/returns; temporary unavailable evidence refuses without clearing or inventing a fence; proven uncertainty stays fenced. |
+| Issuer bytes exhaust shared state | Under-budget current/pending pair issues; overflow refuses before effects, full loader rejects oversized state and retire preserves tombstones at the ceiling. |
+| Production gate closed | Test-injected qualified real provider exercises issue/renew/read; production remains refusing with no issuance even with valid seed, pin and binding. |
+
+Keep the legacy purpose-4 issuer and all other-role isolation witnesses. This
+contract neither provisions the issuer nor activates a host.

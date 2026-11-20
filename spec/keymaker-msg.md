@@ -438,6 +438,11 @@ No NUL prefix, bare-body signature or `{body,signature}` wrapper is accepted.
 | `binding.owner` | Exact protected owner, nonempty UTF-8 at most 255 bytes |
 | `binding.path` | Exact purpose-4 path `m/4'/product'/project'/agent'`, nonempty UTF-8 at most 255 bytes; additionally enforce our four hardened components and identity-sibling relationship |
 
+Erratum: the purpose-1 to purpose-4 (`m/1'` to `m/4'`) path mapping
+above covers Ed25519 (purpose-4) subjects only. For BIP-340 subjects,
+`binding.path` is the exact purpose-9 path; see
+[Live issuer (A7a-1)](keymaker-message-author.md#live-issuer-a7a-1).
+
 The binding object has exactly those six members. Compare independently typed
 protected current-generation evidence with those fields plus boolean
 `active:true`; no normalization or coercion and no absence-equals-absence.

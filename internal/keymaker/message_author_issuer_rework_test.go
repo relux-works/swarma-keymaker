@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -379,12 +380,49 @@ type maiStatus chan string
 
 func (w maiStatus) Write(p []byte) (int, error) { w <- string(p); return len(p), nil }
 
+// Startup's issuer seed is a MADV_DONTDUMP mapping. With no parallel tests,
+// unchanged protected mapping size after refusal checks that startup unmapped it;
+// this reads mapping metadata only, not seed memory or production custody files.
+func maiProtectedMappingKiB(t *testing.T) uint64 {
+	t.Helper()
+	raw, err := os.ReadFile("/proc/self/smaps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var size, total uint64
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 3 && fields[0] == "Size:" && fields[2] == "kB" {
+			size, err = strconv.ParseUint(fields[1], 10, 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if len(fields) > 0 && fields[0] == "VmFlags:" {
+			for _, flag := range fields[1:] {
+				if flag == "dd" {
+					total += size
+				}
+			}
+		}
+	}
+	if total == 0 {
+		t.Fatal("no protected fixture mapping observed")
+	}
+	return total
+}
+
 // Real startup (not just the pin parser) must refuse malformed/mismatched pins
 // and invalid custody before readiness/socket creation; matching and absent pins
 // start beside them, retain the production closed provider, and erase the seed.
 func TestMAIssuerStartupProduction(t *testing.T) {
-	for _, fault := range []string{"match", "absent", "key", "malformed", "format", "profile", "no-seed", "seed-mode", "seed-mode-absent", "seed-empty"} {
+	for _, fault := range []string{"match", "absent", "key", "malformed", "format", "profile", "no-seed", "seed-mode", "seed-mode-absent", "seed-empty", "production-binding"} {
 		t.Run(fault, func(t *testing.T) {
+			// The production binding refuses a non-root-owned pin even when its
+			// content matches; match above is the fixture-owner positive control.
+			if fault == "production-binding" && os.Getuid() == 0 {
+				t.Skip("production pin ownership refusal requires a non-root test uid; startup refuses root separately")
+			}
 			f, i := newMAIssuerFixture(t)
 			cfg, _ := maiServiceConfig(t, f)
 			seed := bytes.Repeat([]byte{0xa5}, 32)
@@ -431,9 +469,16 @@ func TestMAIssuerStartupProduction(t *testing.T) {
 			f.h.store.Close()
 			d := maiDeps(t, f, head)
 			var loaded *maIssuerKey
-			d.pinCheck = func(p string, k *maIssuerKey) (bool, Code) {
-				loaded = k
-				return maIssuerStartupPinOwner(p, k, uint32(os.Getuid()))
+			var protectedBefore uint64
+			if fault == "production-binding" {
+				// Keep the real production checker. Observe cleanup through its
+				// MADV_DONTDUMP mapping rather than replacing it to capture a key.
+				protectedBefore = maiProtectedMappingKiB(t)
+			} else {
+				d.pinCheck = func(p string, k *maIssuerKey) (bool, Code) {
+					loaded = k
+					return maIssuerStartupPinOwner(p, k, uint32(os.Getuid()))
+				}
 			}
 			status := make(maiStatus, 8)
 			ctx, cancel := context.WithCancel(t.Context())
@@ -494,6 +539,9 @@ func TestMAIssuerStartupProduction(t *testing.T) {
 				}
 				if _, e := os.Stat(filepath.Join(cfg.maLive.Socket.Dir, "control.sock")); !os.IsNotExist(e) {
 					t.Fatal("refused pin published socket")
+				}
+				if fault == "production-binding" && maiProtectedMappingKiB(t) != protectedBefore {
+					t.Fatal("refused production startup retained issuer seed mapping")
 				}
 				if loaded != nil {
 					loaded.mu.Lock()

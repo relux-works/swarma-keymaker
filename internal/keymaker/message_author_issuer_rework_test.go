@@ -5,6 +5,7 @@ package keymaker
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -416,15 +417,24 @@ func maiProtectedMappingKiB(t *testing.T) uint64 {
 // and invalid custody before readiness/socket creation; matching and absent pins
 // start beside them, retain the production closed provider, and erase the seed.
 func TestMAIssuerStartupProduction(t *testing.T) {
-	for _, fault := range []string{"match", "absent", "key", "malformed", "format", "profile", "no-seed", "seed-mode", "seed-mode-absent", "seed-empty", "production-binding"} {
+	for _, fault := range []string{"match", "absent", "key", "malformed", "format", "profile", "no-seed", "seed-mode", "seed-mode-absent", "seed-empty", "production-binding", "production-absent"} {
 		t.Run(fault, func(t *testing.T) {
-			// The production binding refuses a non-root-owned pin even when its
-			// content matches; match above is the fixture-owner positive control.
-			if fault == "production-binding" && os.Getuid() == 0 {
-				t.Skip("production pin ownership refusal requires a non-root test uid; startup refuses root separately")
+			// The production binding refuses a matching pin placed under a
+			// non-root-owned directory; match is the fixture-owner control.
+			production := fault == "production-binding" || fault == "production-absent"
+			if production && os.Getuid() == 0 {
+				t.Skip("production pin startup checks require a non-root test uid; startup refuses root separately")
 			}
 			f, i := newMAIssuerFixture(t)
 			cfg, _ := maiServiceConfig(t, f)
+			if fault == "production-absent" {
+				// The production binding admits absence and reaches ready, so a
+				// refuse-all checker cannot pass. Only inspect this random root child.
+				cfg.maLive.IssuerPin = "/keymaker-fixture-absent-" + rand.Text()
+				if _, err := os.Lstat(cfg.maLive.IssuerPin); !os.IsNotExist(err) {
+					t.Fatal("random production-absent pin path is not missing", err)
+				}
+			}
 			seed := bytes.Repeat([]byte{0xa5}, 32)
 			if fault == "seed-empty" {
 				seed = nil
@@ -460,7 +470,7 @@ func TestMAIssuerStartupProduction(t *testing.T) {
 			case "profile":
 				pin = bytes.Replace(pin, []byte("attestation/1"), []byte("attestation/0"), 1)
 			}
-			if fault != "absent" && fault != "seed-mode-absent" {
+			if fault != "absent" && fault != "seed-mode-absent" && fault != "production-absent" {
 				if e := os.WriteFile(cfg.maLive.IssuerPin, pin, 0644); e != nil {
 					t.Fatal(e)
 				}
@@ -470,7 +480,7 @@ func TestMAIssuerStartupProduction(t *testing.T) {
 			d := maiDeps(t, f, head)
 			var loaded *maIssuerKey
 			var protectedBefore uint64
-			if fault == "production-binding" {
+			if production {
 				// Keep the real production checker. Observe cleanup through its
 				// MADV_DONTDUMP mapping rather than replacing it to capture a key.
 				protectedBefore = maiProtectedMappingKiB(t)
@@ -485,7 +495,7 @@ func TestMAIssuerStartupProduction(t *testing.T) {
 			defer cancel()
 			done := make(chan error, 1)
 			go func() { done <- serveMALive(ctx, cfg, status, d) }()
-			if fault == "match" || fault == "absent" {
+			if fault == "match" || fault == "absent" || fault == "production-absent" {
 				foundAbsent := false
 				for {
 					select {
@@ -503,14 +513,20 @@ func TestMAIssuerStartupProduction(t *testing.T) {
 					}
 				}
 			ready:
-				if foundAbsent != (fault == "absent") {
+				if foundAbsent != (fault == "absent" || fault == "production-absent") {
 					t.Fatal("absent pin status missing or forged")
 				}
-				loaded.mu.Lock()
-				closed := loaded.closed && len(loaded.seed) == 0
-				loaded.mu.Unlock()
-				if !closed {
-					t.Fatal("startup retained issuer seed")
+				if fault == "production-absent" {
+					if maiProtectedMappingKiB(t) != protectedBefore {
+						t.Fatal("production absent startup retained issuer seed mapping")
+					}
+				} else {
+					loaded.mu.Lock()
+					closed := loaded.closed && len(loaded.seed) == 0
+					loaded.mu.Unlock()
+					if !closed {
+						t.Fatal("startup retained issuer seed")
+					}
 				}
 				cancel()
 				if e := <-done; e != nil {

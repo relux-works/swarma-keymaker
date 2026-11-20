@@ -13,7 +13,7 @@ import (
 )
 
 func runMessageAuthor(ctx context.Context, args []string, out, errOut io.Writer) int {
-	if len(args) == 0 || args[0] != "init" && args[0] != "enroll" && args[0] != "retire" {
+	if len(args) == 0 || args[0] != "init" && args[0] != "enroll" && args[0] != "retire" && args[0] != "issuer-seed-init" && args[0] != "issuer-pin" {
 		return 2
 	}
 	flags := flag.NewFlagSet("message-author "+args[0], flag.ContinueOnError)

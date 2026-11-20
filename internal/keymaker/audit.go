@@ -174,26 +174,27 @@ type auditSeal struct {
 	Digest string `json:"last_digest"`
 }
 type Journal struct {
-	maLiveEvents map[uint64]AuditRecord
-	mu           auditGate
-	dir          *os.File
-	file         *os.File
-	writer       durableFile
-	uid          uint32
-	instance     string
-	seq          uint64
-	previous     string
-	first        uint64
-	segment      uint64
-	size         int64
-	total        int64
-	failed       bool
-	segmentLimit int64
-	totalLimit   int64
-	reserve      int64
-	clock        AuditClock
-	binding      bindingCommit
-	generation   generationCommit
+	maLiveEvents   map[uint64]AuditRecord
+	maIssuerEvents map[uint64]AuditRecord
+	mu             auditGate
+	dir            *os.File
+	file           *os.File
+	writer         durableFile
+	uid            uint32
+	instance       string
+	seq            uint64
+	previous       string
+	first          uint64
+	segment        uint64
+	size           int64
+	total          int64
+	failed         bool
+	segmentLimit   int64
+	totalLimit     int64
+	reserve        int64
+	clock          AuditClock
+	binding        bindingCommit
+	generation     generationCommit
 
 	deferredWriter bool // Stopped-operator replay creates no writer until a commit.
 	createSegment  bool

@@ -19,10 +19,10 @@ func main() {
 	scratch := flag.String("scratch", "", "existing task scratch parent")
 	only := flag.String("only", "", "run one named plant within the selected group")
 	applies := flag.Bool("check-applies", false, "check selected source plants without running tests")
-	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle message-author, message-author-live or j7-service controls")
+	group := flag.String("group", "core", "core (including native), native, registration, helper, packaging, genjournal-core, genjournal, message-key, message-state, j7-state j7-continuity j7-signing j7-delegation, j7-delegation-r2, j7-lifecycle-wire, j7-idle message-author, message-author-live, message-author-issuer or j7-service controls")
 	flag.Parse()
-	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author-live" && *group != "message-author" && *group != "j7-service") {
-		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author|message-author-live|j7-service]")
+	if *scratch == "" || flag.NArg() != 0 || (*group != "core" && *group != "native" && *group != "registration" && *group != "helper" && *group != "packaging" && *group != "genjournal-core" && *group != "genjournal" && *group != "message-key" && *group != "message-state" && *group != "j7-state" && *group != "j7-continuity" && *group != "j7-signing" && *group != "j7-delegation" && *group != "j7-delegation-r2" && *group != "j7-lifecycle-wire" && *group != "j7-idle" && *group != "message-author-live" && *group != "message-author" && *group != "j7-service" && *group != "message-author-issuer") {
+		fmt.Fprintln(os.Stderr, "use -scratch <directory> [-group core|native|registration|helper|packaging|genjournal-core|genjournal|message-key|message-state|j7-state|j7-continuity|j7-signing|j7-delegation|j7-delegation-r2|j7-lifecycle-wire|j7-idle|message-author|message-author-live|message-author-issuer|j7-service]")
 		os.Exit(2)
 	}
 	root, e := os.Getwd()
@@ -427,6 +427,36 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			{"generation-skip-floor", "generation_linux.go", `g.window.WithEvidence(ctx, g.anchor.Path, g.anchor.Floor,`, `g.window.WithEvidence(ctx, g.anchor.Path, gj.Floor{Hash:gj.ZeroHash},`, "^TestGenerationAnchorContinuity$/^(rollback|fork)$", "--- FAIL: TestGenerationAnchorContinuity/rollback", "incident not fenced once"},
 		}
 	}
+
+	if *group == "message-author-issuer" {
+		controls = []struct{ name, file, old, new, test, needle, witness string }{
+			{"mai-pending-current", "message_author_issuer.go", `r.Phase == "current" && pc == ""`, `pc == ""`, "^TestMAIssuerRenewal$", "--- FAIL: TestMAIssuerRenewal", `current gate got "" want "message_author_unqualified"`},
+			{"mai-cancel-proof", "message_author_issuer.go", `a.Digest != r.CancelHash`, `false`, "^TestMAIssuerCancelRecovery$", "--- FAIL: TestMAIssuerCancelRecovery/true", "false cancellation proof accepted"},
+			{"mai-cancel-after-commit", "message_author_issuer.go", `if r.Phase != "pending" {`, `if false && r.Phase != "pending" {`, "^TestMAIssuerRenewal$", "--- FAIL: TestMAIssuerRenewal", "post-commit cancellation changed evidence"},
+			{"mai-unknown-audit", "message_author_issuer.go", `if a.Seq > s.auditSeq && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {`, `if false && a.Seq > s.auditSeq && (a.Operation == "message_author_attestation_issue" || a.Operation == "message_author_attestation_renew") {`, "^TestMAIssuerCrash$/^mai-success-audit$", "--- FAIL: TestMAIssuerCrash/mai-success-audit", "unknown cancellation restored"},
+			{"mai-pin-equality", "message_author_issuer_custody_linux.go", `if pin.Issuer != key {`, `if false && pin.Issuer != key {`, "^TestMAIssuerCustodyPin$/^key$", "--- FAIL: TestMAIssuerCustodyPin/key", "pin mutation key"},
+			{"mai-profile-reader", "message_author_issuer.go", `if !bytes.Equal(want, got) {`, `if false && !bytes.Equal(want, got) {`, "^TestMAIssuerEnvelopeClosed$/^(roles|actions|purpose|algorithm|binding)$", "--- FAIL: TestMAIssuerEnvelopeClosed/roles", "wider signed issuer record accepted"},
+			{"mai-lifetime", "message_author_issuer.go", `lifetime > 86400*time.Second`, `false`, "^TestMAIssuerProfile$", "--- FAIL: TestMAIssuerProfile", "lifetime gate"},
+			{"mai-interval-lower", "message_author_issuer.go", `maLiveInterval(at, from, until)`, `(at.startBoundsValid() && at.Upper.Before(until))`, "^TestMAIssuerInterval$/^lower$", "--- FAIL: TestMAIssuerInterval/lower", "issuer interval lost bound"},
+			{"mai-interval-upper", "message_author_issuer.go", `maLiveInterval(at, from, until)`, `(at.startBoundsValid() && !at.Lower.Before(from))`, "^TestMAIssuerInterval$/^upper$", "--- FAIL: TestMAIssuerInterval/upper", "issuer interval lost bound"},
+			{"mai-shared-budget", "message_author_issuer.go", `if !maLiveStateRoom(before + 2*((8192+2)/3*4) + 2048 + maLiveRetireReserve) {`, `if false && !maLiveStateRoom(before + 2*((8192+2)/3*4) + 2048 + maLiveRetireReserve) {`, "^TestMAIssuerCapacity$", "--- FAIL: TestMAIssuerCapacity", "over-cap issue changed durable state"},
+			{"mai-current-audit", "message_author_issuer.go", `&& s.maIssuerCommitted(r.Current) {`, `{`, "^TestMAIssuerCurrentProof$/^audit$", "--- FAIL: TestMAIssuerCurrentProof/audit", `current gate got "" want "message_author_unqualified"`},
+			{"mai-current-root", "message_author_issuer.go", `&& maIssuerSignedBy(r.Current, pub)`, `&& (pub == "" || pub != "")`, "^TestMAIssuerCurrentProof$/^root$", "--- FAIL: TestMAIssuerCurrentProof/root", `current gate got "" want "message_author_unqualified"`},
+			{"mai-retained-t", "message_author_live.go", `if a.Attestation != tuple.T {`, `if false && a.Attestation != tuple.T {`, "^TestMAIssuerOldTRelease$", "--- FAIL: TestMAIssuerOldTRelease", "old T not dead"},
+			{"mai-tombstone-reuse", "message_author_issuer.go", `if old == nextT {`, `if false && old == nextT {`, "^TestMAIssuerTombstoneNoResurrection$", "--- FAIL: TestMAIssuerTombstoneNoResurrection", "tombstoned candidate resurrected"},
+			{"mai-timestamp", "message_author_issuer.go", `messageStamp(from) == c.From && messageStamp(until) == c.Until`, `true`, "^TestMAIssuerEnvelopeClosed$/^timestamp$", "--- FAIL: TestMAIssuerEnvelopeClosed/timestamp", "wider signed issuer record accepted"},
+			{"mai-expiry-proof", "message_author_issuer.go", `if e != nil || !at.startBoundsValid() || at.Lower.Before(until) {`, `if e != nil || !at.startBoundsValid() || at.Upper.Before(until) {`, "^TestMAIssuerExpiry$/^pending$", "--- FAIL: TestMAIssuerExpiry/pending", "unproven expiry changed evidence"},
+			{"mai-expiry-uncertain", "message_author_issuer.go", `if s.maIssuerUnpaired() || r.Current != nil && !s.maIssuerCommitted(r.Current) {`, `if r.Current != nil && !s.maIssuerCommitted(r.Current) {`, "^TestMAIssuerExpiry$/^unknown$", "--- FAIL: TestMAIssuerExpiry/unknown", "unknown commit erased by expiry"},
+			{"mai-resolve-proof", "message_author_issuer.go", `|| !s.maIssuerCommitted(r.Current) ||`, `|| false ||`, "^TestMAIssuerStateBoundaries$/^fenced$", "--- FAIL: TestMAIssuerStateBoundaries/fenced", "unknown resolution changed evidence"},
+			{"mai-withdraw-fence", "message_author_live_operator_linux.go", `if r.Phase != "fenced" {`, `if true {`, "^TestMAIssuerStateBoundaries$/^fenced$", "--- FAIL: TestMAIssuerStateBoundaries/fenced", "withdraw cleared fence"},
+			{"mai-production-closed", "message_author_live.go", `func (maLiveUnqualified) WithCurrent(context.Context, Binding, j7GateTime, func(maLiveTuple) Code) Code {
+	return "message_author_unqualified"
+}`, `func (maLiveUnqualified) WithCurrent(context.Context, Binding, j7GateTime, func(maLiveTuple) Code) Code {
+	return ""
+}`, "^TestMAIssuerSchemaProduction$", "--- FAIL: TestMAIssuerSchemaProduction", "production gate opened"},
+		}
+	}
+
 	dependencySource := ""
 	dependencyWorkspace := ""
 	if *group == "genjournal" {
@@ -580,7 +610,7 @@ case "journal_rollback", "journal_fork", "journal_capacity_reserve":`, "^TestGen
 			os.Exit(2)
 		}
 		killed := status == 1 && bytes.Contains(out, []byte(c.needle)) && bytes.Contains(out, []byte(c.witness))
-		if *group == "core" || *group == "native" || *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "message-author-live" || *group == "j7-service" {
+		if *group == "core" || *group == "native" || *group == "j7-delegation" || *group == "j7-delegation-r2" || *group == "j7-lifecycle-wire" || *group == "j7-idle" || *group == "message-author" || *group == "message-author-live" || *group == "j7-service" || *group == "message-author-issuer" {
 			// Bind every new bounded plant's real child command and output to its own
 			// receipt; an applied setup/compile failure still cannot count as a kill.
 			receipt, err := json.MarshalIndent(map[string]any{

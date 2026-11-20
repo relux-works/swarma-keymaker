@@ -39,7 +39,7 @@
   },
   "state": {
     "path": "/var/lib/swarma-keymaker-ma/state",
-    "minimum_reader_schema": 7,
+    "minimum_reader_schema": 8,
     "head_file": "/REPLACE_WITH_INSTALLER_SELECTED_PROTECTED_MA_HEAD"
   }
 }

@@ -109,7 +109,7 @@ func TestMessageAuthorSourceIsolation(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		allowed := path == "message_author_key.go" || path == "message_author_preimage.go" || path == "message_author_live.go" || path == "message_author_live_state.go" || path == "message_author_live_service_linux.go" || path == "message_author_live_custody_linux.go"
+		allowed := path == "message_author_issuer.go" || path == "message_author_key.go" || path == "message_author_preimage.go" || path == "message_author_live.go" || path == "message_author_live_state.go" || path == "message_author_live_service_linux.go" || path == "message_author_live_custody_linux.go"
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.Ident:

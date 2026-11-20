@@ -438,7 +438,7 @@ func TestMALiveProductionProviderRefuses(t *testing.T) {
 func TestMALiveSchemaAndExplicitInit(t *testing.T) {
 	f := newMALiveFixture(t)
 	if _, e := loadStoreMessage(f.dir, uint32(os.Getuid()), 0, false); e == nil {
-		t.Fatal("old reader accepted schema 7")
+		t.Fatal("old reader accepted schema 8")
 	}
 	if _, c := initMALive(t.Context(), f.dir, uint32(os.Getuid()), fixtureAuditClock{}, f.h.key.instance, f.b.Epoch, f.b.RegistryRevision); c != "message_author_unqualified" {
 		t.Fatal("implicit reinitialization", c)
@@ -450,7 +450,7 @@ func TestMALiveSchemaAndExplicitInit(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer dir.Close()
-	if _, e = loadStoreMessage(dir, uint32(os.Getuid()), 7, false); e == nil {
+	if _, e = loadStoreMessage(dir, uint32(os.Getuid()), 8, false); e == nil {
 		t.Fatal("serve initialized empty state")
 	}
 	entries, _ := dir.ReadDir(-1)

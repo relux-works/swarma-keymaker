@@ -89,6 +89,24 @@ func serveMALive(ctx context.Context, cfg Config, status io.Writer, d maLiveServ
 	if s.maLive.Instance != m.Instance || s.maLive.Epoch != m.Epoch || s.maLive.Registry != m.Registry || s.maLive.Fenced {
 		return Code("message_author_unqualified")
 	}
+	// Pin validation never opens issuance. Missing issuer custody is allowed
+	// only with an absent pin; a present pin requires the exact independent key.
+	issuer, issuerCode := loadMAIssuerKey(state, uid)
+	if issuerCode == "" {
+		defer issuer.close()
+	} else {
+		var st unix.Stat_t
+		if e := unix.Fstatat(int(state.Fd()), maIssuerSeedFile, &st, unix.AT_SYMLINK_NOFOLLOW); e != unix.ENOENT {
+			return issuerCode
+		}
+	}
+	pinned, pinCode := maIssuerStartupPin(m.IssuerPin, issuer)
+	if pinCode != "" {
+		return pinCode
+	}
+	if status != nil && !pinned {
+		_, _ = io.WriteString(status, "issuer_pin=absent\n")
+	}
 	if d.generation == nil {
 		return Code("generation_source_unavailable")
 	}

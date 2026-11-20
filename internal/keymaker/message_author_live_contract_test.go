@@ -381,7 +381,7 @@ func TestMALivePackagingContract(t *testing.T) {
 		t.Fatal("packaging config control", e)
 	}
 	m := cfg.maLive
-	if m.State.Minimum != 7 || m.Socket.Dir != "/run/swarma-keymaker-ma" || m.Socket.Group == 0 || m.State.Head != "/REPLACE_WITH_INSTALLER_SELECTED_PROTECTED_MA_HEAD" {
+	if m.State.Minimum != 8 || m.Socket.Dir != "/run/swarma-keymaker-ma" || m.Socket.Group == 0 || m.State.Head != "/REPLACE_WITH_INSTALLER_SELECTED_PROTECTED_MA_HEAD" {
 		t.Fatal("packaging custody contract drift")
 	}
 	unit, e := os.ReadFile("../../packaging/swarma-keymaker-message-author.service")
@@ -408,7 +408,7 @@ func TestMALivePackagingContract(t *testing.T) {
 	if _, e := protectedJ7Head(path); e == nil {
 		t.Fatal("unprotected expected head admitted")
 	}
-	changed := strings.Replace(string(raw), `"minimum_reader_schema": 7`, `"minimum_reader_schema": 6`, 1)
+	changed := strings.Replace(string(raw), `"minimum_reader_schema": 8`, `"minimum_reader_schema": 6`, 1)
 	if _, e := ParseConfig(strings.NewReader(changed)); e == nil {
 		t.Fatal("old schema floor accepted")
 	}

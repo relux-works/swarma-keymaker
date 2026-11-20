@@ -7,7 +7,7 @@ import (
 
 func maLiveOperation(op string) bool {
 	switch op {
-	case "message_author_identity", "sign_message_author", "message_author_init", "message_author_enroll", "message_author_retire", "message_author_release", "message_author_fence", "message_author_reconcile":
+	case "message_author_attestation_issue", "message_author_attestation_renew", "message_author_attestation_fence", "message_author_issuer_seed_init", "message_author_identity", "sign_message_author", "message_author_init", "message_author_enroll", "message_author_retire", "message_author_release", "message_author_fence", "message_author_reconcile":
 		return true
 	}
 	return false
@@ -28,6 +28,10 @@ func validMALiveAudit(r AuditRecord) error {
 		if r.PayloadDigest == nil || !validDigest(*r.PayloadDigest) || r.RequestID == nil || !maLiveID(*r.RequestID) || r.PeerUID == nil || r.Generation == nil {
 			return failure("invalid message-author sign audit")
 		}
+	} else if strings.HasPrefix(r.Operation, "message_author_attestation_") {
+		if r.PayloadDigest == nil || !validDigest(*r.PayloadDigest) {
+			return failure("missing issuer evidence digest")
+		}
 	} else if r.PayloadDigest != nil {
 		return failure("payload in message-author control audit")
 	}
@@ -42,6 +46,12 @@ func validMALiveAudit(r AuditRecord) error {
 func (j *Journal) observeMALive(r AuditRecord) error {
 	if e := validMALiveAudit(r); e != nil {
 		return e
+	}
+	if strings.HasPrefix(r.Operation, "message_author_attestation_") {
+		if j.maIssuerEvents == nil {
+			j.maIssuerEvents = map[uint64]AuditRecord{}
+		}
+		j.maIssuerEvents[r.Seq] = r
 	}
 	if r.Operation == "sign_message_author" {
 		if j.maLiveEvents == nil {
@@ -99,7 +109,7 @@ func (s *Store) recoverMALive(ctx context.Context) Code {
 		return "message_author_unqualified"
 	}
 	wasFenced := s.maLive.Fenced
-	changed := false
+	changed := s.recoverMAIssuers()
 	var rows []int
 	for i := range s.maLive.Attempts {
 		a := &s.maLive.Attempts[i]

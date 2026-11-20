@@ -9,14 +9,15 @@ import (
 )
 
 type maLiveConfiguration struct {
-	Role     string    `json:"service_role"`
-	Instance string    `json:"instance_id"`
-	UID      uint32    `json:"service_uid"`
-	GID      uint32    `json:"service_gid"`
-	Epoch    string    `json:"master_epoch"`
-	Registry string    `json:"registry_revision"`
-	Operator Principal `json:"operator_principal"`
-	State    struct {
+	IssuerPin string    `json:"issuer_pin,omitempty"`
+	Role      string    `json:"service_role"`
+	Instance  string    `json:"instance_id"`
+	UID       uint32    `json:"service_uid"`
+	GID       uint32    `json:"service_gid"`
+	Epoch     string    `json:"master_epoch"`
+	Registry  string    `json:"registry_revision"`
+	Operator  Principal `json:"operator_principal"`
+	State     struct {
 		Path    string `json:"path"`
 		Minimum int    `json:"minimum_reader_schema"`
 		Head    string `json:"head_file"`
@@ -27,13 +28,19 @@ type maLiveConfiguration struct {
 }
 
 func unmarshalMALiveConfig(raw []byte, cfg *Config) error {
-	fields, e := objectMembers(raw, []string{"service_role", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision", "operator_principal", "state", "socket"}, "time_policy", "generation_journal")
+	fields, e := objectMembers(raw, []string{"service_role", "instance_id", "service_uid", "service_gid", "master_epoch", "registry_revision", "operator_principal", "state", "socket"}, "time_policy", "generation_journal", "issuer_pin")
 	if e != nil {
 		return e
 	}
 	var m maLiveConfiguration
 	if StrictJSON(bytes.NewReader(raw), &m) != nil || m.Role != messageAuthorRole || !validJ7Instance(m.Instance) || m.Epoch == "" || m.Registry == "" || !validGeneration(m.Operator.Generation) {
 		return failure("invalid message-author configuration")
+	}
+	if m.IssuerPin != "" && !cleanAbsolute(m.IssuerPin) {
+		return failure("invalid issuer pin path")
+	}
+	if m.IssuerPin == "" {
+		m.IssuerPin = maIssuerPinDefault
 	}
 	if m.UID == 0 || m.GID == 0 {
 		return Code("role_not_permitted")

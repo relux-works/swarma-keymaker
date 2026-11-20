@@ -305,12 +305,12 @@ func TestMALiveNoMaterialInDiagnostics(t *testing.T) {
 // The closed operation/domain contract is checked before touching the writer;
 // every allowed operation has its exact positive shape beside wrong domains.
 func TestMALiveAuditOperations(t *testing.T) {
-	for _, op := range []string{"message_author_identity", "sign_message_author", "message_author_init", "message_author_enroll", "message_author_retire", "message_author_release", "message_author_fence", "message_author_reconcile"} {
+	for _, op := range []string{"message_author_attestation_issue", "message_author_attestation_renew", "message_author_attestation_fence", "message_author_issuer_seed_init", "message_author_identity", "sign_message_author", "message_author_init", "message_author_enroll", "message_author_retire", "message_author_release", "message_author_fence", "message_author_reconcile"} {
 		t.Run(op, func(t *testing.T) {
 			f := newMALiveFixture(t)
 			s := f.h.store
 			var digest *string
-			if op == "sign_message_author" {
+			if op == "sign_message_author" || strings.HasPrefix(op, "message_author_attestation_") {
 				v := maLiveHash(f.preimage)
 				digest = &v
 			}

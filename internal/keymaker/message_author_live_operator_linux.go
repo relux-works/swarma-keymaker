@@ -24,7 +24,7 @@ func initMALive(ctx context.Context, dir *os.File, uid uint32, clock AuditClock,
 	}
 	s.initialized = false
 	s.schema = maLiveSchema
-	s.maLive = &maLiveInventory{Format: "keymaker-message-author-state/1", Instance: instance, Epoch: epoch, Registry: registry, Attempts: []maLiveAttempt{}}
+	s.maLive = &maLiveInventory{Format: "keymaker-message-author-state/2", Instance: instance, Epoch: epoch, Registry: registry, Attempts: []maLiveAttempt{}, Issuers: []maIssuerRecord{}}
 	if syscall.Mkdirat(int(dir.Fd()), "audit", 0700) != nil || dir.Sync() != nil {
 		return nil, "audit_unavailable"
 	}
@@ -52,6 +52,9 @@ func initMALive(ctx context.Context, dir *os.File, uid uint32, clock AuditClock,
 func openMALive(dir *os.File, uid uint32, clock AuditClock, expected j7Expectation) (*Store, Code) {
 	s, _, _, e := openCustodyStateMessage(dir, uid, clock, maLiveSchema, false, expected)
 	if e != nil {
+		if e == Code("message_author_state_schema_unsupported") {
+			return nil, "message_author_state_schema_unsupported"
+		}
 		return nil, "message_author_unqualified"
 	}
 	if !s.j7HeadMatches(expected) {
@@ -125,6 +128,24 @@ func (s *Store) retireMALive(ctx context.Context, p Principal, number uint64) Co
 				return c
 			}
 			s.records[i].Status = "revoked"
+			for n := range s.maLive.Issuers {
+				r := &s.maLive.Issuers[n]
+				if r.Binding.Number == number {
+					if r.Current != nil {
+						r.Tombstones = append(r.Tombstones, r.Current.T)
+					}
+					if r.Pending != nil {
+						r.Tombstones = append(r.Tombstones, r.Pending.T)
+					}
+					r.Current = nil
+					r.Pending = nil
+					if r.Phase != "fenced" {
+						r.Phase = "withdrawn"
+					}
+					r.CancelSeq = 0
+					r.CancelHash = ""
+				}
+			}
 			if s.maLiveRefreshBindings() != nil {
 				return "message_author_unqualified"
 			}

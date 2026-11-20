@@ -178,7 +178,13 @@ func loadStoreMessage(dir *os.File, uid uint32, floor int, recovery bool) (*Stor
 	}
 	defer f.Close()
 	var disk bindingDisk
-	if StrictJSON(f, &disk) != nil {
+	if e := StrictJSON(f, &disk); e != nil {
+		if _, seekErr := f.Seek(0, 0); seekErr == nil {
+			var fields map[string]json.RawMessage
+			if StrictJSON(f, &fields) == nil && string(fields["schema_version"]) == "7" {
+				return nil, Code("message_author_state_schema_unsupported")
+			}
+		}
 		return nil, failure("invalid binding journal")
 	}
 	s.schema, s.messages, s.j7, s.j7Signing, s.maLive = disk.SchemaVersion, disk.Messages, disk.J7, disk.J7Signing, disk.MALive

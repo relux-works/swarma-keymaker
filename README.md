@@ -8,7 +8,7 @@ The [purpose catalog](spec/keymaker-purposes.md) allocates purpose9
 `message-author`; its historical fixture roots and vectors remain unchanged.
 The [`messageauthor`](messageauthor/README.md) codec publishes self-only
 identity/sign request and reply grammar against exact envelope065. The dedicated
-schema-7 participant implements that contract with a refusing production
+schema-8 participant implements that contract with a refusing production
 current-attestation provider. Public fixture roots and independent verifier/oracle
 controls establish source compatibility. The [source contract](spec/keymaker-message-author.md)
 keeps production issuance, real-key provisioning and activation as separate
@@ -639,14 +639,14 @@ outputs. These checks provide no service activation/native qualification.
 
 The dedicated `message-author` participant is specified in
 [the live participant contract](spec/keymaker-message-author.md#live-participant-a7a-2).
-Its schema-7 state, bindings, purpose-9 root capability and Unix socket are separate
+Its schema-8 state, bindings, purpose-9 root capability and Unix socket are separate
 from legacy and J7 roles. Production current-attestation selection refuses by default;
 there is no production key loader, issuer, provisioning or activation in this slice.
 The [configuration example](packaging/message-author.example.json) and
 [unit source](packaging/swarma-keymaker-message-author.service) require installer-selected
 principals, socket group and protected external expected-head pin. They install nothing.
 
-Stopped operator command source is `keymaker message-author init|enroll|retire --config
+Stopped operator command source is `keymaker message-author init|enroll|retire|issuer-seed-init|issuer-pin --config
 <root-owned-config>`, with `--registration-number <number>` for retire. Enroll reads one
 closed Binding JSON document from standard input, including the explicit purpose-1 epoch
 and registration identity. That audited operator assertion is the v1 link to purpose-1;
@@ -673,3 +673,34 @@ compose lifecycle, public-key and consent handling behind the ordered J7 startup
 gates. Production readiness remains closed until the required static-gate
 importer is supplied. Delegation, root-owned configuration qualification and
 distinct-UID launcher/native qualification remain separate gates.
+
+### Internal message-author attestation issuer
+
+[Live issuer](spec/keymaker-message-author.md#live-issuer-a7a-1) supplies a separate
+purpose-5 Ed25519 capability from an independent SLIP-0010 seed. Its fixed path
+is `m/5'/1'/1'/1'`; it shares no root with purpose 9 or the legacy issuer.
+Schema 8 stores `keymaker-message-author-state/2`; schema 7 refuses by name and
+has no implicit migration. The issuer uses the participant's existing snapshot,
+audit and physical byte budget, with fenced pending renewal and the book 06:94
+proven pre-commit cancellation exception.
+
+The stopped operator command source `keymaker message-author issuer-seed-init
+--config <protected-config>` explicitly creates `issuer-seed` in the separate
+participant state directory, auditing before effects and refusing replacement.
+`keymaker message-author issuer-pin --config <protected-config>` prints the
+canonical public pin plus LF and writes no audit record. These commands do not
+install a pin or activate a host. Host provisioning remains owner/Infra work.
+The optional `issuer_pin` configuration path defaults to
+`/etc/swarma-keymaker/purpose5-pin.json`: root-owned 0644, strict CCJ-1 plus LF,
+format `keymaker-purpose5-pin/1`, profile `attestation/1`. A present pin must
+match the issuer key; absence is reported as `issuer_pin=absent` at startup.
+
+Production retains the single closed `G-A7A2-RETENTION-SCALING` gate: it never
+constructs the issuing provider, and identity/sign remain
+`message_author_unqualified`. No registry activation or publication service is
+added. Source tests use fixture-only keys in protected task scratch:
+
+| Tool | Command | Output |
+| --- | --- | --- |
+| Issuer checks | `go test ./internal/keymaker -run MAIssuer -count=1` | Test log in task scratch |
+| Issuer narrowing controls | `go run ./tools/mutations -group message-author-issuer -scratch <private-directory>` | Per-plant logs and real-exit receipts in task scratch |

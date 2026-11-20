@@ -73,8 +73,11 @@ func (disk *bindingDisk) UnmarshalJSON(raw []byte) error {
 		return failure("missing snapshot records")
 	}
 	_, ma := fields["message_author"]
-	if ma || string(fields["schema_version"]) == "7" {
-		if !ma || string(fields["schema_version"]) != "7" || bytes.Equal(bytes.TrimSpace(fields["message_author"]), []byte("null")) {
+	if string(fields["schema_version"]) == "7" {
+		return Code("message_author_state_schema_unsupported")
+	}
+	if ma || string(fields["schema_version"]) == "8" {
+		if !ma || string(fields["schema_version"]) != "8" || bytes.Equal(bytes.TrimSpace(fields["message_author"]), []byte("null")) {
 			return failure("invalid message-author schema")
 		}
 		for _, name := range []string{"messages", "j7", "j7_signing"} {

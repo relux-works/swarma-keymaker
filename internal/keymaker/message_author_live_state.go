@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/relux-works/swarma-envelope/record"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/relux-works/swarma-envelope/record"
 )
 
-const maLiveSchema = 7
+const maLiveSchema = 8
 const maLiveAttemptLimit = 2304
 const maLiveStateLimit = 11796480
 
@@ -27,12 +28,13 @@ const maLiveStateOverhead = 8192
 // The six states record effect knowledge, not connection state. Fenced is a
 // separate continuity overlay; neither startup nor a healthy provider clears it.
 type maLiveInventory struct {
-	Format   string          `json:"format"`
-	Instance string          `json:"instance"`
-	Epoch    string          `json:"master_epoch"`
-	Registry string          `json:"registry_revision"`
-	Fenced   bool            `json:"fenced"`
-	Attempts []maLiveAttempt `json:"attempts"`
+	Format   string           `json:"format"`
+	Instance string           `json:"instance"`
+	Epoch    string           `json:"master_epoch"`
+	Registry string           `json:"registry_revision"`
+	Fenced   bool             `json:"fenced"`
+	Attempts []maLiveAttempt  `json:"attempts"`
+	Issuers  []maIssuerRecord `json:"issuers"`
 }
 type maLiveAttempt struct {
 	Caller      Principal `json:"caller"`
@@ -50,7 +52,7 @@ type maLiveAttempt struct {
 }
 
 func (m *maLiveInventory) UnmarshalJSON(raw []byte) error {
-	if _, e := objectMembers(raw, []string{"format", "instance", "master_epoch", "registry_revision", "fenced", "attempts"}); e != nil {
+	if _, e := objectMembers(raw, []string{"format", "instance", "master_epoch", "registry_revision", "fenced", "attempts", "issuers"}); e != nil {
 		return e
 	}
 	type plain maLiveInventory
@@ -96,7 +98,7 @@ type maLiveStateCache struct {
 
 func (s *Store) maLiveHeader() error {
 	m := s.maLive
-	if s.schema != maLiveSchema || m == nil || m.Format != "keymaker-message-author-state/1" || !validJ7Instance(m.Instance) || m.Epoch == "" || m.Registry == "" || m.Attempts == nil || len(m.Attempts) > maLiveAttemptLimit || s.j7 != nil || s.j7Signing != nil || s.messages != nil || len(s.requests) != 0 {
+	if s.schema != maLiveSchema || m == nil || m.Format != "keymaker-message-author-state/2" || !validJ7Instance(m.Instance) || m.Epoch == "" || m.Registry == "" || m.Attempts == nil || m.Issuers == nil || len(m.Attempts) > maLiveAttemptLimit || s.j7 != nil || s.j7Signing != nil || s.messages != nil || len(s.requests) != 0 {
 		return failure("invalid message-author state")
 	}
 	return nil
@@ -168,6 +170,9 @@ func maLiveRowBytes(a maLiveAttempt) ([]byte, int, error) {
 }
 func (s *Store) validateMALive() error {
 	if e := s.maLiveHeader(); e != nil {
+		return e
+	}
+	if e := s.validateMAIssuers(); e != nil {
 		return e
 	}
 	old := s.maLiveCache
@@ -351,16 +356,17 @@ const maLiveReceiptBound = len(`"audit_hash":"",`) + 64 + len(`"audit_seq":,`) +
 func (s *Store) maLiveMetadata() []byte {
 	m := s.maLive
 	meta, _ := canonical(struct {
-		Fenced   bool   `json:"fenced"`
-		Format   string `json:"format"`
-		Instance string `json:"instance"`
-		Epoch    string `json:"master_epoch"`
-		Registry string `json:"registry_revision"`
-	}{m.Fenced, m.Format, m.Instance, m.Epoch, m.Registry})
+		Fenced   bool             `json:"fenced"`
+		Format   string           `json:"format"`
+		Instance string           `json:"instance"`
+		Epoch    string           `json:"master_epoch"`
+		Registry string           `json:"registry_revision"`
+		Issuers  []maIssuerRecord `json:"issuers"`
+	}{m.Fenced, m.Format, m.Instance, m.Epoch, m.Registry, m.Issuers})
 	return meta
 }
 func (s *Store) maLiveBodySize(version uint64, rows, rowBytes int) int {
-	return len(`{"message_author":{"attempts":[`) + rowBytes + max(0, rows-1) + len(`],`) + len(s.maLiveMetadata()) - 1 + len(`,"next_registration_number":`) + len(strconv.FormatUint(s.next, 10)) + len(`,"records":`) + len(s.maLiveCache.records) + len(`,"requests":[],"schema_version":7,"version":`) + len(strconv.FormatUint(version, 10)) + 1
+	return len(`{"message_author":{"attempts":[`) + rowBytes + max(0, rows-1) + len(`],`) + len(s.maLiveMetadata()) - 1 + len(`,"next_registration_number":`) + len(strconv.FormatUint(s.next, 10)) + len(`,"records":`) + len(s.maLiveCache.records) + len(`,"requests":[],"schema_version":8,"version":`) + len(strconv.FormatUint(version, 10)) + 1
 }
 func (s *Store) maLiveBody(version uint64, updates map[int][]byte, actual int) []byte {
 	m := s.maLive
@@ -383,7 +389,7 @@ func (s *Store) maLiveBody(version uint64, updates map[int][]byte, actual int) [
 	raw = strconv.AppendUint(raw, s.next, 10)
 	raw = append(raw, `,"records":`...)
 	raw = append(raw, s.maLiveCache.records...)
-	raw = append(raw, `,"requests":[],"schema_version":7,"version":`...)
+	raw = append(raw, `,"requests":[],"schema_version":8,"version":`...)
 	raw = strconv.AppendUint(raw, version, 10)
 	return append(raw, '}')
 }

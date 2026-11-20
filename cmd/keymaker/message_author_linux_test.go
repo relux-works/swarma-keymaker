@@ -11,7 +11,7 @@ import (
 // CLI usage is closed before input/config/state I/O. The existing version
 // action remains available; tests do not execute an installed operator action.
 func TestMALiveCommandUsage(t *testing.T) {
-	for _, args := range [][]string{{"message-author"}, {"message-author", "sign"}, {"message-author", "export"}, {"message-author", "init"}, {"message-author", "enroll", "--key-file", "x"}, {"message-author", "retire", "--config", "x", "extra"}} {
+	for _, args := range [][]string{{"message-author"}, {"message-author", "sign"}, {"message-author", "export"}, {"message-author", "init"}, {"message-author", "issuer-seed-init"}, {"message-author", "issuer-pin"}, {"message-author", "issuer-pin", "--config", "x", "extra"}, {"message-author", "enroll", "--key-file", "x"}, {"message-author", "retire", "--config", "x", "extra"}} {
 		var out, diagnostic bytes.Buffer
 		if c := run(context.Background(), args, &out, &diagnostic); c != 2 || out.Len() != 0 {
 			t.Fatal("invalid operator CLI had an effect", c)

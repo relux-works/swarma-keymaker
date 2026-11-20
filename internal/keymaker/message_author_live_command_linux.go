@@ -14,11 +14,13 @@ import (
 )
 
 // RunMessageAuthorOperator is a stopped local operator boundary. It reads no
-// seed and supplies no network method. Enrollment input is the exact closed
+// caller-selected seed and supplies no network method. Only issuer-seed-init
+// creates independent issuer custody; issuer-pin reads it for public output.
+// Enrollment input is the exact closed
 // Binding JSON, including the operator-asserted purpose-1 epoch/registration.
 // The caller owns process hardening and supplies an explicit command/config.
 func RunMessageAuthorOperator(ctx context.Context, command, path string, number uint64, input io.Reader, out io.Writer) Code {
-	if command != "init" && command != "enroll" && command != "retire" || command != "retire" && number != 0 || command == "retire" && number == 0 {
+	if command != "init" && command != "enroll" && command != "retire" && command != "issuer-seed-init" && command != "issuer-pin" || command != "retire" && number != 0 || command == "retire" && number == 0 {
 		return "request_malformed"
 	}
 	var cfg Config
@@ -29,6 +31,32 @@ func RunMessageAuthorOperator(ctx context.Context, command, path string, number 
 	uid := uint32(os.Getuid())
 	if uid == 0 || m.UID != uid || uint32(os.Geteuid()) != uid || m.GID != uint32(os.Getgid()) || uint32(os.Getegid()) != m.GID {
 		return "role_not_permitted"
+	}
+	if command == "issuer-pin" {
+		if out == nil || safeAncestors(m.State.Path, uid) != nil {
+			return "request_malformed"
+		}
+		dir, e := OpenDirectory(m.State.Path, uid, 0700)
+		if e != nil {
+			return "custody_unavailable"
+		}
+		defer dir.Close()
+		if !j7NoACL(int(dir.Fd()), true) {
+			return "custody_unavailable"
+		}
+		k, c := loadMAIssuerKey(dir, uid)
+		if c != "" {
+			return c
+		}
+		defer k.close()
+		raw, c := k.pin()
+		if c != "" {
+			return c
+		}
+		if _, e = out.Write(raw); e != nil {
+			return "custody_unavailable"
+		}
+		return ""
 	}
 	if m.Generation == nil {
 		return "generation_source_unavailable"
@@ -89,6 +117,8 @@ func RunMessageAuthorOperator(ctx context.Context, command, path string, number 
 				return "request_malformed"
 			}
 			return s.enrollMALive(ctx, m.Operator, b)
+		case "issuer-seed-init":
+			return s.initMAIssuerSeed(ctx, m.Operator, nil)
 		case "retire":
 			return s.retireMALive(ctx, m.Operator, number)
 		}
